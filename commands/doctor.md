@@ -41,19 +41,34 @@ fi
 ### 3. claude plugin registration
 
 ```bash
+# `claude plugin list` may not have a stable --json flag; parse the human-
+# readable output instead. The format from the CLI is:
+#   ❯ <name>@<marketplace>
+#       Version: ...
+#       Status: ✔ enabled
+# We grep for "<name>@" followed by enabled status nearby.
 if command -v claude >/dev/null 2>&1; then
-  PLUGIN_LIST=$(claude plugin list --json 2>/dev/null || echo "[]")
-  if echo "$PLUGIN_LIST" | jq -e '.[] | select(.name == "curdx")' >/dev/null 2>&1; then
+  PLUGIN_LIST=$(claude plugin list 2>/dev/null || echo "")
+  check_enabled() {
+    local plugin="$1"
+    # find the plugin block (next ~3 lines after its name) and check for "enabled"
+    echo "$PLUGIN_LIST" | awk -v p="$plugin@" '
+      $0 ~ p { found=1; next }
+      found && /Status:/ && /enabled/ { print "yes"; exit }
+      found && /^❯ / && $0 !~ p { found=0 }
+    '
+  }
+  if [ "$(check_enabled curdx)" = "yes" ]; then
     echo "  ✓ curdx plugin enabled in Claude Code"
   else
     echo "  ✗ curdx plugin NOT enabled — run: claude plugin install curdx@curdx-flow"
   fi
-  if echo "$PLUGIN_LIST" | jq -e '.[] | select(.name == "claude-mem")' >/dev/null 2>&1; then
+  if [ "$(check_enabled claude-mem)" = "yes" ]; then
     echo "  ✓ claude-mem plugin enabled"
   else
     echo "  ℹ claude-mem plugin not enabled (memory features will degrade but core still works)"
   fi
-  if echo "$PLUGIN_LIST" | jq -e '.[] | select(.name == "pua")' >/dev/null 2>&1; then
+  if [ "$(check_enabled pua)" = "yes" ]; then
     echo "  ✓ pua plugin enabled"
   else
     echo "  ℹ pua plugin not enabled (behavioral protocol absent; not required)"
