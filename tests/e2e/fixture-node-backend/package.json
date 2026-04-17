@@ -1,0 +1,14 @@
+{
+  "name": "hello-api-fixture",
+  "version": "0.1.0",
+  "description": "Minimal Node backend fixture for curdx-flow e2e testing",
+  "private": true,
+  "dependencies": {},
+  "devDependencies": {
+    "vitest": "^1.0.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}
