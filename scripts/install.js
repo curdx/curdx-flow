@@ -209,6 +209,19 @@ function stepInstallPua(state) {
   state.dependencies['pua'] = { installed: true, installedAt: new Date().toISOString(), source: 'claude-marketplace' };
 }
 
+function detectMarketplace() {
+  // Priority:
+  //  1. CURDX_MARKETPLACE env var (explicit user override)
+  //  2. Local dev: if we can find our own marketplace.json on disk, use that path
+  //  3. Default: the published GitHub shorthand "curdx/curdx-flow"
+  if (process.env.CURDX_MARKETPLACE) return { mp: process.env.CURDX_MARKETPLACE, mode: 'env' };
+  const localRoot = path.join(__dirname, '..');
+  if (fs.existsSync(path.join(localRoot, '.claude-plugin', 'marketplace.json'))) {
+    return { mp: localRoot, mode: 'local' };
+  }
+  return { mp: 'curdx/curdx-flow', mode: 'remote' };
+}
+
 function stepInstallSelf(state) {
   if (ARGS.skipClaude) { log('skip curdx-flow plugin install (--skip-claude)'); return; }
   if (state.dependencies['curdx-flow'] && !ARGS.force) {
@@ -220,20 +233,38 @@ function stepInstallSelf(state) {
     warn('clone the repo and reference its directory in your .claude/ folder, or install the claude CLI.');
     return;
   }
-  log('installing curdx-flow plugin into Claude Code...');
-  // marketplace location is parameterized — when published we use the github org;
-  // for local dev we point at the cloned repo path
-  const marketplace = process.env.CURDX_MARKETPLACE || 'curdx/curdx-flow';
-  let r = run(`claude plugin marketplace add ${marketplace}`, { silent: true });
+  const { mp, mode } = detectMarketplace();
+  log(`installing curdx-flow plugin into Claude Code (${mode} marketplace: ${mp})...`);
+
+  // In local mode, if a prior install cached an older/broken plugin under the same
+  // marketplace identifier, upgrading our local file doesn't auto-invalidate the cache.
+  // Run `marketplace update` first to refresh; ignore errors if marketplace wasn't added yet.
+  if (mode === 'local' || ARGS.force) {
+    run('claude plugin marketplace update curdx-flow', { silent: true });
+  }
+
+  let r = run(`claude plugin marketplace add ${mp}`, { silent: true });
   if (!r.ok && !/already added|exists/i.test(r.output + r.error)) {
     warn(`marketplace add failed: ${r.error || r.output}. you may need to add it manually.`);
   }
+
   r = run('claude plugin install curdx@curdx-flow', { silent: true });
   if (!r.ok && !/already installed/i.test(r.output + r.error)) {
     warn(`curdx-flow install failed: ${r.error || r.output}.`);
+    // If we're in local mode and the user previously installed from this marketplace,
+    // a stale cache may be interfering. Suggest concrete next step.
+    if (mode === 'local') {
+      warn('local-dev tip: try `claude plugin uninstall curdx@curdx-flow && claude plugin marketplace remove curdx-flow` then re-run this installer.');
+    }
     return;
   }
-  state.dependencies['curdx-flow'] = { installed: true, version: PKG.version, installedAt: new Date().toISOString() };
+  state.dependencies['curdx-flow'] = {
+    installed: true,
+    version: PKG.version,
+    installedAt: new Date().toISOString(),
+    marketplaceMode: mode,
+    marketplacePath: mp,
+  };
 }
 
 function runMigrations(state) {

@@ -1,7 +1,10 @@
 {
   "name": "curdx",
   "version": "0.1.0",
-  "description": "Solo full-stack workflow: spec → plan → tasks → TDD implementation with fresh-context subagent execution and verification gates.",
+  "description": "Solo full-stack workflow: spec -> plan -> tasks -> TDD implementation with fresh-context subagent execution and verification gates.",
+  "author": {
+    "name": "curdx"
+  },
   "license": "MIT",
   "keywords": [
     "workflow",
@@ -9,10 +12,6 @@
     "tdd",
     "fullstack"
   ],
-  "commands": "./commands/",
-  "agents": "./agents/",
-  "skills": "./skills/",
-  "hooks": "./hooks/hooks.json",
   "mcpServers": {
     "sequential-thinking": {
       "command": "npx",
@@ -22,9 +21,5 @@
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"]
     }
-  },
-  "dependencies": [
-    { "name": "claude-mem", "marketplace": "thedotmack/claude-mem" },
-    { "name": "pua", "marketplace": "tanweai/pua" }
-  ]
+  }
 }
