@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "project_name": "{{PROJECT_NAME}}",
+  "initialized_at": "{{ISO_DATE}}",
+  "stack": {
+    "backend": { "language": "{{BACKEND_LANG}}" },
+    "frontend": { "framework": "{{FRONTEND_FRAMEWORK}}" },
+    "is_fullstack": false
+  },
+  "testing": {
+    "runner": "{{TEST_RUNNER}}",
+    "required": true,
+    "tdd_enforced": true
+  },
+  "browser_testing": {
+    "mode": "{{BROWSER_MODE}}",
+    "auto_detected": true,
+    "detection_signals": [],
+    "screenshot_dir": ".curdx/features/{feature_id}/evidence/"
+  },
+  "complexity_router": {
+    "enabled": true,
+    "default_tier": "medium",
+    "use_llm_tiebreak": true,
+    "trivial_keywords": ["fix typo", "rename var", "add comment", "format", "lint", "bump", "chore"],
+    "small_keywords": ["add field", "tweak", "adjust", "patch"],
+    "medium_keywords": ["add endpoint", "new page", "refactor", "migrate", "integration"],
+    "large_keywords": ["build .* system", "implement .* (auth|platform)", "redesign", "rewrite", "multi-tenant"]
+  },
+  "implement_loop": {
+    "max_global_iterations": 100,
+    "max_task_iterations": 5,
+    "yolo_mode": true,
+    "stop_on_blocked": true
+  },
+  "constitution": {
+    "path": ".claude/rules/constitution.md",
+    "hard_enforced": true
+  },
+  "memory": {
+    "use_claude_mem": true,
+    "claude_mem_search_on_spec": true,
+    "claude_mem_search_on_plan": true
+  }
+}
