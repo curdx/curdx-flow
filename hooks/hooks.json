@@ -1,6 +1,28 @@
 {
-  "description": "curdx-flow hooks. Round 1 ships only the Stop hook — the loop driver for /curdx:implement. Round 2 adds SessionStart, UserPromptSubmit, PreToolUse(Bash), PreToolUse(Edit|Write), PostToolUse(Bash), PreCompact.",
+  "description": "curdx-flow hooks. Round 2 adds PreToolUse enforcement for the 5 constitution hard rules (2 hook files) plus the Stop-hook loop driver from Round 1. Round 2.6 will add SessionStart, UserPromptSubmit, PostToolUse, PreCompact hooks for context injection and failure escalation.",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/enforce-constitution.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/careful-bash.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "*",
@@ -15,3 +37,4 @@
     ]
   }
 }
+
