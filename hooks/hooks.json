@@ -1,0 +1,17 @@
+{
+  "description": "curdx-flow hooks. Round 1 ships only the Stop hook — the loop driver for /curdx:implement. Round 2 adds SessionStart, UserPromptSubmit, PreToolUse(Bash), PreToolUse(Edit|Write), PostToolUse(Bash), PreCompact.",
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/implement-loop.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
