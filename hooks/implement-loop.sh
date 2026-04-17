@@ -29,12 +29,15 @@ INPUT="$(cat)"
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
 
 [ -z "$CWD" ] && exit 0
 cd "$CWD" 2>/dev/null || exit 0
 
 STATE_FILE=".curdx/state.json"
 [ -f "$STATE_FILE" ] || exit 0
+
+. "$(dirname "$0")/lib/log-event.sh"
 
 # stop_hook_active guards against infinite re-invocation when our own
 # block-decision triggers another stop event during the same continuation
@@ -206,6 +209,8 @@ INNER
 REASON_JSON=$(echo "$REASON" | jq -Rs .)
 SYSTEM_MSG="curdx-flow iteration $GLOBAL_ITERATION | task $((TASK_INDEX+1))/$TOTAL_TASKS"
 SYSTEM_MSG_JSON=$(echo "$SYSTEM_MSG" | jq -Rs .)
+
+curdx_log "$CWD" "$SESSION_ID" "$(jq -n -c --arg t "$NEXT_TASK_ID" --argjson i "$TASK_INDEX" --argjson tot "$TOTAL_TASKS" --argjson g "$GLOBAL_ITERATION" '{event: "stop_loop_continue", next_task: $t, task_index: $i, total_tasks: $tot, global_iteration: $g}')"
 
 # emit JSON via printf for safe interpolation
 printf '{"decision":"block","reason":%s,"systemMessage":%s}\n' "$REASON_JSON" "$SYSTEM_MSG_JSON"

@@ -21,11 +21,15 @@ INPUT="$(cat)"
 [ -z "$INPUT" ] && exit 0
 
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
 [ -z "$CWD" ] && exit 0
 cd "$CWD" 2>/dev/null || exit 0
 
 # bail if not initialized
 [ -f .curdx/state.json ] || exit 0
+
+. "$(dirname "$0")/lib/log-event.sh"
+curdx_log "$CWD" "$SESSION_ID" '{"event":"pre_compact"}'
 
 mkdir -p .curdx/memory
 

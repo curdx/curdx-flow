@@ -31,6 +31,9 @@ TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
 # post-hooks get the result — check exit code
 EXIT_CODE=$(echo "$INPUT" | jq -r '.tool_result.exit_code // .tool_response.exit_code // 0')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "default"')
+CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+
+. "$(dirname "$0")/lib/log-event.sh"
 
 # sanitize session id for filename (path-traversal guard borrowed from claude-mem)
 SAFE_SID=$(echo "$SESSION_ID" | tr -cd 'a-zA-Z0-9._-' | head -c 64)
@@ -112,6 +115,14 @@ EOF
 esac
 
 if [ -n "$MSG" ]; then
+  # pick the level name based on count
+  LEVEL="L0"
+  case "$COUNT" in
+    2) LEVEL="L1" ;;
+    3) LEVEL="L2" ;;
+    *) [ "$COUNT" -ge 4 ] && LEVEL="L3" ;;
+  esac
+  curdx_log "$CWD" "$SESSION_ID" "$(jq -n -c --arg l "$LEVEL" --argjson c "$COUNT" '{event: "failure_escalation", level: $l, failure_count: $c}')"
   jq -n --arg m "$MSG" '{
     hookSpecificOutput: {
       hookEventName: "PostToolUse",

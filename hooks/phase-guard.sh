@@ -19,8 +19,19 @@ INPUT="$(cat)"
 
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 PROMPT=$(echo "$INPUT" | jq -r '.user_prompt_text // .prompt // empty')
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
 [ -z "$CWD" ] && exit 0
 [ -z "$PROMPT" ] && exit 0
+
+. "$(dirname "$0")/lib/log-event.sh"
+
+# detect /curdx:<cmd> and log it specifically; otherwise log a generic user_prompt event
+CURDX_CMD=$(echo "$PROMPT" | grep -oE '/curdx:[a-z_-]+' | head -1 || true)
+if [ -n "$CURDX_CMD" ]; then
+  curdx_log "$CWD" "$SESSION_ID" "$(jq -n -c --arg c "$CURDX_CMD" '{event: "curdx_command", command: $c}')"
+else
+  curdx_log "$CWD" "$SESSION_ID" '{"event":"user_prompt"}'
+fi
 
 # bail if no .curdx (user not initialized — don't nag)
 [ -f "$CWD/.curdx/state.json" ] || exit 0

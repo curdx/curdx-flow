@@ -22,6 +22,12 @@ CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 EVENT=$(echo "$INPUT" | jq -r '.matcher // "startup"')
 [ -z "$CWD" ] && exit 0
 
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
+
+# log the session-start event before we start pulling state
+. "$(dirname "$0")/lib/log-event.sh"
+curdx_log "$CWD" "$SESSION_ID" "$(jq -n -c --arg m "$EVENT" '{event: "session_start", matcher: $m}')"
+
 # walk up to find .curdx/ (max 10 levels)
 dir="$CWD"
 for _ in 1 2 3 4 5 6 7 8 9 10; do

@@ -23,7 +23,10 @@ INPUT="$(cat)"
 
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+
+. "$(dirname "$0")/lib/log-event.sh"
 
 # only care about Edit/Write
 [ "$TOOL_NAME" != "Edit" ] && [ "$TOOL_NAME" != "Write" ] && exit 0
@@ -38,7 +41,8 @@ STATE=".curdx/state.json"
 
 # helpers
 deny() {
-  local reason="$1"
+  local rule="$1" reason="$2"
+  curdx_log "$CWD" "$SESSION_ID" "$(jq -n -c --arg h "enforce-constitution" --arg r "$rule" --arg t "$TOOL_NAME" '{event: "hook_denied", hook: $h, rule: $r, tool: $t}')"
   jq -n --arg r "$reason" '{permissionDecision:"deny", permissionDecisionReason:$r}'
   exit 0
 }
@@ -89,18 +93,18 @@ case "$PHASE" in
   execution|quick|debug)
     ;;  # proceed
   init|init-complete|spec|spec-complete|plan|plan-complete|tasks|tasks-complete)
-    deny "Rule 1 (NO CODE WITHOUT SPEC): current phase is '$PHASE'. You can only edit $REL_PATH when phase is 'execution' (after /curdx:tasks) or 'quick'/'debug'. Run /curdx:implement to enter execution mode, /curdx:quick for trivial changes, or /curdx:debug for bug investigation."
+    deny "1" "Rule 1 (NO CODE WITHOUT SPEC): current phase is '$PHASE'. You can only edit $REL_PATH when phase is 'execution' (after /curdx:tasks) or 'quick'/'debug'. Run /curdx:implement to enter execution mode, /curdx:quick for trivial changes, or /curdx:debug for bug investigation."
     ;;
 esac
 
 if [ -z "$ACTIVE_FEATURE" ] && [ "$PHASE" = "execution" ]; then
-  deny "Rule 1 (NO CODE WITHOUT SPEC): state.phase is 'execution' but no active_feature. This is inconsistent state; run /curdx:status to inspect."
+  deny "1" "Rule 1 (NO CODE WITHOUT SPEC): state.phase is 'execution' but no active_feature. This is inconsistent state; run /curdx:status to inspect."
 fi
 
 if [ "$PHASE" = "execution" ] && [ -n "$ACTIVE_FEATURE" ]; then
   SPEC_FILE=".curdx/features/$ACTIVE_FEATURE/spec.md"
   if [ ! -f "$SPEC_FILE" ]; then
-    deny "Rule 1 (NO CODE WITHOUT SPEC): active feature $ACTIVE_FEATURE has no spec.md at $SPEC_FILE. Run /curdx:spec first."
+    deny "1" "Rule 1 (NO CODE WITHOUT SPEC): active feature $ACTIVE_FEATURE has no spec.md at $SPEC_FILE. Run /curdx:spec first."
   fi
 fi
 
@@ -131,7 +135,7 @@ if [ "$PHASE" = "execution" ] && [ -n "$ACTIVE_FEATURE" ]; then
       # for v0.2 we keep it as "tests exist at all" to avoid false negatives.
       if ! find tests test __tests__ spec 2>/dev/null | grep -qE '\.(test|spec)\.' 2>/dev/null; then
         if ! find . -name '*_test.go' -o -name '*_test.py' 2>/dev/null | head -1 | grep -q .; then
-          deny "Rule 2 (NO PRODUCTION CODE WITHOUT FAILING TEST): current task is [GREEN]/[REFACTOR] but no test files exist in this repo. The [RED] task should have created a failing test first. Back up and run the [RED] task."
+          deny "2" "Rule 2 (NO PRODUCTION CODE WITHOUT FAILING TEST): current task is [GREEN]/[REFACTOR] but no test files exist in this repo. The [RED] task should have created a failing test first. Back up and run the [RED] task."
         fi
       fi
     fi

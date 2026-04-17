@@ -29,17 +29,23 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 [ -z "$COMMAND" ] && exit 0
 
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
 [ -n "$CWD" ] && cd "$CWD" 2>/dev/null || true
+
+. "$(dirname "$0")/lib/log-event.sh"
 
 ask() {
   local msg="$1"
   local pattern="${2:-unknown}"
+  curdx_log "$CWD" "$SESSION_ID" "$(jq -n -c --arg h "careful-bash" --arg p "$pattern" '{event: "hook_asked", hook: $h, pattern: $p}')"
   jq -n --arg m "$msg" --arg p "$pattern" '{permissionDecision:"ask", message:$m, hookMetadata:{curdx_pattern:$p}}'
   exit 0
 }
 
 deny() {
   local reason="$1"
+  local pattern="${2:-unknown}"
+  curdx_log "$CWD" "$SESSION_ID" "$(jq -n -c --arg h "careful-bash" --arg p "$pattern" '{event: "hook_denied", hook: $h, pattern: $p}')"
   jq -n --arg r "$reason" '{permissionDecision:"deny", permissionDecisionReason:$r}'
   exit 0
 }
@@ -54,32 +60,32 @@ if echo "$COMMAND" | grep -qE '^[[:space:]]*git[[:space:]]+commit\b'; then
     # Common secret patterns (borrowed from trufflehog/gitleaks common set)
     # We scan diff output not files directly to stay fast.
     if echo "$STAGED_DIFF" | grep -qE '(sk-[a-zA-Z0-9]{20,}|sk-ant-[a-zA-Z0-9_-]{20,})'; then
-      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains what looks like an Anthropic or OpenAI API key (sk-...). Unstage with 'git restore --staged <file>' and remove the secret."
+      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains what looks like an Anthropic or OpenAI API key (sk-...). Unstage with 'git restore --staged <file>' and remove the secret." "secret-anthropic"
     fi
     if echo "$STAGED_DIFF" | grep -qE '(ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{82,})'; then
-      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains a GitHub personal access token. Unstage and rotate the token immediately."
+      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains a GitHub personal access token. Unstage and rotate the token immediately." "secret-github-pat"
     fi
     if echo "$STAGED_DIFF" | grep -qE 'glpat-[A-Za-z0-9_-]{20,}'; then
-      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains a GitLab personal access token. Unstage and rotate."
+      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains a GitLab personal access token. Unstage and rotate." "secret-gitlab-pat"
     fi
     if echo "$STAGED_DIFF" | grep -qE 'AKIA[0-9A-Z]{16}'; then
-      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains what looks like an AWS access key ID (AKIA...). Unstage and rotate."
+      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains what looks like an AWS access key ID (AKIA...). Unstage and rotate." "secret-aws-key"
     fi
     if echo "$STAGED_DIFF" | grep -qE 'AIza[0-9A-Za-z_-]{35}'; then
-      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains what looks like a Google API key (AIza...). Unstage and rotate."
+      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains what looks like a Google API key (AIza...). Unstage and rotate." "secret-google-key"
     fi
     if echo "$STAGED_DIFF" | grep -qE -- '-----BEGIN [A-Z ]*PRIVATE KEY-----'; then
-      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains a private key. Unstage, remove, and rotate the key."
+      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains a private key. Unstage, remove, and rotate the key." "secret-private-key"
     fi
     # database URLs with embedded passwords
     if echo "$STAGED_DIFF" | grep -qE '(postgres|postgresql|mysql|mongodb|redis)://[^:@ ]+:[^@ ]+@'; then
-      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains a database URL with embedded credentials. Move to an env var."
+      deny "Rule 5 (NO SECRETS IN COMMITS): staged diff contains a database URL with embedded credentials. Move to an env var." "secret-db-url"
     fi
   fi
 
   # staged .env file (not in .gitignore)
   if git diff --cached --name-only 2>/dev/null | grep -qE '(^|/)\.env(\.[a-z]+)?$'; then
-    deny "Rule 5 (NO SECRETS IN COMMITS): .env file is staged. Move to .gitignore and commit the example (.env.example) instead."
+    deny "Rule 5 (NO SECRETS IN COMMITS): .env file is staged. Move to .gitignore and commit the example (.env.example) instead." "env-file-staged"
   fi
 fi
 
@@ -110,7 +116,7 @@ fi
 if echo "$COMMAND" | grep -qE 'git[[:space:]]+push[[:space:]]+.*(--force|-f)\b'; then
   # extra warning if target is main/master/trunk
   if echo "$COMMAND" | grep -qE '(main|master|trunk)(\b|$)'; then
-    deny "Force-push to main/master/trunk is blocked by curdx-flow. If you absolutely need this, bypass with --no-verify in your environment, not through Claude."
+    deny "Force-push to main/master/trunk is blocked by curdx-flow. If you absolutely need this, bypass with --no-verify in your environment, not through Claude." "force-push-main"
   fi
   ask "careful: 'git push --force' detected. This rewrites remote history and can lose teammates' work. Command:
   $COMMAND" "force-push"
@@ -152,7 +158,7 @@ fi
 
 # ---------- device destruction ----------
 if echo "$COMMAND" | grep -qE '(>[[:space:]]*/dev/(sd[a-z]|nvme|disk[0-9])|dd[[:space:]]+.*of=/dev/)'; then
-  deny "careful: writing to a block device (/dev/sd*, /dev/nvme, /dev/disk*, dd of=/dev/...). This is essentially never intended by an AI agent. Blocked."
+  deny "careful: writing to a block device (/dev/sd*, /dev/nvme, /dev/disk*, dd of=/dev/...). This is essentially never intended by an AI agent. Blocked." "device-write"
 fi
 
 # ---------- chmod 777 / chown root ----------
