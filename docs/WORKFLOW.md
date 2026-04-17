@@ -124,14 +124,27 @@ When `curdx-analyst` writes a spec, it first searches claude-mem for similar pri
 
 ## What's NOT in the workflow yet
 
-Round 1 ships the skeleton. Things deferred:
+Round 1 shipped the skeleton. **Round 2 shipped the quality loop** (this is v0.2, currently in place):
 
-- **Frontend testing (Round 2)** — `curdx-browser-test` skill auto-picks playwright (forms/CRUD) vs chrome-devtools-mcp (WebGL/canvas/maps) based on `.curdx/config.json`
-- **Verification (Round 2)** — `/curdx:verify` produces evidence (test output, screenshots) and writes `verification.md`
-- **Two-stage review (Round 2)** — `/curdx:review` runs spec-compliance and code-quality reviews as separate subagents, with Critical/Important/Minor severity
-- **Bug Reality Check (Round 2)** — `/curdx:debug` captures BEFORE state, runs systematic-debug, captures AFTER state for evidence
-- **Parallel dispatch (Round 3)** — `[P]` task groups dispatched to multiple builder subagents in worktrees
-- **Quick-task pipeline (Round 2)** — `/curdx:quick` bypasses spec/plan for trivial work; `detect-complexity.sh` auto-routes
-- **Ship (Round 3)** — `/curdx:ship` commits and pushes; PR auto-creation deferred indefinitely (you said no CI adapter layer)
+- `/curdx:clarify` resolves ambiguity via 9-category scan with 5-question cap
+- `/curdx:analyze` cross-artifact audit (spec/plan/tasks/constitution); CRITICAL findings block `/curdx:implement`
+- `/curdx:review` two-stage adversarial review (spec compliance → fresh-context code quality)
+- `/curdx:verify` evidence-based completion check with screenshots + stdout + exit codes
+- `/curdx:debug <slug>` persistent systematic-debug session; Reality Check BEFORE/AFTER; survives compaction
+- `/curdx:refactor --file ...` cascade-aware editing of spec/plan/tasks/constitution with .history/ snapshots
+- `/curdx:quick <desc>` complexity-routed bypass; trivial → inline, small → PLAN.md, medium/large → redirect to full pipeline
+- Frontend testing via `curdx-browser-test` skill — auto-routes to Playwright CLI (generated verify.spec.ts) or chrome-devtools-mcp (29 tools for WebGL/canvas/maps/perf)
+- Path-scoped rules (`rules/tdd.md`, `rules/no-sycophancy.md`) that Claude Code loads NATIVELY (not as skills) so compaction doesn't drop them
+- 6 new hooks: constitution enforcement at tool level, careful-bash with secret scanning, session context injection, phase-guard nudges, failure escalation (4 levels), compaction state journal
+
+### Still deferred to Round 3
+
+- `/curdx:ship` — commit + push (commit/push only, no PR creation; CI adapter layer explicitly cut per user direction)
+- `/curdx:resume`, `/curdx:cancel`, `/curdx:doctor`, `/curdx:help`
+- `/curdx:triage` — large-tier decomposition into multiple features
+- `curdx-parallel-dispatch` skill — worktree-based parallel [P] task execution (with the gsd-identified git config.lock sequential-dispatch pattern)
+- `curdx-writing-skills` meta-skill — TDD-for-skill-authoring
+- Migration framework
+- Evals test suite
 
 See `CHANGELOG.md` for what's actually shipped per version.
