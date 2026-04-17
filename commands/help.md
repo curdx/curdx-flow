@@ -67,8 +67,13 @@ curdx-flow commands
   /curdx:resume                 "where were we" dashboard after session break
   /curdx:help [<cmd>]           this help; or detail for a specific command
 
+[diagnostics]
+  /curdx:snapshot [flags]       sanitized tarball of logs + state for sharing with maintainer
+                                 flags: --strict --include-transcript --no-preview --here
+                                 see docs/DIAGNOSTICS.md
+
 [advanced]
-  /curdx:triage <epic> <goal>   decompose large feature into multiple specs (Round 3)
+  /curdx:triage <epic> <goal>   decompose large feature into multiple specs
 
 ---
 recommended next (based on current phase '$PHASE'):

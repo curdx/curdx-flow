@@ -52,11 +52,13 @@ state_set '.phase' '"init-complete"'
 state_set '.started_at' "\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\""
 ```
 
-### 6. Create `.curdx/features/` directory + add to gitignore
+### 6. Create `.curdx/features/` and `.curdx/logs/` directories + add to gitignore
 
 ```bash
-mkdir -p .curdx/features
+mkdir -p .curdx/features .curdx/logs
 ```
+
+`.curdx/logs/` is where hooks append structured events (`events.jsonl`). `/curdx:snapshot` bundles these for sharing. See `docs/DIAGNOSTICS.md`.
 
 Append to `.gitignore` if missing (use `grep -q` to check):
 ```
@@ -66,6 +68,7 @@ Append to `.gitignore` if missing (use `grep -q` to check):
 .curdx/quick/
 .curdx/debug/
 .curdx/features/*/evidence/
+.curdx/logs/
 ```
 
 ### 7. Add CLAUDE.md @-import for active feature context (optional but recommended)

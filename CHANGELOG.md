@@ -6,6 +6,83 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.4.0] — Round 4: structured event logging + snapshot bundling
+
+Make curdx-flow self-observable: every session emits a structured event stream
+the maintainer can analyze when users report bugs. Fills the gap Claude Code's
+native transcripts don't cover (hook decisions, phase transitions, skill
+activations) without reinventing what IS covered (tool calls, OTel, debug logs).
+
+### Added
+
+**Event logging**
+- `hooks/lib/log-event.sh` — shared `curdx_log` function sourced by every hook.
+  Walks up 10 levels to find `.curdx/`, auto-creates `logs/`, rotates at 5 MB,
+  augments every line with ts/session/phase/active_feature from state.json.
+  Atomic append, safe for concurrent hooks.
+- `hooks/log-activity.sh` — NEW catch-all `PreToolUse(*)` + `PostToolUse(*)`
+  hook. Extracts `subagent_type` for Task, `skill` for Skill, first word for
+  Bash, basename for Edit/Write. MCP calls self-identify via their
+  `mcp__<server>__<tool>` names.
+- Each existing hook (load-context, phase-guard, careful-bash, enforce-
+  constitution, failure-escalate, save-state, implement-loop) now calls
+  `curdx_log` at decision points. ~10 event types covered:
+  `session_start`, `user_prompt`, `curdx_command`, `tool_call`, `tool_result`,
+  `hook_denied`, `hook_asked`, `failure_escalation`, `pre_compact`,
+  `stop_loop_continue`.
+- `hooks/hooks.json` — registers `log-activity.sh` for both PreToolUse and
+  PostToolUse with matcher `*`, alongside the specialized hooks.
+
+**Snapshot (sanitized bundle for sharing)**
+- `scripts/lib/sanitize.sh` — regex scrubber. Default mode redacts 14 secret
+  classes (Anthropic/OpenAI/GitHub/GitLab/AWS/Google/Slack tokens, PEM
+  private keys, bearer tokens, DB URLs with creds, env-style KEY=VAL with
+  sensitive-hint keys, JWTs, home directory paths, /var/folders). `--strict`
+  adds email + IPv4 redaction. `#` delimiter used on regex-alternation
+  patterns to avoid `|`-as-both-delimiter-and-metachar conflicts.
+- `scripts/snapshot.sh` — collects + sanitizes + tarballs. Produces
+  `~/curdx-snapshot-<ts>.tar.gz` containing REPORT.md (human-readable
+  summary: state, recent events table, hook firings summary, git log),
+  events.jsonl, state.json, config.json, install-state.json, active
+  feature's md files, active debug session, versions.txt, META.txt.
+  Confirmation prompt before sealing. `--strict`, `--include-transcript`,
+  `--no-preview`, `--here` flags.
+- `commands/snapshot.md` — `/curdx:snapshot` slash command. End-to-end
+  tested with fake project: 2KB tarball, correct file layout, redactions
+  applied (sk-ant-*, env KEY=VAL, /Users/<name>).
+
+**Docs**
+- `docs/DIAGNOSTICS.md` — full walkthrough. Explains the 3 observability
+  layers (Claude native transcripts, OTel, curdx events), event schema,
+  privacy story (structural metadata only, no prompt/output content),
+  sanitization catalog, recipient-side analysis tips (jq queries on
+  events.jsonl), scope boundaries (per-project, append-only, read-only
+  snapshot).
+
+**Updated**
+- `commands/init.md` — creates `.curdx/logs/`; adds `.curdx/logs/` to
+  suggested .gitignore.
+- `commands/help.md` — new `[diagnostics]` section with `/curdx:snapshot`.
+
+### Design decisions (and rejected alternatives)
+
+- **Don't build a backend**: pua's Cloudflare Pages endpoint was rejected;
+  bundle + manual share is the minimum viable path. Recipient's email / DM
+  / private GitLab issue is infra enough.
+- **Don't auto-create GitHub issues**: removed the `--gh` flag considered in
+  early design. Users may not have gh CLI or may use private git; the
+  maintainer shouldn't force a submission channel.
+- **Don't log prompt/output content in events.jsonl**: structural only.
+  Full content goes to Claude Code's native transcript (not ours). Avoids
+  privacy surprises.
+- **Don't reinvent OTel**: Claude Code ships full OpenTelemetry support.
+  curdx-flow's events.jsonl is complementary (covers phase transitions and
+  hook decisions that OTel doesn't), not redundant.
+
+### Statistics
+
+Round 4: 13 files added/modified across 2-3 commits. Repo total: ~95 files.
+
 ## [0.3.0] — Round 3 amplifiers
 
 Rounds 1 and 2 delivered the core pipeline and the quality loop. Round 3 adds the amplifiers: shipping, session continuity, decomposition of large features, worktree-based parallelism, a meta-skill for skill authoring, a migration framework, and testing scaffolding.
