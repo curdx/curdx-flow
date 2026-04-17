@@ -166,9 +166,11 @@ function saveState(state) {
 
 function stepInstallClaudeMem(state) {
   if (ARGS.noDeps) { log('skip claude-mem (--no-deps)'); return; }
-  const installed = state.dependencies['claude-mem'];
-  if (installed && !ARGS.force) {
-    log(`claude-mem already installed (v${installed.version || 'unknown'}); skip. use --force to re-run.`);
+  const dep = state.dependencies['claude-mem'];
+  // only treat as "already installed" if a prior install actually succeeded.
+  // entries like { installed: false, error: ... } from a previous failure do NOT count.
+  if (dep && dep.installed === true && !ARGS.force) {
+    log(`claude-mem already installed (v${dep.version || 'unknown'}); skip. use --force to re-run.`);
     return;
   }
   log('installing claude-mem (cross-session memory layer)...');
@@ -185,8 +187,8 @@ function stepInstallClaudeMem(state) {
 function stepInstallPua(state) {
   if (ARGS.noDeps) { log('skip pua (--no-deps)'); return; }
   if (ARGS.skipClaude) { log('skip pua (--skip-claude)'); return; }
-  const installed = state.dependencies['pua'];
-  if (installed && !ARGS.force) {
+  const dep = state.dependencies['pua'];
+  if (dep && dep.installed === true && !ARGS.force) {
     log(`pua already installed; skip. use --force to re-run.`);
     return;
   }
@@ -224,9 +226,21 @@ function detectMarketplace() {
 
 function stepInstallSelf(state) {
   if (ARGS.skipClaude) { log('skip curdx-flow plugin install (--skip-claude)'); return; }
-  if (state.dependencies['curdx-flow'] && !ARGS.force) {
-    log(`curdx-flow plugin already installed; skip. use --force to re-run.`);
-    return;
+  const dep = state.dependencies['curdx-flow'];
+  if (dep && dep.installed === true && !ARGS.force) {
+    // Double-check: the plugin must actually be enabled in Claude Code.
+    // State can drift if the user manually `claude plugin uninstall`-ed.
+    if (commandExists('claude')) {
+      const r = run('claude plugin list', { silent: true });
+      if (r.ok && /\bcurdx\b/.test(r.output)) {
+        log(`curdx-flow plugin already installed and enabled; skip. use --force to re-run.`);
+        return;
+      }
+      log(`state shows curdx-flow installed but Claude Code does not list it; re-installing...`);
+    } else {
+      log(`curdx-flow plugin marked installed in state.json; skip (claude CLI missing for verification). use --force to re-run.`);
+      return;
+    }
   }
   if (!commandExists('claude')) {
     warn('claude CLI not found; cannot install curdx-flow plugin via marketplace.');
