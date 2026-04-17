@@ -1,0 +1,41 @@
+{
+  "name": "curdx-flow",
+  "version": "0.1.0",
+  "description": "Solo full-stack workflow plugin for Claude Code: spec-driven development with TDD enforcement, fresh-context subagent execution, and verification gates.",
+  "keywords": [
+    "claude-code",
+    "claude-code-plugin",
+    "workflow",
+    "spec-driven",
+    "tdd",
+    "solo-dev",
+    "fullstack"
+  ],
+  "license": "MIT",
+  "bin": {
+    "curdx-flow": "scripts/install.js"
+  },
+  "main": "scripts/install.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "install:plugin": "node scripts/install.js",
+    "test": "echo 'Tests live in tests/evals/ — see CLAUDE.md'"
+  },
+  "files": [
+    ".claude-plugin/",
+    "commands/",
+    "agents/",
+    "skills/",
+    "hooks/",
+    "rules/",
+    "templates/",
+    "scripts/",
+    "migrations/",
+    "docs/",
+    "CLAUDE.md",
+    "README.md",
+    "LICENSE"
+  ]
+}

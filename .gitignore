@@ -1,0 +1,22 @@
+node_modules/
+.DS_Store
+*.log
+*.tmp
+.env
+.env.local
+
+# user state, never commit
+.curdx/state.json
+.curdx/.continue-here.md
+.curdx/quick/
+.curdx/debug/
+.curdx/features/*/evidence/
+
+# install state
+.install-state.json
+.install.lock
+
+# editor
+.vscode/
+.idea/
+*.swp

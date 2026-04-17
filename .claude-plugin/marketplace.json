@@ -1,0 +1,24 @@
+{
+  "name": "curdx-flow",
+  "owner": {
+    "name": "curdx"
+  },
+  "description": "Solo full-stack workflow plugin for Claude Code — spec-driven, TDD-enforced, with fresh-context subagent execution and evidence-based verification.",
+  "license": "MIT",
+  "keywords": [
+    "workflow",
+    "spec-driven",
+    "tdd",
+    "fullstack",
+    "solo-dev"
+  ],
+  "plugins": [
+    {
+      "name": "curdx",
+      "source": "./",
+      "version": "0.1.0",
+      "description": "Solo full-stack workflow: spec → plan → tasks → TDD implementation with fresh-context subagent execution and verification gates.",
+      "category": "workflow"
+    }
+  ]
+}
