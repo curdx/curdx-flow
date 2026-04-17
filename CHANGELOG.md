@@ -6,6 +6,55 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.3.0] — Round 3 amplifiers
+
+Rounds 1 and 2 delivered the core pipeline and the quality loop. Round 3 adds the amplifiers: shipping, session continuity, decomposition of large features, worktree-based parallelism, a meta-skill for skill authoring, a migration framework, and testing scaffolding.
+
+Per the v2 design decision, **no CI adapter layer** — `/curdx:ship` ends at `git push`. PR creation and CI monitoring remain the user's platform-specific concern.
+
+### Added
+
+**Commands (6 new, total 19)**
+- `/curdx:ship` — commit feature artifacts + `git push`. Refuses to push to main/master/trunk. Surfaces auth / non-fast-forward errors without auto-fixing. No PR creation, no CI polling.
+- `/curdx:resume` — read-only dashboard after session break / compaction. Reads state.json + optional .continue-here.md + recent builder-journal.md; derives next action from phase.
+- `/curdx:cancel [feature-id | --debug <slug> | --all-quick]` — 5-option cancel menu (Keep / Soft-move / Delete / Revert / Cancel-this-cancel). Refuses to run mid-execution without --force.
+- `/curdx:doctor [--fix]` — 12-section diagnostic (core tools, install state, plugin registration, claude-mem worker, MCP declarations, hook events, hook script perms, project init, constitution, path-scoped rules, git state, browser-test setup).
+- `/curdx:help [<command>]` — phase-aware command catalog; detail mode for one command.
+- `/curdx:triage <epic> <goal>` — 4-phase decomposition (exploration research → decomposition with interface contracts → validation research → feature-dir creation optionally with gh/glab issues). For large-tier features only (per detect-complexity.sh).
+
+**Skills (2 new, total 8)**
+- `curdx-parallel-dispatch` — documents the `.git/config.lock` gotcha: SEQUENTIAL worktree creation, then PARALLEL builder execution, then snapshot-and-restore merge with "main always wins" for orchestrator-owned files (state.json + tasks.md). Post-merge one-shot hook + test validation. Submodule detection → fall back to sequential. Intra-wave file-overlap safety check.
+- `curdx-writing-skills` (meta) — TDD-for-skill-authoring. 5-phase workflow: identify invariant → write pressure test FIRST → watch it fail (capture verbatim rationalization) → write SKILL.md (with observed excuses in anti-patterns) → re-run pressure test with skill; iterate up to 3 times. Embedded Cialdini-style persuasion guidance.
+
+**Templates (1 new, total 7)**
+- `templates/epic-template.md` — epic.md skeleton with mermaid dependency graph, per-feature interface contracts (exposes + consumes), size estimate, advisory-only architecture note, rejected-decompositions section.
+
+**Migrations framework**
+- `migrations/README.md` — pattern documentation. Versioned by semver filename (vX.Y.Z.js). Idempotent per migration. Fresh installs skip; upgrades run the diff.
+- `migrations/v0.3.0.example.js` — template showing idempotency check, field rename, backfill, cleanup, schema-version bump.
+
+**Testing scaffolding**
+- `tests/README.md` — two-layer testing (evals/ for skill pressure tests, e2e/ for pipeline fixtures). Current status: minimum viable; grows with real usage.
+- `tests/evals/curdx-tdd/pressure-1-time-pressure.md` — "implement [GREEN] with a stub" adversarial scenario. Grading rubric.
+- `tests/evals/curdx-no-sycophancy/pressure-1-angry-user.md` — "user angry about apparent regression" scenario. Compliance = investigate before rewriting.
+- `tests/evals/curdx-verify-evidence/pressure-1-friday-evening.md` — "re-run tests vs trust memory" scenario. Compliance = run tests this turn regardless of Friday-evening pressure.
+- `tests/e2e/fixture-node-backend/{scenario.md,package.json}` — minimal node backend fixture for the full pipeline.
+
+### Explicitly NOT added (per v2 design cut)
+
+- **CI adapter layer** (GitHub/GitLab/Gitea/Azure/Jenkins platform scripts) — dropped because it added 10+ platform-specific scripts for a use case that varies wildly. Users invoke `gh` / `glab` / `tea` directly after `/curdx:ship`.
+- **PR Lifecycle Loop** — 48h autonomous CI-monitoring removed. Too platform-specific; scope-creep risk.
+- **Auto-merge** — never was in scope; out of curdx-flow's purview by design.
+
+### Statistics
+
+- 6 new commands (total 19)
+- 2 new skills (total 8)
+- 1 new template (total 7)
+- migrations/ directory + tests/ scaffolding
+- Round 3: 17 files added across 7 commits
+- Repo total: ~80 files, ~9000 lines
+
 ## [0.2.0] — Round 2 quality loop
 
 Makes the constitution real, adds the two-stage review, evidence-based verification, systematic debugging, browser testing, smart complexity routing, and a full set of session-context hooks.

@@ -137,14 +137,24 @@ Round 1 shipped the skeleton. **Round 2 shipped the quality loop** (this is v0.2
 - Path-scoped rules (`rules/tdd.md`, `rules/no-sycophancy.md`) that Claude Code loads NATIVELY (not as skills) so compaction doesn't drop them
 - 6 new hooks: constitution enforcement at tool level, careful-bash with secret scanning, session context injection, phase-guard nudges, failure escalation (4 levels), compaction state journal
 
-### Still deferred to Round 3
+### Round 3 shipped (v0.3)
 
-- `/curdx:ship` — commit + push (commit/push only, no PR creation; CI adapter layer explicitly cut per user direction)
-- `/curdx:resume`, `/curdx:cancel`, `/curdx:doctor`, `/curdx:help`
-- `/curdx:triage` — large-tier decomposition into multiple features
-- `curdx-parallel-dispatch` skill — worktree-based parallel [P] task execution (with the gsd-identified git config.lock sequential-dispatch pattern)
+Everything from Round 3 is now in place:
+
+- `/curdx:ship` — commit + push to current branch (refuses main/master/trunk; no PR creation per design cut)
+- `/curdx:resume` — read-only "where were we" dashboard
+- `/curdx:cancel [feature | --debug | --all-quick]` — 5-option cancel menu
+- `/curdx:doctor` — 12-section diagnostic
+- `/curdx:help [<cmd>]` — phase-aware command catalog
+- `/curdx:triage` — 4-phase large-feature decomposition with interface contracts
+- `curdx-parallel-dispatch` skill — git.config.lock-safe worktree parallelism
 - `curdx-writing-skills` meta-skill — TDD-for-skill-authoring
-- Migration framework
-- Evals test suite
+- Migrations framework with idempotent semver-named scripts
+- `tests/evals/` pressure tests for key skills; `tests/e2e/` fixture
 
-See `CHANGELOG.md` for what's actually shipped per version.
+### Explicitly NOT in scope
+
+- **CI adapter layer** — dropped in v2 design. No gh/glab/tea/az/Jenkins platform scripts. Use the platform CLI directly after `/curdx:ship`.
+- **PR Lifecycle Loop / auto-merge** — out of curdx-flow's purview.
+
+See `CHANGELOG.md` for per-version file-level details.
