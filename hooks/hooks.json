@@ -1,6 +1,30 @@
 {
-  "description": "curdx-flow hooks. Round 2 adds PreToolUse enforcement for the 5 constitution hard rules (2 hook files) plus the Stop-hook loop driver from Round 1. Round 2.6 will add SessionStart, UserPromptSubmit, PostToolUse, PreCompact hooks for context injection and failure escalation.",
+  "description": "curdx-flow hooks. Round 2 ships 7 hooks total: SessionStart context injection, UserPromptSubmit phase-guard + frustration-detect, PreToolUse constitution enforcement + careful-bash, PostToolUse failure-escalation, PreCompact state journal, Stop implement-loop.",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/load-context.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/phase-guard.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Edit|Write",
@@ -23,6 +47,30 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/failure-escalate.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/save-state.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "*",
@@ -37,4 +85,5 @@
     ]
   }
 }
+
 
