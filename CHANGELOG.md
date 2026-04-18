@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Changed
 
+- **`/curdx:implement` now defaults to SAFE (per-task pause) instead of YOLO.** Previously the autonomous loop ran with no user gate unless `--safe` was passed, which surprised users who didn't expect each of their N tasks to get committed without any chance to review. Now:
+  - `templates/config-template.json` ships `implement_loop.yolo_mode: false`
+  - `hooks/implement-loop.sh` falls back to `// false` when state.json lacks the flag (was `// true`)
+  - `commands/implement.md` flips semantics: `--yolo` opts into autonomous; `--safe` is the default and also an explicit override that wins over config
+  - The constitution PreToolUse hooks still block any rule-violating action regardless of yolo setting — yolo controls the user gate, not the rule gate
+- **`/curdx:resume` now surfaces `review.md` findings when phase is `review-stage1-issues` / `review-stage2-issues`.** Before, resume just printed the phase name and left the user to go `cat review.md` themselves. New step 6a extracts the Verdict line, every `#### S-*` finding header with its severity, and any `S-AMBIGUITY-*` rows routed to `/curdx:clarify`. The phase→action hint table now has specific guidance per review-* phase.
 - **`/curdx:snapshot` now defaults to RAW (no redaction) and captures the full event timeline.** Previously the REPORT.md summary truncated to the last 30 events and every file was run through the sanitize regex by default, which defeated the goal of letting the maintainer reproduce a user's failure from a shipped bundle. New defaults:
   - REPORT.md enumerates **all** events across the current `events.jsonl` and any rotated siblings (`.1`, `.2`, `.3`).
   - Rotated log files are included in the bundle (they were previously dropped on the floor).

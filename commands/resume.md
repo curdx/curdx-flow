@@ -70,6 +70,41 @@ FDIR=".curdx/features/$ACTIVE"
 [ -f "$FDIR/verification.md" ] && echo "  verification:   $(grep 'Result:' $FDIR/verification.md | head -1 | sed 's/\*\*Result:\*\* //')"
 ```
 
+### 6a. Surface review findings (when paused on review)
+
+If `phase` matches `review-stage1-issues` / `review-stage2-issues` / `review-complete` AND `$FDIR/review.md` exists, parse the review file and surface:
+- The Stage 1 / Stage 2 verdict line (look for `**Verdict:**`)
+- Every `#### S-` finding header + its one-line severity tag (e.g. `S-IMP-1 (Important) — createApp() factory drift`)
+- Every `S-AMBIGUITY-*` routed to `/curdx:clarify`
+- A one-line recommended action per phase (see table below)
+
+```bash
+if [ -f "$FDIR/review.md" ] && echo "$PHASE" | grep -q "^review"; then
+  echo "## Review findings (from review.md)"
+  echo
+  # verdict line(s)
+  grep -E '^\*\*Verdict:\*\*' "$FDIR/review.md" | sed 's/^/  /'
+  echo
+  # finding headers (S-CRIT, S-IMP, S-MIN, S-AMBIGUITY)
+  echo "  findings to resolve:"
+  grep -E '^#### S-' "$FDIR/review.md" | sed 's/^#### /    - /'
+  echo
+  # ambiguity section if present
+  if grep -q '^### Spec ambiguities' "$FDIR/review.md"; then
+    echo "  ambiguities routed to /curdx:clarify:"
+    awk '/^### Spec ambiguities/,/^---$/' "$FDIR/review.md" | grep -E '^\| S-' | awk -F '|' '{print "    -" $2 ":" $3}'
+  fi
+fi
+```
+
+Phase → review-specific action hint (appended to the phase table in step 7):
+
+| phase | recommended action when review.md findings present |
+|-------|-----------------------------------------------------|
+| review-stage1-issues | Triage each Important finding: fix code, or amend plan.md to accept drift. Then `/curdx:clarify` for ambiguities, `/curdx:review` to re-verify Stage 1. |
+| review-stage2-issues | Address code-quality findings (see review.md Stage 2 section), commit fixes, `/curdx:review` to re-run. |
+| review-complete | No outstanding findings; `/curdx:ship`. |
+
 ### 6. Check recent commits
 
 ```bash
@@ -95,6 +130,8 @@ Use the phase → next-action table from `/curdx:status`:
 | verify-complete | `/curdx:review` or `/curdx:ship` |
 | verify-gaps | `/curdx:debug <failing-criterion>` or `/curdx:refactor` |
 | review | (in progress) |
+| review-stage1-issues | Read review.md findings (step 6a surfaced them); fix Important items or amend plan, then `/curdx:clarify` for ambiguities and `/curdx:review` to re-verify |
+| review-stage2-issues | Read review.md Stage 2 findings; commit code fixes and `/curdx:review` to re-run |
 | review-complete | `/curdx:verify` (if not done) or `/curdx:ship` |
 | debug | resume the debug session in `.curdx/debug/$active_debug_slug.md` |
 | ship | `/curdx:ship` (not yet pushed) |
@@ -121,6 +158,8 @@ artifacts for {active_feature}:
 task progress:  [####..............] 25% (3/12)
 last updated:   {last_updated from state}
 
+{review findings block from step 6a, if phase is review-*}
+
 recent commits:
   abc123  feat(x): ...
   ...
@@ -129,7 +168,7 @@ recent commits:
 
 {handoff content if .continue-here.md exists}
 
-**Suggested next:** {from phase table}
+**Suggested next:** {from phase table; for review-*-issues phases, cross-reference the review findings block so the user knows exactly which files to touch}
 ```
 
 ## Notes

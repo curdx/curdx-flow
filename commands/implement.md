@@ -1,6 +1,6 @@
 ---
-description: Execute the active feature's tasks autonomously. Stop-hook drives the loop, dispatching each task to a fresh curdx-builder subagent.
-argument-hint: [--safe]
+description: Execute the active feature's tasks under Stop-hook drive, dispatching each task to a fresh curdx-builder subagent. Defaults to safe (per-task pause); pass --yolo to run fully autonomous.
+argument-hint: [--yolo] [--safe]
 allowed-tools: Read, Write, Edit, Bash, Task, Skill
 ---
 
@@ -15,9 +15,10 @@ You are running `/curdx:implement`. This is the **Stop-hook loop entrypoint**. Y
 
 1. Read `.curdx/state.json`. Confirm `active_feature` and `total_tasks > 0`.
 2. Confirm `.curdx/features/{active_feature}/tasks.md` exists.
-3. Read `.curdx/config.json`. Note `implement_loop.yolo_mode` and `--safe` arg:
-   - `--safe` flag OR `yolo_mode: false` → after each task pause and wait for user (`awaiting_approval: true`).
-   - default → autonomous; loop runs until completion.
+3. Read `.curdx/config.json`. Note `implement_loop.yolo_mode` and `--yolo` / `--safe` args:
+   - **Default is safe** — after each task, pause and wait for user (`awaiting_approval: true`).
+   - `--yolo` flag OR `yolo_mode: true` in config → autonomous; loop runs until completion without per-task pause.
+   - `--safe` flag is the explicit form of the default; takes precedence over `--yolo` and config `yolo_mode: true` if both are set.
 4. Confirm `.claude/rules/constitution.md` exists (PreToolUse hooks rely on it).
 
 ## Steps
@@ -26,8 +27,11 @@ You are running `/curdx:implement`. This is the **Stop-hook loop entrypoint**. Y
 
 ```bash
 . "${CLAUDE_PLUGIN_ROOT}/scripts/lib/state-io.sh"
-yolo_mode=$(cat .curdx/config.json | jq -r '.implement_loop.yolo_mode')
-if [ "$1" = "--safe" ]; then yolo_mode=false; fi
+yolo_mode=$(cat .curdx/config.json | jq -r '.implement_loop.yolo_mode // false')
+for arg in "$@"; do
+  [ "$arg" = "--yolo" ] && yolo_mode=true
+  [ "$arg" = "--safe" ] && yolo_mode=false   # --safe always wins
+done
 state_merge "{\"phase\": \"execution\", \"task_index\": 0, \"global_iteration\": 1, \"yolo_mode\": $yolo_mode, \"awaiting_approval\": false}"
 ```
 
@@ -91,7 +95,7 @@ Parse the builder's status:
 - **NEEDS_CONTEXT** → DO NOT increment task_index. Re-dispatch with the missing context. If the same task NEEDS_CONTEXT 5 times in a row (`task_iteration >= 5`), escalate to BLOCKED.
 - **BLOCKED** → set `awaiting_approval: true`, surface the blocker to the user, stop the loop.
 
-For YOLO mode (`yolo_mode: true`), also check `--safe` flag presence — if present, set `awaiting_approval: true` after every task to wait for user.
+If `yolo_mode: false` (the default), set `awaiting_approval: true` after every task so the Stop hook pauses the loop and lets the user review before continuing. If `yolo_mode: true`, leave approval false and let the loop advance.
 
 ### 5. State update for the next iteration
 
@@ -114,6 +118,6 @@ The loop exits cleanly when:
 
 ## Safety
 
-- This loop is autonomous and modifies code + creates commits. Use `--safe` if you want per-task confirmation.
-- The constitution PreToolUse hooks block any constitution-violating action even in YOLO mode.
-- The `--safe` flag adds an `awaiting_approval: true` after each task — Stop hook will let Claude stop instead of re-firing.
+- Defaults to per-task pause. The loop modifies code + creates commits, so the safe default is "let me see each task before moving on". Pass `--yolo` (or set `implement_loop.yolo_mode: true` in config) when you want autonomous execution.
+- The constitution PreToolUse hooks block any constitution-violating action regardless of YOLO setting — YOLO controls the user-gate, not the rule-gate.
+- Per-task pause works by setting `awaiting_approval: true` after each task — Stop hook will let Claude stop instead of re-firing. User resumes by clearing the flag (usually via `/curdx:resume` or continuing the conversation).
