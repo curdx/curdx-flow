@@ -66,7 +66,49 @@ Use sequential-thinking MCP to:
 Output: write tasks.md atomically. Return STATUS (DONE | BLOCKED) + total task count + wave count.
 ```
 
-### 3. After planner returns
+### 3. Plan-check (Revision Gate, max 2 iterations)
+
+Pattern source: GSD `gsd-plan-checker` Revision Gate (`/tmp/gsd/get-shit-done/references/gates.md`). Bounded loop with stall detection and Escalation Gate fallback.
+
+After planner returns `DONE`, dispatch `curdx-plan-checker` to verify the tasks WILL achieve the goal before `/curdx:implement` burns context:
+
+```
+ITER=1
+MAX_ITER=2  # so total planner runs ≤ 3 (initial + 2 revisions)
+
+while [ $ITER -le $((MAX_ITER + 1)) ]; do
+  # Dispatch curdx-plan-checker via Task. Payload:
+  #   "Read spec.md, plan.md, tasks.md, constitution.md.
+  #    Run 3 dimensions: Requirement Coverage, Task Completeness, Scope Sanity.
+  #    Append findings to .curdx/features/{active_feature}/plan-check.md.
+  #    Return PLAN_OK | PLAN_NEEDS_REVISION:<feedback> | BLOCKED."
+
+  # Parse last line of checker's response
+  case "$CHECKER_RESULT" in
+    PLAN_OK*) break ;;
+    BLOCKED*) surface to user; exit ;;
+    PLAN_NEEDS_REVISION*)
+      if [ $ITER -gt $MAX_ITER ]; then
+        # Escalation Gate: max iter exhausted
+        Print: "tasks.md couldn't pass plan-check after 2 revisions.
+                Latest findings: .curdx/features/{active_feature}/plan-check.md.
+                Run /curdx:refactor --file tasks to revise manually,
+                or /curdx:triage to split this feature."
+        state_merge '{"phase": "tasks", "awaiting_approval": true}'
+        exit
+      fi
+      # Re-dispatch planner with checker feedback
+      ITER=$((ITER + 1))
+      ;;
+  esac
+done
+```
+
+When re-dispatching the planner, append to its payload the verbatim `PLAN_NEEDS_REVISION:` feedback so it knows what to fix. The planner re-writes tasks.md atomically; the loop re-runs the checker.
+
+**Stall detection** (advisory): if iteration N's issue count is ≥ iteration N-1's, log a note in plan-check.md ("WARN: revision did not reduce issue count — planner may be stuck"). Do not auto-escalate on stall; let the iteration cap handle it.
+
+### 4. After plan-check passes (or escalates)
 
 Read `tasks.md`. Count tasks via `grep -c '^<task ' tasks.md`. Update state:
 
@@ -75,14 +117,16 @@ total=$(grep -c '^<task ' .curdx/features/{active_feature}/tasks.md)
 state_merge "{\"phase\": \"tasks-complete\", \"total_tasks\": $total, \"task_index\": 0, \"awaiting_approval\": true}"
 ```
 
-### 4. Print
+### 5. Print
 
 ```
 tasks written: .curdx/features/{active_feature}/tasks.md
+plan-check:    {{PLAN_OK | escalated after N iterations}}
 
   total tasks: {{total}}
   waves:       {{n_waves}}
   parallel:    {{n_parallel_tasks}} tasks marked [P]
+  coverage:    {{M FRs covered / N total FRs}}
 
 next:
   /curdx:implement  — kick off Stop-hook driven autonomous execution
