@@ -157,4 +157,26 @@ Everything from Round 3 is now in place:
 - **CI adapter layer** — dropped in v2 design. No gh/glab/tea/az/Jenkins platform scripts. Use the platform CLI directly after `/curdx:ship`.
 - **PR Lifecycle Loop / auto-merge** — out of curdx-flow's purview.
 
+### Delivery-Guarantee Harness — coverage and escape hatches
+
+`scripts/verify-runnable.sh` (run by `/curdx:verify` and `/curdx:ship`) has **hardcoded knowledge of four backend stacks**: node, python, go, rust. This is intentional, not lazy:
+
+| Stack | Gate A (install) | Gate B (build) | Gate C (smoke) |
+|-------|------------------|----------------|----------------|
+| node  | `npm ci --dry-run` / pnpm / yarn frozen-lockfile | typecheck script or `tsc --noEmit` | `package.json` main/bin/start present |
+| python | `poetry check` if poetry.lock present | `python3 -m py_compile` over `*.py` | pyproject.toml parses |
+| go    | `go mod verify` | `go build ./...` | `go vet ./...` |
+| rust  | `cargo check --locked` | `cargo check` | (covered by build) |
+| anything else | skip with note | skip with note | skip with note |
+
+**Why hardcoded and not AI-detected**: harness runs every `/curdx:verify` and every `/curdx:ship`. It must be deterministic (same project → same answer), fast (milliseconds, not 5–30s), and unit-testable (we have 31 assertions in `tests/integration/test-verify-runnable.sh`). An AI-driven detector would compromise all three. The plan-once-write-config-execute-deterministically pattern is on the v0.3 roadmap; v0.2 ships the simpler hardcoded baseline.
+
+**If your stack isn't covered** (Deno, Bun, Elixir, Kotlin, .NET, custom monorepo orchestration, etc.):
+
+1. **Gate C escape hatch (already shipped):** create `.curdx/smoke.sh` — any executable shell script. The harness runs it instead of the heuristic and reports its exit code as gate C. This is the canonical override for any project layout the four hardcoded stacks don't cover.
+2. **Gate A/B fallback:** they will report `skip` with the reason "unknown backend". Your `/curdx:ship` will still proceed because skips don't fail; you simply lose the install/build safety net for those gates. Treat your own CI as the safety net in that case.
+3. **Findings.json (gate D) works regardless of stack** — it's pure shell command assertions you author yourself. Use it to encode runtime invariants the hardcoded gates don't know about (lockfile minimum versions, env var presence, cross-component contracts).
+
+**Roadmap (v0.3, when real users complain):** stack-detector subagent at `/curdx:init` time writes a `verify_runnable.components[]` block into `.curdx/config.json`; harness reads config first, falls back to current hardcoded paths. This handles arbitrary stacks AND fullstack monorepos (one component per package) without giving up determinism. Not building it now because we have zero users and the escape hatch above already covers the unknown-stack case.
+
 See `CHANGELOG.md` for per-version file-level details.
