@@ -83,7 +83,7 @@ MAX_TASK_ITERATIONS=$(jq -r '.max_task_iterations // 5' "$STATE_FILE")
 GLOBAL_ITERATION=$(jq -r '.global_iteration // 1' "$STATE_FILE")
 MAX_GLOBAL_ITERATIONS=$(jq -r '.max_global_iterations // 100' "$STATE_FILE")
 AWAITING_APPROVAL=$(jq -r '.awaiting_approval // false' "$STATE_FILE")
-YOLO_MODE=$(jq -r '.yolo_mode // false' "$STATE_FILE")
+YOLO_MODE=$(jq -r '.yolo_mode // true' "$STATE_FILE")
 
 # only act in execution phase
 if [ "$PHASE" != "execution" ]; then

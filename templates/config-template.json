@@ -30,7 +30,7 @@
   "implement_loop": {
     "max_global_iterations": 100,
     "max_task_iterations": 5,
-    "yolo_mode": false,
+    "yolo_mode": true,
     "stop_on_blocked": true
   },
   "constitution": {
