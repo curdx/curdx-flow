@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # load-context.sh — SessionStart hook
 #
-# Two responsibilities, in this order:
+# Three responsibilities, in this order:
 #
 # 1. Inject the curdx-flow GLOBAL PROTOCOLS into every session where this
 #    plugin is enabled — irrespective of whether the cwd is a curdx project.
@@ -11,12 +11,20 @@
 #      - $HOME/.curdx/user-protocols.md (user override; takes precedence)
 #      - $CLAUDE_PLUGIN_ROOT/protocols/global-protocols.md (shipped default)
 #
-# 2. If cwd is inside a curdx-initialized project, ALSO surface the current
-#    project state (phase, active feature, artifacts, suggested next step).
+# 1b. Run a throttled npm-registry update check, inject a one-line notice if a
+#     newer curdx-flow is available (see scripts/update-check.sh).
+#
+# 2. If cwd is inside a curdx-initialized project:
+#    - Load the `curdx-using-skills` META-SKILL as additionalContext, wrapped in
+#      <EXTREMELY-IMPORTANT> — this is the auto-dispatch layer: it teaches the
+#      agent to map user intent to curdx commands WITHOUT the user having to
+#      remember slash commands. Pattern from obra's superpowers:using-superpowers.
+#    - Surface the current project state (phase, active feature, artifacts, next).
 #
 # Patterns borrowed from pua's hooks/session-restore.sh (additionalContext
 # via JSON stdout) and gsd's gsd-statusline.js (walking up the tree for
-# .curdx/state.json).
+# .curdx/state.json) and obra's superpowers session-start hook (EXTREMELY-
+# IMPORTANT wrapped skill injection).
 #
 # Contract: stdin JSON, stdout JSON with additionalContext OR empty.
 
@@ -76,8 +84,9 @@ if [ -x "$UPDATE_SCRIPT" ]; then
   esac
 fi
 
-# ---------- 2. curdx-project context (conditional) ----------
+# ---------- 2. curdx-project context + auto-dispatch meta-skill (conditional) ----------
 CURDX_CONTEXT=""
+USING_SKILLS_CONTENT=""
 
 # walk up to find .curdx/ (max 10 levels)
 dir="$CWD"
@@ -94,6 +103,18 @@ done
 
 if [ -n "$PROJECT_ROOT" ] && [ -f "$PROJECT_ROOT/.curdx/state.json" ] && [ -f "$PROJECT_ROOT/.curdx/config.json" ]; then
   cd "$PROJECT_ROOT"
+
+  # ---- 2a. Load the curdx-using-skills meta-skill for auto-dispatch ----
+  # Only inject when the project is curdx-initialized; otherwise the skill's
+  # intent-map references commands the user hasn't enabled for this repo.
+  # Opt-out: touch ~/.curdx/no-auto-dispatch
+  if [ ! -f "$HOME/.curdx/no-auto-dispatch" ]; then
+    PLUGIN_ROOT_FOR_SKILL="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+    SKILL_FILE="$PLUGIN_ROOT_FOR_SKILL/skills/curdx-using-skills/SKILL.md"
+    if [ -f "$SKILL_FILE" ]; then
+      USING_SKILLS_CONTENT=$(cat "$SKILL_FILE" 2>/dev/null || true)
+    fi
+  fi
 
   STATE=$(cat .curdx/state.json)
   CONFIG=$(cat .curdx/config.json)
@@ -172,15 +193,44 @@ EOF
 fi
 
 # ---------- assemble final additionalContext ----------
-# Compose: update notice (most transient) → protocols (most fundamental) →
-# curdx context (situational). Skip emit entirely if all three are empty.
-if [ -z "$GLOBAL_PROTOCOLS" ] && [ -z "$CURDX_CONTEXT" ] && [ -z "$UPDATE_NOTICE" ]; then
+# Compose order (top → bottom of the injected block):
+#   1. update notice (most transient, flagged with `>` blockquote)
+#   2. using-skills meta-skill, wrapped in <EXTREMELY-IMPORTANT> (the hardest rule)
+#   3. global protocols (persistent user rules)
+#   4. curdx-project situational context (current phase, active feature)
+#
+# The using-skills block goes near the top because it shapes EVERY response
+# that follows — it's the auto-dispatch layer. If buried under protocols +
+# context, attention dilutes and the 1% rule weakens. Pattern from obra's
+# superpowers hooks/session-start:37-44 wrapping using-superpowers in
+# <EXTREMELY_IMPORTANT>.
+#
+# Skip emit entirely if all four pieces are empty.
+if [ -z "$GLOBAL_PROTOCOLS" ] && [ -z "$CURDX_CONTEXT" ] && [ -z "$UPDATE_NOTICE" ] && [ -z "$USING_SKILLS_CONTENT" ]; then
   exit 0
 fi
 
 CONTEXT=""
 if [ -n "$UPDATE_NOTICE" ]; then
   CONTEXT="> $UPDATE_NOTICE"
+fi
+if [ -n "$USING_SKILLS_CONTENT" ]; then
+  WRAPPED_SKILL="<EXTREMELY-IMPORTANT>
+You are in a curdx-initialized project. The following meta-skill governs how
+you route user intent to curdx commands. Follow it BEFORE any other response.
+Auto-dispatching is the default — slash commands are a manual override.
+
+${USING_SKILLS_CONTENT}
+</EXTREMELY-IMPORTANT>"
+  if [ -n "$CONTEXT" ]; then
+    CONTEXT="${CONTEXT}
+
+---
+
+${WRAPPED_SKILL}"
+  else
+    CONTEXT="$WRAPPED_SKILL"
+  fi
 fi
 if [ -n "$GLOBAL_PROTOCOLS" ]; then
   if [ -n "$CONTEXT" ]; then

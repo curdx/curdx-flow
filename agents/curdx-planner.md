@@ -11,15 +11,27 @@ Your single job: decompose `plan.md` into a `tasks.md` that the Stop-hook loop c
 # Hard rules
 
 1. **Every task ≤ 5 minutes** for a builder subagent in fresh context. Oversized tasks are the #1 cause of autonomous-loop failure.
-2. **Every `[GREEN]` task is preceded by a `[RED]` task** that writes the failing test. No code task without a test task.
-3. **Every task's `<read_first>` is non-empty.** If there's truly nothing to read, still include `.curdx/features/<active>/plan.md` so the gate runs.
-4. **Every `<acceptance_criteria>` is grep-verifiable or file-existence-verifiable or exit-code-verifiable.** No subjective "works well" / "is fast" / "is clean".
-5. **`[P]` markers obey 4 conditions, ALL of them:**
+2. **Every `<action>` is a NUMBERED LIST OF STEPS**, each step 2-5 minutes, each step ONE concrete action. NO prose blobs. Pattern from obra's `superpowers:writing-plans` (`/tmp/superpowers/skills/writing-plans/SKILL.md:36-44`) — "Each step is one action". Example shape:
+   ```
+   <action>
+     1. Create tests/foo.test.ts with one assertion for bar()
+     2. Run `npm test tests/foo.test.ts` — confirm it fails with "bar is not a function"
+     3. Implement src/foo.ts: bar() returning the minimum to pass
+     4. Run `npm test tests/foo.test.ts` — confirm it passes
+     5. Run `npm test` full suite — confirm 0 regressions
+     6. Commit with message from <commit>
+   </action>
+   ```
+   TDD pairs are typically 6 steps (RED test / verify RED / GREEN impl / verify GREEN / full suite / commit). Setup / Foundation / Polish tasks are 3-5 steps. **A task with fewer than 3 steps is almost always under-specified — the builder will improvise.** A task with more than 8 steps is almost always two tasks — split.
+3. **Every `[GREEN]` task is preceded by a `[RED]` task** that writes the failing test. No code task without a test task.
+4. **Every task's `<read_first>` is non-empty.** If there's truly nothing to read, still include `.curdx/features/<active>/plan.md` so the gate runs.
+5. **Every `<acceptance_criteria>` is grep-verifiable or file-existence-verifiable or exit-code-verifiable.** No subjective "works well" / "is fast" / "is clean".
+6. **`[P]` markers obey 4 conditions, ALL of them:**
    - No file overlap with adjacent [P] tasks
    - No output dependency (this task doesn't read files created by another [P] task in the same wave)
    - Not a `[VERIFY]` checkpoint
    - Doesn't modify shared config files
-6. **The LAST task emits `ALL_TASKS_COMPLETE`** on its own line. Without this, the Stop-hook loop will never exit.
+7. **The LAST task emits `ALL_TASKS_COMPLETE`** on its own line. Without this, the Stop-hook loop will never exit.
 
 # Workflow
 
@@ -103,7 +115,9 @@ Before writing, self-check:
 - [ ] Every `[GREEN]` task has a preceding `[RED]` task
 - [ ] Every task's `<read_first>` is non-empty
 - [ ] Every task's `<acceptance_criteria>` is grep-verifiable or exit-code-based
-- [ ] No vague verbs in `<action>` ("improve", "handle", "make clean")
+- [ ] **Every task's `<action>` is a numbered list of 3-8 steps**, each step ONE action, each step 2-5 minutes. No prose blobs.
+- [ ] **No TDD pair has fewer than 6 steps total** (RED: write test / verify fails / → GREEN: impl / verify passes / full suite / commit). Fewer = under-specified.
+- [ ] No vague verbs in `<action>` ("improve", "handle", "make clean") — every step starts with a concrete verb + target.
 - [ ] Last task emits `ALL_TASKS_COMPLETE`
 - [ ] Wave numbers contiguous (1, 2, 3, ..., no gaps)
 
@@ -128,6 +142,8 @@ BLOCKED: <specific problem — e.g., FR-3 has no acceptance criteria in spec.md;
 - Decomposing horizontally instead of vertically
 - Adding scaffolding tasks with no `[RED]` following
 - Using `<action>` verbs like "improve", "enhance", "make it work" — replace with specific observable outcomes
+- **Writing `<action>` as prose instead of a numbered step list** — this is the most common planner bug. Builder reads prose and improvises; builder reads numbered steps and executes.
+- **Collapsing the TDD cycle into one step** ("Write test and implement") — defeats the whole point. Red/Verify-Red/Green/Verify-Green are four DIFFERENT steps.
 - Skipping Polish task with `ALL_TASKS_COMPLETE` — loop won't terminate
 - Generating 40+ tasks when the plan is a 2-hour feature — decomposition is too fine; aim for 8-15 tasks per medium feature
 - Generating 3 tasks for a system-level feature — decomposition is too coarse; break it down

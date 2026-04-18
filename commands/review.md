@@ -1,10 +1,10 @@
 ---
-description: Two-stage review of the active feature. Stage 1 spec-compliance then (if clean) Stage 2 code-quality. Findings are Critical/Important/Minor; reviewer is adversarial by construction.
+description: Two-stage adversarial review — fresh-context spec-reviewer first, then (if clean) fresh-context quality-reviewer. Findings are Critical/Important/Minor. Split into two agents so context pollution from Stage 1 doesn't bias Stage 2 (superpowers' proven pattern).
 argument-hint: [--stage {1|2|both}] (default — both, sequential)
 allowed-tools: Read, Write, Edit, Bash, Task
 ---
 
-You are running `/curdx:review`. Your job is to orchestrate the two-stage adversarial review loop.
+You are running `/curdx:review`. Your job is to orchestrate the two-stage adversarial review by dispatching two DIFFERENT subagents — never one agent called twice. Fresh context per stage is the whole point.
 
 ## Pre-checks
 
@@ -21,63 +21,75 @@ You are running `/curdx:review`. Your job is to orchestrate the two-stage advers
 state_merge '{"phase": "review", "awaiting_approval": false}'
 ```
 
-### 2. Stage 1 — Spec Compliance
+### 2. Stage 1 — dispatch `curdx-spec-reviewer`
 
-Dispatch `curdx-reviewer` via `Task`. Payload:
+Use the `Task` tool with `subagent_type: curdx-spec-reviewer`. Fresh context — the agent has never seen Stage 2 concerns. Payload:
 
 ```
 You are running STAGE 1 (Spec Compliance) for feature {feature_id}.
 
-Spec: .curdx/features/{feature_id}/spec.md
-Plan: .curdx/features/{feature_id}/plan.md
-Tasks: .curdx/features/{feature_id}/tasks.md
-Output: .curdx/features/{feature_id}/review.md (append under ## Stage 1)
+Inputs:
+  Spec: .curdx/features/{feature_id}/spec.md
+  Plan: .curdx/features/{feature_id}/plan.md
+  Tasks: .curdx/features/{feature_id}/tasks.md
+  Git diff: git log --oneline main..HEAD AND per-commit `git show <sha>`
 
-Per agents/curdx-reviewer.md:
-- Compare implementation against every FR, AC, Out-of-Scope, and plan decision
-- Do not trust builder DONE reports; verify via Read, Grep, Bash
-- Return findings with file:line + concrete fix suggestion
+Output: append to .curdx/features/{feature_id}/review.md under
+        `## Stage 1: Spec Compliance (iteration N)` where N is
+        the next integer given how many Stage 1 sections already exist.
+
+Per agents/curdx-spec-reviewer.md:
+- Compare implementation against every FR, AC, Out-of-Scope, plan decision
+- Verify via Read/Grep/Bash; don't trust builder DONE claims
 - Severity: Critical / Important / Minor
-- Final line: SPEC_COMPLIANT | SPEC_ISSUES: <counts> | BLOCKED: <why>
+- Stay in spec-compliance scope — style/readability/perf → "Stage 2 concern"
+- Final line: SPEC_COMPLIANT | SPEC_ISSUES: <n> crit, <m> imp, <k> min | BLOCKED: <why>
 
 The curdx-no-sycophancy skill is auto-loaded. Do not soften criticism.
-Do not produce a zero-findings review without listing what you checked.
 ```
 
 ### 3. Handle Stage 1 result
 
-- **SPEC_COMPLIANT** → proceed to Stage 2 (if requested).
+- **SPEC_COMPLIANT** → proceed to Stage 2 (if requested by `--stage both` or `--stage 2`).
 - **SPEC_ISSUES**:
   - Parse counts. If any Critical: the builder must fix before Stage 2.
   - Dispatch `curdx-builder` with the Stage 1 findings as task description. The builder fixes each, atomically commits, returns DONE.
-  - After builder returns: re-dispatch `curdx-reviewer` Stage 1 (iteration 2). Loop cap: 3 iterations. Past 3 → escalate BLOCKED.
+  - After builder returns: re-dispatch `curdx-spec-reviewer` in FRESH context (iteration 2). Loop cap: 3 iterations. Past 3 → escalate BLOCKED.
 - **BLOCKED** → surface to user, stop.
 
-### 4. Stage 2 — Code Quality
+### 4. Stage 2 — dispatch `curdx-quality-reviewer` (NOT `curdx-spec-reviewer` again)
 
 Only if Stage 1 is SPEC_COMPLIANT and `--stage` is `2` or `both`.
 
-Dispatch `curdx-reviewer` Stage 2. Payload:
+Use the `Task` tool with `subagent_type: curdx-quality-reviewer`. Fresh context — the agent has never seen Stage 1's findings. Payload:
 
 ```
 You are running STAGE 2 (Code Quality) for feature {feature_id}.
 
-Inputs: same as Stage 1 plus the existing .curdx/features/{feature_id}/review.md
-Output: .curdx/features/{feature_id}/review.md (append under ## Stage 2)
+Inputs (same source files as Stage 1; you're looking at them for a DIFFERENT question):
+  Spec: .curdx/features/{feature_id}/spec.md
+  Plan: .curdx/features/{feature_id}/plan.md
+  Tasks: .curdx/features/{feature_id}/tasks.md
+  Existing review: .curdx/features/{feature_id}/review.md (read the Stage 1
+    section for CONTEXT only — do not re-adjudicate spec compliance)
 
-Per agents/curdx-reviewer.md Stage 2 checklist:
-- Readability, error handling, input validation, test quality,
-  duplication, complexity, SOLID, security, performance, observability
+Output: append to .curdx/features/{feature_id}/review.md under
+        `## Stage 2: Code Quality (iteration N)`.
+
+Per agents/curdx-quality-reviewer.md Stage 2 checklist:
+- Readability, error handling, input validation, test quality, duplication,
+  complexity, SOLID, security, performance, observability
 - Compare against 3-5 similar files in the codebase for convention parity
 - Severity: Critical / Important / Minor
-- Final line: QUALITY_APPROVED | QUALITY_ISSUES: <counts> | BLOCKED: <why>
+- Stay in quality scope — FR-missing is a Stage 1 escalation, not a Q-finding
+- Final line: QUALITY_APPROVED | QUALITY_ISSUES: <n>, <m>, <k> | BLOCKED: <why>
 ```
 
 ### 5. Handle Stage 2 result
 
 - **QUALITY_APPROVED** → update state, print summary, suggest `/curdx:verify` (if not done) or `/curdx:ship`.
 - **QUALITY_ISSUES**:
-  - Critical/Important: dispatch `curdx-builder` to fix, then re-review.
+  - Critical/Important: dispatch `curdx-builder` to fix, then re-dispatch `curdx-quality-reviewer` in FRESH context (iteration 2).
   - Minor-only: surface to user; they decide whether to fix now or track in a backlog.
 
 ### 6. Update state and print summary
@@ -95,15 +107,21 @@ review complete: .curdx/features/{feature_id}/review.md
 
 next:
   /curdx:verify    — produce evidence (if not already run)
-  /curdx:ship      — commit and push (Round 3)
+  /curdx:ship      — commit and push
 ```
+
+## Why two separate agents (not one agent called twice)
+
+The old design dispatched one `curdx-reviewer` agent twice with a "which stage" parameter. That was wrong: the same-agent-different-call pattern shares nothing at the conversation level, but **the prompt contains both stages' rules**, so the agent carries stage-2-shaped thinking into stage 1 (and vice versa) even on a fresh dispatch. obra found this in `superpowers:subagent-driven-development` (`/tmp/superpowers/skills/subagent-driven-development/SKILL.md:47-79`) and split into implementer / spec-reviewer / code-quality-reviewer. We do the same.
+
+The payoff is subtle but real: Stage 1 can't rationalize "this FR is missing but the code is so clean it deserves compliance"; Stage 2 can't rationalize "the code is a mess but it matches the spec so approved". Separate prompts, separate judgments.
 
 ## Notes
 
-- The reviewer NEVER edits source; the builder does. The reviewer writes findings; the orchestrator dispatches the builder to fix.
-- Stage 2 runs from a fresh reviewer context, NOT continuing from Stage 1's context. This enforces the "stage 2 is a separate judgment" rule from superpowers' pattern.
-- If the user wants only one stage: `/curdx:review --stage 1` or `/curdx:review --stage 2` (the latter requires a prior clean Stage 1).
+- The reviewer agents NEVER edit source; the builder does. Reviewers write findings to review.md; the orchestrator dispatches the builder to fix.
+- Stage 2 runs from a fresh reviewer context, NOT continuing from Stage 1's context.
 - Minor findings do not block. They are recorded in review.md and surfaced in `/curdx:status` output.
+- If the user wants only one stage: `/curdx:review --stage 1` or `/curdx:review --stage 2` (the latter requires a prior clean Stage 1).
 
 ## When Stage 1 exposes a spec problem
 

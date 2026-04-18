@@ -8,6 +8,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- **Auto-dispatch meta-skill (`curdx-using-skills`) injected via SessionStart.** Adapts obra's `superpowers:using-superpowers` pattern: when cwd is a curdx-initialized project, `hooks/load-context.sh` injects `skills/curdx-using-skills/SKILL.md` as `additionalContext`, wrapped in `<EXTREMELY-IMPORTANT>` tags. The skill contains a 16-row intent→action map (user says "let's add X" → auto-dispatch `/curdx:spec` logic; "fix bug" → auto-dispatch `/curdx:debug`; etc.) plus a Red Flags rationalization-counter table lifted from obra's design. **Net effect: the user never has to remember 20 slash commands** — they describe intent, Claude routes to the right pipeline entry point. Slash commands remain as manual override.
+  - Inject order in `additionalContext`: update-notice → `<EXTREMELY-IMPORTANT>using-skills</EXTREMELY-IMPORTANT>` → global-protocols → project-context. Using-skills goes NEAR THE TOP because it shapes every subsequent response.
+  - Opt-out: `touch ~/.curdx/no-auto-dispatch` (follows existing `no-global-protocols` / `no-update-check` marker pattern).
+  - Non-curdx projects are unaffected — the skill only loads when `.curdx/` is detected up the cwd tree.
+
+- **Reviewer split into two fresh-context agents** (`curdx-spec-reviewer` + `curdx-quality-reviewer`). Old single-agent `curdx-reviewer.md` with `--stage {1|2}` flag deleted. `commands/review.md` now dispatches the two agents via separate `Task` tool calls — Stage 2 starts only after Stage 1 returns `SPEC_COMPLIANT`. Pattern from obra's `superpowers:subagent-driven-development` (`/tmp/superpowers/skills/subagent-driven-development/SKILL.md:47-79`) which split implementer / spec-reviewer / code-quality-reviewer for exactly the reason curdx has now: **same-agent single-prompt two-stage judgment bleeds quality concerns into spec compliance and vice versa**, even when the agent "runs twice". Fresh context per stage is the whole point.
+
+- **2-5 minute step granularity in `templates/tasks-template.md`.** Every `<task>` block's `<action>` field is now a **numbered list of 3-8 steps**, each 2-5 minutes, each one concrete action — NOT a prose blob. A typical TDD pair is 6 steps (write failing test / verify RED / write minimal impl / verify GREEN / run full suite / commit). Pattern from obra's `superpowers:writing-plans` (`/tmp/superpowers/skills/writing-plans/SKILL.md:36-44`). `agents/curdx-planner.md` updated with matching hard rule and self-review checklist item ("No TDD pair has fewer than 6 steps total"); anti-patterns section warns against prose blobs and collapsed RED/GREEN steps. **Net effect: the planner can no longer produce 30-minute mega-tasks that exhaust the builder's fresh-context budget mid-execution.**
+
+- **`/curdx:help` reorganized into CORE (8) vs ADVANCED (12).** Core: `init spec implement ship status doctor help snapshot` — the commands the user actually needs to remember. Advanced: the other 12 — still fully functional, but auto-triggered by the intent map in `curdx-using-skills` so most users never need to know their names.
+
+### Changed
+
+- **`hooks/load-context.sh`** rewritten to compose 4 context blocks (update-notice → using-skills → global-protocols → project-context) instead of 3. Hook file went from ~180 to ~240 lines. `CLAUDE_PLUGIN_ROOT` fallback preserved for direct-invocation testing.
+
+### Removed
+
+- **`agents/curdx-reviewer.md`** (replaced by `curdx-spec-reviewer.md` + `curdx-quality-reviewer.md`). No backwards-compat shim — v0.x is breaking-changes-allowed per `CLAUDE.md:46` convention.
+
 - **Update-check in SessionStart hook** (`scripts/update-check.sh`, wired through `hooks/load-context.sh`). Queries `registry.npmjs.org/curdx-flow/latest` at most once / 24h, compares to the plugin's `package.json` version, and if a newer release exists, injects a single-line `additionalContext` notice above Global Protocols: `curdx-flow X.Y.Z available (you have A.B.C). Upgrade: npx curdx-flow@latest install --force.` Never auto-upgrades.
   - **Opt-out:** `touch ~/.curdx/no-update-check` (mirrors the existing `no-global-protocols` marker pattern).
   - **Fail-safe:** 4-second wall-clock timeout on the registry call, graceful degrade on HTML error pages / empty responses / missing `curl` or `jq` — any failure silently no-ops, SessionStart is never blocked.
