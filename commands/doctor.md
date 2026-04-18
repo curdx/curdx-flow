@@ -248,6 +248,40 @@ if [ -f .curdx/config.json ]; then
 fi
 ```
 
+### 13. Update-check state
+
+Reports what the local update-check cache knows. Pure read (no network) by default. With `--fix`, runs the checker with `--force` to bust the cache and query the npm registry synchronously.
+
+```bash
+OPT_OUT="$HOME/.curdx/no-update-check"
+CACHE_FILE="$HOME/.curdx/.last-update-check"
+if [ -f "$OPT_OUT" ]; then
+  echo "  ℹ update-check: DISABLED (opt-out marker at ~/.curdx/no-update-check)"
+elif [ -f "$CACHE_FILE" ]; then
+  CACHED=$(cat "$CACHE_FILE" 2>/dev/null || true)
+  MTIME=$(stat -c %Y "$CACHE_FILE" 2>/dev/null || stat -f %m "$CACHE_FILE" 2>/dev/null || echo 0)
+  AGE_MIN=$(( ( $(date +%s) - MTIME ) / 60 ))
+  case "$CACHED" in
+    UPGRADE_AVAILABLE*)
+      OLD=$(echo "$CACHED" | awk '{print $2}')
+      NEW=$(echo "$CACHED" | awk '{print $3}')
+      echo "  ⚠  update-check: upgrade available ($OLD → $NEW, cached ${AGE_MIN}m ago)"
+      echo "     run: npx curdx-flow@latest install --force"
+      ;;
+    UP_TO_DATE*)
+      echo "  ✓ update-check: up to date (cache ${AGE_MIN}m old)"
+      ;;
+    *)
+      echo "  ℹ update-check: cache unreadable — next SessionStart will re-fetch"
+      ;;
+  esac
+else
+  echo "  ℹ update-check: no cache yet (first SessionStart has not fired)"
+fi
+```
+
+With `--fix`: run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/update-check.sh" --force` which busts the cache and hits the npm registry synchronously. A single-line UPGRADE_AVAILABLE / UP_TO_DATE / (empty on network failure) response is returned.
+
 ## Output format
 
 ```

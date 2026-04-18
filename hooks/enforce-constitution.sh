@@ -135,7 +135,27 @@ if [ "$PHASE" = "execution" ] && [ -n "$ACTIVE_FEATURE" ]; then
       # for v0.2 we keep it as "tests exist at all" to avoid false negatives.
       if ! find tests test __tests__ spec 2>/dev/null | grep -qE '\.(test|spec)\.' 2>/dev/null; then
         if ! find . -name '*_test.go' -o -name '*_test.py' 2>/dev/null | head -1 | grep -q .; then
-          deny "2" "Rule 2 (NO PRODUCTION CODE WITHOUT FAILING TEST): current task is [GREEN]/[REFACTOR] but no test files exist in this repo. The [RED] task should have created a failing test first. Back up and run the [RED] task."
+          # Derive an actionable install command from config (testing.runner='unknown'
+          # = no framework configured). Mirrors the suggestion printed by /curdx:init
+          # when stack detection found no runner.
+          RUNNER=""
+          if [ -f ".curdx/config.json" ]; then
+            RUNNER=$(jq -r '.testing.runner // "unknown"' .curdx/config.json 2>/dev/null || echo unknown)
+          fi
+          BACKEND=""
+          if [ -f ".curdx/config.json" ]; then
+            BACKEND=$(jq -r '.stack.backend.language // "unknown"' .curdx/config.json 2>/dev/null || echo unknown)
+          fi
+          HINT=""
+          if [ "$RUNNER" = "unknown" ]; then
+            case "$BACKEND" in
+              node)   HINT=" No runner is configured — install one, then re-run /curdx:init:\n    npm i -D vitest && npm pkg set scripts.test=\"vitest run\"" ;;
+              python) HINT=" No runner is configured — install one, then re-run /curdx:init:\n    pip install pytest && mkdir -p tests" ;;
+              ruby)   HINT=" No runner is configured — install one, then re-run /curdx:init:\n    bundle add rspec --group=test && bundle exec rspec --init" ;;
+              *)      HINT=" No runner is configured — install your language's test runner, then re-run /curdx:init." ;;
+            esac
+          fi
+          deny "2" "Rule 2 (NO PRODUCTION CODE WITHOUT FAILING TEST): current task is [GREEN]/[REFACTOR] but no test files exist in this repo. The [RED] task should have created a failing test first. Back up and run the [RED] task.${HINT}"
         fi
       fi
     fi

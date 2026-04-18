@@ -56,6 +56,26 @@ if [ ! -f "$HOME/.curdx/no-global-protocols" ]; then
   fi
 fi
 
+# ---------- 1b. update-check (unconditional, opt-out, cached) ----------
+# Query npm registry at most once / 24h, cache the result, inject a one-line
+# notice when a newer curdx-flow version is available. Script exits silently
+# on network failure, missing tools, or when the user has opted out via
+# ~/.curdx/no-update-check. See scripts/update-check.sh and docs/INSTALL.md.
+UPDATE_NOTICE=""
+UPDATE_SCRIPT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/scripts/update-check.sh"
+if [ -x "$UPDATE_SCRIPT" ]; then
+  # run with a hard wall-clock timeout so a slow registry can never block
+  # SessionStart past the hook's declared timeout in hooks/hooks.json
+  UPDATE_RAW=$(timeout 4 bash "$UPDATE_SCRIPT" 2>/dev/null || true)
+  case "$UPDATE_RAW" in
+    UPGRADE_AVAILABLE\ *)
+      OLD_VER=$(echo "$UPDATE_RAW" | awk '{print $2}')
+      NEW_VER=$(echo "$UPDATE_RAW" | awk '{print $3}')
+      UPDATE_NOTICE=$(printf 'curdx-flow %s available (you have %s). Upgrade: `npx curdx-flow@latest install --force`.\nSilence this for good: `touch ~/.curdx/no-update-check`.' "$NEW_VER" "$OLD_VER")
+      ;;
+  esac
+fi
+
 # ---------- 2. curdx-project context (conditional) ----------
 CURDX_CONTEXT=""
 
@@ -152,22 +172,37 @@ EOF
 fi
 
 # ---------- assemble final additionalContext ----------
-# Compose: protocols on top (most fundamental), curdx context below (situational).
-# Skip emit entirely if both are empty (truly nothing to inject).
-if [ -z "$GLOBAL_PROTOCOLS" ] && [ -z "$CURDX_CONTEXT" ]; then
+# Compose: update notice (most transient) → protocols (most fundamental) →
+# curdx context (situational). Skip emit entirely if all three are empty.
+if [ -z "$GLOBAL_PROTOCOLS" ] && [ -z "$CURDX_CONTEXT" ] && [ -z "$UPDATE_NOTICE" ]; then
   exit 0
 fi
 
-if [ -n "$GLOBAL_PROTOCOLS" ] && [ -n "$CURDX_CONTEXT" ]; then
-  CONTEXT="${GLOBAL_PROTOCOLS}
+CONTEXT=""
+if [ -n "$UPDATE_NOTICE" ]; then
+  CONTEXT="> $UPDATE_NOTICE"
+fi
+if [ -n "$GLOBAL_PROTOCOLS" ]; then
+  if [ -n "$CONTEXT" ]; then
+    CONTEXT="${CONTEXT}
+
+---
+
+${GLOBAL_PROTOCOLS}"
+  else
+    CONTEXT="$GLOBAL_PROTOCOLS"
+  fi
+fi
+if [ -n "$CURDX_CONTEXT" ]; then
+  if [ -n "$CONTEXT" ]; then
+    CONTEXT="${CONTEXT}
 
 ---
 
 ${CURDX_CONTEXT}"
-elif [ -n "$GLOBAL_PROTOCOLS" ]; then
-  CONTEXT="$GLOBAL_PROTOCOLS"
-else
-  CONTEXT="$CURDX_CONTEXT"
+  else
+    CONTEXT="$CURDX_CONTEXT"
+  fi
 fi
 
 jq -n --arg ctx "$CONTEXT" '{

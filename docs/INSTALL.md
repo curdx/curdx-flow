@@ -104,6 +104,32 @@ This is intentional and part of the product opinion. Three ways to control it:
 
 The injection lives 100% inside the SessionStart hook — **curdx-flow never writes to `~/.claude/CLAUDE.md`, `~/.claude/rules/`, or `~/.claude/settings.json`**. Uninstalling the plugin (or disabling it) removes the rules from future sessions automatically.
 
+## Update notifications
+
+The SessionStart hook also runs `scripts/update-check.sh` at most once per 24 hours. When a newer `curdx-flow` is published on npm, you'll see a one-line notice at the top of the session context:
+
+```
+> curdx-flow 0.5.0 available (you have 0.1.0). Upgrade: `npx curdx-flow@latest install --force`.
+```
+
+Design choices:
+
+- **Notify only; never auto-upgrade.** You decide when to take the bump.
+- **Throttled.** Network is hit at most once per 24h (cache at `~/.curdx/.last-update-check`). If the network fails, the check silently no-ops.
+- **Non-blocking.** 4-second wall-clock timeout on the registry call; if npm is slow the hook returns empty and SessionStart proceeds normally.
+
+Control it:
+
+| What you want | How |
+|---|---|
+| See update notices (default) | Do nothing |
+| Silence until next version | Bump the cache's max-age by waiting, or just ignore the notice |
+| Silence forever | `touch ~/.curdx/no-update-check` |
+| Re-enable after silencing | `rm ~/.curdx/no-update-check` |
+| Force-check right now | `CURDX_PLUGIN_ROOT=<plugin-dir> bash <plugin-dir>/scripts/update-check.sh --force` |
+
+`/curdx:doctor` step **13** reports the current update-check state and last-known remote version.
+
 ## Uninstall
 
 ```bash

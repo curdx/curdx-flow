@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- **Update-check in SessionStart hook** (`scripts/update-check.sh`, wired through `hooks/load-context.sh`). Queries `registry.npmjs.org/curdx-flow/latest` at most once / 24h, compares to the plugin's `package.json` version, and if a newer release exists, injects a single-line `additionalContext` notice above Global Protocols: `curdx-flow X.Y.Z available (you have A.B.C). Upgrade: npx curdx-flow@latest install --force.` Never auto-upgrades.
+  - **Opt-out:** `touch ~/.curdx/no-update-check` (mirrors the existing `no-global-protocols` marker pattern).
+  - **Fail-safe:** 4-second wall-clock timeout on the registry call, graceful degrade on HTML error pages / empty responses / missing `curl` or `jq` — any failure silently no-ops, SessionStart is never blocked.
+  - **Cache:** `~/.curdx/.last-update-check` stores `UPGRADE_AVAILABLE <old> <new>` or `UP_TO_DATE <ver>` for replay. `--force` busts it (used by `/curdx:doctor --fix`).
+  - **Pattern borrowed from** gstack's `bin/gstack-update-check`. Simplified for curdx: no snooze levels, no telemetry, no "just upgraded" marker — we notify, you decide.
+  - `/curdx:doctor` step **13** reports the cached state without hitting the network.
+  - `docs/INSTALL.md` documents the opt-out / re-enable / force-check lifecycle.
+
+- **Missing test-runner guidance in `/curdx:init`** (step 2a) and in the Rule 2 deny message (`hooks/enforce-constitution.sh`). When `detect-stack.sh` returns `testing.runner = "unknown"`, `/curdx:init` now prints a per-language install hint (`vitest` for node, `pytest` for python, etc.) and the Rule 2 PreToolUse block now includes the same hint when it fires. We deliberately do **not** auto-install a runner — runner choice (vitest vs jest, pytest vs unittest) is a project decision we refuse to make for the user. This closes the "first `/curdx:implement` hits Rule 2 with no actionable remediation" dead-end.
+
 - **Global Protocols auto-injected via SessionStart hook.** Every Claude session where curdx-flow is enabled (which is every session, since plugins are user-global) now receives a "Global Protocols" block as `additionalContext`: 中文 user output / English tool interactions, minimal-no-redundancy code style, decisions backed by code reading or web search, MUST `ultrathink` in English. This is curdx-flow's product opinion on how to work, baked into the plugin instead of relying on each user to copy the rules into their own `~/.claude/CLAUDE.md`.
   - Shipped default at `protocols/global-protocols.md` in the plugin.
   - User override at `~/.curdx/user-protocols.md` (takes precedence, won't be overwritten by upgrades).

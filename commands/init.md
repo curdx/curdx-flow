@@ -28,6 +28,33 @@ Combine the two JSON outputs. If `detect-browser-test.sh` returns `mode: "prompt
 - Question: "We detected a frontend but no test scaffolding. Which browser-test integration do you want?"
 - Options: `playwright` (forms/CRUD), `chrome-devtools` (WebGL/maps/3D), `both`, `none` (no browser tests).
 
+### 2a. Missing test runner — surface, don't auto-install
+
+If `detect-stack.sh` returns `"testing": { "runner": "unknown" }`, Constitution Rule 2 (NO PRODUCTION CODE WITHOUT FAILING TEST) will block `/curdx:implement` the moment a `[GREEN]` task tries to edit production source. Surface this up front so the user can install a runner themselves before that wall.
+
+Print a block like this (substitute the lines for the detected `backend.language`):
+
+```
+⚠  No test runner detected. Constitution Rule 2 requires one.
+
+   Pick ONE and run it yourself, then re-run `/curdx:init`:
+
+     node:    npm i -D vitest && npm pkg set scripts.test="vitest run"
+     python:  pip install pytest && mkdir -p tests
+     go:      (built-in — no install needed)
+     rust:    (built-in — no install needed)
+     ruby:    bundle add rspec --group=test && bundle exec rspec --init
+     java:    (pom.xml / build.gradle — add JUnit per your build tool)
+     php:     composer require --dev phpunit/phpunit
+
+   Why we don't auto-install: runner choice (vitest vs jest, pytest vs
+   unittest, etc.) is a project decision we won't make for you.
+```
+
+Do **not** run the install command. Do **not** use AskUserQuestion to pick one — this is the user's call and they may already have a preference or team convention. Continue with step 3 regardless; the config will carry `testing.runner = "unknown"` and the hint will repeat in any Rule 2 block message (`hooks/enforce-constitution.sh`).
+
+Skip step 2a silently if `testing.runner` is anything other than `"unknown"`.
+
 ### 3. Write `.curdx/config.json`
 
 Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/config-template.json`. Fill in the placeholders from detection results. Write atomically (write to `.curdx/config.json.tmp` then `mv`).
