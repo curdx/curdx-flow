@@ -6,6 +6,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+
+- **`/curdx:snapshot` now defaults to RAW (no redaction) and captures the full event timeline.** Previously the REPORT.md summary truncated to the last 30 events and every file was run through the sanitize regex by default, which defeated the goal of letting the maintainer reproduce a user's failure from a shipped bundle. New defaults:
+  - REPORT.md enumerates **all** events across the current `events.jsonl` and any rotated siblings (`.1`, `.2`, `.3`).
+  - Rotated log files are included in the bundle (they were previously dropped on the floor).
+  - `features/` now ships every feature directory, not just the active one.
+  - `debug/` now ships every debug session.
+  - Claude Code's native transcripts are included **by default** (no 5000-line cap). Pass `--no-transcript` to exclude them.
+  - New `settings/` directory ships `.claude/settings.json`, `.claude/settings.local.json`, and `~/.claude/settings.json` to surface hook-registration drift.
+  - New `hooks/` directory ships the installed plugin hooks so the maintainer can diff them against source.
+  - New `git/` directory ships `log.txt` (200 commits), `status.txt`, `diff-HEAD.patch`, `stash.txt`, `remotes.txt`.
+  - New `env.txt` captures `CLAUDE_*`/`OTEL_*`/`CURDX_*`/`PATH`/`SHELL`/`LANG`/`TERM`, with obvious secret-looking names filtered out.
+- **Redaction is now opt-in** via `--redact` (standard scrubber) or `--strict` (scrubber + emails + IPv4). `--include-transcript` is now a no-op alias kept only for back-compat; use `--no-transcript` to exclude.
+- `META.txt` now explicitly states the bundle is raw-by-default and warns the user to re-run with `--redact` before sharing outside a trusted recipient.
+
 ## [0.4.0] — Round 4: structured event logging + snapshot bundling
 
 Make curdx-flow self-observable: every session emits a structured event stream

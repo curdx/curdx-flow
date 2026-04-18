@@ -1,81 +1,99 @@
 ---
-description: Package up the current project's curdx-flow state and recent events into a sanitized tarball for sharing with the maintainer. Collects state.json + events.jsonl + active feature artifacts + versions; applies regex-based secret redaction; writes a human-readable REPORT.md summary.
-argument-hint: [--strict] [--include-transcript] [--no-preview] [--here]
+description: Package up the current project's curdx-flow state, logs, transcripts, settings, and git state into a tarball for the maintainer. Default is RAW (no redaction) — pass --redact to scrub secrets. Produces REPORT.md summary with the FULL event timeline.
+argument-hint: [--redact] [--strict] [--no-transcript] [--no-preview] [--here]
 allowed-tools: Read, Bash, AskUserQuestion
 ---
 
-You are running `/curdx:snapshot`. Goal: produce a shareable diagnostic bundle for the maintainer when something goes wrong.
+You are running `/curdx:snapshot`. Goal: produce a diagnostic bundle the
+maintainer can use to fully reproduce and analyze a curdx-flow issue on
+someone else's machine.
 
-This is NOT a bug-fixing command; it's a "here's what happened in my session" packager. For actual bug investigation, use `/curdx:debug`.
+This is NOT a bug-fixing command; it's a "here's what happened" packager.
+For actual bug investigation, use `/curdx:debug`.
+
+## Design choice: completeness over privacy
+
+The bundle is shared one-to-one with the maintainer of curdx-flow. Redacted
+logs hide the exact cause of bugs, so the default is **no redaction**. If
+the user wants to share the bundle more broadly (posting on a public issue,
+forwarding to a third party), they can pass `--redact` or `--strict`.
 
 ## Pre-checks
 
 1. Read `.curdx/state.json`. If missing, tell the user this project isn't initialized (they need `/curdx:init` first).
 2. Parse flags from `$ARGUMENTS`:
-   - `--strict` — maximally aggressive redaction (emails + all IPs, on top of default secrets)
-   - `--include-transcript` — add Claude Code's native transcript (`~/.claude/projects/.../session.jsonl`, last 5000 lines sanitized). **Default off** because transcripts contain raw tool outputs and potentially user prompts with PII.
+   - `--redact` — run the regex sanitizer on every file (secrets, home paths, bearer tokens, JWTs, DB creds, etc.)
+   - `--strict` — `--redact` PLUS emails and all IPv4 addresses
+   - `--no-transcript` — skip Claude Code's native transcripts (they're included by default for full fidelity)
    - `--no-preview` — skip the "seal tarball? [Y/n]" confirmation
    - `--here` — write tarball to current directory instead of `$HOME`
 
 ## Steps
 
-### 1. Surface what's about to happen
-
-Run `/curdx:doctor` first (as a separate call via `Read`-ing `.curdx/state.json` and printing the state). The snapshot script CANNOT invoke slash commands itself, so encourage the user to paste doctor output into the bug report thread manually if needed.
-
-### 2. Run the snapshot script
+### 1. Run the snapshot script
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/snapshot.sh" $ARGUMENTS
 ```
 
-Arguments pass through verbatim.
+Arguments pass through verbatim. `CLAUDE_PLUGIN_ROOT` is exported so the
+script can locate the installed hook scripts to include in the bundle.
 
-### 3. Explain the output to the user
+### 2. Explain the output to the user
 
 After the script finishes, it prints the tarball path. Surface to the user:
 
 - Where the tarball is (`~/curdx-snapshot-<timestamp>.tar.gz` by default)
 - Approximate size
-- What's inside (events.jsonl, state.json, features/active/, config.json, install-state, versions, REPORT.md)
-- What's NOT inside by default (transcript — pass `--include-transcript` to add; full bash commands — only first word logged; file paths — basenames only)
-- Reminder: sanitization is regex-based; user should skim REPORT.md before sharing to catch anything the regex missed
+- What's inside (full list below)
+- Whether redaction ran (yes if user passed `--redact`/`--strict`; otherwise raw)
+- Reminder: if they're sharing beyond the maintainer, re-run with `--redact`
 
-### 4. Next-step suggestion
+### 3. Bundle contents
 
 ```
 snapshot ready: ~/curdx-snapshot-{timestamp}.tar.gz
 
 contents:
-  - REPORT.md        human-readable summary (scan this first!)
-  - events.jsonl     {N} session events, sanitized
-  - state.json       current phase + task progress
-  - config.json      stack detection + testing mode
-  - features/        active feature's spec/plan/tasks (sanitized)
-  - install-state.json dependency versions
-  - versions.txt     claude/node/jq/git versions
+  - REPORT.md               human-readable summary with the FULL event
+                            timeline (not truncated), hook firings,
+                            current state, git log + status
+  - events.jsonl            all events from the current log
+  - events.jsonl.1 / .2     rotated logs from prior bursts (if present)
+  - state.json              phase + task progress
+  - config.json             stack detection + testing mode
+  - install-state.json      dependency versions
+  - features/               EVERY feature directory (spec/plan/tasks/...)
+  - debug/                  every /curdx:debug session
+  - settings/               project + user .claude/settings.json(s)
+  - hooks/                  installed plugin hooks (for version-drift checks)
+  - transcripts/            all Claude native session transcripts for this
+                            project, full length (skip with --no-transcript)
+  - git/log.txt             last 200 commits
+  - git/status.txt          working tree status
+  - git/diff-HEAD.patch     uncommitted diff vs HEAD
+  - git/stash.txt           stash list
+  - env.txt                 safe env vars (CLAUDE_*, OTEL_*, PATH, etc.)
+  - versions.txt            claude/node/jq/git/bash versions + uname -a
+  - META.txt                generation metadata + share guidance
 
 to share:
   - email / DM / upload the tar.gz to the curdx-flow maintainer
   - before sharing, at minimum: `tar -tzf the-tarball` to list contents,
     `tar -xzO the-tarball <file> | less` to spot-check contents
 
-default redaction covers: API keys (anthropic/openai/github/gitlab/aws/
-google/slack), bearer tokens, PEM private keys, DB URLs with creds,
-KEY=VALUE env entries containing TOKEN/SECRET/KEY/PASSWORD/CREDENTIAL,
-JWT, home directory paths, /var/folders.
-
---strict ALSO redacts emails and all IPv4 addresses.
---include-transcript adds ~/.claude/projects/<project>/<session>.jsonl
-  (last 5000 lines, sanitized) — this is the richest source of context
-  but also most likely to contain sensitive info you typed.
+redaction (opt-in via --redact / --strict):
+  API keys (anthropic/openai/github/gitlab/aws/google/slack), bearer tokens,
+  PEM private keys, DB URLs with creds, KEY=VALUE env entries containing
+  TOKEN/SECRET/KEY/PASSWORD/CREDENTIAL, JWTs, home directory paths,
+  /var/folders. --strict ALSO redacts emails and all IPv4 addresses.
 ```
 
 ## When to use
 
 - Something broke in `/curdx:implement` that isn't your fault (loop stuck, constitution denying legitimate edits, hooks misfiring)
-- The maintainer asked for logs
-- You want to audit your own session — skim `events.jsonl` and `REPORT.md` to understand what curdx-flow actually did
+- The maintainer asked for logs to diagnose an issue on your machine
+- You want to audit your own session — skim `REPORT.md` to see the full timeline
 
 ## What the bundle does NOT replace
 
