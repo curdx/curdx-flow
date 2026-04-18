@@ -18,7 +18,9 @@ You are running `/curdx:ship`. This is the final step in the feature lifecycle. 
    done=$(grep -c 'status="done"' ".curdx/features/$ACTIVE/tasks.md" 2>/dev/null || echo 0)
    [ "$done" -lt "$total" ] && echo "Not all tasks complete ($done/$total)" && exit 1
    ```
-3. Unless `--skip-verify`: require `.curdx/features/$ACTIVE/verification.md` to exist AND contain `**Result:** VERIFIED`. If not, refuse with clear message directing to `/curdx:verify`.
+3. Unless `--skip-verify`: require `.curdx/features/$ACTIVE/verification.md` to exist AND contain either `**Result:** VERIFIED` or `**Result:** VERIFIED_WITH_SHIP_BLOCKERS`. If not, refuse with clear message directing to `/curdx:verify`.
+
+   If the result is `VERIFIED_WITH_SHIP_BLOCKERS`, surface a heads-up BEFORE running the harness in step 4b: "Your last `/curdx:verify` previewed ship blockers. If you haven't fixed them since, `/curdx:ship` will refuse in a moment." Do NOT auto-skip — we re-run the harness fresh because the user may have fixed things between verify and ship.
 4. Read `.curdx/config.json` to check git settings.
 
 ## Steps

@@ -3,7 +3,7 @@
 **Feature ID:** {{FEATURE_ID}}
 **Verified by:** curdx-verifier
 **Timestamp:** {{ISO_TIMESTAMP}}
-**Result:** {{VERIFIED | VERIFICATION_GAPS | BLOCKED}}
+**Result:** {{VERIFIED | VERIFIED_WITH_SHIP_BLOCKERS | VERIFICATION_GAPS | BLOCKED}}
 
 ## Summary
 
@@ -74,6 +74,29 @@
   1. Test with fix applied → PASS (evidence: `evidence/rg-fix-applied-{{ts}}.log`)
   2. Fix reverted → test FAILS (evidence: `evidence/rg-fix-reverted-{{ts}}.log`)
   3. Fix restored → test PASSES again (evidence: `evidence/rg-fix-restored-{{ts}}.log`)
+
+## Delivery Harness Preview
+
+Dry-run of the gates `/curdx:ship` will enforce at push time. This is informational — a failure here lowers the overall result to `VERIFIED_WITH_SHIP_BLOCKERS` but does not affect acceptance-criteria verification.
+
+| Gate | Status | Detail |
+|------|--------|--------|
+| A install   | {{pass/fail/skip}} | {{detail}} |
+| B build     | {{pass/fail/skip}} | {{detail}} |
+| C smoke     | {{pass/fail/skip}} | {{detail}} |
+| D preflight | {{pass/fail/skip}} | {{detail}} |
+
+**Raw output:** `evidence/harness-preview-{{ts}}.json`
+
+### Blockers to fix before `/curdx:ship` (if any)
+
+- **[gate]** {{failure message from harness .failures[]}}
+- ...
+
+### Warnings (advisory findings — ship will proceed but user should know)
+
+- **[gate]** {{warning message from harness .warnings[]}}
+- ...
 
 ## Gaps (if VERIFICATION_GAPS)
 
