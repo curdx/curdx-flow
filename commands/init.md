@@ -144,6 +144,28 @@ If any gate is `fail`, append a short "what this means":
 
 If all gates are pass/skip, just say: `  baseline looks clean — no pre-existing issues detected.`
 
+### 8b. Statusline opt-in (recommended, not auto)
+
+curdx-flow ships `hooks/statusline.sh` — when registered as Claude Code's `statusLine`, it (a) shows a context-usage progress bar to the user and (b) writes a bridge file that lets `hooks/context-monitor.sh` warn the agent when context is running low. Without it, `context-monitor.sh` exits silently (no harm, but you lose the warning).
+
+We do NOT auto-write `~/.claude/settings.json` (per CLAUDE.md project rule). Instead, suggest the one-liner the user can run themselves. Print exactly:
+
+```
+optional: enable statusline + context-pressure warnings
+
+  Add this to ~/.claude/settings.json (or .claude/settings.json in this project):
+
+    "statusLine": {
+      "type": "command",
+      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/statusline.sh"
+    }
+
+  Without it: the PostToolUse context-monitor hook degrades silently (no warnings injected).
+  With it: agent gets WARNING at 35% remaining, CRITICAL at 25% — wraps up before compaction.
+```
+
+Skip this print if `~/.claude/settings.json` already contains `statusline.sh` (the user already enabled it — common in re-init).
+
 ### 9. Print success summary
 
 Print exactly this format (substitute real values):
@@ -159,6 +181,7 @@ curdx-flow initialized.
   constitution:    .claude/rules/constitution.md ({{n}} hard rules loaded)
 
 next: `/curdx:spec <feature-slug>` to start your first feature.
+      (or `/curdx:next` to auto-route, `/curdx:do <text>` for NL routing.)
 ```
 
 ## Failure handling
