@@ -1,10 +1,12 @@
 ---
-description: Commit all feature artifacts and push to the current branch. No PR creation, no CI monitoring. Requires /curdx:verify to have run (or --skip-verify to override).
-argument-hint: [--skip-verify] [--no-push]
+description: Commit all feature artifacts and run the Delivery-Guarantee Harness (install / build / smoke / research-driven preflight) before pushing. Refuses to push if any blocker gate fails. No PR creation, no CI monitoring.
+argument-hint: [--skip-verify] [--skip-preflight] [--no-push]
 allowed-tools: Read, Write, Edit, Bash
 ---
 
-You are running `/curdx:ship`. This is the final step in the feature lifecycle. Scope is intentionally minimal: commit + push. PR creation / CI monitoring / auto-merge are NOT in scope (per user direction — no CI adapter layer).
+You are running `/curdx:ship`. This is the final step in the feature lifecycle. Scope is intentionally minimal: commit + **verify runnable** + push. PR creation / CI monitoring / auto-merge are NOT in scope (per user direction — no CI adapter layer).
+
+**Delivery-Guarantee Harness.** Between "commit" and "push" runs `scripts/verify-runnable.sh`, which enforces four gates: install, build, smoke, and preflight (research-driven assertions from `findings.json`). A failing blocker aborts the push — the "shipped" state only applies to work that actually runs.
 
 ## Pre-checks
 
@@ -64,6 +66,39 @@ Create or switch to a feature branch first, e.g.:
   git checkout -b feature/{feature_slug}
 ```
 
+### 4b. Delivery-Guarantee Harness (verify-runnable)
+
+Before pushing, run the harness. This is the single most load-bearing step in Path 4:
+
+```bash
+# Flag translation:
+#   /curdx:ship                    → verify-runnable with all gates
+#   /curdx:ship --skip-preflight   → verify-runnable --skip-preflight (A/B/C still enforced)
+#   /curdx:ship --skip-verify      → skip this entire step 4b
+HARNESS_ARGS="--feature $ACTIVE"
+[ "$SKIP_PREFLIGHT" = "1" ] && HARNESS_ARGS="$HARNESS_ARGS --skip-preflight"
+
+HARNESS_JSON=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/verify-runnable.sh" $HARNESS_ARGS 2>/dev/null) || true
+```
+
+Surface the summary to the user verbatim — each gate (A install / B build / C smoke / D preflight) with its pass/fail/skip status and detail line. The script already printed the human summary on stderr; include it in your response.
+
+Decision:
+
+- **All gates pass** (`.status == "pass"`): proceed to step 5.
+- **Any blocker fails** (`.status == "fail"`): **refuse to push**. Print each failure from `.failures[]`, grouped by gate, with the remediation hint. End the response with one line telling the user the three unblocks:
+  - fix the root cause, re-run `/curdx:ship` (preferred)
+  - `/curdx:ship --skip-preflight` — skips gate D only; A/B/C still enforced (use when a finding's `preflight_cmd` itself is broken, not when the assertion fails)
+  - `/curdx:ship --skip-verify` — nuclear, skips the entire harness (use only when you have an out-of-band guarantee the branch runs)
+- **`--skip-verify`** was passed: skip this entire step 4b. Print a prominent warning verbatim: `SKIP_VERIFY: the Delivery-Guarantee Harness was bypassed. The remote branch may not build or run.`
+
+Record the harness result in state for `/curdx:status` to surface:
+
+```bash
+. "${CLAUDE_PLUGIN_ROOT}/scripts/lib/state-io.sh"
+state_merge "{\"last_harness\": $(echo "$HARNESS_JSON" | jq '{status, feature, gates: (.gates | with_entries(.value |= .status))}')}"
+```
+
 ### 5. Push (unless --no-push)
 
 ```bash
@@ -103,6 +138,10 @@ state_merge '{"phase": "shipped", "awaiting_approval": true}'
 
 - **Tasks not done**: surface the unchecked task ids; suggest `/curdx:implement` or `/curdx:status`
 - **Verification not done**: surface; suggest `/curdx:verify`
+- **Harness gate A (install) fails**: lockfile drift. Surface the remediation from the gate detail (usually "run `npm install` / `go mod tidy` / etc. and commit the lockfile").
+- **Harness gate B (build) fails**: compile/type errors. Surface the command the user should run to see the errors (e.g. `npx tsc --noEmit`, `go build ./...`).
+- **Harness gate C (smoke) fails**: a `.curdx/smoke.sh` you committed returned non-zero, or the fallback heuristic (go vet, entrypoint check) flagged an issue. Re-run the smoke script directly to see output.
+- **Harness gate D (preflight) fails**: a research-time blocker finding's `preflight_cmd` returned non-zero. Surface the finding id, assertion, and command. The user either fixes the underlying assumption (e.g., upgrades the library, sets the env var) or — if the preflight itself was wrong — edits `.curdx/features/$ACTIVE/findings.json` and re-runs `/curdx:ship`.
 - **Unclean working tree** (unexpected uncommitted files): list the files; ask whether to stage/commit them or stash
 - **Currently on main**: refuse (see step 4)
 - **Push fails (auth)**: surface, don't retry without user input

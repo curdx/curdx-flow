@@ -55,6 +55,20 @@ How do we know in production this worked? (Not "tests pass" — that's verify. T
 
 - ...
 
+## Research Findings
+
+Pre-flight research produced by `curdx-analyst` before spec was finalized. Canonical artifact is `findings.json` (same directory) — this table is the human-readable mirror.
+
+Every `blocker` finding has a `preflight_cmd` that `/curdx:ship` runs before push; a failing blocker aborts the push. `advisory` findings surface as warnings but do not block.
+
+| ID | kind | assertion | severity | source |
+|----|------|-----------|----------|--------|
+| F1 | version | ... | blocker | https://... |
+| F2 | env | ... | blocker | — |
+| F3 | api | ... | advisory | https://... |
+
+If the feature has no predictable runtime risks, this table is empty and `findings.json` has `"findings": []`. That is legal; don't invent risks.
+
 ## Open Questions
 
 Use `/curdx:clarify` to resolve these. Each Q gets a recorded A.
