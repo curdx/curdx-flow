@@ -6,7 +6,7 @@ allowed-tools: Read
 
 You are running `/curdx:help`. Show the command catalog.
 
-**The important thing to tell the user up-front:** curdx-flow 的 20 个命令里只有 8 个你**需要**记住。其他 12 个会在你描述意图时由 `curdx-using-skills` meta-skill 自动触发——`skills/curdx-using-skills/SKILL.md` 里有完整的 intent→action 映射表。
+**The important thing to tell the user up-front:** curdx-flow 的 22 个命令里只有 10 个你**需要**记住。其他 12 个会在你描述意图时由 `curdx-using-skills` meta-skill 自动触发——`skills/curdx-using-skills/SKILL.md` 里有完整的 intent→action 映射表。**新手提示：忘了下一步该干啥就 `/curdx:next`，记不住命令就 `/curdx:do <自由文本描述>`。**
 
 ## Steps
 
@@ -39,6 +39,8 @@ curdx-flow commands
 
   /curdx:init                   bootstrap .curdx/, detect stack, copy constitution
   /curdx:spec <slug>            start a new feature (spec first, everything else follows)
+  /curdx:next                   auto-advance to the logical next command (zero-friction)
+  /curdx:do <freeform text>     route NL intent to the right command (dispatcher only)
   /curdx:implement [--safe]     autonomous Stop-hook loop; one commit per atomic task
   /curdx:ship                   commit all feature artifacts + git push
   /curdx:status                 dashboard — phase, progress, active feature, artifacts
