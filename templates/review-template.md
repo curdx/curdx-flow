@@ -1,10 +1,10 @@
 # Review: {{FEATURE_NAME}}
 
 **Feature ID:** {{FEATURE_ID}}
-**Reviewer:** curdx-reviewer (adversarial, two-stage)
+**Reviewers:** `curdx-spec-reviewer` (Stage 1) + `curdx-quality-reviewer` (Stage 2)
 **Started:** {{TIMESTAMP}}
 
-Findings accumulate as the review iterates. Each stage is run in a fresh subagent context to enforce independent judgment.
+Findings accumulate as the review iterates. Each stage runs in a fresh subagent context — and each stage runs in a DIFFERENT agent — to enforce independent judgment. Pattern from obra's `superpowers:subagent-driven-development`.
 
 ---
 

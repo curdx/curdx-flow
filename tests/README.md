@@ -1,6 +1,28 @@
 # Tests
 
-Evaluative tests for curdx-flow. Two layers:
+Evaluative tests for curdx-flow. Three layers:
+
+## `integration/` — runnable structural + hook tests
+
+Shell-based assertions that verify plugin mechanics (hook JSON output, file layout, agent dispatch contracts, template discipline). **These run automatically and fail fast.**
+
+```bash
+./tests/integration/run.sh          # run all
+./tests/integration/run.sh loader   # run only test-loader.sh (substring filter)
+```
+
+Current coverage:
+
+| Test file | What it pins |
+|---|---|
+| `test-load-context.sh` | SessionStart hook's 4 injection paths: inside curdx project, outside, opt-out marker, upgrade-cached. Verifies `<EXTREMELY-IMPORTANT>` ordering and that global protocols fire independently of auto-dispatch. |
+| `test-reviewer-split.sh` | The two-agent split is intact: old `curdx-reviewer.md` gone, new spec-reviewer + quality-reviewer exist, `commands/review.md` dispatches both, no stale `curdx-reviewer\b` references anywhere except CHANGELOG. |
+| `test-task-granularity.sh` | Template `<action>` blocks are numbered step lists (not prose), TDD pair has ≥6 steps, planner's hard rule #2 + self-review checklist + anti-patterns cite the step-granularity discipline. |
+| `test-help-structure.sh` | `commands/help.md` classifies all 20 commands into exactly 8 CORE + 12 ADVANCED; no command file lacks classification. |
+
+The shared `lib/assert.sh` provides `assert`, `assert_file_exists`, `assert_contains`, `assert_not_contains`, `assert_regex`, `assert_count`, `assert_exit`, and `finish_test`. Each test prints ✓/✗ lines and exits with the cumulative fail count; `run.sh` aggregates.
+
+**When to add an integration test**: whenever a change could silently regress and the regression wouldn't be obvious in a pressure test (which focuses on adversarial-prompt compliance, not mechanics).
 
 ## `evals/` — skill pressure tests
 
@@ -21,6 +43,8 @@ evals/
 │   └── pressure-1-friday-evening.md
 ├── curdx-systematic-debug/
 │   └── pressure-1-third-retry.md
+├── curdx-using-skills/
+│   └── pressure-1-silent-edit.md
 └── README.md
 ```
 

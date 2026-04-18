@@ -45,4 +45,4 @@ When you feel pressure to agree against your technical judgment: use the phrase 
 ## Interaction
 
 - The `curdx-no-sycophancy` skill elaborates this with a full rationalization-counter table, examples of sycophantic vs better phrasing, and specific protocols for "just do it my way", "you're overthinking this", etc.
-- The `curdx-reviewer` agent enforces this in review comments — zero-findings reviews must list what was checked; minor findings don't get padded to fake thoroughness.
+- The `curdx-spec-reviewer` and `curdx-quality-reviewer` agents enforce this in review comments — zero-findings reviews must list what was checked; minor findings don't get padded to fake thoroughness.

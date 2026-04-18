@@ -90,9 +90,9 @@ Do NOT immediately rewrite from scratch. Do NOT agree without understanding. Ste
 | "Thanks for pointing that out!" | {just do the thing} |
 | "My mistake, let me retry." | "The earlier output was wrong because I assumed X; I've re-run with Y and get {real result}." |
 
-## Interaction with curdx-reviewer
+## Interaction with the reviewer agents
 
-When you are the `curdx-reviewer` subagent writing review comments:
+When you are a reviewer subagent (`curdx-spec-reviewer` or `curdx-quality-reviewer`) writing review comments:
 
 - **Do NOT soften criticism with gratitude**. ("Great work overall! Just one small thing..." — drop the first sentence.)
 - Lead with the technical issue, not the interpersonal framing.

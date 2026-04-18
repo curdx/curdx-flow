@@ -112,7 +112,7 @@ next:
 
 ## Why two separate agents (not one agent called twice)
 
-The old design dispatched one `curdx-reviewer` agent twice with a "which stage" parameter. That was wrong: the same-agent-different-call pattern shares nothing at the conversation level, but **the prompt contains both stages' rules**, so the agent carries stage-2-shaped thinking into stage 1 (and vice versa) even on a fresh dispatch. obra found this in `superpowers:subagent-driven-development` (`/tmp/superpowers/skills/subagent-driven-development/SKILL.md:47-79`) and split into implementer / spec-reviewer / code-quality-reviewer. We do the same.
+Stage 1 and Stage 2 ask DIFFERENT questions. Loading both questions into one agent's prompt — even across two fresh dispatches — bleeds stage-2-shaped thinking into stage 1 and vice versa, because the prompt itself contains both rule sets. obra proved this in `superpowers:subagent-driven-development` (`skills/subagent-driven-development/SKILL.md:47-79`) and split into three dedicated agents: implementer / spec-reviewer / code-quality-reviewer. We do the same here.
 
 The payoff is subtle but real: Stage 1 can't rationalize "this FR is missing but the code is so clean it deserves compliance"; Stage 2 can't rationalize "the code is a mess but it matches the spec so approved". Separate prompts, separate judgments.
 

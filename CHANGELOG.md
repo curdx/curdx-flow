@@ -8,6 +8,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- **`tests/integration/` — runnable shell-based structural + hook tests.** Four test files + shared `lib/assert.sh` + `run.sh` aggregator. This is the third testing layer alongside `tests/evals/` (manual pressure tests) and `tests/e2e/` (fixture scenarios). Each integration test exits nonzero on any assertion failure; `run.sh` aggregates into a pass/fail summary.
+  - `test-load-context.sh` — 19 assertions across 5 scenarios (inside-curdx, outside-curdx, opt-out marker, upgrade-cached, syntax clean). Pins the SessionStart hook contract, including `<EXTREMELY-IMPORTANT>` ordering above global protocols.
+  - `test-reviewer-split.sh` — 19 assertions: two-agent files exist with correct frontmatter names and return-contract strings, scope-discipline language present, `commands/review.md` dispatches both in the right order, no stale `curdx-reviewer\b` references anywhere except CHANGELOG.
+  - `test-task-granularity.sh` — 19 assertions: every `<action>` is a numbered step list (zero prose blobs), RED has ≥3 steps, GREEN has ≥3, TDD pair ≥6 total, planner agent cites the 2-5min budget + flags under/over-sized tasks + has the matching anti-patterns.
+  - `test-help-structure.sh` — 25 assertions: help.md lists all 8 CORE and all 12 ADVANCED commands, counts match expectations, every `commands/*.md` file is classified, every classified command has a file.
+  - `tests/evals/curdx-using-skills/pressure-1-silent-edit.md` — new pressure test for P0 auto-dispatch. Adversarial prompt: user describes a JWT auth feature AND explicitly says "skip the pipeline". Grading rubric covers 7 compliance indicators. Manual run until Round 5 adds `claude -p` eval automation.
+
+### Fixed
+
+- **Stale references to the deleted `curdx-reviewer` agent** surfaced by `test-reviewer-split.sh`. Bugs caught:
+  - `commands/analyze.md` was still dispatching `subagent_type: curdx-reviewer` — a runtime crash waiting for the first user of `/curdx:analyze`. Switched to `curdx-spec-reviewer` (analyze is Stage 1 run pre-implementation).
+  - `templates/review-template.md` header named the old agent. Updated to cite both new agents.
+  - `rules/no-sycophancy.md` and `skills/curdx-no-sycophancy/SKILL.md` referenced `curdx-reviewer` in "interaction" sections. Updated.
+  - `commands/review.md` had a historical explainer paragraph mentioning the old agent name. Rephrased without the legacy reference (CHANGELOG keeps the history).
+
 - **Auto-dispatch meta-skill (`curdx-using-skills`) injected via SessionStart.** Adapts obra's `superpowers:using-superpowers` pattern: when cwd is a curdx-initialized project, `hooks/load-context.sh` injects `skills/curdx-using-skills/SKILL.md` as `additionalContext`, wrapped in `<EXTREMELY-IMPORTANT>` tags. The skill contains a 16-row intent→action map (user says "let's add X" → auto-dispatch `/curdx:spec` logic; "fix bug" → auto-dispatch `/curdx:debug`; etc.) plus a Red Flags rationalization-counter table lifted from obra's design. **Net effect: the user never has to remember 20 slash commands** — they describe intent, Claude routes to the right pipeline entry point. Slash commands remain as manual override.
   - Inject order in `additionalContext`: update-notice → `<EXTREMELY-IMPORTANT>using-skills</EXTREMELY-IMPORTANT>` → global-protocols → project-context. Using-skills goes NEAR THE TOP because it shapes every subsequent response.
   - Opt-out: `touch ~/.curdx/no-auto-dispatch` (follows existing `no-global-protocols` / `no-update-check` marker pattern).
