@@ -2,6 +2,7 @@
 description: Verify the active feature meets every acceptance criterion with fresh evidence. Dispatches curdx-verifier to re-run every AC + verify command; captures screenshots, stdout, exit codes; writes verification.md.
 argument-hint: [--feature <id>] (default — active feature from state.json)
 allowed-tools: Read, Write, Edit, Bash, Task
+user-invocable: false
 ---
 
 You are running `/curdx:verify`. Your job is to delegate to `curdx-verifier` and act on the results.

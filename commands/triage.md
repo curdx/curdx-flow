@@ -2,6 +2,7 @@
 description: Decompose a large-tier effort into multiple independently-shippable features. Writes an epic manifest and creates N feature directories with cross-references. Use when detect-complexity classifies work as "large" or a feature spans 5+ user stories.
 argument-hint: <epic-name> <goal>
 allowed-tools: Read, Write, Edit, Bash, Task, AskUserQuestion
+user-invocable: false
 ---
 
 You are running `/curdx:triage <epic-name> <goal>`. Your job is to break a large effort into vertical slices that can each go through `/curdx:spec` → `/curdx:plan` → ... → `/curdx:ship` independently.

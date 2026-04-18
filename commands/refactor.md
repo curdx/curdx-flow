@@ -2,6 +2,7 @@
 description: Edit active feature's spec, plan, or tasks with automatic cascade detection. Changing spec may invalidate plan; changing plan may invalidate tasks. Routes the right re-generation to the right agent.
 argument-hint: [--file {spec|plan|tasks|constitution}] [reason]
 allowed-tools: Read, Write, Edit, Bash, Task, AskUserQuestion
+user-invocable: false
 ---
 
 You are running `/curdx:refactor`. Your job is to let the user amend one of the feature's artifacts (or the constitution), then check whether downstream artifacts are now stale and need regeneration.

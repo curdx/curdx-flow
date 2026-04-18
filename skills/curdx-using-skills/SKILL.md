@@ -11,7 +11,7 @@ If no curdx pattern applies (e.g. the user asked a pure question with no action 
 
 # Why this skill exists
 
-The user has 20 slash commands available (`/curdx:init`, `/curdx:spec`, `/curdx:plan`, ...) but **cannot be expected to remember any of them**. This skill is the bridge: user describes intent in natural language, you detect the intent, you run the right command's dispatch logic directly — the user never needs to know the command exists.
+The user has 22 slash commands available but, starting Round 5, only 10 CORE commands (`/curdx:init`, `/curdx:spec`, `/curdx:implement`, `/curdx:ship`, `/curdx:status`, `/curdx:doctor`, `/curdx:help`, `/curdx:snapshot`, `/curdx:next`, `/curdx:do`) are visible in the `/` menu. The remaining 12 ADVANCED commands carry `user-invocable: false` in their frontmatter and are only reachable via this skill's auto-dispatch — the user **cannot be expected to remember any of them**. This skill is the bridge: user describes intent in natural language, you detect the intent, you run the right command's dispatch logic directly — the user never needs to know the command exists.
 
 Pattern lifted from obra's `superpowers:using-superpowers` (`/tmp/superpowers/skills/using-superpowers/SKILL.md:10-16`). The hard measure is: **if after this skill a user can describe "I want to add a password reset feature" and end up with spec → plan → tasks → implementation → verification → review → ship artifacts without ever typing a slash command, we succeeded**.
 
@@ -34,6 +34,7 @@ Check this map BEFORE any reply, BEFORE any clarifying question, BEFORE any file
 |---|---|---|
 | "I want to build X" / "new feature" / "let's add X" / describes a feature | Invoke `/curdx:spec <slug>` logic (dispatch `curdx-analyst`) | Rule 1 — no code without spec |
 | "here's a spec doc" / user pastes requirements | Invoke `/curdx:spec` then suggest `/curdx:clarify` if ambiguity | Same |
+| "design the API" / "what endpoints do we need?" / "define the contract" / describes request-response shapes for a full-stack feature | Dispatch `curdx-contractor` to generate `contracts/<feature-id>/openapi.yaml` (or tRPC/GraphQL) BEFORE `/curdx:plan` | Single source of truth — backend and frontend both consume the contract; see `skills/curdx-contract-first/SKILL.md` |
 | "can we plan this?" / "what's the architecture?" after spec exists | Invoke `/curdx:plan` logic (dispatch `curdx-architect`) | Normal flow |
 | "break it into tasks" / "let's decompose" after plan exists | Invoke `/curdx:tasks` logic (dispatch `curdx-planner`) | Normal flow |
 | "let's build it" / "implement" / "start coding" after tasks exist | Invoke `/curdx:implement` logic (kick off Stop-hook loop) | Normal flow |

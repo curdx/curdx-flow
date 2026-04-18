@@ -2,6 +2,7 @@
 description: Cross-artifact consistency audit of spec.md, plan.md, and tasks.md. Produces a findings table (6 categories × 4 severity levels) + coverage table + metrics. Read-only.
 argument-hint: (no arguments)
 allowed-tools: Read, Grep, Glob, Bash, Task
+user-invocable: false
 ---
 
 You are running `/curdx:analyze`. Your job is to delegate to `curdx-spec-reviewer` in analyze-mode — a non-destructive audit across spec, plan, tasks, and constitution. Analyze is essentially "Stage 1 of review, run pre-implementation" — it's checking the artifacts against each other, not checking code against artifacts. The spec-reviewer agent knows how to judge spec consistency; we reuse it here.

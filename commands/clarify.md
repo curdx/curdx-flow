@@ -2,6 +2,7 @@
 description: Resolve ambiguity in the active spec by asking up-to-5 targeted clarification questions. 9-category taxonomy, multiple-choice format, atomic writeback to spec.md.
 argument-hint: (no arguments)
 allowed-tools: Read, Write, Edit, Bash, Task, AskUserQuestion
+user-invocable: false
 ---
 
 You are running `/curdx:clarify`. Your job is to dispatch `curdx-analyst` in clarification mode to resolve `[NEEDS CLARIFICATION]` markers and surface latent ambiguity.

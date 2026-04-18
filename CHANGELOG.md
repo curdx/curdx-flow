@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed — Round 5 groundwork: contract-first + browser MCP always-on + `/` menu reduction
+
+- **MCP servers `playwright` + `chrome-devtools` added to `.claude-plugin/plugin.json`.** Microsoft's official `@playwright/mcp@latest` (accessibility-tree driven, deterministic, best for pre-release verification) and Google's official `chrome-devtools-mcp@latest` (Console/Network/Performance/DOM, best for day-to-day development). 2026 consensus (Simon Willison, Steve Kinney, official Chrome for Developers blog) is to run both — Chrome DevTools MCP as the everyday "debugging" tool, Playwright MCP as the verification "driving" tool. They auto-start when the plugin is enabled; no user install step needed beyond the plugin itself.
+- **12 ADVANCED commands hidden from the `/` menu** via `user-invocable: false` frontmatter: `clarify`, `plan`, `tasks`, `analyze`, `verify`, `review`, `debug`, `quick`, `refactor`, `cancel`, `resume`, `triage`. They remain fully functional — `curdx-using-skills` still auto-dispatches them from natural-language intent. Only the 10 CORE commands stay visible in `/`: `init`, `spec`, `implement`, `ship`, `status`, `doctor`, `help`, `snapshot`, `next`, `do`. Rationale: 2026 Claude Code best-practice consensus (per [jxnl on context engineering](https://jxnl.co/writing/2025/08/29/context-engineering-slash-commands-subagents/), the official `/batch`-and-friends shipping pattern, and Warp/Replit/Lovable single-entry UX) — commands are the "take the wheel" escape hatch, skills are the default auto-dispatch layer. Visible menu bloat was a recognized anti-pattern.
+- **`skills/curdx-using-skills/SKILL.md` intent-map gained a contract-first row.** When the user asks about API endpoints, request/response shapes, or explicitly says "contract", dispatch `curdx-contractor` BEFORE `/curdx:plan`. The "Why this skill exists" preamble now reflects the 10-visible / 12-hidden split.
+
+### Added — Contract-first pipeline (Round 5 MVP)
+
+- **New `contracts/` directory at repo root** (whitelisted in `package.json.files`). Holds per-feature single source of truth: `contracts/<feature-id>/{openapi.yaml | trpc.ts | schema.graphql}`. README at the directory root explains consumption contract: backend task `read_first` + frontend task `read_first` both cite the contract file; any drift between code and contract is a bug.
+- **New `curdx-contractor` subagent** (`agents/curdx-contractor.md`). Runs between `curdx-analyst` (spec) and `curdx-architect` (plan) for any feature the spec marks as full-stack. Reads `spec.md` → produces `contracts/<feature-id>/openapi.yaml` (or tRPC / GraphQL per stack) → returns `CONTRACT_READY: <path>` or `NEEDS_CLARIFICATION: <list>`. Never writes code; only contract documents.
+- **New `curdx-contract-first` skill** (`skills/curdx-contract-first/SKILL.md`). Hard discipline: in full-stack features, no endpoint implementation (backend or frontend) without reading the contract file this turn. Mirrors `curdx-read-first`'s pattern but for API surfaces. Auto-loads when any task's `<files>` touches both backend and frontend paths.
+
+### Deferred to next round (explicitly out of scope for this commit)
+
+- Replacing `hooks/implement-loop.sh` with the official Claude Code `/batch` skill — architectural change, needs isolated PR with e2e test coverage. Tracked in TODO.
+- Splitting `curdx-builder` into `curdx-backend-builder` + `curdx-frontend-builder` with worktree isolation — depends on `/batch` replacement above.
+- Rule 6 ("NO FRONTEND COMPLETION WITHOUT BROWSER EVIDENCE") — needs hook-level enforcement similar to `enforce-constitution.sh`, plus an evidence format for screenshots/console/network. Designed, not yet implemented.
+
 ### Added
 
 - **`tests/integration/` — runnable shell-based structural + hook tests.** Four test files + shared `lib/assert.sh` + `run.sh` aggregator. This is the third testing layer alongside `tests/evals/` (manual pressure tests) and `tests/e2e/` (fixture scenarios). Each integration test exits nonzero on any assertion failure; `run.sh` aggregates into a pass/fail summary.

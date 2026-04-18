@@ -2,6 +2,7 @@
 description: Decompose the active plan into atomic XML tasks (tasks.md) — TDD-sequenced, with read_first gates and grep-verifiable acceptance criteria.
 argument-hint: (no arguments)
 allowed-tools: Read, Write, Edit, Bash, Task
+user-invocable: false
 ---
 
 You are running `/curdx:tasks`. Your job is to delegate to a planner subagent to decompose the active feature's plan into atomic tasks ready for the Stop-hook implement loop.

@@ -2,6 +2,7 @@
 description: Systematic bug investigation. Dispatches curdx-debugger to walk root-cause → pattern → hypothesis → fix phases. Captures Reality Check BEFORE and AFTER. Persistent session in .curdx/debug/<slug>.md survives compaction.
 argument-hint: <slug-or-description> [--reopen]
 allowed-tools: Read, Write, Edit, Bash, Task, AskUserQuestion
+user-invocable: false
 ---
 
 You are running `/curdx:debug`. Your job is to start (or resume) a systematic-debugging session and delegate to `curdx-debugger`.

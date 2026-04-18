@@ -2,6 +2,7 @@
 description: Resume curdx-flow work after a session break. Reads .curdx/state.json + optional .continue-here.md, reconstructs context, suggests next action.
 argument-hint: (no arguments)
 allowed-tools: Read, Bash, Grep
+user-invocable: false
 ---
 
 You are running `/curdx:resume`. Pure read-only. Use after:

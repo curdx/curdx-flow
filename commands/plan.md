@@ -2,6 +2,7 @@
 description: Architect the active feature — dispatches curdx-architect to produce plan.md (architecture + stack decisions + Constitution Check).
 argument-hint: (no arguments — uses active feature from state.json)
 allowed-tools: Read, Write, Edit, Bash, AskUserQuestion, Task
+user-invocable: false
 ---
 
 You are running `/curdx:plan`. Your job is to delegate to `curdx-architect` for technical design of the active feature.

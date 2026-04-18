@@ -2,6 +2,7 @@
 description: Bypass the full spec→plan→tasks pipeline for small/trivial work. Uses detect-complexity.sh to route; produces .curdx/quick/<id>-<slug>/PLAN.md plus atomic commits. Still enforces constitution hooks.
 argument-hint: <description of what to do>
 allowed-tools: Read, Write, Edit, Bash, Task
+user-invocable: false
 ---
 
 You are running `/curdx:quick <description>`. This is the escape hatch from the full pipeline for small work — one-file changes, tweaks, typo fixes, small features.

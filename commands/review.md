@@ -2,6 +2,7 @@
 description: Two-stage adversarial review — fresh-context spec-reviewer first, then (if clean) fresh-context quality-reviewer. Findings are Critical/Important/Minor. Split into two agents so context pollution from Stage 1 doesn't bias Stage 2 (superpowers' proven pattern).
 argument-hint: [--stage {1|2|both}] (default — both, sequential)
 allowed-tools: Read, Write, Edit, Bash, Task
+user-invocable: false
 ---
 
 You are running `/curdx:review`. Your job is to orchestrate the two-stage adversarial review by dispatching two DIFFERENT subagents — never one agent called twice. Fresh context per stage is the whole point.

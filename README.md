@@ -18,6 +18,8 @@ This installs:
 - [`pua`](https://github.com/tanweai/pua) — failure-detection and behavioral protocol injection
 - [`@modelcontextprotocol/server-sequential-thinking`](https://www.npmjs.com/package/@modelcontextprotocol/server-sequential-thinking) — multi-step reasoning MCP
 - [`@upstash/context7-mcp`](https://www.npmjs.com/package/@upstash/context7-mcp) — up-to-date library docs MCP
+- [`@playwright/mcp`](https://www.npmjs.com/package/@playwright/mcp) — browser automation MCP (accessibility tree, deterministic targeting — use for pre-release verification)
+- [`chrome-devtools-mcp`](https://www.npmjs.com/package/chrome-devtools-mcp) — Chrome DevTools MCP (Console, Network, Performance, DOM — use for day-to-day development & debugging)
 
 Re-running the installer is safe: already-installed deps are detected and skipped; missing pieces are filled in; user-disabled hooks are respected.
 

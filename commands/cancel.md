@@ -2,6 +2,7 @@
 description: Cancel the active feature OR an active debug session. Offers keep-state, revert-code, or delete-feature options. Never destructive without confirmation.
 argument-hint: [<feature-id> | --debug <slug> | --all-quick]
 allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
+user-invocable: false
 ---
 
 You are running `/curdx:cancel`. Your job is to cleanly abort an in-progress session without leaving orphaned state or breaking other features' data.
