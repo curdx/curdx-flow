@@ -22,7 +22,7 @@ assert_regex "$HELP" "CORE"     "help.md has CORE section marker"
 assert_regex "$HELP" "ADVANCED" "help.md has ADVANCED section marker"
 
 # ─── Expected membership (curated — enforce the split we decided on) ───
-CORE_EXPECTED="init spec implement ship status doctor help snapshot"
+CORE_EXPECTED="init spec next do implement ship status doctor help snapshot"
 ADV_EXPECTED="clarify plan tasks analyze verify review debug quick refactor cancel resume triage"
 
 # Every CORE command is mentioned in help.md
@@ -39,9 +39,9 @@ done
 CORE_COUNT=$(echo "$CORE_EXPECTED" | wc -w | tr -d ' ')
 ADV_COUNT=$(echo "$ADV_EXPECTED" | wc -w | tr -d ' ')
 TOTAL_COUNT=$((CORE_COUNT + ADV_COUNT))
-assert_count "$CORE_COUNT"  "8"  "CORE list has 8 commands"
+assert_count "$CORE_COUNT"  "10" "CORE list has 10 commands"
 assert_count "$ADV_COUNT"   "12" "ADVANCED list has 12 commands"
-assert_count "$TOTAL_COUNT" "20" "total = 20 commands"
+assert_count "$TOTAL_COUNT" "22" "total = 22 commands"
 
 # ─── Every command file on disk is classified ────────────────────────
 # If a new /curdx:foo is added without updating help.md, fail loudly.

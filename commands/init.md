@@ -113,6 +113,59 @@ If no `./CLAUDE.md` exists, offer to create a minimal one. Don't force it.
 
 If `detect-browser-test.sh` returned non-empty `install_commands` array, present them to the user with `AskUserQuestion`: "Run these install commands now? [Y/n]" — show the commands. On yes, run each.
 
+### 8a. Project baseline health check
+
+Run the Delivery-Guarantee Harness (`scripts/verify-runnable.sh`) against the project with NO active feature. Gate D (preflight) auto-skips because there's no `findings.json`; gates A/B/C probe install/build/smoke state of the codebase as-is.
+
+This is a baseline snapshot — it does not block init. Its job is to let the user *see* what curdx-flow will enforce later, so they can fix latent issues on their own time.
+
+```bash
+BASELINE_JSON=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/verify-runnable.sh" --quiet 2>/dev/null) || true
+```
+
+Print the result as a baseline table (substitute real values from `$BASELINE_JSON`):
+
+```
+  project baseline health check
+  -----------------------------
+  A. install:  {{pass|fail|skip}}  — {{detail}}
+  B. build:    {{pass|fail|skip}}  — {{detail}}
+  C. smoke:    {{pass|fail|skip}}  — {{detail}}
+  D. preflight: skip (no active feature yet)
+```
+
+If any gate is `fail`, append a short "what this means":
+```
+  one or more gates failed on your current tree. curdx-flow did NOT
+  change anything — this is just telling you what `/curdx:ship` will
+  refuse to push today. fix at your leisure; the harness reruns on
+  every /curdx:verify and /curdx:ship.
+```
+
+If all gates are pass/skip, just say: `  baseline looks clean — no pre-existing issues detected.`
+
+### 8b. Statusline opt-in (recommended, not auto)
+
+curdx-flow ships `hooks/statusline.sh` — when registered as Claude Code's `statusLine`, it (a) shows a context-usage progress bar to the user and (b) writes a bridge file that lets `hooks/context-monitor.sh` warn the agent when context is running low. Without it, `context-monitor.sh` exits silently (no harm, but you lose the warning).
+
+We do NOT auto-write `~/.claude/settings.json` (per CLAUDE.md project rule). Instead, suggest the one-liner the user can run themselves. Print exactly:
+
+```
+optional: enable statusline + context-pressure warnings
+
+  Add this to ~/.claude/settings.json (or .claude/settings.json in this project):
+
+    "statusLine": {
+      "type": "command",
+      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/statusline.sh"
+    }
+
+  Without it: the PostToolUse context-monitor hook degrades silently (no warnings injected).
+  With it: agent gets WARNING at 35% remaining, CRITICAL at 25% — wraps up before compaction.
+```
+
+Skip this print if `~/.claude/settings.json` already contains `statusline.sh` (the user already enabled it — common in re-init).
+
 ### 9. Print success summary
 
 Print exactly this format (substitute real values):
@@ -128,6 +181,7 @@ curdx-flow initialized.
   constitution:    .claude/rules/constitution.md ({{n}} hard rules loaded)
 
 next: `/curdx:spec <feature-slug>` to start your first feature.
+      (or `/curdx:next` to auto-route, `/curdx:do <text>` for NL routing.)
 ```
 
 ## Failure handling

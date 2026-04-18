@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "curdx-flow/findings",
+  "title": "Delivery Pre-flight Findings",
+  "description": "Structured research output that becomes runtime assertions at /curdx:ship time. Every blocker-level finding MUST include a preflight_cmd; advisory findings only need a source URL.",
+
+  "type": "object",
+  "required": ["schema_version", "feature_id", "generated_at", "findings"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "feature_id": { "type": "string", "pattern": "^[0-9]{3}-[a-z0-9-]+$" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "research_budget_used": {
+      "type": "object",
+      "description": "Track how much of the 5-query budget was consumed. Surfaced by /curdx:status.",
+      "properties": {
+        "context7_queries": { "type": "integer", "minimum": 0 },
+        "websearch_queries": { "type": "integer", "minimum": 0 },
+        "local_probes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/finding" }
+    }
+  },
+
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["id", "kind", "subject", "assertion", "severity"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^F[0-9]+$",
+          "description": "F1, F2, ... stable within a feature"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["version", "api", "env", "lockfile", "config", "compat"],
+          "description": "version = lib >= X; api = endpoint shape; env = env var required; lockfile = dep must resolve; config = file must have key; compat = platform/runtime constraint"
+        },
+        "subject": {
+          "type": "string",
+          "description": "What the finding is about — library name, env var name, API endpoint, etc."
+        },
+        "assertion": {
+          "type": "string",
+          "description": "The human-readable condition that must be true at ship time."
+        },
+        "source": {
+          "type": "string",
+          "description": "URL or file path backing the assertion. Required for advisory findings."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why this matters — what breaks if the assertion fails."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["blocker", "advisory"],
+          "description": "blocker = /curdx:ship refuses to push if preflight_cmd fails. advisory = surfaces warning, does not block."
+        },
+        "preflight_cmd": {
+          "type": "string",
+          "description": "Shell one-liner that exits 0 when assertion holds, non-zero otherwise. REQUIRED for blocker severity. Must be deterministic and offline when possible."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "severity": { "const": "blocker" } } },
+          "then": { "required": ["preflight_cmd"] }
+        },
+        {
+          "if": { "properties": { "severity": { "const": "advisory" } } },
+          "then": { "required": ["source"] }
+        }
+      ]
+    }
+  },
+
+  "examples": [
+    {
+      "schema_version": 1,
+      "feature_id": "001-hello-api",
+      "generated_at": "2026-04-18T00:00:00Z",
+      "research_budget_used": {
+        "context7_queries": 2,
+        "websearch_queries": 1,
+        "local_probes": 2
+      },
+      "findings": [
+        {
+          "id": "F1",
+          "kind": "version",
+          "subject": "next",
+          "assertion": "package-lock.json resolves next to >= 14.2.0",
+          "source": "https://nextjs.org/blog/next-14-2",
+          "reason": "App Router breaking change in 14.1 — older lockfile will crash at build time.",
+          "severity": "blocker",
+          "preflight_cmd": "jq -e '.packages[\"node_modules/next\"].version | split(\".\")[0] | tonumber >= 14' package-lock.json >/dev/null"
+        },
+        {
+          "id": "F2",
+          "kind": "env",
+          "subject": "DATABASE_URL",
+          "assertion": "DATABASE_URL is set in the ship-time environment",
+          "reason": "Postgres client fails fast if URL is missing; runtime crash on first request.",
+          "severity": "blocker",
+          "preflight_cmd": "[ -n \"${DATABASE_URL:-}\" ]"
+        },
+        {
+          "id": "F3",
+          "kind": "api",
+          "subject": "Stripe webhook signature",
+          "assertion": "code uses 2024-06-20 API version header",
+          "source": "https://docs.stripe.com/upgrades",
+          "reason": "Older API versions silently drop fields the code expects.",
+          "severity": "advisory"
+        }
+      ]
+    }
+  ]
+}

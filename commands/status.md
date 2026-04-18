@@ -67,6 +67,8 @@ artifacts=""
 [ -f "$fdir/clarifications.md" ] && artifacts="$artifacts clarify"
 [ -f "$fdir/plan.md" ]          && artifacts="$artifacts plan"
 [ -f "$fdir/tasks.md" ]         && artifacts="$artifacts tasks"
+[ -f "$fdir/plan-check.md" ]    && artifacts="$artifacts plan-check"
+[ -f "$fdir/findings.json" ]    && artifacts="$artifacts findings"
 [ -f "$fdir/review.md" ]        && artifacts="$artifacts review"
 [ -f "$fdir/verification.md" ]  && artifacts="$artifacts verify"
 ```

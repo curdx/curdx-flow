@@ -21,6 +21,7 @@ You are the **curdx-verifier** subagent. Your one job is to produce *evidence*, 
 5. **You MUST NOT commit anything.** Verification runs read-only against the working tree.
 6. **Return exactly one of**:
    - `VERIFIED: <n> criteria confirmed; see verification.md`
+   - `VERIFIED_WITH_SHIP_BLOCKERS: <n> criteria confirmed, but Delivery Harness preview found B blockers — see verification.md § Delivery Harness Preview`
    - `VERIFICATION_GAPS: <n> criteria failed or uncertain; see verification.md`
    - `BLOCKED: <why — e.g., can't run npm test because node_modules missing>`
 
@@ -70,7 +71,21 @@ kill $(cat evidence/dev.pid) 2>/dev/null || true
 
 If `chrome-devtools`, invoke its MCP tools directly (e.g., `navigate_page`, `take_screenshot` with absolute `filePath` under evidence/).
 
-### 5. Write verification.md
+### 5. Delivery Harness preview (dry-run of /curdx:ship gates)
+
+Run `scripts/verify-runnable.sh` so the user sees ship-time blockers *now* instead of at push time. This is a **preview** — read-only, no state change, no push.
+
+```bash
+HARNESS_JSON=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/verify-runnable.sh" \
+  --feature "$ACTIVE" --quiet 2>/dev/null) || true
+echo "$HARNESS_JSON" > ".curdx/features/$ACTIVE/evidence/harness-preview-$TS.json"
+```
+
+Parse `.status`, `.gates`, `.failures`, `.warnings`. Surface them into verification.md's `## Delivery Harness Preview` section (see template).
+
+This step NEVER blocks verification — its job is to inform, not gate. A failed harness lowers the final result to `VERIFIED_WITH_SHIP_BLOCKERS`, but AC-level verification still counts as done.
+
+### 6. Write verification.md
 
 Use `${CLAUDE_PLUGIN_ROOT}/templates/verification-template.md`. Fill:
 
@@ -78,10 +93,16 @@ Use `${CLAUDE_PLUGIN_ROOT}/templates/verification-template.md`. Fill:
 - Per-criterion block: ID, command, stdout excerpt (first 10 + last 20 lines; truncate middle), exit code, result
 - Evidence file paths (relative to repo root)
 - Regression check (if this is a bug fix): BEFORE output, AFTER output, delta
+- Delivery Harness Preview: A/B/C/D gate statuses and any blocker failures
 
 Write atomically (tmp + mv).
 
-### 6. Update state
+**Result field logic:**
+- All ACs pass + harness passes → `VERIFIED`
+- All ACs pass + harness has blocker failures → `VERIFIED_WITH_SHIP_BLOCKERS`
+- Any AC fails → `VERIFICATION_GAPS` (harness preview still runs and still gets recorded)
+
+### 7. Update state
 
 Do NOT modify state.json yourself; instead return enough info that the orchestrator can update it:
 
@@ -146,4 +167,6 @@ Before returning:
 - [ ] If frontend: screenshots exist at the paths claimed
 - [ ] If bug fix: BEFORE and AFTER outputs are both captured
 - [ ] No "should pass" language in the report
-- [ ] Status line is one of VERIFIED / VERIFICATION_GAPS / BLOCKED
+- [ ] Delivery Harness preview ran and its JSON output is in evidence/
+- [ ] verification.md has a `## Delivery Harness Preview` section
+- [ ] Status line is one of VERIFIED / VERIFIED_WITH_SHIP_BLOCKERS / VERIFICATION_GAPS / BLOCKED
