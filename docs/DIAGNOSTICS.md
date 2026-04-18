@@ -80,26 +80,38 @@ claude
 
 Produces `~/curdx-snapshot-<timestamp>.tar.gz` containing:
 
-- `REPORT.md` — human-readable summary (current state, recent events timeline, hook firings, git log)
-- `events.jsonl` — sanitized event log
-- `state.json` — sanitized `.curdx/state.json`
-- `config.json` — sanitized `.curdx/config.json`
-- `install-state.json` — sanitized `~/.curdx/install-state.json`
-- `features/<active>/` — sanitized active-feature artifacts (spec/plan/tasks/etc)
-- `debug/<active>/` — sanitized active debug session if any
-- `versions.txt` — claude-code/node/jq/git versions
-- `META.txt` — generation metadata
+- `REPORT.md` — human-readable summary with the **full** event timeline (not truncated), current state, hook firings, git log + status
+- `events.jsonl` — full event log for the current session generation
+- `events.jsonl.1` / `.2` — rotated event logs from earlier bursts (if present)
+- `state.json` — `.curdx/state.json`
+- `config.json` — `.curdx/config.json`
+- `install-state.json` — `~/.curdx/install-state.json`
+- `features/` — **every** feature directory under `.curdx/features/` (not just the active one)
+- `debug/` — every `/curdx:debug` session
+- `settings/` — project `.claude/settings.json`, `settings.local.json`, and user `~/.claude/settings.json`
+- `hooks/` — the actual hook scripts as installed, so the maintainer can spot version drift
+- `transcripts/` — Claude Code's native session transcripts for this project, full length
+- `git/` — `log.txt` (200 commits), `status.txt`, `diff-HEAD.patch`, `stash.txt`, `remotes.txt`
+- `env.txt` — safe env vars (CLAUDE_*, OTEL_*, CURDX_*, PATH, SHELL, LANG, TERM), secret-like names filtered out
+- `versions.txt` — claude-code/node/jq/git/bash versions + `uname -a`
+- `META.txt` — generation metadata + share guidance
+
+Default mode is **RAW** — no redaction. Because the bundle is typically
+shared one-to-one with the maintainer, redacted logs would hide the exact
+cause of bugs. Opt into scrubbing explicitly with `--redact` (or `--strict`
+for the strongest mode).
 
 Optional flags:
 
-- `--strict` — also redact emails and all IPv4 addresses
-- `--include-transcript` — add Claude Code's native transcript (last 5000 lines, sanitized). **Off by default** because transcripts are the most likely file to contain secrets you typed into prompts.
+- `--redact` — run the regex sanitizer (API keys, bearer tokens, JWTs, DB creds, home paths, etc.)
+- `--strict` — same as `--redact`, plus redact emails and all IPv4 addresses
+- `--no-transcript` — skip Claude Code's native transcripts (they're the most likely place to contain secrets you typed into prompts; excluding trades fidelity for privacy)
 - `--no-preview` — skip the "seal tarball? [Y/n]" prompt
 - `--here` — write tarball to `$PWD` instead of `$HOME`
 
-## Sanitization — what gets redacted
+## Sanitization — what gets redacted (only with `--redact` / `--strict`)
 
-By default:
+With `--redact`:
 
 | Pattern | Replacement |
 |---|---|
@@ -124,7 +136,11 @@ With `--strict` additionally:
 | Email addresses | `<REDACTED:email>` |
 | IPv4 addresses | `<REDACTED:ipv4>` (loopback and private ranges not preserved) |
 
-**Sanitization is regex-based — not semantic.** It catches common patterns; it cannot catch novel / custom token formats. Always **skim REPORT.md** before sharing. If you find something the regex missed, report it so we can widen the patterns.
+**Sanitization is regex-based — not semantic.** It catches common patterns; it cannot catch novel / custom token formats. Always **skim REPORT.md** before sharing broadly. If you find something the regex missed, report it so we can widen the patterns.
+
+### Why raw by default?
+
+The snapshot is designed for the maintainer to reproduce a failure you saw on your machine. Home paths, exact phase transitions, the actual next-task string the loop was stuck on — all of it matters. Redacting by default turned every bug report into a guessing game. You still get `--redact` / `--strict` for when the bundle will travel further than one trusted recipient.
 
 ## Recipient-side analysis
 
