@@ -1,6 +1,6 @@
 {
   "name": "curdx-flow",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "Solo full-stack workflow plugin for Claude Code: spec-driven development with TDD enforcement, fresh-context subagent execution, and verification gates.",
   "keywords": [
     "claude-code",
@@ -29,6 +29,7 @@
     "agents/",
     "skills/",
     "hooks/",
+    "protocols/",
     "rules/",
     "templates/",
     "scripts/",

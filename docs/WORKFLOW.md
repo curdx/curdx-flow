@@ -54,9 +54,9 @@ This document walks through the end-to-end workflow for one feature, with the ar
 | tasks | `/curdx:tasks` | curdx-architect (tasks mode) | `.curdx/features/NNN-slug/tasks.md` |
 | implement | `/curdx:implement` | curdx-builder × N (one per task) | code + N atomic git commits |
 
-Round 2 will add: `/curdx:clarify` (after spec), `/curdx:analyze` (after tasks), `/curdx:review` and `/curdx:verify` (after implement), `/curdx:debug` (sideways from implement), `/curdx:refactor` (sideways from spec/plan/tasks), `/curdx:quick` (full-pipeline bypass for trivial work).
+Round 2 added: `/curdx:clarify` (after spec), `/curdx:analyze` (after tasks), `/curdx:review` and `/curdx:verify` (after implement), `/curdx:debug` (sideways from implement), `/curdx:refactor` (sideways from spec/plan/tasks), `/curdx:quick` (full-pipeline bypass for trivial work).
 
-Round 3 will add: `/curdx:ship` (commit + push), `/curdx:resume`, `/curdx:cancel`, `/curdx:doctor`, `/curdx:help`.
+Round 3 added: `/curdx:ship` (commit + push), `/curdx:resume`, `/curdx:cancel`, `/curdx:doctor`, `/curdx:help`.
 
 ## The Stop-hook loop in detail
 

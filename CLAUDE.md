@@ -8,7 +8,7 @@ This file is for Claude Code when **working on the curdx-flow plugin source**, n
 
 ## Architecture (one-liner per directory)
 
-- `.claude-plugin/` — plugin + marketplace manifests; declares dependencies (claude-mem, pua) and MCP servers (sequential-thinking, context7) for Claude Code's plugin system to auto-install.
+- `.claude-plugin/` — plugin + marketplace manifests; declares MCP servers (sequential-thinking, context7). Runtime companions (claude-mem, pua) are installed by `scripts/install.js` via `npx` / `claude plugin marketplace add`, NOT via Claude Code's `plugin.json.dependencies` field. If/when that field is wired up, update this line and drop the matching code paths in `install.js`.
 - `commands/` — slash commands users type. Each `.md` is a Claude prompt with frontmatter.
 - `agents/` — specialized subagents with isolated contexts (analyst, architect, builder, reviewer, verifier, debugger, refactor, planner).
 - `skills/` — reusable behavioral disciplines (TDD, read-first, systematic-debug, verify-evidence, browser-test, parallel-dispatch, writing-skills, no-sycophancy).

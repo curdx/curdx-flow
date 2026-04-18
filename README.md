@@ -4,7 +4,7 @@
 
 A Claude Code plugin that gives a single developer the discipline of a senior team: every change starts from a spec, every spec becomes a plan, every plan decomposes into atomic tasks, every task runs in a fresh subagent context with TDD enforcement, and nothing is "done" without fresh verification evidence.
 
-**Status:** v0.1 (Round 1 of 3 — skeleton). Backend TDD pipeline works end-to-end. Frontend testing, debug/review/verify, and ship come in Round 2 and 3.
+**Status:** v0.4 — all four rounds shipped. Round 1 (skeleton: init/spec/plan/tasks/implement/status), Round 2 (quality loop: clarify/analyze/review/verify/debug/refactor/quick + constitution hooks + frontend testing), Round 3 (amplifiers: ship/resume/cancel/doctor/help/triage + parallel-dispatch + migrations), and Round 4 (structured event logging + snapshot bundling). See [CHANGELOG.md](./CHANGELOG.md) for per-round details.
 
 ## Install
 
@@ -28,7 +28,7 @@ claude plugin marketplace add curdx/curdx-flow
 claude plugin install curdx@curdx-flow
 ```
 
-Claude Code's plugin system recursively installs declared dependencies and registers MCP servers + hooks automatically.
+Claude Code's plugin system registers the plugin's MCP servers and hooks automatically. `claude-mem` and `pua` are NOT currently declared in `plugin.json.dependencies` — install them separately (either via `npx curdx-flow install` above, or `npx claude-mem install --ide claude-code` + `claude plugin install pua@tanweai/pua`).
 
 ## First use
 
