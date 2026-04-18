@@ -6,6 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+
+- **Global Protocols auto-injected via SessionStart hook.** Every Claude session where curdx-flow is enabled (which is every session, since plugins are user-global) now receives a "Global Protocols" block as `additionalContext`: 中文 user output / English tool interactions, minimal-no-redundancy code style, decisions backed by code reading or web search, MUST `ultrathink` in English. This is curdx-flow's product opinion on how to work, baked into the plugin instead of relying on each user to copy the rules into their own `~/.claude/CLAUDE.md`.
+  - Shipped default at `protocols/global-protocols.md` in the plugin.
+  - User override at `~/.curdx/user-protocols.md` (takes precedence, won't be overwritten by upgrades).
+  - Opt-out via `touch ~/.curdx/no-global-protocols`.
+  - Hook resolution lives in `hooks/load-context.sh`; emits protocols block on top + curdx-project context below (when applicable). When neither applies the hook stays silent.
+  - Critically: curdx-flow never writes to `~/.claude/CLAUDE.md`, `~/.claude/rules/`, or `~/.claude/settings.json`. The injection is 100% via the official SessionStart `additionalContext` mechanism, so uninstalling/disabling the plugin removes the rules from future sessions automatically.
+  - `/curdx:doctor` step **10a** reports which mode is active (default / user-customized / disabled).
+  - `docs/INSTALL.md` documents the customize / opt-out / re-enable lifecycle.
+
 ### Changed
 
 - **`/curdx:implement` keeps YOLO as default (the whole point of the plugin is autonomous execution) but now prints a pre-run banner** so new users are never surprised when N commits appear without intermediate review. The banner tells them: which feature, how many tasks, expected commit count, current branch, the mode (YOLO/SAFE), how to abort, and how to switch to per-task review. Explicit `--yolo` and `--safe` flags are both recognised; `--safe` wins if both are passed. Config `yolo_mode: true` remains the default in `templates/config-template.json`, and `hooks/implement-loop.sh` falls back to `// true` when state lacks the flag.

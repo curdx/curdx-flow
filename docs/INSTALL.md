@@ -82,6 +82,28 @@ This:
 - Initializes `.curdx/state.json`
 - Optionally adds an `@.curdx/state.json` import to your project's `CLAUDE.md`
 
+## Global protocols (auto-injected into every session)
+
+Once curdx-flow is installed and enabled in Claude Code, the SessionStart hook (`hooks/load-context.sh`) injects a "Global Protocols" block as `additionalContext` for **every** Claude session — regardless of whether your cwd is a curdx-initialized project. The shipped default lives at `<plugin-dir>/protocols/global-protocols.md` and codifies the curdx-flow way of working:
+
+- 中文 user output, English tool/model interactions
+- Minimal, no-redundancy code style; comments only when non-obvious
+- Decisions backed by code reading or web search — no guesswork
+- Force `ultrathink` in English on hard problems
+
+This is intentional and part of the product opinion. Three ways to control it:
+
+| What you want | How |
+|---|---|
+| Use the default | Do nothing — it ships ready |
+| Customize the rules for yourself | `cp $CLAUDE_PLUGIN_ROOT/protocols/global-protocols.md ~/.curdx/user-protocols.md` then edit. Your override wins; future plugin upgrades won't touch your file. |
+| Disable entirely | `touch ~/.curdx/no-global-protocols`. Hook silently skips the injection. |
+| Re-enable after disabling | `rm ~/.curdx/no-global-protocols` |
+
+`/curdx:doctor` step **10a** reports which mode is active.
+
+The injection lives 100% inside the SessionStart hook — **curdx-flow never writes to `~/.claude/CLAUDE.md`, `~/.claude/rules/`, or `~/.claude/settings.json`**. Uninstalling the plugin (or disabling it) removes the rules from future sessions automatically.
+
 ## Uninstall
 
 ```bash

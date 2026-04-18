@@ -178,6 +178,31 @@ for rule in tdd.md no-sycophancy.md; do
 done
 ```
 
+### 10a. Global protocols (SessionStart inject)
+
+The `load-context.sh` SessionStart hook injects a "Global Protocols" block as
+`additionalContext` into every Claude session where this plugin is enabled —
+regardless of cwd. Resolution order is opt-out marker → user override → shipped
+default. Verify which one is in effect:
+
+```bash
+if [ -f "$HOME/.curdx/no-global-protocols" ]; then
+  echo "  ℹ global protocols: DISABLED (opt-out marker at ~/.curdx/no-global-protocols)"
+elif [ -f "$HOME/.curdx/user-protocols.md" ]; then
+  LINES=$(wc -l < "$HOME/.curdx/user-protocols.md" | tr -d ' ')
+  echo "  ✓ global protocols: USER-CUSTOMIZED (~/.curdx/user-protocols.md, $LINES lines)"
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "${CLAUDE_PLUGIN_ROOT}/protocols/global-protocols.md" ]; then
+  LINES=$(wc -l < "${CLAUDE_PLUGIN_ROOT}/protocols/global-protocols.md" | tr -d ' ')
+  echo "  ✓ global protocols: SHIPPED DEFAULT ($LINES lines, source: \$CLAUDE_PLUGIN_ROOT/protocols/global-protocols.md)"
+else
+  echo "  ✗ global protocols: NEITHER user override NOR shipped default found — re-install with: npx curdx-flow install --force"
+fi
+```
+
+To customize: copy the shipped default to `~/.curdx/user-protocols.md` and edit.
+To opt out: `touch ~/.curdx/no-global-protocols`.
+To re-enable: `rm ~/.curdx/no-global-protocols`.
+
 ### 11. Git state sanity
 
 ```bash
