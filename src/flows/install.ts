@@ -3,25 +3,63 @@ import pc from 'picocolors';
 import { PKGS, findPkg } from '../registry/index.ts';
 import type { Pkg } from '../registry/types.ts';
 import { t } from '../i18n/index.ts';
+import { refreshMarketplaces } from '../runner/state.ts';
 
 export type InstallOptions = {
-  ids?: string[];           // explicit ids from flag mode (`install <ids...>`)
-  all?: boolean;            // --all
-  yes?: boolean;            // --yes (skip reinstall confirm; default reinstall=true for already installed)
+  ids?: string[];
+  all?: boolean;
+  yes?: boolean;
+  noRefresh?: boolean;
 };
+
+type DerivedState =
+  | { kind: 'not_installed' }
+  | { kind: 'up_to_date'; version: string | null }
+  | { kind: 'update_available'; current: string; latest: string };
 
 type Result = { id: string; status: 'ok' | 'fail' | 'skip'; message?: string };
 
-async function selectInteractive(): Promise<Pkg[] | null> {
-  const states = await Promise.all(PKGS.map(async (pkg) => ({ pkg, installed: await pkg.isInstalled() })));
-  const options = states.map(({ pkg, installed }) => ({
-    value: pkg.id,
-    label: `${pkg.name} ${pc.dim(`(${pkg.type})`)}  ${
-      installed ? pc.green(`✓ ${t('pkg.installed')}`) : pc.yellow(`✗ ${t('pkg.notInstalled')}`)
-    }`,
-    hint: pkg.description,
-  }));
-  const initialValues = states.filter((s) => !s.installed).map((s) => s.pkg.id);
+async function deriveState(pkg: Pkg): Promise<DerivedState> {
+  if (!(await pkg.isInstalled())) return { kind: 'not_installed' };
+  const [installed, latest] = await Promise.all([
+    pkg.installedVersion?.() ?? Promise.resolve(null),
+    pkg.latestVersion?.() ?? Promise.resolve(null),
+  ]);
+  if (installed && latest && installed !== latest) {
+    return { kind: 'update_available', current: installed, latest };
+  }
+  return { kind: 'up_to_date', version: installed };
+}
+
+function stateLabel(pkg: Pkg, s: DerivedState): string {
+  const head = `${pkg.name} ${pc.dim(`(${pkg.type})`)}`;
+  switch (s.kind) {
+    case 'not_installed':
+      return `${head}  ${pc.yellow(`✗ ${t('pkg.notInstalled')}`)}`;
+    case 'up_to_date':
+      return `${head}  ${pc.green(
+        s.version ? `✓ ${t('pkg.upToDateWithVersion', { version: s.version })}` : `✓ ${t('pkg.installed')}`,
+      )}`;
+    case 'update_available':
+      return `${head}  ${pc.cyan(
+        `↑ ${t('pkg.updateAvailable', { current: s.current, latest: s.latest })}`,
+      )}`;
+  }
+}
+
+async function selectInteractive(
+  states: Map<string, DerivedState>,
+): Promise<Pkg[] | null> {
+  const options = PKGS.map((pkg) => {
+    const s = states.get(pkg.id)!;
+    return { value: pkg.id, label: stateLabel(pkg, s), hint: pkg.description };
+  });
+  const initialValues = PKGS
+    .filter((pkg) => {
+      const s = states.get(pkg.id)!;
+      return s.kind === 'not_installed' || s.kind === 'update_available';
+    })
+    .map((pkg) => pkg.id);
 
   const picked = await p.multiselect<string>({
     message: t('install.selectPrompt'),
@@ -45,13 +83,16 @@ function selectFromIds(opts: InstallOptions): Pkg[] {
   return found;
 }
 
-async function runOne(pkg: Pkg, opts: InstallOptions, alreadyInstalled: boolean): Promise<Result> {
-  // Reinstall confirmation for already-installed
-  let reinstall = false;
-  if (alreadyInstalled) {
-    if (opts.yes) {
-      reinstall = true;
-    } else {
+async function runOne(pkg: Pkg, state: DerivedState, opts: InstallOptions): Promise<Result> {
+  // Reinstall confirmation only applies to up_to_date items the user selected anyway.
+  let mode: 'install' | 'update' | 'reinstall';
+  if (state.kind === 'not_installed') {
+    mode = 'install';
+  } else if (state.kind === 'update_available') {
+    mode = 'update';
+  } else {
+    // up_to_date — selected explicitly. Ask before nuking.
+    if (!opts.yes) {
       const ans = await p.confirm({
         message: t('install.confirmReinstall', { name: pkg.name }),
         initialValue: false,
@@ -59,8 +100,8 @@ async function runOne(pkg: Pkg, opts: InstallOptions, alreadyInstalled: boolean)
       if (p.isCancel(ans) || ans === false) {
         return { id: pkg.id, status: 'skip', message: t('install.skippedReinstall', { name: pkg.name }) };
       }
-      reinstall = true;
     }
+    mode = 'reinstall';
   }
 
   if (pkg.prereqCheck) {
@@ -72,20 +113,38 @@ async function runOne(pkg: Pkg, opts: InstallOptions, alreadyInstalled: boolean)
   }
 
   let config: Record<string, string> = {};
-  if (pkg.configPrompts) {
+  if (pkg.configPrompts && mode !== 'update') {
+    // Don't re-prompt config on update — keep existing settings.
     const cfg = await pkg.configPrompts({ t });
     if (cfg === null) return { id: pkg.id, status: 'skip', message: t('app.cancelled') };
     config = cfg;
   }
 
-  const log = p.taskLog({ title: t('install.starting', { name: pkg.name }) });
+  const titleKey = mode === 'update' ? 'install.updating' : 'install.starting';
+  const titleVars: Record<string, string> = { name: pkg.name };
+  if (mode === 'update' && state.kind === 'update_available') {
+    titleVars['version'] = state.latest;
+  }
+  const log = p.taskLog({ title: t(titleKey, titleVars) });
+
   try {
-    if (reinstall) {
+    if (mode === 'reinstall') {
       log.message(t('reinstall.uninstalling'));
       await pkg.uninstall({ log, config, t });
       log.message(t('reinstall.installing'));
+      await pkg.install({ log, config, t });
+    } else if (mode === 'update') {
+      if (pkg.update) {
+        await pkg.update({ log, config, t });
+      } else {
+        log.message(t('reinstall.uninstalling'));
+        await pkg.uninstall({ log, config, t });
+        log.message(t('reinstall.installing'));
+        await pkg.install({ log, config, t });
+      }
+    } else {
+      await pkg.install({ log, config, t });
     }
-    await pkg.install({ log, config, t });
     log.success(t('install.success', { name: pkg.name }));
     return { id: pkg.id, status: 'ok' };
   } catch (err) {
@@ -111,30 +170,62 @@ function summarize(results: Result[]): void {
   p.note(lines.join('\n'), t('install.summaryTitle'));
 }
 
+async function maybeRefreshMarketplaces(opts: InstallOptions): Promise<void> {
+  if (opts.noRefresh) return;
+  const names = new Set<string>();
+  for (const pkg of PKGS) {
+    if (pkg.marketplaces) for (const n of pkg.marketplaces()) names.add(n);
+  }
+  if (names.size === 0) return;
+  const sp = p.spinner();
+  sp.start(t('marketplace.refreshing'));
+  const refreshed = await refreshMarketplaces([...names]);
+  sp.stop(
+    refreshed.length > 0
+      ? t('marketplace.refreshed', { count: refreshed.length })
+      : t('marketplace.refreshSkipped'),
+  );
+}
+
 export async function installFlow(opts: InstallOptions = {}): Promise<void> {
+  await maybeRefreshMarketplaces(opts);
+
   const explicit = opts.all || (opts.ids && opts.ids.length > 0);
-  const targets = explicit ? selectFromIds(opts) : await selectInteractive();
-  if (targets === null) {
-    p.cancel(t('app.cancelled'));
+  const candidates = explicit ? selectFromIds(opts) : [...PKGS];
+  if (candidates.length === 0) {
+    p.log.info(t('install.nothingSelected'));
     return;
   }
+
+  // Derive state for everything (used both for label rendering and for dispatch).
+  const stateMap = new Map<string, DerivedState>();
+  await Promise.all(
+    candidates.map(async (pkg) => {
+      stateMap.set(pkg.id, await deriveState(pkg));
+    }),
+  );
+
+  let targets: Pkg[];
+  if (explicit) {
+    targets = candidates;
+  } else {
+    const picked = await selectInteractive(stateMap);
+    if (picked === null) {
+      p.cancel(t('app.cancelled'));
+      return;
+    }
+    targets = picked;
+  }
+
   if (targets.length === 0) {
     p.log.info(t('install.nothingSelected'));
     return;
   }
 
-  // Snapshot installed-state once up front so we can decide reinstall vs fresh install per item.
-  const installedMap = new Map<string, boolean>();
-  await Promise.all(
-    targets.map(async (pkg) => {
-      installedMap.set(pkg.id, await pkg.isInstalled());
-    }),
-  );
-
   const results: Result[] = [];
   for (const pkg of targets) {
-    const installed = installedMap.get(pkg.id) ?? false;
-    results.push(await runOne(pkg, opts, installed));
+    const state = stateMap.get(pkg.id) ?? { kind: 'not_installed' as const };
+    results.push(await runOne(pkg, state, opts));
   }
   summarize(results);
 }

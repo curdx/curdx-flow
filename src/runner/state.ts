@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import { run } from './exec.ts';
 
 export type PluginEntry = {
@@ -123,4 +126,78 @@ export async function isMcpInstalled(name: string): Promise<boolean> {
 export async function findPlugin(id: string): Promise<PluginEntry | undefined> {
   const list = await listPlugins();
   return list.find((p) => p.id === id);
+}
+
+// ---- marketplace.json reading + cache refresh ----
+
+export type MarketplacePluginEntry = {
+  name: string;
+  version?: string;
+  description?: string;
+  source?: unknown;
+};
+
+export type MarketplaceJson = {
+  name?: string;
+  plugins?: MarketplacePluginEntry[];
+};
+
+const marketplaceJsonCache = new Map<string, MarketplaceJson | null>();
+
+function marketplaceDir(name: string): string {
+  return path.join(os.homedir(), '.claude', 'plugins', 'marketplaces', name);
+}
+
+export async function readMarketplaceJson(name: string): Promise<MarketplaceJson | null> {
+  if (marketplaceJsonCache.has(name)) return marketplaceJsonCache.get(name) ?? null;
+  const file = path.join(marketplaceDir(name), '.claude-plugin', 'marketplace.json');
+  try {
+    const raw = await fs.readFile(file, 'utf8');
+    const parsed = JSON.parse(raw) as MarketplaceJson;
+    marketplaceJsonCache.set(name, parsed);
+    return parsed;
+  } catch {
+    marketplaceJsonCache.set(name, null);
+    return null;
+  }
+}
+
+export async function getMarketplacePluginVersion(
+  marketplaceName: string,
+  pluginName: string,
+): Promise<string | null> {
+  const m = await readMarketplaceJson(marketplaceName);
+  if (!m?.plugins) return null;
+  const entry = m.plugins.find((p) => p.name === pluginName);
+  return entry?.version ?? null;
+}
+
+const REFRESH_TTL_MS = 60 * 60 * 1000; // 1h
+
+async function shouldSkipRefresh(name: string): Promise<boolean> {
+  try {
+    const stat = await fs.stat(marketplaceDir(name));
+    return Date.now() - stat.mtimeMs < REFRESH_TTL_MS;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Refresh given marketplaces' caches. Skips any whose mtime is within REFRESH_TTL_MS.
+ * Returns the list of marketplace names that were actually refreshed.
+ */
+export async function refreshMarketplaces(names: string[]): Promise<string[]> {
+  const unique = [...new Set(names)];
+  const toRefresh: string[] = [];
+  for (const name of unique) {
+    if (!(await shouldSkipRefresh(name))) toRefresh.push(name);
+  }
+  if (toRefresh.length === 0) return [];
+  await Promise.all(
+    toRefresh.map((name) => run('claude', ['plugin', 'marketplace', 'update', name])),
+  );
+  // Bust the JSON cache for refreshed marketplaces.
+  for (const name of toRefresh) marketplaceJsonCache.delete(name);
+  return toRefresh;
 }

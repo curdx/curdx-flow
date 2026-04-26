@@ -19,6 +19,14 @@ const messages: Record<MessageKey, string> = {
   'pkg.installed': 'installed',
   'pkg.notInstalled': 'not installed',
   'pkg.unknown': 'unknown',
+  'pkg.upToDateWithVersion': 'installed v{version}',
+  'pkg.updateAvailable': 'v{current} → v{latest} available',
+
+  'marketplace.refreshing': 'Refreshing marketplace caches…',
+  'marketplace.refreshed': 'Refreshed {count} marketplace(s)',
+  'marketplace.refreshSkipped': 'Marketplace caches are fresh, skipping refresh',
+
+  'install.updating': 'Updating "{name}" to v{version}',
 
   'install.selectPrompt': 'Select items to install / reinstall (not-installed are pre-selected)',
   'install.nothingSelected': 'Nothing selected. Exiting.',

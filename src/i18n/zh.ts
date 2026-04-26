@@ -17,6 +17,14 @@ const messages = {
   'pkg.installed': '已安装',
   'pkg.notInstalled': '未安装',
   'pkg.unknown': '未知',
+  'pkg.upToDateWithVersion': '已安装 v{version}',
+  'pkg.updateAvailable': '已安装 v{current} → v{latest} 可用',
+
+  'marketplace.refreshing': '刷新 marketplace 缓存…',
+  'marketplace.refreshed': '已刷新 {count} 个 marketplace',
+  'marketplace.refreshSkipped': 'marketplace 缓存仍是新鲜的，跳过刷新',
+
+  'install.updating': '更新 "{name}" 到 v{version}',
 
   'install.selectPrompt': '勾选要安装 / 重装的条目（默认勾选未安装的）',
   'install.nothingSelected': '没有选择任何条目，已退出。',

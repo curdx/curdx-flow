@@ -17,18 +17,24 @@ const sharedArgs = {
 };
 
 const installCmd = defineCommand({
-  meta: { name: 'install', description: 'Install or reinstall plugins / MCP servers' },
+  meta: { name: 'install', description: 'Install, reinstall, or update plugins / MCP servers' },
   args: {
     ...sharedArgs,
     all: { type: 'boolean' as const, description: 'Install all known items' },
     yes: { type: 'boolean' as const, description: 'Skip reinstall confirmation (assume yes)' },
+    'no-refresh': { type: 'boolean' as const, description: 'Skip refreshing marketplace caches' },
     ids: { type: 'positional' as const, required: false, description: 'Item ids', default: '' },
   },
   async run({ args }) {
     await initLanguage(parseLang(args.lang));
     p.intro(t('app.intro'));
     const ids = collectPositional(args);
-    await installFlow({ ids, all: Boolean(args.all), yes: Boolean(args.yes) });
+    await installFlow({
+      ids,
+      all: Boolean(args.all),
+      yes: Boolean(args.yes),
+      noRefresh: Boolean((args as Record<string, unknown>)['no-refresh']),
+    });
     p.outro(t('app.outro'));
   },
 });
@@ -84,7 +90,7 @@ const SUBCOMMANDS = new Set(['install', 'uninstall', 'update', 'status']);
 const root = defineCommand({
   meta: {
     name: '@curdx/flow',
-    version: '3.1.0',
+    version: '3.2.0',
     description: 'Interactive installer for Claude Code plugins and MCP servers',
   },
   args: sharedArgs,

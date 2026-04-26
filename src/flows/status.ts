@@ -9,12 +9,23 @@ export type StatusOptions = {
 
 export async function statusFlow(opts: StatusOptions = {}): Promise<void> {
   const states = await Promise.all(
-    PKGS.map(async (pkg) => ({
-      id: pkg.id,
-      name: pkg.name,
-      type: pkg.type,
-      installed: await pkg.isInstalled(),
-    })),
+    PKGS.map(async (pkg) => {
+      const installed = await pkg.isInstalled();
+      const installedVersion = installed && pkg.installedVersion ? await pkg.installedVersion() : null;
+      const latestVersion = pkg.latestVersion ? await pkg.latestVersion() : null;
+      const updateAvailable = Boolean(
+        installed && installedVersion && latestVersion && installedVersion !== latestVersion,
+      );
+      return {
+        id: pkg.id,
+        name: pkg.name,
+        type: pkg.type,
+        installed,
+        installedVersion,
+        latestVersion,
+        updateAvailable,
+      };
+    }),
   );
 
   if (opts.json) {
