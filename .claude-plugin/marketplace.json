@@ -1,5 +1,5 @@
 {
-  "name": "curdx-flow",
+  "name": "curdx",
   "owner": {
     "name": "curdx"
   },
@@ -8,16 +8,15 @@
   },
   "plugins": [
     {
-      "name": "ralph-specum",
+      "name": "curdx-flow",
       "description": "Spec-driven development with research, requirements, design, tasks, autonomous execution, and epic triage. Fresh context per task.",
       "version": "4.9.1",
       "author": {
         "name": "tzachbon"
       },
-      "source": "./plugins/ralph-specum",
+      "source": "./plugins/curdx-flow",
       "category": "development",
       "tags": [
-        "ralph",
         "spec-driven",
         "autonomous",
         "research",

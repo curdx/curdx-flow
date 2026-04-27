@@ -31,11 +31,13 @@ npx @curdx/flow --lang en    # override language
 | `claude-mem` | plugin | `thedotmack/claude-mem` |
 | `chrome-devtools-mcp` | plugin | `ChromeDevTools/chrome-devtools-mcp` |
 | `frontend-design` | plugin | `claude-plugins-official` (built-in) |
-| `ralph-specum` | plugin | bundled in this repo — spec-driven dev with autonomous task execution (originally [tzachbon/smart-ralph](https://github.com/tzachbon/smart-ralph), MIT) |
+| `curdx-flow` | plugin | bundled in this repo (always installed) — spec-driven dev with autonomous task execution (originally [tzachbon/smart-ralph](https://github.com/tzachbon/smart-ralph), MIT, intermediate fork: ralph-specum) |
 | `sequential-thinking` | mcp | `@modelcontextprotocol/server-sequential-thinking` |
 | `context7` | mcp | HTTP — `https://mcp.context7.com/mcp` (optional API key) |
 
-> If you previously installed ralph-specum from `tzachbon/smart-ralph`, run `claude plugin uninstall ralph-specum@smart-ralph` before installing this version. Only the `ralph-specum@curdx-flow` build is maintained going forward.
+> Migration notes:
+> - If you installed the upstream `ralph-specum@smart-ralph` build, run `claude plugin uninstall ralph-specum@smart-ralph` before upgrading.
+> - If you installed `ralph-specum@curdx-flow` (curdx-flow v3.4.0 / v3.5.0), run `claude plugin uninstall ralph-specum@curdx-flow` and re-run `npx @curdx/flow install`. The plugin is now `curdx-flow@curdx` with slash namespace `/curdx-flow:*`.
 
 ## What it writes to your filesystem
 

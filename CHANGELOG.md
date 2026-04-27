@@ -2,6 +2,19 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 4.0.0 — 2026-04-27
+
+### Breaking
+
+- **Plugin renamed `ralph-specum` → `curdx-flow`.** The bundled spec-driven workflow plugin now lives under the `curdx-flow` brand, slash namespace `/curdx-flow:*`, full slug `curdx-flow@curdx`. The marketplace identifier was simultaneously shortened from `curdx-flow` to `curdx` (the GitHub repo source `curdx/curdx-flow` is unchanged). All in-plugin slash references, env vars (`RALPH_SPECUM_*` → `CURDX_FLOW_*`), and labels were updated accordingly.
+- **Auto-migration:** the installer now detects legacy `ralph-specum@curdx-flow` and `ralph-specum@smart-ralph` installs and uninstalls them automatically before installing the new slug, so users on v3.4 / v3.5 transparently transition. Your `specs/` directory and any in-progress spec state files are not touched — the rename is purely a plugin-identity change.
+- **Manual fallback:** if you'd rather run the migration yourself, execute `claude plugin uninstall ralph-specum@curdx-flow` (or `@smart-ralph`) before re-running `npx @curdx/flow install`. The old marketplace `curdx-flow` may remain registered alongside the new `curdx` marketplace; this is harmless and you can `claude plugin marketplace remove curdx-flow` if you want to clean up.
+
+### Notes
+
+- The plugin's authorship and license lineage (smart-ralph by tzachbon → ralph-specum fork → curdx-flow) is recorded in `plugins/curdx-flow/NOTICE.md`. MIT License preserved.
+- `.claude-plugin/marketplace.json` now declares one plugin: `curdx-flow` v4.9.1 sourced from `./plugins/curdx-flow`.
+
 ## 3.5.0 — 2026-04-27
 
 ### Changed

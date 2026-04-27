@@ -251,7 +251,7 @@ export async function installFlow(opts: InstallOptions = {}): Promise<void> {
       // For `--ids X` mode, drop auto-added required pkgs that are already up-to-date.
       // The user didn't list them, and there's nothing to do — skip silently to avoid
       // a noisy reinstall confirmation prompt in runOne. Required pkgs the user DID
-      // list (`--ids ralph-specum`) stay in targets and follow the normal up_to_date
+      // list (`--ids curdx-flow`) stay in targets and follow the normal up_to_date
       // → reinstall confirmation path. `--all` keeps everything as-is.
       if (opts.ids && opts.ids.length > 0) {
         const userListedIds = new Set(opts.ids);
