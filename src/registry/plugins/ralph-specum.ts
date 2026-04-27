@@ -17,6 +17,7 @@ const ralphSpecum: Pkg = {
   name: 'ralph-specum',
   description: 'curdx-flow (originally tzachbon/smart-ralph) — spec-driven dev with autonomous task execution',
   type: 'plugin',
+  required: true,
   slashNamespace: '/ralph-specum:*',
   whenToUse:
     'for spec-driven multi-task work — research → requirements → design → tasks → autonomous execution per task. Use when starting a feature that benefits from upfront spec; skip for one-shot fixes or simple edits.',

@@ -26,6 +26,7 @@ const messages = {
 
   'install.updating': '更新 "{name}" 到 v{version}',
 
+  'install.requiredHeader': '以下条目随 @curdx/flow 默认安装（不可取消）',
   'install.selectPrompt': '勾选要安装 / 重装的条目（默认勾选未安装的）',
   'install.nothingSelected': '没有选择任何条目，已退出。',
   'install.confirmReinstall': '"{name}" 已安装，是否重新安装（先卸载再安装）？',

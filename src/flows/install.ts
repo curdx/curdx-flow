@@ -52,11 +52,19 @@ function stateLabel(pkg: Pkg, s: DerivedState): string {
 async function selectInteractive(
   states: Map<string, DerivedState>,
 ): Promise<Pkg[] | null> {
-  const options = PKGS.map((pkg) => {
+  const requiredPkgs = PKGS.filter((pkg) => pkg.required);
+  const optionalPkgs = PKGS.filter((pkg) => !pkg.required);
+
+  if (requiredPkgs.length > 0) {
+    const lines = requiredPkgs.map((pkg) => `  ${stateLabel(pkg, states.get(pkg.id)!)}`);
+    p.note(lines.join('\n'), t('install.requiredHeader'));
+  }
+
+  const options = optionalPkgs.map((pkg) => {
     const s = states.get(pkg.id)!;
     return { value: pkg.id, label: stateLabel(pkg, s), hint: pkg.description };
   });
-  const initialValues = PKGS
+  const initialValues = optionalPkgs
     .filter((pkg) => {
       const s = states.get(pkg.id)!;
       return s.kind === 'not_installed' || s.kind === 'update_available';
@@ -70,7 +78,11 @@ async function selectInteractive(
     required: false,
   });
   if (p.isCancel(picked)) return null;
-  return (picked as string[]).map((id) => findPkg(id)).filter((x): x is Pkg => Boolean(x));
+  const userPicked = (picked as string[]).map((id) => findPkg(id)).filter((x): x is Pkg => Boolean(x));
+  // Required pkgs that need action (not_installed / update_available) are auto-included.
+  // Up-to-date required pkgs are silently skipped — there's nothing to do.
+  const requiredAuto = requiredPkgs.filter((pkg) => states.get(pkg.id)?.kind !== 'up_to_date');
+  return [...requiredAuto, ...userPicked];
 }
 
 function selectFromIds(opts: InstallOptions): Pkg[] {
@@ -206,6 +218,16 @@ export async function installFlow(opts: InstallOptions = {}): Promise<void> {
       return;
     }
 
+    // Required pkgs must enter the state map even if user's --ids list omits them,
+    // so we can decide whether they need action. `--all` already covers everything.
+    if (opts.ids && opts.ids.length > 0) {
+      for (const pkg of PKGS) {
+        if (pkg.required && !candidates.some((c) => c.id === pkg.id)) {
+          candidates.push(pkg);
+        }
+      }
+    }
+
     // Derive state for everything (used both for label rendering and for dispatch).
     // Wrap in spinner: this triggers `claude plugin list --json` + `claude mcp list`
     // (the latter does an MCP server health check, can take 5-15s).
@@ -226,7 +248,21 @@ export async function installFlow(opts: InstallOptions = {}): Promise<void> {
 
     let targets: Pkg[];
     if (explicit) {
-      targets = candidates;
+      // For `--ids X` mode, drop auto-added required pkgs that are already up-to-date.
+      // The user didn't list them, and there's nothing to do — skip silently to avoid
+      // a noisy reinstall confirmation prompt in runOne. Required pkgs the user DID
+      // list (`--ids ralph-specum`) stay in targets and follow the normal up_to_date
+      // → reinstall confirmation path. `--all` keeps everything as-is.
+      if (opts.ids && opts.ids.length > 0) {
+        const userListedIds = new Set(opts.ids);
+        targets = candidates.filter((pkg) => {
+          if (!pkg.required) return true;
+          if (userListedIds.has(pkg.id)) return true;
+          return stateMap.get(pkg.id)?.kind !== 'up_to_date';
+        });
+      } else {
+        targets = candidates;
+      }
     } else {
       const picked = await selectInteractive(stateMap);
       if (picked === null) {

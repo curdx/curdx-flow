@@ -54,4 +54,14 @@ export type Pkg = {
    * this unset.
    */
   slashNamespace?: string;
+
+  /**
+   * Required by the @curdx/flow bundle. When true:
+   * - Hidden from the interactive install multiselect (rendered in an "always installed" header instead).
+   * - Auto-added to install targets even when the user passes `--ids` without listing it.
+   * - Skipped silently when state is up_to_date (nothing to do).
+   * Does NOT affect uninstall / update flows — users may still uninstall manually;
+   * the next install will re-add it.
+   */
+  required?: boolean;
 };

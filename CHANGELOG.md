@@ -2,6 +2,13 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 3.5.0 — 2026-04-27
+
+### Changed
+
+- **`ralph-specum` is now a required bundled plugin** — it no longer appears as an optional checkbox in the install multiselect. Instead, it's listed in a dedicated "always installed" header above the prompt, alongside its current state (not installed / up-to-date / update available). When the flow runs, ralph-specum is auto-installed or auto-updated whenever it needs action; up-to-date installs are silently skipped. The other six items (pua, claude-mem, chrome-devtools-mcp, frontend-design, sequential-thinking, context7) remain optional. `--ids X` now also auto-includes required plugins that need action; users can still explicitly run `--ids ralph-specum` to force a reinstall confirmation. Uninstall flow is unchanged — users may still uninstall ralph-specum, and the next install will re-add it.
+- **Internal:** `Pkg` type gains a `required?: boolean` field so future bundled plugins can opt into the same "always installed" semantics without touching install-flow code.
+
 ## 3.4.0 — 2026-04-27
 
 ### Added

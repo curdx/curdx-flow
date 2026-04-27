@@ -28,6 +28,7 @@ const messages: Record<MessageKey, string> = {
 
   'install.updating': 'Updating "{name}" to v{version}',
 
+  'install.requiredHeader': 'Always installed by @curdx/flow (cannot be unchecked)',
   'install.selectPrompt': 'Select items to install / reinstall (not-installed are pre-selected)',
   'install.nothingSelected': 'Nothing selected. Exiting.',
   'install.confirmReinstall': '"{name}" is already installed. Reinstall (uninstall then install)?',
