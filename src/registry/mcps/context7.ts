@@ -11,6 +11,8 @@ const context7: Pkg = {
   name: 'context7',
   description: 'upstash/context7 — up-to-date docs from any library (HTTP MCP, optional API key)',
   type: 'mcp',
+  whenToUse:
+    'for any library / SDK / framework / API / Claude Code docs lookup. Use instead of web search.',
   isInstalled: () => isMcpInstalled(MCP_NAME),
   configPrompts: async ({ t }) => {
     p.note(`${t('context7.dashboardHint')}\n${t('context7.keyWarning')}`, 'context7');

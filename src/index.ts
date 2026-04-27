@@ -12,8 +12,17 @@ function parseLang(v: unknown): Lang | undefined {
   return v === 'zh' || v === 'en' ? v : undefined;
 }
 
+function noClaudeMdFromArgs(args: Record<string, unknown>): boolean {
+  if (args['no-claude-md']) return true;
+  return Boolean(process.env['CURDX_FLOW_NO_CLAUDE_MD']);
+}
+
 const sharedArgs = {
   lang: { type: 'string' as const, description: 'Override language: zh or en' },
+  'no-claude-md': {
+    type: 'boolean' as const,
+    description: 'Skip syncing the @curdx/flow block in ~/.claude/CLAUDE.md',
+  },
 };
 
 const installCmd = defineCommand({
@@ -34,6 +43,7 @@ const installCmd = defineCommand({
       all: Boolean(args.all),
       yes: Boolean(args.yes),
       noRefresh: Boolean((args as Record<string, unknown>)['no-refresh']),
+      noClaudeMd: noClaudeMdFromArgs(args as Record<string, unknown>),
     });
     p.outro(t('app.outro'));
   },
@@ -50,7 +60,11 @@ const uninstallCmd = defineCommand({
     await initLanguage(parseLang(args.lang));
     p.intro(t('app.intro'));
     const ids = collectPositional(args);
-    await uninstallFlow({ ids, yes: Boolean(args.yes) });
+    await uninstallFlow({
+      ids,
+      yes: Boolean(args.yes),
+      noClaudeMd: noClaudeMdFromArgs(args as Record<string, unknown>),
+    });
     p.outro(t('app.outro'));
   },
 });
@@ -66,7 +80,11 @@ const updateCmd = defineCommand({
     await initLanguage(parseLang(args.lang));
     p.intro(t('app.intro'));
     const ids = collectPositional(args);
-    await updateFlow({ ids, all: Boolean(args.all) });
+    await updateFlow({
+      ids,
+      all: Boolean(args.all),
+      noClaudeMd: noClaudeMdFromArgs(args as Record<string, unknown>),
+    });
     p.outro(t('app.outro'));
   },
 });
@@ -90,7 +108,7 @@ const SUBCOMMANDS = new Set(['install', 'uninstall', 'update', 'status']);
 const root = defineCommand({
   meta: {
     name: '@curdx/flow',
-    version: '3.2.0',
+    version: '3.3.0',
     description: 'Interactive installer for Claude Code plugins and MCP servers',
   },
   args: sharedArgs,

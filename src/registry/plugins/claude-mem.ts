@@ -17,6 +17,9 @@ const claudeMem: Pkg = {
   name: 'claude-mem',
   description: 'thedotmack/claude-mem — persistent cross-session memory for Claude Code',
   type: 'plugin',
+  slashNamespace: '/claude-mem:*',
+  whenToUse:
+    'for cross-session memory search ("did we solve this before?"), phased planning (`make-plan`), or phased execution (`do`).',
   marketplaces: () => [MARKETPLACE_NAME],
   isInstalled: () => isPluginInstalled(PLUGIN_ID),
   installedVersion: async () => {

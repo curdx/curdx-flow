@@ -69,6 +69,12 @@ const messages = {
 
   'reinstall.uninstalling': '先卸载旧版本…',
   'reinstall.installing': '安装新版本…',
+
+  'claudeMd.synced': 'CLAUDE.md 已更新（{path}）',
+  'claudeMd.unchanged': 'CLAUDE.md 已是最新',
+  'claudeMd.removed': '已从 CLAUDE.md 移除 @curdx/flow 区块',
+  'claudeMd.skipped': '已跳过 CLAUDE.md 同步（--no-claude-md）',
+  'claudeMd.failed': 'CLAUDE.md 同步失败：{error}',
 };
 
 export default messages;

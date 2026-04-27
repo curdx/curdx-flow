@@ -17,6 +17,9 @@ const pua: Pkg = {
   name: 'pua',
   description: 'tanweai/pua — Chinese Claude Code skills bundle',
   type: 'plugin',
+  slashNamespace: '/pua:*',
+  whenToUse:
+    'auto-fires on 2+ failures or user frustration; sub-modes p7 / p9 / pro / loop. Skip on first-attempt failures or when a known fix is executing.',
   marketplaces: () => [MARKETPLACE_NAME],
   isInstalled: () => isPluginInstalled(PLUGIN_ID),
   installedVersion: async () => {

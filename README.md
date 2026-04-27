@@ -34,6 +34,28 @@ npx @curdx/flow --lang en    # override language
 | `sequential-thinking` | mcp | `@modelcontextprotocol/server-sequential-thinking` |
 | `context7` | mcp | HTTP — `https://mcp.context7.com/mcp` (optional API key) |
 
+## What it writes to your filesystem
+
+After every successful `install` / `update` / `uninstall`, flow keeps a short managed block in your global `~/.claude/CLAUDE.md` so Claude Code knows at session start which tools are installed and when to use them. The block looks like:
+
+```
+<!-- BEGIN @curdx/flow v1 -->
+## Tool Usage
+
+Available tools/plugins:
+- pua (v3.0.0) — `/pua:*` — auto-fires on 2+ failures or user frustration; ...
+- ...
+
+Rules:
+- Do not call every tool by default; ...
+- ...
+
+Run `npx @curdx/flow` to install / update / uninstall.
+<!-- END @curdx/flow v1 -->
+```
+
+Anything outside the BEGIN/END markers is preserved verbatim — flow only ever rewrites or removes the block itself. Uninstalling all managed items removes the block entirely. Pass `--no-claude-md` (or set `CURDX_FLOW_NO_CLAUDE_MD=1`) to opt out.
+
 ## Requirements
 
 - Node.js >= 20.12

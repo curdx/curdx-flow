@@ -31,6 +31,8 @@ const chromeDevtoolsMcp: Pkg = {
   name: 'chrome-devtools-mcp',
   description: 'ChromeDevTools/chrome-devtools-mcp — drive a real Chrome from Claude Code',
   type: 'plugin',
+  whenToUse:
+    'when debugging code that runs in a browser: perf traces, network / console inspection, DOM / CSS issues. Prefer snapshot over screenshot.',
   prereqCheck: async (t): Promise<PrereqResult> => {
     const major = Number(process.versions.node.split('.')[0] ?? '0');
     const minor = Number(process.versions.node.split('.')[1] ?? '0');

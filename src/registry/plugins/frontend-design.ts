@@ -10,6 +10,8 @@ const frontendDesign: Pkg = {
   name: 'frontend-design',
   description: 'Anthropic official — UI/frontend design helpers',
   type: 'plugin',
+  whenToUse:
+    'auto-fires when building UI / web components / pages. Best where visual personality matters (landing, marketing, portfolio).',
   isInstalled: () => isPluginInstalled(PLUGIN_ID),
   install: (ctx) => installPluginById(PLUGIN_ID, ctx),
   uninstall: (ctx) => uninstallPluginById(PLUGIN_ID, ctx),

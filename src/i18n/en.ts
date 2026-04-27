@@ -71,6 +71,12 @@ const messages: Record<MessageKey, string> = {
 
   'reinstall.uninstalling': 'Uninstalling old version…',
   'reinstall.installing': 'Installing new version…',
+
+  'claudeMd.synced': 'CLAUDE.md updated ({path})',
+  'claudeMd.unchanged': 'CLAUDE.md already up to date',
+  'claudeMd.removed': 'Removed @curdx/flow block from CLAUDE.md',
+  'claudeMd.skipped': 'Skipped CLAUDE.md sync (--no-claude-md)',
+  'claudeMd.failed': 'CLAUDE.md sync failed: {error}',
 };
 
 export default messages;

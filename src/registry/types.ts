@@ -38,4 +38,20 @@ export type Pkg = {
   latestVersion?: () => Promise<string | null>;
   /** Marketplaces this pkg depends on; install flow refreshes them before reading latestVersion. */
   marketplaces?: () => string[];
+
+  /**
+   * WHEN to use this tool, in English. Rendered into the "Available tools/plugins"
+   * list of the @curdx/flow block in ~/.claude/CLAUDE.md.
+   * Style: a fragment beginning with "when ..." / "for ..." / "auto-fires on ...".
+   * NOT a description of what the tool is — the plugin's own SKILL.md already covers that.
+   * The unique value here is decision routing: telling Claude when to reach for it.
+   */
+  whenToUse?: string;
+
+  /**
+   * Slash invocation pattern, e.g. "/pua:*" or "/claude-mem:*". Only set for plugins
+   * that expose an explicit slash namespace; auto-invoked plugins / MCP servers leave
+   * this unset.
+   */
+  slashNamespace?: string;
 };

@@ -4,12 +4,14 @@ import { PKGS, findPkg } from '../registry/index.ts';
 import type { Pkg } from '../registry/types.ts';
 import { t } from '../i18n/index.ts';
 import { refreshMarketplaces } from '../runner/state.ts';
+import { syncFromState } from '../runner/claudeMd.ts';
 
 export type InstallOptions = {
   ids?: string[];
   all?: boolean;
   yes?: boolean;
   noRefresh?: boolean;
+  noClaudeMd?: boolean;
 };
 
 type DerivedState =
@@ -228,4 +230,5 @@ export async function installFlow(opts: InstallOptions = {}): Promise<void> {
     results.push(await runOne(pkg, state, opts));
   }
   summarize(results);
+  await syncFromState({ skip: opts.noClaudeMd });
 }

@@ -3,10 +3,12 @@ import pc from 'picocolors';
 import { PKGS, findPkg } from '../registry/index.ts';
 import type { Pkg } from '../registry/types.ts';
 import { t } from '../i18n/index.ts';
+import { syncFromState } from '../runner/claudeMd.ts';
 
 export type UninstallOptions = {
   ids?: string[];
   yes?: boolean;
+  noClaudeMd?: boolean;
 };
 
 type Result = { id: string; status: 'ok' | 'fail'; message?: string };
@@ -94,4 +96,5 @@ export async function uninstallFlow(opts: UninstallOptions = {}): Promise<void> 
     ].join('\n'),
     t('install.summaryTitle'),
   );
+  await syncFromState({ skip: opts.noClaudeMd });
 }
