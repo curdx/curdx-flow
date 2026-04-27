@@ -190,55 +190,67 @@ async function maybeRefreshMarketplaces(opts: InstallOptions): Promise<void> {
 }
 
 export async function installFlow(opts: InstallOptions = {}): Promise<void> {
-  await maybeRefreshMarketplaces(opts);
-
-  const explicit = opts.all || (opts.ids && opts.ids.length > 0);
-  const candidates = explicit ? selectFromIds(opts) : [...PKGS];
-  if (candidates.length === 0) {
-    p.log.info(t('install.nothingSelected'));
-    return;
-  }
-
-  // Derive state for everything (used both for label rendering and for dispatch).
-  // Wrap in spinner: this triggers `claude plugin list --json` + `claude mcp list`
-  // (the latter does an MCP server health check, can take 5-15s).
-  const stateMap = new Map<string, DerivedState>();
-  const sp = p.spinner();
-  sp.start(t('state.checking'));
+  // Default: sync CLAUDE.md at end of flow regardless of whether anything was
+  // actually installed — the user may be running this for the first time after
+  // upgrading flow with everything already installed, and we still want the
+  // managed block to reflect current state. Only an explicit user cancellation
+  // (Ctrl+C / multiselect cancel) suppresses the sync.
+  let userCancelled = false;
   try {
-    // Warm both list caches in parallel; subsequent per-pkg checks are in-memory.
-    await Promise.all([listPlugins(), listMcp()]);
-    await Promise.all(
-      candidates.map(async (pkg) => {
-        stateMap.set(pkg.id, await deriveState(pkg));
-      }),
-    );
-  } finally {
-    sp.stop(t('state.checked', { count: candidates.length }));
-  }
+    await maybeRefreshMarketplaces(opts);
 
-  let targets: Pkg[];
-  if (explicit) {
-    targets = candidates;
-  } else {
-    const picked = await selectInteractive(stateMap);
-    if (picked === null) {
-      p.cancel(t('app.cancelled'));
+    const explicit = opts.all || (opts.ids && opts.ids.length > 0);
+    const candidates = explicit ? selectFromIds(opts) : [...PKGS];
+    if (candidates.length === 0) {
+      p.log.info(t('install.nothingSelected'));
       return;
     }
-    targets = picked;
-  }
 
-  if (targets.length === 0) {
-    p.log.info(t('install.nothingSelected'));
-    return;
-  }
+    // Derive state for everything (used both for label rendering and for dispatch).
+    // Wrap in spinner: this triggers `claude plugin list --json` + `claude mcp list`
+    // (the latter does an MCP server health check, can take 5-15s).
+    const stateMap = new Map<string, DerivedState>();
+    const sp = p.spinner();
+    sp.start(t('state.checking'));
+    try {
+      // Warm both list caches in parallel; subsequent per-pkg checks are in-memory.
+      await Promise.all([listPlugins(), listMcp()]);
+      await Promise.all(
+        candidates.map(async (pkg) => {
+          stateMap.set(pkg.id, await deriveState(pkg));
+        }),
+      );
+    } finally {
+      sp.stop(t('state.checked', { count: candidates.length }));
+    }
 
-  const results: Result[] = [];
-  for (const pkg of targets) {
-    const state = stateMap.get(pkg.id) ?? { kind: 'not_installed' as const };
-    results.push(await runOne(pkg, state, opts));
+    let targets: Pkg[];
+    if (explicit) {
+      targets = candidates;
+    } else {
+      const picked = await selectInteractive(stateMap);
+      if (picked === null) {
+        userCancelled = true;
+        p.cancel(t('app.cancelled'));
+        return;
+      }
+      targets = picked;
+    }
+
+    if (targets.length === 0) {
+      p.log.info(t('install.nothingSelected'));
+      return;
+    }
+
+    const results: Result[] = [];
+    for (const pkg of targets) {
+      const state = stateMap.get(pkg.id) ?? { kind: 'not_installed' as const };
+      results.push(await runOne(pkg, state, opts));
+    }
+    summarize(results);
+  } finally {
+    if (!userCancelled) {
+      await syncFromState({ skip: opts.noClaudeMd });
+    }
   }
-  summarize(results);
-  await syncFromState({ skip: opts.noClaudeMd });
 }
