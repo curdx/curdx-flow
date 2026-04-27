@@ -1,5 +1,6 @@
 import type { Pkg, InstallCtx } from '../types.ts';
 import { findPlugin, getMarketplacePluginVersion, isPluginInstalled } from '../../runner/state.ts';
+import { purgeLegacyPluginArtifacts } from '../../runner/legacy-cleanup.ts';
 import {
   ensureMarketplace,
   installPluginById,
@@ -18,10 +19,16 @@ const LEGACY_PLUGIN_IDS = ['ralph-specum@curdx-flow', 'ralph-specum@smart-ralph'
 
 async function uninstallLegacyIfPresent(ctx: InstallCtx): Promise<void> {
   for (const legacyId of LEGACY_PLUGIN_IDS) {
-    if (await isPluginInstalled(legacyId)) {
+    const installed = await isPluginInstalled(legacyId);
+    if (installed) {
       ctx.log.message(`Removing legacy plugin ${legacyId} (renamed to ${PLUGIN_ID})…`);
       await uninstallPluginById(legacyId, ctx);
     }
+    // Always run the purge even when isPluginInstalled returned false: `claude
+    // plugin uninstall` is unreliable when the marketplace's plugin id has been
+    // renamed (it can't resolve the legacy id and bails), leaving cache/settings
+    // residue. The purge is idempotent — no-op when nothing's there.
+    await purgeLegacyPluginArtifacts(legacyId, ctx);
   }
 }
 

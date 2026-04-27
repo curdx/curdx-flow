@@ -2,6 +2,18 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 4.0.1 — 2026-04-27
+
+### Fixed
+
+- **Migration cleanup is now exhaustive.** v4.0.0's auto-migration for the `ralph-specum` → `curdx-flow` rename only invoked `claude plugin uninstall`, which leaves substantial residue when the marketplace's plugin id has been renamed (the CLI can't resolve the legacy id and bails). The installer now manually purges every leftover artifact for legacy slugs (`ralph-specum@curdx-flow`, `ralph-specum@smart-ralph`):
+  - `~/.claude/settings.json` → removes `enabledPlugins[<legacyId>]`
+  - `~/.claude/plugins/installed_plugins.json` → removes `plugins[<legacyId>]`
+  - `~/.claude/plugins/cache/<marketplace>/<name>/` → recursive remove
+  - `~/.claude/plugins/data/<name>-<marketplace>/` → recursive remove
+  - Marketplace registrations (`known_marketplaces.json`, `extraKnownMarketplaces`) are deliberately left alone — those are user-managed.
+- Implementation lives in `src/runner/legacy-cleanup.ts::purgeLegacyPluginArtifacts`. Idempotent and safe: every step swallows ENOENT silently and reports JSON / IO errors via the install task log without failing the flow.
+
 ## 4.0.0 — 2026-04-27
 
 ### Breaking
