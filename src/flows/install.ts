@@ -3,7 +3,7 @@ import pc from 'picocolors';
 import { PKGS, findPkg } from '../registry/index.ts';
 import type { Pkg } from '../registry/types.ts';
 import { t } from '../i18n/index.ts';
-import { refreshMarketplaces } from '../runner/state.ts';
+import { listMcp, listPlugins, refreshMarketplaces } from '../runner/state.ts';
 import { syncFromState } from '../runner/claudeMd.ts';
 
 export type InstallOptions = {
@@ -200,12 +200,22 @@ export async function installFlow(opts: InstallOptions = {}): Promise<void> {
   }
 
   // Derive state for everything (used both for label rendering and for dispatch).
+  // Wrap in spinner: this triggers `claude plugin list --json` + `claude mcp list`
+  // (the latter does an MCP server health check, can take 5-15s).
   const stateMap = new Map<string, DerivedState>();
-  await Promise.all(
-    candidates.map(async (pkg) => {
-      stateMap.set(pkg.id, await deriveState(pkg));
-    }),
-  );
+  const sp = p.spinner();
+  sp.start(t('state.checking'));
+  try {
+    // Warm both list caches in parallel; subsequent per-pkg checks are in-memory.
+    await Promise.all([listPlugins(), listMcp()]);
+    await Promise.all(
+      candidates.map(async (pkg) => {
+        stateMap.set(pkg.id, await deriveState(pkg));
+      }),
+    );
+  } finally {
+    sp.stop(t('state.checked', { count: candidates.length }));
+  }
 
   let targets: Pkg[];
   if (explicit) {

@@ -198,23 +198,31 @@ export async function syncClaudeMd(opts?: { skip?: boolean }): Promise<SyncResul
 // ---------- Convenience: call from flows after summarize() ----------
 
 export async function syncFromState(opts?: { skip?: boolean }): Promise<void> {
-  const r = await syncClaudeMd(opts);
+  if (opts?.skip) {
+    p.log.info(t('claudeMd.skipped'));
+    return;
+  }
+  // Wrap in spinner — internally re-fires `claude plugin list --json` + `claude mcp list`
+  // (force=true after install/uninstall busted the cache), so this can take 5-15s.
+  const sp = p.spinner();
+  sp.start(t('claudeMd.syncing'));
+  const r = await syncClaudeMd();
   switch (r.status) {
     case 'skipped':
-      p.log.info(t('claudeMd.skipped'));
+      sp.stop(t('claudeMd.skipped'));
       return;
     case 'unchanged':
-      p.log.info(t('claudeMd.unchanged'));
+      sp.stop(t('claudeMd.unchanged'));
       return;
     case 'created':
     case 'updated':
-      p.log.info(t('claudeMd.synced', { path: r.path }));
+      sp.stop(t('claudeMd.synced', { path: r.path }));
       return;
     case 'removed':
-      p.log.info(t('claudeMd.removed'));
+      sp.stop(t('claudeMd.removed'));
       return;
     case 'failed':
-      p.log.warn(t('claudeMd.failed', { error: r.error ?? 'unknown' }));
+      sp.stop(t('claudeMd.failed', { error: r.error ?? 'unknown' }));
       return;
   }
 }

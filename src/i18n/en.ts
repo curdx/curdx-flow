@@ -72,6 +72,10 @@ const messages: Record<MessageKey, string> = {
   'reinstall.uninstalling': 'Uninstalling old version…',
   'reinstall.installing': 'Installing new version…',
 
+  'state.checking': 'Checking installed state… (claude plugin list / mcp list)',
+  'state.checked': 'Checked {count} item(s)',
+
+  'claudeMd.syncing': 'Syncing ~/.claude/CLAUDE.md…',
   'claudeMd.synced': 'CLAUDE.md updated ({path})',
   'claudeMd.unchanged': 'CLAUDE.md already up to date',
   'claudeMd.removed': 'Removed @curdx/flow block from CLAUDE.md',

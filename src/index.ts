@@ -108,7 +108,7 @@ const SUBCOMMANDS = new Set(['install', 'uninstall', 'update', 'status']);
 const root = defineCommand({
   meta: {
     name: '@curdx/flow',
-    version: '3.3.0',
+    version: '3.3.1',
     description: 'Interactive installer for Claude Code plugins and MCP servers',
   },
   args: sharedArgs,

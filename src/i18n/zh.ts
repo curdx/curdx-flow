@@ -70,6 +70,10 @@ const messages = {
   'reinstall.uninstalling': '先卸载旧版本…',
   'reinstall.installing': '安装新版本…',
 
+  'state.checking': '检查已安装状态…（claude plugin list / mcp list）',
+  'state.checked': '已检查 {count} 项',
+
+  'claudeMd.syncing': '同步 ~/.claude/CLAUDE.md …',
   'claudeMd.synced': 'CLAUDE.md 已更新（{path}）',
   'claudeMd.unchanged': 'CLAUDE.md 已是最新',
   'claudeMd.removed': '已从 CLAUDE.md 移除 @curdx/flow 区块',

@@ -3,6 +3,7 @@ import pc from 'picocolors';
 import { PKGS, findPkg } from '../registry/index.ts';
 import type { Pkg } from '../registry/types.ts';
 import { t } from '../i18n/index.ts';
+import { listMcp, listPlugins } from '../runner/state.ts';
 import { syncFromState } from '../runner/claudeMd.ts';
 
 export type UpdateOptions = {
@@ -18,8 +19,22 @@ async function getInstalled(): Promise<Pkg[]> {
   return states.filter((s) => s.installed).map((s) => s.pkg);
 }
 
+async function probeInstalled(): Promise<Pkg[]> {
+  const sp = p.spinner();
+  sp.start(t('state.checking'));
+  try {
+    await Promise.all([listPlugins(), listMcp()]);
+    const installed = await getInstalled();
+    sp.stop(t('state.checked', { count: installed.length }));
+    return installed;
+  } catch (err) {
+    sp.stop(t('state.checked', { count: 0 }));
+    throw err;
+  }
+}
+
 export async function updateFlow(opts: UpdateOptions = {}): Promise<void> {
-  const installed = await getInstalled();
+  const installed = await probeInstalled();
   if (installed.length === 0) {
     p.log.info(t('update.noneInstalled'));
     return;
