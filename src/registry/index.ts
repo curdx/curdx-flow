@@ -3,6 +3,7 @@ import pua from './plugins/pua.ts';
 import claudeMem from './plugins/claude-mem.ts';
 import chromeDevtoolsMcp from './plugins/chrome-devtools-mcp.ts';
 import frontendDesign from './plugins/frontend-design.ts';
+import ralphSpecum from './plugins/ralph-specum.ts';
 import sequentialThinking from './mcps/sequential-thinking.ts';
 import context7 from './mcps/context7.ts';
 
@@ -11,6 +12,7 @@ export const PKGS: Pkg[] = [
   claudeMem,
   chromeDevtoolsMcp,
   frontendDesign,
+  ralphSpecum,
   sequentialThinking,
   context7,
 ];

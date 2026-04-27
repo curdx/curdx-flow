@@ -1,0 +1,30 @@
+{
+  "name": "curdx-flow",
+  "owner": {
+    "name": "curdx"
+  },
+  "metadata": {
+    "description": "Claude Code plugins curated and bundled by curdx-flow"
+  },
+  "plugins": [
+    {
+      "name": "ralph-specum",
+      "description": "Spec-driven development with research, requirements, design, tasks, autonomous execution, and epic triage. Fresh context per task.",
+      "version": "4.9.1",
+      "author": {
+        "name": "tzachbon"
+      },
+      "source": "./plugins/ralph-specum",
+      "category": "development",
+      "tags": [
+        "ralph",
+        "spec-driven",
+        "autonomous",
+        "research",
+        "tasks",
+        "epic",
+        "triage"
+      ]
+    }
+  ]
+}

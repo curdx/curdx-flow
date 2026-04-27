@@ -1,0 +1,182 @@
+---
+description: Generate requirements from goal and research
+argument-hint: [spec-name]
+allowed-tools: "*"
+---
+
+# Requirements Phase
+
+Generate requirements for the active spec. Running this command implicitly approves research. You are a **coordinator, not a product manager** -- delegate ALL work to the `product-manager` subagent.
+
+## Checklist
+
+Create a task for each item and complete in order:
+
+1. **Gather context** -- resolve spec, read research and goal
+2. **Interview** -- brainstorming dialogue (skip if `--quick`)
+3. **Execute requirements** -- dispatch product-manager via team
+4. **Artifact review** -- spec-reviewer validation loop (only if `--quick`)
+5. **Walkthrough & approval** -- display summary, get user approval
+6. **Finalize** -- update state, commit, stop
+
+## Step 1: Gather Context
+
+1. If `$ARGUMENTS` contains a spec name, use `ralph_find_spec()` to resolve it; otherwise use `ralph_resolve_current()`
+2. If no active spec, error: "No active spec. Run /ralph-specum:new <name> first."
+3. Check the resolved spec directory exists
+4. Read `.ralph-state.json`; clear approval flag: `awaitingApproval: false`
+5. Read context: `research.md` (if exists), `.progress.md`, original goal
+
+## Step 2: Interview (skip if --quick)
+
+Check if `--quick` appears in `$ARGUMENTS`. If present, skip to Step 3.
+
+### Read Context from .progress.md
+
+Parse Intent Classification and prior interview responses to skip already-answered questions.
+
+**Intent-Based Question Counts:**
+- TRIVIAL: 1-2 | REFACTOR: 3-5 | GREENFIELD: 5-10 | MID_SIZED: 3-7
+
+### Brainstorming Dialogue
+
+Apply adaptive dialogue from `${CLAUDE_PLUGIN_ROOT}/skills/interview-framework/SKILL.md`. Ask context-driven questions one at a time.
+
+**Requirements Exploration Territory** (hints, not a script):
+- **Primary users** -- who will use this feature? Developers, end users, specific roles?
+- **Priority tradeoffs** -- speed of delivery vs code quality vs feature completeness
+- **Success criteria** -- what does success look like? Metrics, behaviors, user outcomes
+- **Scope boundaries** -- what is explicitly out of scope for this iteration?
+- **Compliance or regulatory needs** -- security, privacy, or regulatory considerations?
+
+### Requirements Approach Proposals
+
+After dialogue, propose 2-3 scoping approaches. Examples (illustrative only):
+- **(A)** Full feature set -- comprehensive user stories covering all use cases
+- **(B)** MVP scope -- core user stories only, defer edge cases to v2
+- **(C)** Phased delivery -- essential stories now, planned expansion later
+
+### Store Interview & Approach
+
+Append to `.progress.md` under "Interview Responses":
+```markdown
+### Requirements Interview (from requirements.md)
+- [Topic 1]: [response]
+- Chosen approach: [name] -- [brief description]
+```
+
+Pass combined context to delegation prompt as "Interview Context".
+
+## Step 3: Execute Requirements (Team-Based)
+
+<mandatory>
+**Use Claude Code Teams with `product-manager` as the teammate subagent type.**
+
+Follow the full team lifecycle:
+
+1. **Clean up stale team (MANDATORY FIRST ACTION)**: Call `TeamDelete()` before anything else. This releases whatever team the session is currently leading (could be from any prior phase). Errors mean no team was active -- harmless, proceed.
+2. **Create team**: `TeamCreate(team_name: "requirements-$spec")`
+3. **Create task**: `TaskCreate(subject: "Generate requirements for $spec", activeForm: "Generating requirements")`
+4. **Spawn teammate**: `Task(subagent_type: product-manager, team_name: "requirements-$spec", name: "pm-1")` — delegate with research context, goal, and interview context. Instruct to create user stories with acceptance criteria, functional requirements (FR-*), non-functional requirements (NFR-*), glossary, out-of-scope, dependencies. Output to `./specs/$spec/requirements.md`.
+5. **Wait for completion**: Monitor via TaskList.
+6. **Shutdown**: `SendMessage(type: "shutdown_request", recipient: "pm-1")`
+7. **Collect results**: Read `./specs/$spec/requirements.md`.
+8. **Clean up**: `TeamDelete()`.
+
+**Fallback**: If TeamCreate fails with "already leading" error, call `TeamDelete()` and retry `TeamCreate` once. If still fails, fall back to direct `Task(subagent_type: product-manager)` call.
+</mandatory>
+
+## Step 4: Artifact Review (only in --quick mode)
+
+<mandatory>
+**Review loop must complete before walkthrough. Max 3 iterations.**
+
+If NOT `--quick`, skip to Step 5.
+
+Invoke `spec-reviewer` via Task tool. Follow the standard review loop:
+- REVIEW_PASS: log to .progress.md, proceed
+- REVIEW_FAIL (iteration < 3): log, re-invoke product-manager with feedback, loop
+- REVIEW_FAIL (iteration >= 3): graceful degradation, log warning, proceed
+- No signal: treat as REVIEW_PASS (permissive)
+
+**Review delegation**: Include full requirements.md content, iteration count, prior findings. Upstream: research.md.
+
+**Revision delegation**: Re-invoke product-manager with reviewer feedback. Focus on specific issues.
+
+**Error handling**: Reviewer no signal = REVIEW_PASS. Agent failure = retry once, then use original.
+</mandatory>
+
+## Step 5: Walkthrough & Approval
+
+<mandatory>
+**WALKTHROUGH IS REQUIRED - DO NOT SKIP.**
+
+Read `./specs/$spec/requirements.md` and display:
+
+```
+Requirements complete for '$spec'.
+Output: $PWD/specs/$spec/requirements.md
+
+## What I Created
+
+**Goal**: [1 sentence summary]
+
+**User Stories** ([count] total):
+- US-1: [title]
+- US-2: [title]
+- US-3: [title]
+[list all, keep titles brief]
+
+**Requirements**: [X] functional, [Y] non-functional
+```
+</mandatory>
+
+### User Approval (skip if --quick)
+
+If `--quick`, skip to Step 6.
+
+Ask ONE question: "How do you want to proceed?" with these options via AskUserQuestion:
+1. **Approve** (Recommended) -- Accept artifact as-is, advance to next phase
+2. **Run review** -- Spawn spec-reviewer to validate against rubrics, show findings, then loop back to this choice
+3. **Request changes** -- Provide specific feedback to revise the artifact
+
+**If "Approve"**: proceed to Step 6.
+**If "Run review"**: Invoke spec-reviewer via Task tool with full requirements.md content (upstream: research.md). Display findings table. If REVIEW_PASS, note it. If REVIEW_FAIL, show feedback. Then loop back to this same 3-choice question (user decides next action).
+**If "Request changes" or "Other"**:
+1. Ask what to change
+2. Re-invoke product-manager using **cleanup-and-recreate** team pattern (TeamDelete old -> TeamCreate new -> spawn with feedback -> wait -> shutdown -> TeamDelete)
+3. Re-display walkthrough, ask again with same 3 choices. Loop until approved.
+
+## Step 6: Finalize
+
+### Update State
+
+1. **Merge** into `.ralph-state.json` (preserve all existing fields):
+   ```bash
+   jq '. + {"phase": "requirements", "awaitingApproval": true}' \
+     "$SPEC_PATH/.ralph-state.json" > "$SPEC_PATH/.ralph-state.json.tmp" && \
+     mv "$SPEC_PATH/.ralph-state.json.tmp" "$SPEC_PATH/.ralph-state.json"
+   ```
+2. Update `.progress.md`: mark research as implicitly approved, set current phase
+
+### Commit Spec (if enabled)
+
+Read `commitSpec` from `.ralph-state.json`. If true:
+```bash
+git add ./specs/$spec/requirements.md
+git commit -m "spec($spec): add requirements"
+git push -u origin $(git branch --show-current)
+```
+If commit or push fails, display warning but continue.
+
+### Stop
+
+<mandatory>
+**STOP HERE. DO NOT PROCEED TO DESIGN.**
+
+(Does not apply in `--quick` mode.)
+
+1. Display: `-> Next: Run /ralph-specum:design`
+2. End your response immediately
+3. Wait for user to explicitly run `/ralph-specum:design`
+</mandatory>

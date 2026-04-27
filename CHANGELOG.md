@@ -2,6 +2,18 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 3.4.0 — 2026-04-27
+
+### Added
+
+- **`ralph-specum` is now a bundled plugin** — spec-driven development with autonomous task-by-task execution (research → requirements → design → tasks → implement, plus epic triage). Originally authored by [tzachbon](https://github.com/tzachbon/smart-ralph); ralph-specum v4.9.1 has been migrated into this repository as the canonical home and is no longer tracked against upstream. MIT license and authorship are preserved at `plugins/ralph-specum/LICENSE` and `plugins/ralph-specum/NOTICE.md`.
+- **curdx-flow itself is now a Claude Code marketplace** — the repo ships `.claude-plugin/marketplace.json` so Claude CLI can install bundled plugins via `claude plugin marketplace add curdx/curdx-flow` + `claude plugin install ralph-specum@curdx-flow`. The flow installer wires this up automatically; users just run `npx @curdx/flow install` and ralph-specum is pre-checked in the multiselect along with the other not-installed items.
+
+### Notes
+
+- If you previously installed ralph-specum from the upstream `tzachbon/smart-ralph` marketplace, run `claude plugin uninstall ralph-specum@smart-ralph` before installing this version to avoid a name collision. Going forward, only the `ralph-specum@curdx-flow` build is maintained.
+- Plugin files are not shipped in the npm tarball (`package.json` `files` is unchanged: `["dist", "CHANGELOG.md"]`). They live in the GitHub repo and are pulled by Claude CLI when the marketplace is added — so a `git push` of this repo must precede `npm publish` for a new release to be installable.
+
 ## 3.3.2 — 2026-04-27
 
 ### Fixed

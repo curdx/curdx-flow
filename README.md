@@ -31,8 +31,11 @@ npx @curdx/flow --lang en    # override language
 | `claude-mem` | plugin | `thedotmack/claude-mem` |
 | `chrome-devtools-mcp` | plugin | `ChromeDevTools/chrome-devtools-mcp` |
 | `frontend-design` | plugin | `claude-plugins-official` (built-in) |
+| `ralph-specum` | plugin | bundled in this repo — spec-driven dev with autonomous task execution (originally [tzachbon/smart-ralph](https://github.com/tzachbon/smart-ralph), MIT) |
 | `sequential-thinking` | mcp | `@modelcontextprotocol/server-sequential-thinking` |
 | `context7` | mcp | HTTP — `https://mcp.context7.com/mcp` (optional API key) |
+
+> If you previously installed ralph-specum from `tzachbon/smart-ralph`, run `claude plugin uninstall ralph-specum@smart-ralph` before installing this version. Only the `ralph-specum@curdx-flow` build is maintained going forward.
 
 ## What it writes to your filesystem
 
