@@ -1,6 +1,6 @@
 # State File Schema
 
-Ralph plugins use `.ralph-state.json` to track execution state.
+curdx-flow uses `.ralph-state.json` to track execution state.
 
 ## Location
 

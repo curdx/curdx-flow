@@ -1,9 +1,11 @@
 ---
+name: feedback
 description: Submit feedback or report an issue for curdx-flow plugin.
 arguments:
   - name: message
     description: Your feedback or issue description
     required: false
+disable-model-invocation: true
 ---
 
 <example>
@@ -26,7 +28,7 @@ Help improve curdx-flow by submitting feedback or reporting issues.
 
 2. **If `gh` is available**, create an issue with the user's feedback:
    ```bash
-   gh issue create --repo tzachbon/smart-ralph --title "<short title from feedback>" --body "<full feedback message>"
+   gh issue create --repo curdx/curdx-flow --title "<short title from feedback>" --body "<full feedback message>"
    ```
    - Extract a short, descriptive title from the feedback
    - Include the full feedback in the body
@@ -35,9 +37,9 @@ Help improve curdx-flow by submitting feedback or reporting issues.
 3. **If `gh` is NOT available**, inform the user:
    > The `gh` CLI is not installed or not authenticated. Please submit your feedback manually at:
    >
-   > **https://github.com/tzachbon/smart-ralph/issues/new**
+   > **https://github.com/curdx/curdx-flow/issues/new**
    >
-   > Or browse existing issues: https://github.com/tzachbon/smart-ralph/issues?q=sort%3Aupdated-desc+is%3Aissue+is%3Aopen
+   > Or browse existing issues: https://github.com/curdx/curdx-flow/issues?q=sort%3Aupdated-desc+is%3Aissue+is%3Aopen
 
 4. **If no message was provided**, ask the user what feedback they'd like to submit.
 

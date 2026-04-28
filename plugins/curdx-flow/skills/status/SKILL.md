@@ -1,7 +1,9 @@
 ---
+name: status
 description: Show all specs and their current status
 argument-hint: [--update-index]
 allowed-tools: [Read, Bash, Glob, Task]
+disable-model-invocation: true
 ---
 
 # Spec Status

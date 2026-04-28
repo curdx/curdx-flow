@@ -556,7 +556,7 @@ Before outputting:
    ```
 7. Check for PR and output link if exists: `gh pr view --json url -q .url 2>/dev/null`
 
-This signal terminates the Ralph Loop.
+This signal terminates the curdx-flow Loop.
 
 **PR Link Output**: If a PR was created during execution, output the PR URL after ALL_TASKS_COMPLETE:
 ```text

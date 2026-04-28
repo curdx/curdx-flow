@@ -1,17 +1,17 @@
 ---
-name: smart-ralph
-description: This skill should be used when the user asks about "ralph arguments", "quick mode", "commit spec", "max iterations", "ralph state file", "execution modes", "ralph loop", "coordinator behavior", "delegate to subagent", or needs guidance on Ralph plugin arguments, state management, delegation patterns, or execution loop behavior. Core behavioral skill for all curdx-flow operations.
+name: core
+description: This skill should be used when the user asks about "ralph arguments", "quick mode", "commit spec", "max iterations", "ralph state file", "execution modes", "ralph loop", "coordinator behavior", "delegate to subagent", or needs guidance on curdx-flow plugin arguments, state management, delegation patterns, or execution loop behavior. Core behavioral skill for all curdx-flow operations.
 version: 0.2.0
 user-invocable: false
 ---
 
-# Smart Ralph
+# Core
 
-Core skill for all Ralph plugins. Defines common arguments, execution modes, shared behaviors, and coordinator delegation rules.
+Core skill for the curdx-flow plugin. Defines common arguments, execution modes, shared behaviors, and coordinator delegation rules.
 
 ## Common Arguments
 
-All Ralph commands support these standard arguments:
+All curdx-flow commands support these standard arguments:
 
 | Argument | Short | Description | Default |
 |----------|-------|-------------|---------|
@@ -44,7 +44,7 @@ Argument precedence: `--no-commit` > `--commit` > mode default.
 
 ## State File
 
-All Ralph plugins use `.ralph-state.json` for execution state. See `references/state-file-schema.md` for full schema.
+curdx-flow uses `.ralph-state.json` for execution state. See `references/state-file-schema.md` for full schema.
 
 Key fields: `phase`, `taskIndex`, `totalTasks`, `taskIteration`, `maxTaskIterations`, `awaitingApproval`.
 
@@ -77,7 +77,7 @@ If state file missing/invalid: output error, suggest re-running implement comman
 
 ## Branch Management
 
-All Ralph plugins follow consistent branch strategy:
+curdx-flow follows a consistent branch strategy:
 
 1. Check current branch before starting
 2. If on default branch (main/master): prompt for branch strategy

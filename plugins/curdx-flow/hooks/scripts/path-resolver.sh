@@ -15,7 +15,7 @@ RALPH_DEFAULT_SPECS_DIR="./specs"
 
 # Internal: Log warning messages to stderr
 _ralph_warn() {
-    echo "[ralph-warn] $1" >&2
+    echo "[curdx-flow-warn] $1" >&2
 }
 
 # Internal: Validate RALPH_CWD exists

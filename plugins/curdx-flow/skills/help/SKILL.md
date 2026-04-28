@@ -1,5 +1,7 @@
 ---
+name: help
 description: Show help for curdx-flow plugin commands and workflow.
+disable-model-invocation: true
 ---
 
 # curdx-flow Help

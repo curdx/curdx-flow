@@ -1,7 +1,9 @@
 ---
+name: implement
 description: Start task execution loop
 argument-hint: [--max-task-iterations 5] [--max-global-iterations 100] [--recovery-mode]
 allowed-tools: [Read, Write, Edit, Task, Bash, Skill]
+disable-model-invocation: true
 ---
 
 # Start Execution

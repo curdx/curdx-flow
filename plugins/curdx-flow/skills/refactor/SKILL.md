@@ -1,7 +1,9 @@
 ---
+name: refactor
 description: Update spec files methodically after execution (requirements -> design -> tasks)
 argument-hint: [spec-name] [--file=requirements|design|tasks]
 allowed-tools: [Read, Write, Edit, Task, Bash, AskUserQuestion]
+disable-model-invocation: true
 ---
 
 # Refactor Spec

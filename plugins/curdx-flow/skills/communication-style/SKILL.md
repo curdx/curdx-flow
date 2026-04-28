@@ -1,6 +1,6 @@
 ---
 name: communication-style
-description: This skill should be used when generating spec artifacts (research.md, requirements.md, design.md, tasks.md), formatting agent output, structuring phase results, or when any Ralph agent needs guidance on concise, scannable output formatting. Applies to all Ralph spec phase agents.
+description: This skill should be used when generating spec artifacts (research.md, requirements.md, design.md, tasks.md), formatting agent output, structuring phase results, or when any curdx-flow agent needs guidance on concise, scannable output formatting. Applies to all curdx-flow spec phase agents.
 version: 0.2.0
 user-invocable: false
 ---
