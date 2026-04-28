@@ -1,5 +1,5 @@
 #!/bin/bash
-# Spec Index Updater for curdx-flow
+# Spec Index Updater for Ralph Specum
 # Updates ./specs/.index/ with current spec state across all directories
 #
 # Usage: update-spec-index.sh [--quiet]

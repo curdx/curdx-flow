@@ -1,9 +1,7 @@
 ---
-name: implement
 description: Start task execution loop
 argument-hint: [--max-task-iterations 5] [--max-global-iterations 100] [--recovery-mode]
 allowed-tools: [Read, Write, Edit, Task, Bash, Skill]
-disable-model-invocation: true
 ---
 
 # Start Execution
@@ -26,7 +24,7 @@ Create a task for each item and complete in order:
 - `ralph_resolve_current()` -- resolves .current-spec to full path (bare name = ./specs/$name, full path = as-is)
 - `ralph_find_spec(name)` -- find spec by name across all configured roots
 
-**Configuration**: Specs directories are configured in `.claude/curdx-flow.local.md`:
+**Configuration**: Specs directories are configured in `.claude/ralph-specum.local.md`:
 ```yaml
 specs_dirs: ["./specs", "./packages/api/specs", "./packages/web/specs"]
 ```

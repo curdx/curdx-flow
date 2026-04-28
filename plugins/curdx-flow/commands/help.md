@@ -1,14 +1,12 @@
 ---
-name: help
-description: Show help for curdx-flow plugin commands and workflow.
-disable-model-invocation: true
+description: Show help for Ralph Specum plugin commands and workflow.
 ---
 
-# curdx-flow Help
+# Ralph Specum Help
 
 ## Overview
 
-curdx-flow is a spec-driven development plugin that guides you through research, requirements, design, and task generation phases, then executes tasks autonomously with fresh context per task.
+Ralph Specum is a spec-driven development plugin that guides you through research, requirements, design, and task generation phases, then executes tasks autonomously with fresh context per task.
 
 ## Commands
 
@@ -123,7 +121,7 @@ You can organize specs across multiple directories using the `specs_dirs` config
 
 ### Configuration
 
-Add `specs_dirs` to your settings file at `.claude/curdx-flow.local.md`:
+Add `specs_dirs` to your settings file at `.claude/ralph-specum.local.md`:
 
 ```yaml
 ---
@@ -158,7 +156,7 @@ For a monorepo with multiple packages:
 ```
 my-monorepo/
 ├── .claude/
-│   └── curdx-flow.local.md    # specs_dirs config
+│   └── ralph-specum.local.md    # specs_dirs config
 ├── packages/
 │   ├── api/
 │   │   └── specs/               # API-related specs

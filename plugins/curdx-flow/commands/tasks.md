@@ -1,9 +1,7 @@
 ---
-name: tasks
 description: Generate implementation tasks from design
 argument-hint: [spec-name] [--tasks-size fine|coarse]
 allowed-tools: "*"
-disable-model-invocation: true
 ---
 
 # Tasks Phase

@@ -285,7 +285,7 @@ Before starting a new spec, check if codebase indexing exists (skip if --quick):
 
 ```bash
 # Session guard (skip if already shown in this session)
-if [ -z "${CURDX_FLOW_INDEX_HINT_SHOWN:-}" ]; then
+if [ -z "${RALPH_SPECUM_INDEX_HINT_SHOWN:-}" ]; then
   # Check if specs/.index/ exists and has content
   if [ ! -d "./specs/.index" ] || [ -z "$(ls -A ./specs/.index 2>/dev/null)" ]; then
     SHOW_INDEX_HINT=true
@@ -303,4 +303,4 @@ Tip: Run /curdx-flow:index to scan your codebase and create indexed specs.
 This helps the research phase find relevant existing code patterns and components.
 ```
 
-After displaying, set `export CURDX_FLOW_INDEX_HINT_SHOWN=1`. Only show once per session.
+After displaying, set `export RALPH_SPECUM_INDEX_HINT_SHOWN=1`. Only show once per session.

@@ -1,9 +1,7 @@
 ---
-name: design
 description: Generate technical design from requirements
 argument-hint: [spec-name]
 allowed-tools: "*"
-disable-model-invocation: true
 ---
 
 # Design Phase

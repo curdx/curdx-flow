@@ -136,7 +136,7 @@ Scan all skill files and match against the goal text:
    e. Remove stopwords: a, an, the, to, for, with, and, or, in, on, by, is, be, that, this, of, it, should, used, when, asks, needs, about
 4. Count word overlap between context tokens and description tokens
 5. If overlap >= 2 AND skill not already in `discoveredSkills` with `invoked: true`:
-   - Invoke: `Skill({ skill: "curdx-flow:<name>" })`
+   - Invoke: `Skill({ skill: "ralph-specum:<name>" })`
    - On success: add `{ name, matchedAt: "start", invoked: true }` to `discoveredSkills`
    - On failure: set `invoked: false` -- add `{ name, matchedAt: "start", invoked: false }`, log warning, continue
 6. If no skills match across all scanned skills: log `- No skills matched`
@@ -167,7 +167,7 @@ Re-scan skills with enriched context after research completes:
    e. Remove stopwords: a, an, the, to, for, with, and, or, in, on, by, is, be, that, this, of, it, should, used, when, asks, needs, about
 4. Count word overlap between context tokens and description tokens
 5. If overlap >= 2 AND skill not already in `discoveredSkills` with `invoked: true`:
-   - Invoke: `Skill({ skill: "curdx-flow:<name>" })`
+   - Invoke: `Skill({ skill: "ralph-specum:<name>" })`
    - On success: add `{ name, matchedAt: "post-research", invoked: true }` to `discoveredSkills`
    - On failure: set `invoked: false` -- add `{ name, matchedAt: "post-research", invoked: false }`, log warning, continue
 6. If no skills match across all scanned skills: log `- No new skills matched`

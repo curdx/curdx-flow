@@ -1,5 +1,5 @@
 #!/bin/bash
-# Path Resolution Helper for curdx-flow
+# Path Resolution Helper for Ralph Specum
 # Source this file in hooks and commands
 #
 # Functions provided:
@@ -10,12 +10,12 @@
 #   ralph_get_default_dir()  - Returns first specs_dir (for new spec creation)
 
 RALPH_CWD="${RALPH_CWD:-$(pwd)}"
-RALPH_SETTINGS_FILE="$RALPH_CWD/.claude/curdx-flow.local.md"
+RALPH_SETTINGS_FILE="$RALPH_CWD/.claude/ralph-specum.local.md"
 RALPH_DEFAULT_SPECS_DIR="./specs"
 
 # Internal: Log warning messages to stderr
 _ralph_warn() {
-    echo "[curdx-flow-warn] $1" >&2
+    echo "[ralph-warn] $1" >&2
 }
 
 # Internal: Validate RALPH_CWD exists

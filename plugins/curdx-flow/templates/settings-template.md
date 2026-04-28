@@ -6,9 +6,9 @@ quick_mode_default: false
 specs_dirs: ["./specs"]
 ---
 
-# curdx-flow Configuration
+# Ralph Specum Configuration
 
-This file configures curdx-flow plugin behavior for this project.
+This file configures Ralph Specum plugin behavior for this project.
 
 ## Settings
 
@@ -36,7 +36,7 @@ When a spec name exists in multiple directories, commands will prompt for disamb
 
 ## Usage
 
-Create this file at `.claude/curdx-flow.local.md` in your project root to customize plugin behavior.
+Create this file at `.claude/ralph-specum.local.md` in your project root to customize plugin behavior.
 
 ## Example
 
@@ -48,7 +48,7 @@ auto_commit_spec: false
 quick_mode_default: true
 ---
 
-# curdx-flow Configuration
+# Ralph Specum Configuration
 
 Custom settings for this project.
 ```
@@ -67,7 +67,7 @@ specs_dirs:
   - "./packages/shared/specs"
 ---
 
-# curdx-flow Configuration
+# Ralph Specum Configuration
 
 Specs are organized by package in this monorepo.
 ```

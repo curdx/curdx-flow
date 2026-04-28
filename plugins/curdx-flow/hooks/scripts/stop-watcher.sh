@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stop Hook for curdx-flow — Loop controller for task execution continuation
+# Stop Hook for Ralph Specum — Loop controller for task execution continuation
 # Exits silently (code 0) when no active spec, outputs block JSON when tasks remain.
 
 # Read hook input from stdin
@@ -21,7 +21,7 @@ export RALPH_CWD
 source "$SCRIPT_DIR/path-resolver.sh"
 
 # Check for settings file to see if plugin is enabled
-SETTINGS_FILE="$CWD/.claude/curdx-flow.local.md"
+SETTINGS_FILE="$CWD/.claude/ralph-specum.local.md"
 if [ -f "$SETTINGS_FILE" ]; then
     # Extract enabled setting from YAML frontmatter (normalize case and strip quotes)
     ENABLED=$(sed -n '/^---$/,/^---$/p' "$SETTINGS_FILE" 2>/dev/null \
@@ -68,7 +68,7 @@ TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null 
 if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
     # Primary: 500 lines covers most sessions for reliable detection
     if tail -500 "$TRANSCRIPT_PATH" 2>/dev/null | grep -qE '(^|\W)ALL_TASKS_COMPLETE(\W|$)'; then
-        echo "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript" >&2
+        echo "[ralph-specum] ALL_TASKS_COMPLETE detected in transcript" >&2
         # Note: State file cleanup is handled by the coordinator (implement.md Section 10)
         # Do not delete here to avoid race condition
         # Update epic state if this spec belongs to an epic
@@ -85,7 +85,7 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
                 else
                     rm -f "$TMP_FILE"
                 fi
-                echo "[curdx-flow] Updated epic '$EPIC_NAME_VAL': spec '$SPEC_NAME' marked completed" >&2
+                echo "[ralph-specum] Updated epic '$EPIC_NAME_VAL': spec '$SPEC_NAME' marked completed" >&2
             fi
         fi
         "$SCRIPT_DIR/update-spec-index.sh" --quiet 2>/dev/null || true
@@ -93,7 +93,7 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
     fi
     # Fallback: check last 20 lines for edge cases (very recent signal)
     if tail -20 "$TRANSCRIPT_PATH" 2>/dev/null | grep -qE '(^|\W)ALL_TASKS_COMPLETE(\W|$)'; then
-        echo "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript (tail-end)" >&2
+        echo "[ralph-specum] ALL_TASKS_COMPLETE detected in transcript (tail-end)" >&2
         # Update epic state if this spec belongs to an epic
         EPIC_NAME_VAL=$(jq -r '.epicName // empty' "$STATE_FILE" 2>/dev/null || true)
         CURRENT_EPIC_FILE="$CWD/specs/.current-epic"
@@ -108,7 +108,7 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
                 else
                     rm -f "$TMP_FILE"
                 fi
-                echo "[curdx-flow] Updated epic '$EPIC_NAME_VAL': spec '$SPEC_NAME' marked completed" >&2
+                echo "[ralph-specum] Updated epic '$EPIC_NAME_VAL': spec '$SPEC_NAME' marked completed" >&2
             fi
         fi
         "$SCRIPT_DIR/update-spec-index.sh" --quiet 2>/dev/null || true
@@ -129,7 +129,7 @@ EOF
 
     jq -n \
       --arg reason "$REASON" \
-      --arg msg "curdx-flow: corrupt state file" \
+      --arg msg "Ralph-specum: corrupt state file" \
       '{
         "decision": "block",
         "reason": $reason,
@@ -151,8 +151,8 @@ GLOBAL_ITERATION=$(jq -r '.globalIteration // 1' "$STATE_FILE" 2>/dev/null || ec
 MAX_GLOBAL=$(jq -r '.maxGlobalIterations // 100' "$STATE_FILE" 2>/dev/null || echo "100")
 
 if [ "$GLOBAL_ITERATION" -ge "$MAX_GLOBAL" ]; then
-    echo "[curdx-flow] ERROR: Maximum global iterations ($MAX_GLOBAL) reached. Review .progress.md for failure patterns." >&2
-    echo "[curdx-flow] Recovery: fix issues manually, then run /curdx-flow:implement or /curdx-flow:cancel" >&2
+    echo "[ralph-specum] ERROR: Maximum global iterations ($MAX_GLOBAL) reached. Review .progress.md for failure patterns." >&2
+    echo "[ralph-specum] Recovery: fix issues manually, then run /curdx-flow:implement or /curdx-flow:cancel" >&2
     exit 0
 fi
 
@@ -160,7 +160,7 @@ fi
 if [ "$QUICK_MODE" = "true" ] && [ "$PHASE" != "execution" ]; then
     STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null || echo "false")
     if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
-        echo "[curdx-flow] stop_hook_active=true in quick mode, allowing stop to prevent loop" >&2
+        echo "[ralph-specum] stop_hook_active=true in quick mode, allowing stop to prevent loop" >&2
         exit 0
     fi
 
@@ -174,7 +174,7 @@ EOF
 )
     jq -n \
       --arg reason "$REASON" \
-      --arg msg "curdx-flow quick mode: continue $PHASE phase" \
+      --arg msg "Ralph-specum quick mode: continue $PHASE phase" \
       '{
         "decision": "block",
         "reason": $reason,
@@ -185,7 +185,7 @@ fi
 
 # Log current state
 if [ "$PHASE" = "execution" ]; then
-    echo "[curdx-flow] Session stopped during spec: $SPEC_NAME | Task: $((TASK_INDEX + 1))/$TOTAL_TASKS | Attempt: $TASK_ITERATION" >&2
+    echo "[ralph-specum] Session stopped during spec: $SPEC_NAME | Task: $((TASK_INDEX + 1))/$TOTAL_TASKS | Attempt: $TASK_ITERATION" >&2
 fi
 
 # Execution completion verification: cross-check state AND tasks.md
@@ -194,7 +194,7 @@ if [ "$PHASE" = "execution" ] && [ "$TASK_INDEX" -ge "$TOTAL_TASKS" ] && [ "$TOT
     if [ -f "$TASKS_FILE" ]; then
         UNCHECKED=$(grep -c '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null || echo "0")
         if [ "$UNCHECKED" -gt 0 ]; then
-            echo "[curdx-flow] State says complete but tasks.md has $UNCHECKED unchecked items" >&2
+            echo "[ralph-specum] State says complete but tasks.md has $UNCHECKED unchecked items" >&2
             REASON=$(cat <<EOF
 Tasks incomplete: state index ($TASK_INDEX) reached total ($TOTAL_TASKS), but tasks.md has $UNCHECKED unchecked items.
 
@@ -208,7 +208,7 @@ EOF
 )
             jq -n \
               --arg reason "$REASON" \
-              --arg msg "curdx-flow: $UNCHECKED unchecked tasks remain in tasks.md" \
+              --arg msg "Ralph-specum: $UNCHECKED unchecked tasks remain in tasks.md" \
               '{
                 "decision": "block",
                 "reason": $reason,
@@ -218,7 +218,7 @@ EOF
         fi
     fi
     # All tasks verified complete — allow stop
-    echo "[curdx-flow] All tasks verified complete for $SPEC_NAME" >&2
+    echo "[ralph-specum] All tasks verified complete for $SPEC_NAME" >&2
     exit 0
 fi
 
@@ -227,7 +227,7 @@ if [ "$PHASE" = "execution" ] && [ "$TASK_INDEX" -lt "$TOTAL_TASKS" ]; then
     # Respect user approval gates (e.g. PR creation, manual review steps)
     AWAITING=$(jq -r '.awaitingApproval // false' "$STATE_FILE" 2>/dev/null || echo "false")
     if [ "$AWAITING" = "true" ]; then
-        echo "[curdx-flow] awaitingApproval=true, allowing stop for user gate" >&2
+        echo "[ralph-specum] awaitingApproval=true, allowing stop for user gate" >&2
         exit 0
     fi
 
@@ -243,7 +243,7 @@ if [ "$PHASE" = "execution" ] && [ "$TASK_INDEX" -lt "$TOTAL_TASKS" ]; then
     # fires during an existing stop-hook continuation.
     STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null || echo "false")
     if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
-        echo "[curdx-flow] stop_hook_active=true, skipping continuation to prevent re-invocation loop" >&2
+        echo "[ralph-specum] stop_hook_active=true, skipping continuation to prevent re-invocation loop" >&2
         exit 0
     fi
 
@@ -337,7 +337,7 @@ $PARALLEL_INSTRUCTIONS
 STOP_WATCHER_REASON_EOF
 )
 
-    SYSTEM_MSG="curdx-flow iteration $GLOBAL_ITERATION | Task $((TASK_INDEX + 1))/$TOTAL_TASKS"
+    SYSTEM_MSG="Ralph-specum iteration $GLOBAL_ITERATION | Task $((TASK_INDEX + 1))/$TOTAL_TASKS"
     if [ "$IS_PARALLEL" = "true" ]; then
         SYSTEM_MSG="$SYSTEM_MSG (PARALLEL GROUP)"
     fi

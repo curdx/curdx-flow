@@ -1,9 +1,7 @@
 ---
-name: requirements
 description: Generate requirements from goal and research
 argument-hint: [spec-name]
 allowed-tools: "*"
-disable-model-invocation: true
 ---
 
 # Requirements Phase

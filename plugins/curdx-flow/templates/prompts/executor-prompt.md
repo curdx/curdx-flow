@@ -5,7 +5,7 @@
 
 ## Task Tool Parameters
 
-- **subagent_type:** `curdx-flow:spec-executor`
+- **subagent_type:** `ralph-specum:spec-executor`
 - **description:** `Execute task {TASK_INDEX} for {SPEC_NAME}`
 
 ## Prompt

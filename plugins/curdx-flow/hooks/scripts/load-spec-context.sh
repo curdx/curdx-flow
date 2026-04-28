@@ -1,5 +1,5 @@
 #!/bin/bash
-# SessionStart Hook for curdx-flow
+# SessionStart Hook for Ralph Specum
 # Loads context for active spec on session start:
 # 1. Detects active spec from .current-spec
 # 2. Loads progress and state for context
@@ -29,7 +29,7 @@ else
 fi
 
 # Check for settings file to see if plugin is enabled
-SETTINGS_FILE="$CWD/.claude/curdx-flow.local.md"
+SETTINGS_FILE="$CWD/.claude/ralph-specum.local.md"
 if [ -f "$SETTINGS_FILE" ]; then
     # Extract enabled setting from YAML frontmatter (normalize case and strip quotes)
     ENABLED=$(sed -n '/^---$/,/^---$/p' "$SETTINGS_FILE" 2>/dev/null \
@@ -57,7 +57,7 @@ SPEC_NAME=$(basename "$SPEC_RELATIVE_PATH")
 STATE_FILE="$SPEC_PATH/.ralph-state.json"
 PROGRESS_FILE="$SPEC_PATH/.progress.md"
 
-echo "[curdx-flow] Active spec detected: $SPEC_NAME" >&2
+echo "[ralph-specum] Active spec detected: $SPEC_NAME" >&2
 
 # Output state summary if state file exists
 if [ -f "$STATE_FILE" ] && jq empty "$STATE_FILE" 2>/dev/null; then
@@ -66,36 +66,36 @@ if [ -f "$STATE_FILE" ] && jq empty "$STATE_FILE" 2>/dev/null; then
     TOTAL_TASKS=$(jq -r '.totalTasks // 0' "$STATE_FILE" 2>/dev/null)
     AWAITING=$(jq -r '.awaitingApproval // false' "$STATE_FILE" 2>/dev/null)
 
-    echo "[curdx-flow] Phase: $PHASE | Task: $((TASK_INDEX + 1))/$TOTAL_TASKS | Awaiting approval: $AWAITING" >&2
+    echo "[ralph-specum] Phase: $PHASE | Task: $((TASK_INDEX + 1))/$TOTAL_TASKS | Awaiting approval: $AWAITING" >&2
 
     if [ "$PHASE" = "execution" ] && [ "$AWAITING" = "false" ]; then
-        echo "[curdx-flow] Execution in progress. Run /curdx-flow:implement to continue." >&2
+        echo "[ralph-specum] Execution in progress. Run /curdx-flow:implement to continue." >&2
     elif [ "$AWAITING" = "true" ]; then
         case "$PHASE" in
             research)
-                echo "[curdx-flow] Research complete. Run /curdx-flow:requirements to continue." >&2
+                echo "[ralph-specum] Research complete. Run /curdx-flow:requirements to continue." >&2
                 ;;
             requirements)
-                echo "[curdx-flow] Requirements complete. Run /curdx-flow:design to continue." >&2
+                echo "[ralph-specum] Requirements complete. Run /curdx-flow:design to continue." >&2
                 ;;
             design)
-                echo "[curdx-flow] Design complete. Run /curdx-flow:tasks to continue." >&2
+                echo "[ralph-specum] Design complete. Run /curdx-flow:tasks to continue." >&2
                 ;;
             tasks)
-                echo "[curdx-flow] Tasks complete. Run /curdx-flow:implement to start execution." >&2
+                echo "[ralph-specum] Tasks complete. Run /curdx-flow:implement to start execution." >&2
                 ;;
         esac
     fi
 else
     # No state file - check what spec files exist
     if [ -f "$SPEC_PATH/tasks.md" ]; then
-        echo "[curdx-flow] Tasks defined but no execution state. Run /curdx-flow:implement to start." >&2
+        echo "[ralph-specum] Tasks defined but no execution state. Run /curdx-flow:implement to start." >&2
     elif [ -f "$SPEC_PATH/design.md" ]; then
-        echo "[curdx-flow] Design exists. Run /curdx-flow:tasks to generate tasks." >&2
+        echo "[ralph-specum] Design exists. Run /curdx-flow:tasks to generate tasks." >&2
     elif [ -f "$SPEC_PATH/requirements.md" ]; then
-        echo "[curdx-flow] Requirements exist. Run /curdx-flow:design to continue." >&2
+        echo "[ralph-specum] Requirements exist. Run /curdx-flow:design to continue." >&2
     elif [ -f "$SPEC_PATH/research.md" ]; then
-        echo "[curdx-flow] Research exists. Run /curdx-flow:requirements to continue." >&2
+        echo "[ralph-specum] Research exists. Run /curdx-flow:requirements to continue." >&2
     fi
 fi
 
@@ -103,7 +103,7 @@ fi
 if [ -f "$PROGRESS_FILE" ]; then
     GOAL=$(grep -A1 "^## Original Goal" "$PROGRESS_FILE" 2>/dev/null | tail -1)
     if [ -n "$GOAL" ]; then
-        echo "[curdx-flow] Goal: $GOAL" >&2
+        echo "[ralph-specum] Goal: $GOAL" >&2
     fi
 fi
 

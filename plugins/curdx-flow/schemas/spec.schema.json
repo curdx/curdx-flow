@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "curdx-flow",
-  "title": "curdx-flow Specification Schema",
-  "description": "Schema for curdx-flow state files and spec document frontmatter",
+  "$id": "ralph-specum",
+  "title": "Ralph Specum Specification Schema",
+  "description": "Schema for ralph-specum state files and spec document frontmatter",
 
   "definitions": {
     "state": {

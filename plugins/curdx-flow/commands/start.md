@@ -1,14 +1,12 @@
 ---
-name: start
 description: Smart entry point that detects if you need a new spec or should resume existing
 argument-hint: [name] [goal] [--fresh] [--quick] [--commit-spec] [--no-commit-spec] [--specs-dir <path>] [--tasks-size fine|coarse]
 allowed-tools: "*"
-disable-model-invocation: true
 ---
 
 # Smart Start
 
-Smart entry point for curdx-flow. Detects whether to create a new spec or resume an existing one.
+Smart entry point for ralph-specum. Detects whether to create a new spec or resume an existing one.
 
 ## Checklist
 
@@ -154,7 +152,7 @@ Continuing...
 8. Create `.progress.md` with goal
 9. **Skill Discovery Pass 1** -- Scan all skill files and match against the goal text:
    1. Scan SKILL.md files from all skill paths (collect all skills before matching):
-      - **Plugin skills**: `${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md` → invoked as `Skill({ skill: "curdx-flow:<name>" })`
+      - **Plugin skills**: `${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md` → invoked as `Skill({ skill: "ralph-specum:<name>" })`
       - **Project skills**: `.agents/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
       - **Claude skills**: `.claude/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
 
@@ -193,7 +191,7 @@ Continuing...
     Scan all skill files and match against goal + research context:
 
     1. Scan SKILL.md files from all skill paths (collect all skills before matching):
-       - **Plugin skills**: `${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md` → invoked as `Skill({ skill: "curdx-flow:<name>" })`
+       - **Plugin skills**: `${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md` → invoked as `Skill({ skill: "ralph-specum:<name>" })`
        - **Project skills**: `.agents/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
        - **Claude skills**: `.claude/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
 

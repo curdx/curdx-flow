@@ -74,7 +74,7 @@ Ends with: `awaitingApproval: true`
 ### 5. Execution Phase
 
 **Command**: `/curdx-flow:implement`
-**Agent**: spec-executor (via curdx-flow Loop)
+**Agent**: spec-executor (via Ralph Loop)
 **State**: `phase: "execution"`
 
 Activities:

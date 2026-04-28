@@ -1,9 +1,7 @@
 ---
-name: new
 description: Create new spec and start research phase
 argument-hint: <spec-name> [goal description] [--skip-research] [--specs-dir <path>]
 allowed-tools: [Bash, Write, Task, AskUserQuestion]
-disable-model-invocation: true
 ---
 
 # Create New Spec

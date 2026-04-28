@@ -18,7 +18,7 @@ NC='\033[0m' # No Color
 setup() {
     TEST_TMPDIR=$(mktemp -d)
     export RALPH_CWD="$TEST_TMPDIR"
-    export RALPH_SETTINGS_FILE="$TEST_TMPDIR/.claude/curdx-flow.local.md"
+    export RALPH_SETTINGS_FILE="$TEST_TMPDIR/.claude/ralph-specum.local.md"
 
     # Source the path resolver
     source "$SCRIPT_DIR/path-resolver.sh"

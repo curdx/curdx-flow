@@ -1,5 +1,5 @@
 {
-  "description": "curdx-flow hooks for spec execution validation, session context loading, and quick mode enforcement",
+  "description": "Ralph Specum hooks for spec execution validation, session context loading, and quick mode enforcement",
   "hooks": {
     "PreToolUse": [
       {

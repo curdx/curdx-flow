@@ -1,9 +1,7 @@
 ---
-name: research
 description: Run or re-run research phase for current spec
 argument-hint: [spec-name]
 allowed-tools: "*"
-disable-model-invocation: true
 ---
 
 # Research Phase

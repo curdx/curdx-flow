@@ -5,7 +5,7 @@
 
 ## Task Tool Parameters
 
-- **subagent_type:** `curdx-flow:research-analyst`
+- **subagent_type:** `ralph-specum:research-analyst`
 - **description:** `Research {TOPIC} for {SPEC_NAME}`
 
 ## Prompt

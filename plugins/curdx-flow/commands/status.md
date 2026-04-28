@@ -1,9 +1,7 @@
 ---
-name: status
 description: Show all specs and their current status
 argument-hint: [--update-index]
 allowed-tools: [Read, Bash, Glob, Task]
-disable-model-invocation: true
 ---
 
 # Spec Status
@@ -38,7 +36,7 @@ This command uses the path resolver to discover specs from all configured direct
 - `ralph_list_specs()` - Returns all specs as `name|path` pairs
 - `ralph_resolve_current()` - Resolves .current-spec to full path
 
-**Configuration**: Specs directories are configured in `.claude/curdx-flow.local.md`:
+**Configuration**: Specs directories are configured in `.claude/ralph-specum.local.md`:
 ```yaml
 specs_dirs: ["./specs", "./packages/api/specs", "./packages/web/specs"]
 ```
@@ -77,7 +75,7 @@ For each spec directory found:
 Group specs by their root directory. Show `[dir-path]` suffix for specs NOT in the default `./specs` directory.
 
 ```
-# curdx-flow Status
+# Ralph Specum Status
 
 Active spec: <name from .current-spec> (or "none")
 
