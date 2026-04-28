@@ -20,6 +20,7 @@ jobs:
           cache: npm
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
+      - run: npm run check-versions
       - run: npm run build
       - run: npm publish --provenance --access public
         env:

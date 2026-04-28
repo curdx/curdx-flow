@@ -14,8 +14,9 @@ export type PluginEntry = {
 
 export type MarketplaceEntry = {
   name: string;
-  source?: string;
-  repo?: string;
+  source?: string; // 'github' | 'directory'
+  repo?: string;   // 'owner/repo' for source=github
+  path?: string;   // local path for source=directory
 };
 
 export type McpEntry = {
@@ -184,8 +185,87 @@ async function shouldSkipRefresh(name: string): Promise<boolean> {
 }
 
 /**
+ * Fetch the upstream marketplace.json content for a given marketplace entry, if reachable.
+ * - source=github → HTTPS GET against raw.githubusercontent.com/{repo}/HEAD/.claude-plugin/marketplace.json
+ * - source=directory → read the path directly
+ * Returns null on any failure (offline, 404, malformed entry); callers fall back to local cache.
+ */
+async function fetchUpstreamMarketplaceJson(
+  entry: MarketplaceEntry,
+): Promise<string | null> {
+  if (entry.source === 'github' && entry.repo) {
+    const url = `https://raw.githubusercontent.com/${entry.repo}/HEAD/.claude-plugin/marketplace.json`;
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!r.ok) return null;
+      return await r.text();
+    } catch {
+      return null;
+    }
+  }
+  if (entry.source === 'directory' && entry.path) {
+    try {
+      return await fs.readFile(
+        path.join(entry.path, '.claude-plugin', 'marketplace.json'),
+        'utf8',
+      );
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function normalizeJsonForCompare(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text));
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * Defend against the failure mode where `claude plugin marketplace update` reports success
+ * but doesn't actually rewrite the local cache file (observed empirically — likely a stale
+ * local git clone that fails to fetch silently). We fetch the upstream marketplace.json
+ * directly and overwrite the local cache when the contents diverge.
+ *
+ * Returns true if the local cache was rewritten, false otherwise (already in sync, upstream
+ * unreachable, or marketplace not registered).
+ */
+async function reconcileMarketplaceCache(name: string): Promise<boolean> {
+  const entries = await listMarketplaces();
+  const entry = entries.find((m) => m.name === name);
+  if (!entry) return false;
+  const upstream = await fetchUpstreamMarketplaceJson(entry);
+  if (!upstream) return false;
+  const localFile = path.join(marketplaceDir(name), '.claude-plugin', 'marketplace.json');
+  let localContent: string | null = null;
+  try {
+    localContent = await fs.readFile(localFile, 'utf8');
+  } catch {
+    localContent = null;
+  }
+  if (
+    localContent !== null &&
+    normalizeJsonForCompare(localContent) === normalizeJsonForCompare(upstream)
+  ) {
+    return false;
+  }
+  try {
+    await fs.mkdir(path.dirname(localFile), { recursive: true });
+    await fs.writeFile(localFile, upstream, 'utf8');
+    marketplaceJsonCache.delete(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Refresh given marketplaces' caches. Skips any whose mtime is within REFRESH_TTL_MS.
- * Returns the list of marketplace names that were actually refreshed.
+ * Returns the list of marketplace names that were actually refreshed (either by claude CLI
+ * update or by direct upstream reconciliation).
  */
 export async function refreshMarketplaces(names: string[]): Promise<string[]> {
   const unique = [...new Set(names)];
@@ -199,5 +279,9 @@ export async function refreshMarketplaces(names: string[]): Promise<string[]> {
   );
   // Bust the JSON cache for refreshed marketplaces.
   for (const name of toRefresh) marketplaceJsonCache.delete(name);
+  // Defensive reconciliation: claude CLI's update command sometimes returns success
+  // without actually rewriting the local cache file. Fetch upstream directly and
+  // overwrite when contents diverge. Best-effort — failures are non-fatal.
+  await Promise.all(toRefresh.map((name) => reconcileMarketplaceCache(name)));
   return toRefresh;
 }
