@@ -1,6 +1,6 @@
 {
   "name": "@curdx/flow",
-  "version": "4.0.1",
+  "version": "5.0.0",
   "description": "Interactive installer for Claude Code plugins and MCP servers",
   "type": "module",
   "bin": "./dist/index.mjs",
