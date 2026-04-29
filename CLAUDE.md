@@ -37,7 +37,7 @@ Default to **PATCH bump** (`6.0.1 → 6.0.2`). Always confirm the bump level wit
 
 ### 2. Sync all 5 version fields
 
-`scripts/check-versions.mjs` will fail the build if any of these drift. Edit all of them to the same value:
+Run **`npm run bump-version <X.Y.Z|patch|minor|major>`** — it atomically writes all 5 fields below and then runs `check-versions` to confirm. Use `--dry-run` first if you want to see the plan.
 
 | File | Field |
 | --- | --- |
@@ -47,7 +47,7 @@ Default to **PATCH bump** (`6.0.1 → 6.0.2`). Always confirm the bump level wit
 | `plugins/curdx-flow/.claude-plugin/plugin.json` | `version` |
 | `.claude-plugin/marketplace.json` | `plugins[name="curdx-flow"].version` |
 
-The fastest correct path is `npm version <patch|minor|major> --no-git-tag-version` (handles package.json + both lock fields), then manually edit the two plugin manifests. Re-run `npm run check-versions` to confirm.
+If you really need to edit by hand (rare), bump every field above and then run `npm run check-versions` — `prepublishOnly` and the release workflow both gate on it, so any drift fails the build.
 
 ### 3. Update CHANGELOG.md
 

@@ -17,6 +17,7 @@
     "start": "node ./dist/index.mjs",
     "typecheck": "tsc --noEmit",
     "check-versions": "node scripts/check-versions.mjs",
+    "bump-version": "node scripts/bump-version.mjs",
     "prepublishOnly": "node scripts/check-versions.mjs && npm run typecheck && npm run build"
   },
   "keywords": [
