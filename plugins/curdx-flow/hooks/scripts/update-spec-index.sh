@@ -1,5 +1,5 @@
 #!/bin/bash
-# Spec Index Updater for Ralph Specum
+# Spec Index Updater for curdx-flow
 # Updates ./specs/.index/ with current spec state across all directories
 #
 # Usage: update-spec-index.sh [--quiet]
@@ -25,14 +25,14 @@ log() {
 }
 
 # Get default specs dir for index location
-DEFAULT_DIR=$(ralph_get_default_dir)
+DEFAULT_DIR=$(curdx_get_default_dir)
 INDEX_DIR="$DEFAULT_DIR/.index"
 
 # Create index directory
 mkdir -p "$INDEX_DIR"
 
 # Get all configured directories
-SPECS_DIRS=$(ralph_get_specs_dirs)
+SPECS_DIRS=$(curdx_get_specs_dirs)
 
 # Build directories array for JSON
 DIRS_JSON="["
@@ -78,13 +78,13 @@ SPECS_JSON="["
 FIRST_SPEC=true
 
 # Get all specs using path resolver
-ALL_SPECS=$(ralph_list_specs)
+ALL_SPECS=$(curdx_list_specs)
 
 while IFS='|' read -r name path; do
     [ -z "$name" ] && continue
 
-    # Read state from .ralph-state.json if exists
-    STATE_FILE="$path/.ralph-state.json"
+    # Read state from .curdx-state.json if exists
+    STATE_FILE="$path/.curdx-state.json"
     PHASE="unknown"
     TASK_INDEX=0
     TOTAL_TASKS=0
@@ -219,7 +219,7 @@ while IFS='|' read -r name path; do
     DIR=$(dirname "$path")
 
     # Read state
-    STATE_FILE="$path/.ralph-state.json"
+    STATE_FILE="$path/.curdx-state.json"
     PHASE="unknown"
     STATUS=""
 

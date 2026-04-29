@@ -1,12 +1,12 @@
 ---
-description: Show help for Ralph Specum plugin commands and workflow.
+description: Show help for curdx-flow plugin commands and workflow.
 ---
 
-# Ralph Specum Help
+# curdx-flow Help
 
 ## Overview
 
-Ralph Specum is a spec-driven development plugin that guides you through research, requirements, design, and task generation phases, then executes tasks autonomously with fresh context per task.
+curdx-flow is a spec-driven development plugin that guides you through research, requirements, design, and task generation phases, then executes tasks autonomously with fresh context per task.
 
 ## Commands
 
@@ -80,7 +80,7 @@ Done!
 - `--commit-spec`: Commit and push spec files after each phase (default: true in normal mode, false in quick mode)
 - `--no-commit-spec`: Explicitly disable committing spec files
 
-The `--commit-spec` setting is stored in `.ralph-state.json` and applies to all subsequent phases (research, requirements, design, tasks).
+The `--commit-spec` setting is stored in `.curdx-state.json` and applies to all subsequent phases (research, requirements, design, tasks).
 
 ### new command
 ```
@@ -92,7 +92,7 @@ The `--commit-spec` setting is stored in `.ralph-state.json` and applies to all 
 ```
 /curdx-flow:<phase> [spec-name]
 ```
-Phase commands use the `commitSpec` setting from `.ralph-state.json` (set during `/curdx-flow:start`).
+Phase commands use the `commitSpec` setting from `.curdx-state.json` (set during `/curdx-flow:start`).
 
 ### implement command
 ```
@@ -107,7 +107,7 @@ Specs are stored in `./specs/` by default:
 ./specs/
 ├── .current-spec           # Active spec name (or full path for multi-dir)
 ├── my-feature/
-│   ├── .ralph-state.json   # Loop state (deleted on completion)
+│   ├── .curdx-state.json   # Loop state (deleted on completion)
 │   ├── .progress.md        # Progress tracking (persists)
 │   ├── research.md         # Research findings
 │   ├── requirements.md     # Requirements
@@ -121,7 +121,7 @@ You can organize specs across multiple directories using the `specs_dirs` config
 
 ### Configuration
 
-Add `specs_dirs` to your settings file at `.claude/ralph-specum.local.md`:
+Add `specs_dirs` to your settings file at `.claude/curdx-flow.local.md`:
 
 ```yaml
 ---
@@ -156,7 +156,7 @@ For a monorepo with multiple packages:
 ```
 my-monorepo/
 ├── .claude/
-│   └── ralph-specum.local.md    # specs_dirs config
+│   └── curdx-flow.local.md    # specs_dirs config
 ├── packages/
 │   ├── api/
 │   │   └── specs/               # API-related specs

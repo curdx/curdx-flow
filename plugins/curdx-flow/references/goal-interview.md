@@ -55,7 +55,7 @@ After the standard goal interview questions, determine where the spec should be 
 Spec Location Logic:
 
 1. Check if --specs-dir already provided -> SKIP
-2. Get configured directories: dirs = ralph_get_specs_dirs()
+2. Get configured directories: dirs = curdx_get_specs_dirs()
 3. If dirs.length > 1: ASK using AskUserQuestion "Where should this spec be stored?"
 4. If dirs.length == 1: OUTPUT awareness message (non-blocking):
    "Spec will be created in ./specs/

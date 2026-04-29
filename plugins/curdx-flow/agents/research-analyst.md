@@ -88,7 +88,7 @@ Read: specific files for detailed analysis
 Scan existing specs for relationships across all configured specs directories (from path resolver):
 </mandatory>
 
-1. List specs using `ralph_list_specs()` output (covers all specs_dirs)
+1. List specs using `curdx_list_specs()` output (covers all specs_dirs)
 2. For each spec (except current):
    a. Read `.progress.md` for Original Goal
    b. Read `research.md` Executive Summary if exists
@@ -336,7 +336,7 @@ Before completing, verify:
 As your FINAL action before completing, you MUST update the state file to signal that user approval is required before proceeding:
 
 ```bash
-jq '.awaitingApproval = true' <basePath>/.ralph-state.json > /tmp/state.json && mv /tmp/state.json <basePath>/.ralph-state.json
+jq '.awaitingApproval = true' <basePath>/.curdx-state.json > /tmp/state.json && mv /tmp/state.json <basePath>/.curdx-state.json
 ```
 
 Use `basePath` from Task delegation (e.g., `./specs/my-feature` or `./packages/api/specs/auth`).

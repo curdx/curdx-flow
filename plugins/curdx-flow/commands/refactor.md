@@ -21,10 +21,10 @@ Create a task for each item and complete in order:
 
 ## Step 1: Gather Context
 
-1. If `$ARGUMENTS` contains a spec name, use `ralph_find_spec()` to resolve it; otherwise use `ralph_resolve_current()`
+1. If `$ARGUMENTS` contains a spec name, use `curdx_find_spec()` to resolve it; otherwise use `curdx_resolve_current()`
 2. If no active spec, error: "No active spec. Run /curdx-flow:new <name> first."
 3. Check the resolved spec directory exists
-4. Read `.ralph-state.json` if exists
+4. Read `.curdx-state.json` if exists
 5. Identify which spec files exist: `requirements.md`, `design.md`, `tasks.md`
 6. If no spec files exist, error: "No spec files found. Run /curdx-flow:start first."
 7. Read `.progress.md` to understand implementation learnings
@@ -109,12 +109,12 @@ If "Regenerate" selected, delegate to the original agent (architect-reviewer for
 
 ### Update State
 
-1. Update `.ralph-state.json`: keep existing phase, reset `taskIndex` to 0 if tasks modified, set `awaitingApproval: true`
+1. Update `.curdx-state.json`: keep existing phase, reset `taskIndex` to 0 if tasks modified, set `awaitingApproval: true`
 2. Append refactoring summary to `.progress.md`
 
 ### Commit (if enabled)
 
-Read `commitSpec` from `.ralph-state.json`. If true:
+Read `commitSpec` from `.curdx-state.json`. If true:
 ```bash
 git add ./specs/$spec/
 git commit -m "spec($spec): refactor specifications"

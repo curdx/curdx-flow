@@ -21,10 +21,10 @@ Create a task for each item and complete in order:
 
 ## Step 1: Gather Context
 
-1. If `$ARGUMENTS` contains a spec name, use `ralph_find_spec()` to resolve it; otherwise use `ralph_resolve_current()`
+1. If `$ARGUMENTS` contains a spec name, use `curdx_find_spec()` to resolve it; otherwise use `curdx_resolve_current()`
 2. If no active spec, error: "No active spec. Run /curdx-flow:new <name> first."
 3. Check the resolved spec directory exists
-4. Read `.ralph-state.json`; clear approval flag: `awaitingApproval: false`
+4. Read `.curdx-state.json`; clear approval flag: `awaitingApproval: false`
 5. Read context: `research.md` (if exists), `.progress.md`, original goal
 
 ## Step 2: Interview (skip if --quick)
@@ -151,17 +151,17 @@ Ask ONE question: "How do you want to proceed?" with these options via AskUserQu
 
 ### Update State
 
-1. **Merge** into `.ralph-state.json` (preserve all existing fields):
+1. **Merge** into `.curdx-state.json` (preserve all existing fields):
    ```bash
    jq '. + {"phase": "requirements", "awaitingApproval": true}' \
-     "$SPEC_PATH/.ralph-state.json" > "$SPEC_PATH/.ralph-state.json.tmp" && \
-     mv "$SPEC_PATH/.ralph-state.json.tmp" "$SPEC_PATH/.ralph-state.json"
+     "$SPEC_PATH/.curdx-state.json" > "$SPEC_PATH/.curdx-state.json.tmp" && \
+     mv "$SPEC_PATH/.curdx-state.json.tmp" "$SPEC_PATH/.curdx-state.json"
    ```
 2. Update `.progress.md`: mark research as implicitly approved, set current phase
 
 ### Commit Spec (if enabled)
 
-Read `commitSpec` from `.ralph-state.json`. If true:
+Read `commitSpec` from `.curdx-state.json`. If true:
 ```bash
 git add ./specs/$spec/requirements.md
 git commit -m "spec($spec): add requirements"

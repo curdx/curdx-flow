@@ -9,19 +9,19 @@ This reference contains the spec discovery, matching, and management logic used 
 Spec scanning uses the path resolver for multi-directory support:
 
 ```bash
-ralph_get_specs_dirs()    # Returns all configured spec directories
-ralph_get_default_dir()   # Returns first specs_dir (default for new specs)
-ralph_find_spec(name)     # Find spec by name, returns full path
-ralph_list_specs()        # List all specs as "name|path" pairs
-ralph_resolve_current()   # Resolve .current-spec to full path
+curdx_get_specs_dirs()    # Returns all configured spec directories
+curdx_get_default_dir()   # Returns first specs_dir (default for new specs)
+curdx_find_spec(name)     # Find spec by name, returns full path
+curdx_list_specs()        # List all specs as "name|path" pairs
+curdx_resolve_current()   # Resolve .current-spec to full path
 ```
 
 ## Scanning Steps
 
 ```text
-1. List all specs across all configured directories using ralph_list_specs():
+1. List all specs across all configured directories using curdx_list_specs():
    - Returns "name|path" pairs for each spec
-   - Searches all directories in ralph_get_specs_dirs()
+   - Searches all directories in curdx_get_specs_dirs()
    - Exclude the current spec being created (if known)
    - Exclude .index directory (handled separately in step 1b)
    |
@@ -34,7 +34,7 @@ ralph_resolve_current()   # Resolve .current-spec to full path
      - Mark as "indexed" type for display differentiation
    |
 2. For each spec found (name|path pair):
-   - Read $path/.progress.md (using the full path from ralph_list_specs)
+   - Read $path/.progress.md (using the full path from curdx_list_specs)
    - Extract "Original Goal" section (line after "## Original Goal")
    - If .progress.md doesn't exist, skip this spec
    |
@@ -69,7 +69,7 @@ ralph_resolve_current()   # Resolve .current-spec to full path
    This context may inform the interview questions.
    |
 6. Store in state file:
-   - Update .ralph-state.json with relatedSpecs array:
+   - Update .curdx-state.json with relatedSpecs array:
      {
        ...existing state,
        "relatedSpecs": [
@@ -140,7 +140,7 @@ For indexed specs, reference them to understand existing codebase patterns:
 ### --specs-dir Validation
 
 When `--specs-dir` is provided:
-1. Call `ralph_get_specs_dirs()` to get configured directories
+1. Call `curdx_get_specs_dirs()` to get configured directories
 2. Check if provided path matches one of the configured directories
 3. If NOT in configured list: Error "Invalid --specs-dir: '$path' is not in configured specs_dirs"
 4. If valid: Use this path as the spec root instead of default
@@ -149,7 +149,7 @@ When `--specs-dir` is provided:
 --specs-dir Validation Logic:
 
 1. Extract --specs-dir value from $ARGUMENTS
-2. Get configured dirs: dirs = ralph_get_specs_dirs()
+2. Get configured dirs: dirs = curdx_get_specs_dirs()
 3. Normalize paths (remove trailing slashes)
 4. Check: specsDir in dirs?
    - YES: Use specsDir for spec creation
@@ -163,10 +163,10 @@ Spec Directory Logic:
 
 1. Check if --specs-dir in $ARGUMENTS
    - YES: Validate against configured specs_dirs, use if valid
-   - NO: Use ralph_get_default_dir() (first configured dir, defaults to ./specs)
+   - NO: Use curdx_get_default_dir() (first configured dir, defaults to ./specs)
 
 2. Determine spec base path:
-   specsDir = validated --specs-dir OR ralph_get_default_dir()
+   specsDir = validated --specs-dir OR curdx_get_default_dir()
    basePath = "$specsDir/$name"
 
 3. For .current-spec:
@@ -178,7 +178,7 @@ Spec Directory Logic:
 
 ### Reading
 
-Use `ralph_resolve_current()` to resolve `.current-spec` to a full path:
+Use `curdx_resolve_current()` to resolve `.current-spec` to a full path:
 - Bare name (e.g., `my-feature`) resolves to `./specs/my-feature`
 - Full path (e.g., `./packages/api/specs/my-feature`) used as-is
 
@@ -187,7 +187,7 @@ Use `ralph_resolve_current()` to resolve `.current-spec` to a full path:
 Update `.current-spec` based on root directory:
 
 ```text
-defaultDir = ralph_get_default_dir()
+defaultDir = curdx_get_default_dir()
 if specsDir == defaultDir:
     echo "$name" > "$defaultDir/.current-spec"     # Bare name for default root
 else:
@@ -198,7 +198,7 @@ else:
 
 When switching active spec:
 1. If input starts with `./` or `/`: treat as full path
-2. Otherwise: treat as spec name to search for via `ralph_find_spec()`
+2. Otherwise: treat as spec name to search for via `curdx_find_spec()`
 3. Exit code 0 (found unique): proceed with switch
 4. Exit code 1 (not found): error with list of searched directories
 5. Exit code 2 (ambiguous): show disambiguation prompt with full paths
@@ -209,7 +209,7 @@ Determine spec phase from directory contents:
 
 ### Resume Flow
 
-1. Read `$specPath/.ralph-state.json`
+1. Read `$specPath/.curdx-state.json`
 2. If no state file (completed or never started):
    - Check what files exist (research.md, requirements.md, design.md, tasks.md)
    - Determine last completed phase from file presence
@@ -244,7 +244,7 @@ Continuing...
 ```text
 Validation Sequence:
 
-1. specsDir = validated --specs-dir OR ralph_get_default_dir()
+1. specsDir = validated --specs-dir OR curdx_get_default_dir()
 2. If $specsDir/$name/ already exists:
    - Append -2, -3, etc. until unique name found
    - Display: "Created '$name-2' at $specsDir ($name already exists)"
@@ -260,7 +260,7 @@ Spec Location Logic:
 1. Check if --specs-dir already provided in $ARGUMENTS
    -> SKIP spec location question entirely, use provided value
 
-2. Get configured directories: dirs = ralph_get_specs_dirs()
+2. Get configured directories: dirs = curdx_get_specs_dirs()
 
 3. If dirs.length > 1 (multiple directories configured):
    -> ASK using AskUserQuestion:
@@ -285,7 +285,7 @@ Before starting a new spec, check if codebase indexing exists (skip if --quick):
 
 ```bash
 # Session guard (skip if already shown in this session)
-if [ -z "${RALPH_SPECUM_INDEX_HINT_SHOWN:-}" ]; then
+if [ -z "${CURDX_INDEX_HINT_SHOWN:-}" ]; then
   # Check if specs/.index/ exists and has content
   if [ ! -d "./specs/.index" ] || [ -z "$(ls -A ./specs/.index 2>/dev/null)" ]; then
     SHOW_INDEX_HINT=true
@@ -303,4 +303,4 @@ Tip: Run /curdx-flow:index to scan your codebase and create indexed specs.
 This helps the research phase find relevant existing code patterns and components.
 ```
 
-After displaying, set `export RALPH_SPECUM_INDEX_HINT_SHOWN=1`. Only show once per session.
+After displaying, set `export CURDX_INDEX_HINT_SHOWN=1`. Only show once per session.

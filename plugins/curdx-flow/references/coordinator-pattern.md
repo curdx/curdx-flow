@@ -22,7 +22,7 @@ You are fully autonomous. NEVER ask questions or wait for user input.
 
 ## Read State
 
-Read `$SPEC_PATH/.ralph-state.json` to get current state:
+Read `$SPEC_PATH/.curdx-state.json` to get current state:
 
 ```json
 {
@@ -37,7 +37,7 @@ Read `$SPEC_PATH/.ralph-state.json` to get current state:
 **ERROR: Missing/Corrupt State File**
 
 If state file missing or corrupt (invalid JSON, missing required fields):
-1. Output error: "ERROR: State file missing or corrupt at $SPEC_PATH/.ralph-state.json"
+1. Output error: "ERROR: State file missing or corrupt at $SPEC_PATH/.curdx-state.json"
 2. Suggest: "Run /curdx-flow:implement to reinitialize execution state"
 3. Do NOT continue execution
 4. Do NOT output ALL_TASKS_COMPLETE
@@ -66,7 +66,7 @@ If `nativeSyncEnabled` is not `false` in state AND (`nativeTaskMap` is missing o
    - On failure: increment `nativeSyncFailureCount` in state. If count >= 3: set `nativeSyncEnabled` to `false`, log "Native sync disabled after 3 consecutive failures" to .progress.md, stop creating remaining tasks and continue without sync
    - Store mapping: nativeTaskMap[i] = returned task ID
    - If task already completed ([x]): immediately TaskUpdate(taskId: nativeTaskMap[i], status: "completed")
-3. Write updated nativeTaskMap to .ralph-state.json
+3. Write updated nativeTaskMap to .curdx-state.json
 
 If `nativeSyncEnabled` is `false`: skip all sync operations silently.
 
@@ -78,7 +78,7 @@ If taskIndex >= totalTasks:
 1. Verify all tasks marked [x] in tasks.md
 2. Delete state file explicitly:
    ```bash
-   rm -f "$SPEC_PATH/.ralph-state.json"
+   rm -f "$SPEC_PATH/.curdx-state.json"
    ```
 3. Output: ALL_TASKS_COMPLETE
 4. STOP - do not delegate any task
@@ -416,7 +416,7 @@ After successful completion (TASK_COMPLETE for sequential or all parallel tasks 
 **CRITICAL: Always use jq merge pattern to preserve all existing fields (source, name, basePath, commitSpec, relatedSpecs, etc.). Never write a new object from scratch.**
 
 **Sequential Update**:
-1. Read current .ralph-state.json
+1. Read current .curdx-state.json
 2. Increment taskIndex by 1
 3. Reset taskIteration to 1
 4. Increment globalIteration by 1
@@ -428,7 +428,7 @@ After successful completion (TASK_COMPLETE for sequential or all parallel tasks 
    ```
 
 **Parallel Batch Update**:
-1. Read current .ralph-state.json
+1. Read current .curdx-state.json
 2. Set taskIndex to parallelGroup.endIndex + 1 (jump past entire batch)
 3. Reset taskIteration to 1
 4. Increment globalIteration by 1
@@ -539,7 +539,7 @@ Before outputting ALL_TASKS_COMPLETE:
 
 Before outputting:
 1. Verify all tasks marked [x] in tasks.md
-2. Delete .ralph-state.json (cleanup execution state)
+2. Delete .curdx-state.json (cleanup execution state)
 3. Keep .progress.md (preserve learnings and history)
 4. **Cleanup orphaned temp progress files** (from interrupted parallel batches):
    ```bash
@@ -556,7 +556,7 @@ Before outputting:
    ```
 7. Check for PR and output link if exists: `gh pr view --json url -q .url 2>/dev/null`
 
-This signal terminates the Ralph Loop.
+This signal terminates the Loop.
 
 **PR Link Output**: If a PR was created during execution, output the PR URL after ALL_TASKS_COMPLETE:
 ```text
@@ -590,7 +590,7 @@ Extract the JSON payload:
 
 **Validate Request**:
 
-1. Read `modificationMap` from .ralph-state.json
+1. Read `modificationMap` from .curdx-state.json
 2. Count: `modificationMap[originalTaskId].count` (default 0)
 3. If count >= 3: REJECT, log "Max modifications (3) reached for task $taskId" in .progress.md, skip modification
 4. Depth check: count dots in proposed task IDs. If dots > 3 (depth > 2 levels): REJECT
@@ -642,8 +642,8 @@ jq --arg taskId "$TASK_ID" \
    .modificationMap[$taskId].count += 1 |
    .modificationMap[$taskId].modifications += [{id: $modId, type: $type, reason: $reason}] |
    .totalTasks += $delta
-   ' "$SPEC_PATH/.ralph-state.json" > "$SPEC_PATH/.ralph-state.json.tmp" && \
-   mv "$SPEC_PATH/.ralph-state.json.tmp" "$SPEC_PATH/.ralph-state.json"
+   ' "$SPEC_PATH/.curdx-state.json" > "$SPEC_PATH/.curdx-state.json.tmp" && \
+   mv "$SPEC_PATH/.curdx-state.json.tmp" "$SPEC_PATH/.curdx-state.json"
 ```
 
 > **Note**: Set `PROPOSED_COUNT` to the number of proposed tasks (e.g., `PROPOSED_COUNT=$(echo "$PROPOSED_TASKS" | jq 'length')`). For SPLIT_TASK this is N (the number of sub-tasks), for ADD_PREREQUISITE and ADD_FOLLOWUP this is 1.
@@ -670,12 +670,12 @@ When TASK_MODIFICATION_REQUEST is processed and new tasks are inserted into task
    - `TaskUpdate` original task with `addBlockedBy: [prerequisite task ID]`
 4. For ADD_FOLLOWUP:
    - `TaskCreate(subject: "<FR-11 format>", description, activeForm: "<FR-12 format>")` for followup, add returned ID to `nativeTaskMap`
-5. Update `nativeTaskMap` in .ralph-state.json with new entries
+5. Update `nativeTaskMap` in .curdx-state.json with new entries
 6. Re-indexing: rebuild `nativeTaskMap` to match the updated tasks.md order.
    - Parse tasks.md in order after insertion.
    - Keep existing native task IDs for unchanged task identities (match by task ID pattern `X.Y` in subject, not title alone).
    - Assign newly created IDs to inserted tasks at their actual indices.
-   - Persist the fully re-keyed map to .ralph-state.json.
+   - Persist the fully re-keyed map to .curdx-state.json.
 7. If any TaskCreate/TaskUpdate fails: log warning, continue
 
 ## PR Lifecycle Loop (Phase 5)
@@ -758,7 +758,7 @@ All must be true:
 
 When all Step 4 criteria met:
 1. Update .progress.md with final state
-2. Delete .ralph-state.json
+2. Delete .curdx-state.json
 3. Get PR URL: `gh pr view --json url -q .url`
 4. Output: ALL_TASKS_COMPLETE
 5. Output: PR link

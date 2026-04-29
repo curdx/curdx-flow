@@ -63,11 +63,11 @@ Validation Sequence:
 1. Validate input (non-empty goal/plan)
 2. Infer name from goal (if not provided)
 3. Determine spec directory using path resolver:
-   specsDir = (--specs-dir value if valid) OR ralph_get_default_dir()
+   specsDir = (--specs-dir value if valid) OR curdx_get_default_dir()
    basePath = "$specsDir/$name"
 4. Create spec directory: mkdir -p "$basePath"
 4a. Ensure gitignore entries exist (.current-spec, .progress.md)
-5. Write .ralph-state.json:
+5. Write .curdx-state.json:
    { source: "plan", name, basePath, phase: "research",
      taskIndex: 0, totalTasks: 0, taskIteration: 1,
      maxTaskIterations: 5, globalIteration: 1,
@@ -136,11 +136,11 @@ Scan all skill files and match against the goal text:
    e. Remove stopwords: a, an, the, to, for, with, and, or, in, on, by, is, be, that, this, of, it, should, used, when, asks, needs, about
 4. Count word overlap between context tokens and description tokens
 5. If overlap >= 2 AND skill not already in `discoveredSkills` with `invoked: true`:
-   - Invoke: `Skill({ skill: "ralph-specum:<name>" })`
+   - Invoke: `Skill({ skill: "curdx-flow:<name>" })`
    - On success: add `{ name, matchedAt: "start", invoked: true }` to `discoveredSkills`
    - On failure: set `invoked: false` -- add `{ name, matchedAt: "start", invoked: false }`, log warning, continue
 6. If no skills match across all scanned skills: log `- No skills matched`
-7. Update `.ralph-state.json` with updated `discoveredSkills` array
+7. Update `.curdx-state.json` with updated `discoveredSkills` array
 8. Append a `## Skill Discovery` section to `.progress.md` with match details per skill:
    ```markdown
    ## Skill Discovery
@@ -167,11 +167,11 @@ Re-scan skills with enriched context after research completes:
    e. Remove stopwords: a, an, the, to, for, with, and, or, in, on, by, is, be, that, this, of, it, should, used, when, asks, needs, about
 4. Count word overlap between context tokens and description tokens
 5. If overlap >= 2 AND skill not already in `discoveredSkills` with `invoked: true`:
-   - Invoke: `Skill({ skill: "ralph-specum:<name>" })`
+   - Invoke: `Skill({ skill: "curdx-flow:<name>" })`
    - On success: add `{ name, matchedAt: "post-research", invoked: true }` to `discoveredSkills`
    - On failure: set `invoked: false` -- add `{ name, matchedAt: "post-research", invoked: false }`, log warning, continue
 6. If no skills match across all scanned skills: log `- No new skills matched`
-7. Update `.ralph-state.json` with updated `discoveredSkills` array
+7. Update `.curdx-state.json` with updated `discoveredSkills` array
 8. Append a `### Post-Research Retry` subsection to `.progress.md` under `## Skill Discovery`:
    ```markdown
    ### Post-Research Retry

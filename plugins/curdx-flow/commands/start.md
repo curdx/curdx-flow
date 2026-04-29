@@ -6,7 +6,7 @@ allowed-tools: "*"
 
 # Smart Start
 
-Smart entry point for ralph-specum. Detects whether to create a new spec or resume an existing one.
+Smart entry point for curdx-flow. Detects whether to create a new spec or resume an existing one.
 
 ## Checklist
 
@@ -47,7 +47,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/references/spec-scanner.md` and follow the scanning 
 **Skip spec scanner and index hint if --quick flag detected in $ARGUMENTS.**
 </mandatory>
 
-**Summary**: Scans ./specs/ directory (and all configured specs_dirs) for related specs using keyword matching. Displays related specs with relevance scores. Shows index hint if codebase indexing not yet done. Stores relatedSpecs in .ralph-state.json for use during interview.
+**Summary**: Scans ./specs/ directory (and all configured specs_dirs) for related specs using keyword matching. Displays related specs with relevance scores. Shows index hint if codebase indexing not yet done. Stores relatedSpecs in .curdx-state.json for use during interview.
 
 ## Step 3.5: Epic Detection
 
@@ -92,7 +92,7 @@ Based on detection logic from Step 2:
 
 ### Resume Flow
 
-1. Read `$specPath/.ralph-state.json`
+1. Read `$specPath/.curdx-state.json`
 2. If no state file -- check which files exist, determine last phase, ask "Continue or restart?"
 3. If state file exists -- read phase/taskIndex, show brief status, continue from current phase
 
@@ -122,13 +122,13 @@ Continuing...
 2. If no goal provided, ask: "What is the goal? Describe what you want to build."
 3. Determine spec directory:
    ```text
-   specsDir = (--specs-dir if valid) OR (interview response) OR ralph_get_default_dir()
+   specsDir = (--specs-dir if valid) OR (interview response) OR curdx_get_default_dir()
    basePath = "$specsDir/$name"
    ```
 4. Create spec directory: `mkdir -p "$basePath"`
 5. Update .current-spec (bare name for default dir, full path for non-default)
 6. Ensure gitignore entries for specs/.current-spec, specs/.current-epic, and **/.progress.md
-7. Initialize `.ralph-state.json`:
+7. Initialize `.curdx-state.json`:
    ```json
    {
      "source": "spec", "name": "$name", "basePath": "$basePath",
@@ -152,7 +152,7 @@ Continuing...
 8. Create `.progress.md` with goal
 9. **Skill Discovery Pass 1** -- Scan all skill files and match against the goal text:
    1. Scan SKILL.md files from all skill paths (collect all skills before matching):
-      - **Plugin skills**: `${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md` → invoked as `Skill({ skill: "ralph-specum:<name>" })`
+      - **Plugin skills**: `${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md` → invoked as `Skill({ skill: "curdx-flow:<name>" })`
       - **Project skills**: `.agents/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
       - **Claude skills**: `.claude/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
 
@@ -171,7 +171,7 @@ Continuing...
       - On success: add `{ name, source: "<path>", matchedAt: "start", invoked: true }` to `discoveredSkills`
       - On failure: set `invoked: false` -- add `{ name, source: "<path>", matchedAt: "start", invoked: false }`, log warning, continue
    5. If no skills match across all scanned skills: log `- No skills matched`
-   6. Update `.ralph-state.json` with updated `discoveredSkills` array
+   6. Update `.curdx-state.json` with updated `discoveredSkills` array
    7. Append a `## Skill Discovery` section to `.progress.md` with match details per skill:
       ```markdown
       ## Skill Discovery
@@ -191,7 +191,7 @@ Continuing...
     Scan all skill files and match against goal + research context:
 
     1. Scan SKILL.md files from all skill paths (collect all skills before matching):
-       - **Plugin skills**: `${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md` → invoked as `Skill({ skill: "ralph-specum:<name>" })`
+       - **Plugin skills**: `${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md` → invoked as `Skill({ skill: "curdx-flow:<name>" })`
        - **Project skills**: `.agents/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
        - **Claude skills**: `.claude/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
 
@@ -210,7 +210,7 @@ Continuing...
        - On success: add `{ name, source: "<path>", matchedAt: "post-research", invoked: true }` to `discoveredSkills`
        - On failure: set `invoked: false` -- add `{ name, source: "<path>", matchedAt: "post-research", invoked: false }`, log warning, continue
     5. If no skills match across all scanned skills: log `- No new skills matched`
-    6. Update `.ralph-state.json` with updated `discoveredSkills` array
+    6. Update `.curdx-state.json` with updated `discoveredSkills` array
     7. Append a `### Post-Research Retry` subsection to `.progress.md` under `## Skill Discovery`:
        ```markdown
        ### Post-Research Retry
@@ -292,7 +292,7 @@ Quick mode does NOT exempt you from delegation -- it only skips interactive phas
 After ANY subagent returns in normal mode (no `--quick` flag):
 
 1. Wait for subagent to return
-2. Read `$basePath/.ralph-state.json`
+2. Read `$basePath/.curdx-state.json`
 3. If `awaitingApproval: true`: STOP IMMEDIATELY
 4. Output a brief status message
 5. **END YOUR RESPONSE**

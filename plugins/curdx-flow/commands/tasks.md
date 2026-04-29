@@ -21,17 +21,17 @@ Create a task for each item and complete in order:
 
 ## Step 1: Gather Context
 
-1. If `$ARGUMENTS` contains a spec name, use `ralph_find_spec()` to resolve it; otherwise use `ralph_resolve_current()`
+1. If `$ARGUMENTS` contains a spec name, use `curdx_find_spec()` to resolve it; otherwise use `curdx_resolve_current()`
 2. If no active spec, error: "No active spec. Run /curdx-flow:new <name> first."
 3. Check the resolved spec directory exists
 4. Check `design.md` exists. If not, error: "Design not found. Run /curdx-flow:design first."
 5. Check `requirements.md` exists
-6. Read `.ralph-state.json`; clear approval flag: `awaitingApproval: false`
+6. Read `.curdx-state.json`; clear approval flag: `awaitingApproval: false`
 7. **`--tasks-size` flag handling**: Check `$ARGUMENTS` for `--tasks-size` flag:
-   - If value is `fine` or `coarse`: update `granularity` in `.ralph-state.json` to the given value (overrides any value set by `/curdx-flow:start`)
-   - If value is invalid (not `fine` or `coarse`): warn the user (`⚠️ Invalid --tasks-size value "<value>", defaulting to fine`) and set `"granularity": "fine"` in `.ralph-state.json`
-   - If `--tasks-size` flag is absent: leave `granularity` unchanged in `.ralph-state.json` (preserve any value set by `/curdx-flow:start`)
-8. **Quick mode granularity default**: If `--quick` is present in `$ARGUMENTS` AND `granularity` is not set in `.ralph-state.json`, set `"granularity": "fine"` in `.ralph-state.json`
+   - If value is `fine` or `coarse`: update `granularity` in `.curdx-state.json` to the given value (overrides any value set by `/curdx-flow:start`)
+   - If value is invalid (not `fine` or `coarse`): warn the user (`⚠️ Invalid --tasks-size value "<value>", defaulting to fine`) and set `"granularity": "fine"` in `.curdx-state.json`
+   - If `--tasks-size` flag is absent: leave `granularity` unchanged in `.curdx-state.json` (preserve any value set by `/curdx-flow:start`)
+8. **Quick mode granularity default**: If `--quick` is present in `$ARGUMENTS` AND `granularity` is not set in `.curdx-state.json`, set `"granularity": "fine"` in `.curdx-state.json`
 9. Read context: `requirements.md`, `design.md`, `research.md` (if exists), `.progress.md`
 
 ## Step 2: Interview (skip if --quick)
@@ -60,13 +60,13 @@ Apply adaptive dialogue from `${CLAUDE_PLUGIN_ROOT}/skills/interview-framework/S
 
 **Granularity question skip conditions**: Only ask the "Task granularity" question when ALL of these are true:
 - `--quick` is NOT present in `$ARGUMENTS`
-- `granularity` is NOT already set in `.ralph-state.json` (i.e., not pre-set via `--tasks-size` flag on `/curdx-flow:start` or `/curdx-flow:tasks`)
+- `granularity` is NOT already set in `.curdx-state.json` (i.e., not pre-set via `--tasks-size` flag on `/curdx-flow:start` or `/curdx-flow:tasks`)
 
 If either condition is false, skip the granularity question:
 - In `--quick` mode: handled in Step 1 (quick mode granularity default)
-- If `granularity` already set in `.ralph-state.json`: use the existing value without asking
+- If `granularity` already set in `.curdx-state.json`: use the existing value without asking
 
-When the user answers the granularity question, store the response in `.progress.md` under Interview Responses and update `"granularity"` in `.ralph-state.json`.
+When the user answers the granularity question, store the response in `.progress.md` under Interview Responses and update `"granularity"` in `.curdx-state.json`.
 
 ### Tasks Approach Proposals
 
@@ -116,7 +116,7 @@ Follow the full team lifecycle:
 **Fallback**: If TeamCreate fails with "already leading" error, call `TeamDelete()` and retry `TeamCreate` once. If still fails, fall back to direct `Task(subagent_type: task-planner)` call.
 
 > **Delegation Context**: When delegating to task-planner, include these inputs:
-> - **Granularity**: [fine|coarse] (from `granularity` field in `.ralph-state.json`; default to `fine` if field is absent)
+> - **Granularity**: [fine|coarse] (from `granularity` field in `.curdx-state.json`; default to `fine` if field is absent)
 >
 > For VE Tasks — VE1 (startup), VE2 (check), VE3 (cleanup) — generation:
 > - **E2E Verification**: enabled or disabled (from interview response, or auto-enabled in quick mode)
@@ -190,12 +190,12 @@ Ask ONE question: "How do you want to proceed?" with these options via AskUserQu
 ### Update State
 
 1. Count total tasks from generated file
-2. Update `.ralph-state.json`: `{ "phase": "tasks", "totalTasks": <count>, "awaitingApproval": true }`
+2. Update `.curdx-state.json`: `{ "phase": "tasks", "totalTasks": <count>, "awaitingApproval": true }`
 3. Update `.progress.md`: mark design as implicitly approved, set current phase, update task count
 
 ### Commit Spec (if enabled)
 
-Read `commitSpec` from `.ralph-state.json`. If true:
+Read `commitSpec` from `.curdx-state.json`. If true:
 ```bash
 git add ./specs/$spec/tasks.md
 git commit -m "spec($spec): add implementation tasks"

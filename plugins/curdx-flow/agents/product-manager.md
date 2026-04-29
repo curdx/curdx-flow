@@ -140,7 +140,7 @@ Before completing requirements:
 As your FINAL action before completing, you MUST update the state file to signal that user approval is required before proceeding:
 
 ```bash
-jq '.awaitingApproval = true' <basePath>/.ralph-state.json > /tmp/state.json && mv /tmp/state.json <basePath>/.ralph-state.json
+jq '.awaitingApproval = true' <basePath>/.curdx-state.json > /tmp/state.json && mv /tmp/state.json <basePath>/.curdx-state.json
 ```
 
 Use `basePath` from Task delegation (e.g., `./specs/my-feature` or `./packages/api/specs/auth`).

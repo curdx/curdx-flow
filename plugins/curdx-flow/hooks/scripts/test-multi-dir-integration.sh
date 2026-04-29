@@ -17,8 +17,8 @@ NC='\033[0m' # No Color
 # Setup test environment
 setup() {
     TEST_TMPDIR=$(mktemp -d)
-    export RALPH_CWD="$TEST_TMPDIR"
-    export RALPH_SETTINGS_FILE="$TEST_TMPDIR/.claude/ralph-specum.local.md"
+    export CURDX_CWD="$TEST_TMPDIR"
+    export CURDX_SETTINGS_FILE="$TEST_TMPDIR/.claude/curdx-flow.local.md"
 
     # Source the path resolver
     source "$SCRIPT_DIR/path-resolver.sh"
@@ -118,7 +118,7 @@ assert_line_count() {
 create_settings() {
     local dirs_json="$1"
     mkdir -p "$TEST_TMPDIR/.claude"
-    cat > "$RALPH_SETTINGS_FILE" << EOF
+    cat > "$CURDX_SETTINGS_FILE" << EOF
 ---
 specs_dirs: $dirs_json
 ---
@@ -130,7 +130,7 @@ EOF
 create_spec_default() {
     local name="$1"
     local default_dir
-    default_dir=$(ralph_get_default_dir)
+    default_dir=$(curdx_get_default_dir)
 
     # Create spec directory structure
     mkdir -p "$TEST_TMPDIR/$default_dir/$name"
@@ -151,7 +151,7 @@ create_spec_custom() {
 
     # Get default dir to determine .current-spec location and content
     local default_dir
-    default_dir=$(ralph_get_default_dir)
+    default_dir=$(curdx_get_default_dir)
     mkdir -p "$TEST_TMPDIR/$default_dir"
 
     # Write full path to .current-spec for non-default roots
@@ -184,9 +184,9 @@ test_create_spec_default_dir() {
     content=$(cat "$TEST_TMPDIR/specs/.current-spec")
     assert_eq "my-feature" "$content" "Default dir: .current-spec contains bare name"
 
-    # Verify ralph_resolve_current resolves to full path
+    # Verify curdx_resolve_current resolves to full path
     local resolved
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./specs/my-feature" "$resolved" "Default dir: resolved path includes dir prefix"
 
     cleanup
@@ -214,9 +214,9 @@ test_create_spec_custom_dir() {
     content=$(cat "$TEST_TMPDIR/specs/.current-spec")
     assert_eq "./packages/api/specs/api-feature" "$content" "Custom dir: .current-spec contains full path"
 
-    # Verify ralph_resolve_current returns the full path
+    # Verify curdx_resolve_current returns the full path
     local resolved
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./packages/api/specs/api-feature" "$resolved" "Custom dir: resolved path matches"
 
     cleanup
@@ -239,7 +239,7 @@ test_list_specs_multiple_roots() {
 
     # List all specs
     local result
-    result=$(ralph_list_specs)
+    result=$(curdx_list_specs)
 
     # Verify all specs are listed
     assert_line_count 3 "$result" "Lists 3 specs from all roots"
@@ -269,29 +269,29 @@ test_switch_between_specs_different_roots() {
 
     # Verify current spec is main-feature
     local resolved
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./specs/main-feature" "$resolved" "Initial spec is main-feature"
 
-    # Simulate switching to api-feature (ralph_find_spec finds it)
+    # Simulate switching to api-feature (curdx_find_spec finds it)
     local found_path
-    found_path=$(ralph_find_spec "api-feature")
+    found_path=$(curdx_find_spec "api-feature")
     assert_eq "./packages/api/specs/api-feature" "$found_path" "Found api-feature path"
 
     # Write full path to .current-spec (simulate switch)
     echo "$found_path" > "$TEST_TMPDIR/specs/.current-spec"
 
     # Verify new current spec is api-feature
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./packages/api/specs/api-feature" "$resolved" "Switched to api-feature"
 
     # Simulate switching back to main-feature
-    found_path=$(ralph_find_spec "main-feature")
+    found_path=$(curdx_find_spec "main-feature")
     assert_eq "./specs/main-feature" "$found_path" "Found main-feature path"
 
     # Write back bare name for default dir
     echo "main-feature" > "$TEST_TMPDIR/specs/.current-spec"
 
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./specs/main-feature" "$resolved" "Switched back to main-feature"
 
     cleanup
@@ -314,12 +314,12 @@ test_backward_compat_bare_name() {
 
     # Verify bare name resolves to ./specs/name
     local resolved
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./specs/legacy-feature" "$resolved" "Bare name resolves to ./specs/ prefix"
 
-    # Verify ralph_find_spec finds it
+    # Verify curdx_find_spec finds it
     local found
-    found=$(ralph_find_spec "legacy-feature")
+    found=$(curdx_find_spec "legacy-feature")
     local exit_code=$?
     assert_exit 0 "$exit_code" "Find returns exit 0 for legacy spec"
     assert_eq "./specs/legacy-feature" "$found" "Found legacy spec in default dir"
@@ -342,17 +342,17 @@ test_backward_compat_no_settings() {
 
     # Verify default dir is ./specs
     local default_dir
-    default_dir=$(ralph_get_default_dir)
+    default_dir=$(curdx_get_default_dir)
     assert_eq "./specs" "$default_dir" "No settings: default dir is ./specs"
 
     # Verify specs_dirs returns default
     local dirs
-    dirs=$(ralph_get_specs_dirs)
+    dirs=$(curdx_get_specs_dirs)
     assert_eq "./specs" "$dirs" "No settings: specs_dirs returns ./specs"
 
     # Verify listing works
     local list
-    list=$(ralph_list_specs)
+    list=$(curdx_list_specs)
     assert_line_count 2 "$list" "No settings: lists 2 specs"
     assert_contains "$list" "feature-a|./specs/feature-a" "No settings: contains feature-a"
     assert_contains "$list" "feature-b|./specs/feature-b" "No settings: contains feature-b"
@@ -374,14 +374,14 @@ test_disambiguation_same_name() {
     mkdir -p "$TEST_TMPDIR/packages/api/specs/shared-feature"
     create_settings '["./specs", "./packages/api/specs"]'
 
-    # Verify ralph_find_spec returns exit 2 for ambiguous
+    # Verify curdx_find_spec returns exit 2 for ambiguous
     local exit_code=0
-    ralph_find_spec "shared-feature" >/dev/null 2>&1 || exit_code=$?
+    curdx_find_spec "shared-feature" >/dev/null 2>&1 || exit_code=$?
     assert_exit 2 "$exit_code" "Disambiguation: returns exit 2 for ambiguous spec"
 
     # Verify listing shows both
     local list
-    list=$(ralph_list_specs)
+    list=$(curdx_list_specs)
     assert_contains "$list" "shared-feature|./specs/shared-feature" "Disambiguation: lists spec from default root"
     assert_contains "$list" "shared-feature|./packages/api/specs/shared-feature" "Disambiguation: lists spec from api root"
 
@@ -407,7 +407,7 @@ test_full_path_switch() {
 
     # Verify resolved path is the full path
     local resolved
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./packages/api/specs/shared-feature" "$resolved" "Full path switch: correct resolution"
 
     cleanup
@@ -431,24 +431,24 @@ test_complete_workflow() {
     create_spec_default "first-feature"
 
     local resolved
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./specs/first-feature" "$resolved" "Workflow: created first-feature in default"
 
     # Step 2: Create spec in custom dir (simulates --specs-dir)
     create_spec_custom "api-feature" "packages/api/specs"
 
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./packages/api/specs/api-feature" "$resolved" "Workflow: created api-feature in custom"
 
     # Step 3: Create another spec in default
     create_spec_default "second-feature"
 
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./specs/second-feature" "$resolved" "Workflow: created second-feature in default"
 
     # Step 4: List all specs
     local list
-    list=$(ralph_list_specs)
+    list=$(curdx_list_specs)
     assert_line_count 3 "$list" "Workflow: lists all 3 specs"
     assert_contains "$list" "first-feature|./specs/first-feature" "Workflow: contains first-feature"
     assert_contains "$list" "api-feature|./packages/api/specs/api-feature" "Workflow: contains api-feature"
@@ -474,7 +474,7 @@ test_trailing_slash_normalization() {
 
     # Verify trailing slash is normalized
     local resolved
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./specs/my-feature" "$resolved" "Trailing slash normalized"
 
     cleanup
@@ -495,35 +495,35 @@ test_all_functions_work_without_config() {
     echo "feature-x" > "$TEST_TMPDIR/specs/.current-spec"
 
     # Ensure no settings file exists
-    rm -f "$RALPH_SETTINGS_FILE"
+    rm -f "$CURDX_SETTINGS_FILE"
     rmdir "$TEST_TMPDIR/.claude" 2>/dev/null || true
 
-    # Test ralph_get_specs_dirs works without config
+    # Test curdx_get_specs_dirs works without config
     local dirs
-    dirs=$(ralph_get_specs_dirs)
-    assert_eq "./specs" "$dirs" "No config: ralph_get_specs_dirs returns ./specs"
+    dirs=$(curdx_get_specs_dirs)
+    assert_eq "./specs" "$dirs" "No config: curdx_get_specs_dirs returns ./specs"
 
-    # Test ralph_get_default_dir works without config
+    # Test curdx_get_default_dir works without config
     local default_dir
-    default_dir=$(ralph_get_default_dir)
-    assert_eq "./specs" "$default_dir" "No config: ralph_get_default_dir returns ./specs"
+    default_dir=$(curdx_get_default_dir)
+    assert_eq "./specs" "$default_dir" "No config: curdx_get_default_dir returns ./specs"
 
-    # Test ralph_resolve_current works without config
+    # Test curdx_resolve_current works without config
     local resolved
-    resolved=$(ralph_resolve_current)
-    assert_eq "./specs/feature-x" "$resolved" "No config: ralph_resolve_current works"
+    resolved=$(curdx_resolve_current)
+    assert_eq "./specs/feature-x" "$resolved" "No config: curdx_resolve_current works"
 
-    # Test ralph_find_spec works without config
+    # Test curdx_find_spec works without config
     local found
-    found=$(ralph_find_spec "feature-y")
+    found=$(curdx_find_spec "feature-y")
     local exit_code=$?
-    assert_exit 0 "$exit_code" "No config: ralph_find_spec finds spec"
-    assert_eq "./specs/feature-y" "$found" "No config: ralph_find_spec returns correct path"
+    assert_exit 0 "$exit_code" "No config: curdx_find_spec finds spec"
+    assert_eq "./specs/feature-y" "$found" "No config: curdx_find_spec returns correct path"
 
-    # Test ralph_list_specs works without config
+    # Test curdx_list_specs works without config
     local list
-    list=$(ralph_list_specs)
-    assert_line_count 2 "$list" "No config: ralph_list_specs lists both specs"
+    list=$(curdx_list_specs)
+    assert_line_count 2 "$list" "No config: curdx_list_specs lists both specs"
     assert_contains "$list" "feature-x|./specs/feature-x" "No config: list contains feature-x"
     assert_contains "$list" "feature-y|./specs/feature-y" "No config: list contains feature-y"
 
@@ -544,60 +544,60 @@ test_no_warnings_without_config() {
     echo "my-spec" > "$TEST_TMPDIR/specs/.current-spec"
 
     # Ensure no settings file exists
-    rm -f "$RALPH_SETTINGS_FILE"
+    rm -f "$CURDX_SETTINGS_FILE"
     rmdir "$TEST_TMPDIR/.claude" 2>/dev/null || true
 
     # Capture stderr for all functions to ensure no warnings
     local stderr_output
     local result
 
-    # Test ralph_get_specs_dirs - no warnings
-    stderr_output=$(ralph_get_specs_dirs 2>&1 >/dev/null)
+    # Test curdx_get_specs_dirs - no warnings
+    stderr_output=$(curdx_get_specs_dirs 2>&1 >/dev/null)
     if [ -z "$stderr_output" ]; then
-        echo -e "${GREEN}PASS${NC}: No config: ralph_get_specs_dirs produces no warnings"
+        echo -e "${GREEN}PASS${NC}: No config: curdx_get_specs_dirs produces no warnings"
         PASS_COUNT=$((PASS_COUNT + 1))
     else
-        echo -e "${RED}FAIL${NC}: No config: ralph_get_specs_dirs produced warning: $stderr_output"
+        echo -e "${RED}FAIL${NC}: No config: curdx_get_specs_dirs produced warning: $stderr_output"
         FAIL_COUNT=$((FAIL_COUNT + 1))
     fi
 
-    # Test ralph_get_default_dir - no warnings
-    stderr_output=$(ralph_get_default_dir 2>&1 >/dev/null)
+    # Test curdx_get_default_dir - no warnings
+    stderr_output=$(curdx_get_default_dir 2>&1 >/dev/null)
     if [ -z "$stderr_output" ]; then
-        echo -e "${GREEN}PASS${NC}: No config: ralph_get_default_dir produces no warnings"
+        echo -e "${GREEN}PASS${NC}: No config: curdx_get_default_dir produces no warnings"
         PASS_COUNT=$((PASS_COUNT + 1))
     else
-        echo -e "${RED}FAIL${NC}: No config: ralph_get_default_dir produced warning: $stderr_output"
+        echo -e "${RED}FAIL${NC}: No config: curdx_get_default_dir produced warning: $stderr_output"
         FAIL_COUNT=$((FAIL_COUNT + 1))
     fi
 
-    # Test ralph_resolve_current - no warnings
-    stderr_output=$(ralph_resolve_current 2>&1 >/dev/null)
+    # Test curdx_resolve_current - no warnings
+    stderr_output=$(curdx_resolve_current 2>&1 >/dev/null)
     if [ -z "$stderr_output" ]; then
-        echo -e "${GREEN}PASS${NC}: No config: ralph_resolve_current produces no warnings"
+        echo -e "${GREEN}PASS${NC}: No config: curdx_resolve_current produces no warnings"
         PASS_COUNT=$((PASS_COUNT + 1))
     else
-        echo -e "${RED}FAIL${NC}: No config: ralph_resolve_current produced warning: $stderr_output"
+        echo -e "${RED}FAIL${NC}: No config: curdx_resolve_current produced warning: $stderr_output"
         FAIL_COUNT=$((FAIL_COUNT + 1))
     fi
 
-    # Test ralph_find_spec - no warnings
-    stderr_output=$(ralph_find_spec "my-spec" 2>&1 >/dev/null)
+    # Test curdx_find_spec - no warnings
+    stderr_output=$(curdx_find_spec "my-spec" 2>&1 >/dev/null)
     if [ -z "$stderr_output" ]; then
-        echo -e "${GREEN}PASS${NC}: No config: ralph_find_spec produces no warnings"
+        echo -e "${GREEN}PASS${NC}: No config: curdx_find_spec produces no warnings"
         PASS_COUNT=$((PASS_COUNT + 1))
     else
-        echo -e "${RED}FAIL${NC}: No config: ralph_find_spec produced warning: $stderr_output"
+        echo -e "${RED}FAIL${NC}: No config: curdx_find_spec produced warning: $stderr_output"
         FAIL_COUNT=$((FAIL_COUNT + 1))
     fi
 
-    # Test ralph_list_specs - no warnings
-    stderr_output=$(ralph_list_specs 2>&1 >/dev/null)
+    # Test curdx_list_specs - no warnings
+    stderr_output=$(curdx_list_specs 2>&1 >/dev/null)
     if [ -z "$stderr_output" ]; then
-        echo -e "${GREEN}PASS${NC}: No config: ralph_list_specs produces no warnings"
+        echo -e "${GREEN}PASS${NC}: No config: curdx_list_specs produces no warnings"
         PASS_COUNT=$((PASS_COUNT + 1))
     else
-        echo -e "${RED}FAIL${NC}: No config: ralph_list_specs produced warning: $stderr_output"
+        echo -e "${RED}FAIL${NC}: No config: curdx_list_specs produced warning: $stderr_output"
         FAIL_COUNT=$((FAIL_COUNT + 1))
     fi
 
@@ -619,7 +619,7 @@ test_empty_settings_file() {
 
     # Create empty settings file (no specs_dirs defined)
     mkdir -p "$TEST_TMPDIR/.claude"
-    cat > "$RALPH_SETTINGS_FILE" << 'EOF'
+    cat > "$CURDX_SETTINGS_FILE" << 'EOF'
 ---
 # Empty settings - no specs_dirs
 ---
@@ -627,15 +627,15 @@ EOF
 
     # Verify defaults to ./specs like no file at all
     local default_dir
-    default_dir=$(ralph_get_default_dir)
+    default_dir=$(curdx_get_default_dir)
     assert_eq "./specs" "$default_dir" "Empty settings: defaults to ./specs"
 
     local dirs
-    dirs=$(ralph_get_specs_dirs)
+    dirs=$(curdx_get_specs_dirs)
     assert_eq "./specs" "$dirs" "Empty settings: specs_dirs returns ./specs"
 
     local resolved
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./specs/test-feature" "$resolved" "Empty settings: resolve works"
 
     cleanup
@@ -656,7 +656,7 @@ test_settings_without_specs_dirs() {
 
     # Create settings file with other keys but no specs_dirs
     mkdir -p "$TEST_TMPDIR/.claude"
-    cat > "$RALPH_SETTINGS_FILE" << 'EOF'
+    cat > "$CURDX_SETTINGS_FILE" << 'EOF'
 ---
 some_other_setting: true
 another_key: "value"
@@ -666,11 +666,11 @@ EOF
 
     # Verify defaults to ./specs
     local default_dir
-    default_dir=$(ralph_get_default_dir)
+    default_dir=$(curdx_get_default_dir)
     assert_eq "./specs" "$default_dir" "Settings without specs_dirs: defaults to ./specs"
 
     local resolved
-    resolved=$(ralph_resolve_current)
+    resolved=$(curdx_resolve_current)
     assert_eq "./specs/another-feature" "$resolved" "Settings without specs_dirs: resolve works"
 
     cleanup

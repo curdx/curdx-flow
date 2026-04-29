@@ -67,7 +67,7 @@ git diff --cached --quiet || git commit -m "chore(spec): update progress for tas
 
 ## What NOT to Include
 
-- `.ralph-state.json` - never committed, managed by coordinator
+- `.curdx-state.json` - never committed, managed by coordinator
 - Lock files (`.tasks.lock`, `.git-commit.lock`) - temporary, cleaned up after batch
 - Temp progress files (`.progress-task-*.md`) - merged into main .progress.md by coordinator
 
@@ -102,7 +102,7 @@ When running in parallel mode, use flock to prevent race conditions:
 
 ## State File Protection
 
-The spec-executor must NEVER modify `.ralph-state.json`:
+The spec-executor must NEVER modify `.curdx-state.json`:
 - Commands (start, implement, etc.) set phase transitions
 - Coordinator (implement command loop) increments taskIndex after verified completion
 - spec-executor: READ ONLY, never write

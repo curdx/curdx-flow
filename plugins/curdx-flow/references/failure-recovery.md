@@ -86,7 +86,7 @@ If no completion signal from spec-executor:
 ## Recovery Mode Entry Point
 
 When spec-executor does NOT output TASK_COMPLETE:
-1. First, check if `recoveryMode` is true in .ralph-state.json
+1. First, check if `recoveryMode` is true in .curdx-state.json
 2. If recoveryMode is false, undefined, or missing: skip to Max Retries above (existing behavior preserved)
 3. If recoveryMode is explicitly true: proceed with iterative recovery
 
@@ -149,7 +149,7 @@ recoveryMode defaults to false. When recoveryMode is false or missing, the exist
 ## Check Fix Task Limits
 
 Before generating a fix task:
-1. Read `fixTaskMap` from .ralph-state.json
+1. Read `fixTaskMap` from .curdx-state.json
 2. Check if `fixTaskMap[taskId].attempts >= maxFixTasksPerOriginal`
 3. If limit reached:
    - Output error: "ERROR: Max fix attempts ($maxFixTasksPerOriginal) reached for task $taskId"
@@ -162,7 +162,7 @@ Before generating a fix task:
 Before generating a fix task, verify nesting depth is within limits:
 1. Count dots in task ID: `DEPTH=$(echo "$TASK_ID" | tr -cd '.' | wc -c)`
 2. FIX_DEPTH = DEPTH - 1 (e.g., "1.3.1.1" = 3 dots - 1 = depth 2)
-3. Read `maxFixTaskDepth` from .ralph-state.json (default: 3)
+3. Read `maxFixTaskDepth` from .curdx-state.json (default: 3)
 4. If FIX_DEPTH >= maxFixTaskDepth:
    - Output error: "ERROR: Max fix task depth ($maxFixTaskDepth) exceeded for task $taskId"
    - Show lineage: "Fix task chain: [parent task IDs from task ID dots]"
@@ -265,8 +265,8 @@ jq --arg taskId "$TASK_ID" \
 
    # Also increment totalTasks to account for inserted fix task
    .totalTasks += 1
-   ' "$SPEC_PATH/.ralph-state.json" > "$SPEC_PATH/.ralph-state.json.tmp" && \
-   mv "$SPEC_PATH/.ralph-state.json.tmp" "$SPEC_PATH/.ralph-state.json"
+   ' "$SPEC_PATH/.curdx-state.json" > "$SPEC_PATH/.curdx-state.json.tmp" && \
+   mv "$SPEC_PATH/.curdx-state.json.tmp" "$SPEC_PATH/.curdx-state.json"
 ```
 
 **Example state after fix task generation**:
@@ -318,15 +318,15 @@ After second failure (fix task 1.3.2 generated):
 ```bash
 # Check current attempts for a task
 CURRENT_ATTEMPTS=$(jq -r --arg taskId "$TASK_ID" \
-  '.fixTaskMap[$taskId].attempts // 0' "$SPEC_PATH/.ralph-state.json")
+  '.fixTaskMap[$taskId].attempts // 0' "$SPEC_PATH/.curdx-state.json")
 
 # Check if limit exceeded
-MAX_FIX=$(jq -r '.maxFixTasksPerOriginal // 3' "$SPEC_PATH/.ralph-state.json")
+MAX_FIX=$(jq -r '.maxFixTasksPerOriginal // 3' "$SPEC_PATH/.curdx-state.json")
 if [ "$CURRENT_ATTEMPTS" -ge "$MAX_FIX" ]; then
   echo "ERROR: Max fix attempts ($MAX_FIX) reached for task $TASK_ID"
   # Show fix history
   jq -r --arg taskId "$TASK_ID" \
-    '.fixTaskMap[$taskId].fixTaskIds | join(", ")' "$SPEC_PATH/.ralph-state.json"
+    '.fixTaskMap[$taskId].fixTaskIds | join(", ")' "$SPEC_PATH/.curdx-state.json"
   exit 1
 fi
 ```
@@ -374,7 +374,7 @@ Use the Edit tool to cleanly insert the fix task after the current task block.
    - This places fix task immediately after original task block
 
 6. **Update state totalTasks**:
-   - Read .ralph-state.json
+   - Read .curdx-state.json
    - Increment `totalTasks` by 1
    - Write updated state
 

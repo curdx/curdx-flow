@@ -14,17 +14,17 @@ This command uses the path resolver for multi-root spec discovery:
 
 ```bash
 # Source the path resolver (conceptual - commands use these patterns)
-# ralph_find_spec(name)   - Find spec by name across all roots
-# ralph_resolve_current() - Get current spec's full path
+# curdx_find_spec(name)   - Find spec by name across all roots
+# curdx_resolve_current() - Get current spec's full path
 ```
 
 ## Determine Target Spec
 
 1. If `$ARGUMENTS` contains input:
    - If starts with `./` or `/`: treat as full path, validate it exists
-   - Otherwise: treat as spec name, use `ralph_find_spec()` pattern to search
+   - Otherwise: treat as spec name, use `curdx_find_spec()` pattern to search
 2. If no argument provided:
-   - Use `ralph_resolve_current()` pattern to get active spec path from `.current-spec`
+   - Use `curdx_resolve_current()` pattern to get active spec path from `.current-spec`
 3. If no active spec and no argument, inform user there's nothing to cancel
 
 ### Handle Disambiguation
@@ -43,7 +43,7 @@ Do NOT automatically select one. User must specify the full path.
 
 ## Check State
 
-1. Check if `$spec_path/.ralph-state.json` exists (where `$spec_path` is the resolved full path)
+1. Check if `$spec_path/.curdx-state.json` exists (where `$spec_path` is the resolved full path)
 2. If not, inform user no active loop for this spec
 
 ## Read Current State
@@ -57,7 +57,7 @@ If state file exists, read and display:
 
 1. Delete state file:
    ```bash
-   rm $spec_path/.ralph-state.json
+   rm $spec_path/.curdx-state.json
    ```
 
 2. Remove spec directory:
@@ -87,7 +87,7 @@ State before cancellation:
 - Iterations: <globalIteration>
 
 Cleanup:
-- [x] Removed .ralph-state.json
+- [x] Removed .curdx-state.json
 - [x] Removed spec directory ($spec_path)
 - [x] Cleared current spec marker
 
@@ -100,7 +100,7 @@ To start a new spec:
 
 ## If No Active Loop
 
-If there's no `.ralph-state.json`, still proceed with removing the spec directory and clearing `.current-spec`:
+If there's no `.curdx-state.json`, still proceed with removing the spec directory and clearing `.current-spec`:
 
 ```
 No active execution loop found for spec: $spec_name

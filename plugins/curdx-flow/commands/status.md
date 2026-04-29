@@ -33,25 +33,25 @@ The index is also updated automatically when specs are created, completed, or de
 This command uses the path resolver to discover specs from all configured directories.
 
 **Path Resolver Functions**:
-- `ralph_list_specs()` - Returns all specs as `name|path` pairs
-- `ralph_resolve_current()` - Resolves .current-spec to full path
+- `curdx_list_specs()` - Returns all specs as `name|path` pairs
+- `curdx_resolve_current()` - Resolves .current-spec to full path
 
-**Configuration**: Specs directories are configured in `.claude/ralph-specum.local.md`:
+**Configuration**: Specs directories are configured in `.claude/curdx-flow.local.md`:
 ```yaml
 specs_dirs: ["./specs", "./packages/api/specs", "./packages/web/specs"]
 ```
 
 ## Gather Information
 
-1. Use `ralph_list_specs()` to enumerate all specs from all configured directories
-2. Use `ralph_resolve_current()` to identify the active spec path
+1. Use `curdx_list_specs()` to enumerate all specs from all configured directories
+2. Use `curdx_resolve_current()` to identify the active spec path
 3. Group specs by their root directory
 
 ## For Each Spec
 
 For each spec directory found:
 
-1. Read `.ralph-state.json` if exists to get:
+1. Read `.curdx-state.json` if exists to get:
    - Current phase
    - Task progress (taskIndex/totalTasks)
    - Iteration count
@@ -66,7 +66,7 @@ For each spec directory found:
    - Count lines matching `- [x]` pattern
    - Count lines matching `- [ ]` pattern
 
-4. If `.ralph-state.json` has `relatedSpecs`:
+4. If `.curdx-state.json` has `relatedSpecs`:
    - List related specs with relevance
    - Mark those with `mayNeedUpdate: true` with asterisk
 
@@ -75,7 +75,7 @@ For each spec directory found:
 Group specs by their root directory. Show `[dir-path]` suffix for specs NOT in the default `./specs` directory.
 
 ```
-# Ralph Specum Status
+# curdx-flow Status
 
 Active spec: <name from .current-spec> (or "none")
 

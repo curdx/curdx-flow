@@ -29,7 +29,7 @@ When refactoring a specific file:
 ### 1. Read Current State
 - Read the target spec file completely (from basePath)
 - Read `<basePath>/.progress.md` for implementation learnings
-- Read `<basePath>/.ralph-state.json` for context
+- Read `<basePath>/.curdx-state.json` for context
 
 ### 2. Section-by-Section Review
 For each major section in the file:

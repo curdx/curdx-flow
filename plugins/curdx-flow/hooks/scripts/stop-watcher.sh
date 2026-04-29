@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stop Hook for Ralph Specum — Loop controller for task execution continuation
+# Stop Hook for curdx-flow — Loop controller for task execution continuation
 # Exits silently (code 0) when no active spec, outputs block JSON when tasks remain.
 
 # Read hook input from stdin
@@ -16,12 +16,12 @@ fi
 
 # Source path resolver for spec directory resolution
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RALPH_CWD="$CWD"
-export RALPH_CWD
+CURDX_CWD="$CWD"
+export CURDX_CWD
 source "$SCRIPT_DIR/path-resolver.sh"
 
 # Check for settings file to see if plugin is enabled
-SETTINGS_FILE="$CWD/.claude/ralph-specum.local.md"
+SETTINGS_FILE="$CWD/.claude/curdx-flow.local.md"
 if [ -f "$SETTINGS_FILE" ]; then
     # Extract enabled setting from YAML frontmatter (normalize case and strip quotes)
     ENABLED=$(sed -n '/^---$/,/^---$/p' "$SETTINGS_FILE" 2>/dev/null \
@@ -32,7 +32,7 @@ if [ -f "$SETTINGS_FILE" ]; then
 fi
 
 # Resolve current spec using path resolver (handles multi-directory support)
-SPEC_PATH=$(ralph_resolve_current 2>/dev/null)
+SPEC_PATH=$(curdx_resolve_current 2>/dev/null)
 if [ -z "$SPEC_PATH" ]; then
     exit 0
 fi
@@ -40,7 +40,7 @@ fi
 # Extract spec name from path (last component)
 SPEC_NAME=$(basename "$SPEC_PATH")
 
-STATE_FILE="$CWD/$SPEC_PATH/.ralph-state.json"
+STATE_FILE="$CWD/$SPEC_PATH/.curdx-state.json"
 if [ ! -f "$STATE_FILE" ]; then
     exit 0
 fi
@@ -68,7 +68,7 @@ TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null 
 if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
     # Primary: 500 lines covers most sessions for reliable detection
     if tail -500 "$TRANSCRIPT_PATH" 2>/dev/null | grep -qE '(^|\W)ALL_TASKS_COMPLETE(\W|$)'; then
-        echo "[ralph-specum] ALL_TASKS_COMPLETE detected in transcript" >&2
+        echo "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript" >&2
         # Note: State file cleanup is handled by the coordinator (implement.md Section 10)
         # Do not delete here to avoid race condition
         # Update epic state if this spec belongs to an epic
@@ -85,7 +85,7 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
                 else
                     rm -f "$TMP_FILE"
                 fi
-                echo "[ralph-specum] Updated epic '$EPIC_NAME_VAL': spec '$SPEC_NAME' marked completed" >&2
+                echo "[curdx-flow] Updated epic '$EPIC_NAME_VAL': spec '$SPEC_NAME' marked completed" >&2
             fi
         fi
         "$SCRIPT_DIR/update-spec-index.sh" --quiet 2>/dev/null || true
@@ -93,7 +93,7 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
     fi
     # Fallback: check last 20 lines for edge cases (very recent signal)
     if tail -20 "$TRANSCRIPT_PATH" 2>/dev/null | grep -qE '(^|\W)ALL_TASKS_COMPLETE(\W|$)'; then
-        echo "[ralph-specum] ALL_TASKS_COMPLETE detected in transcript (tail-end)" >&2
+        echo "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript (tail-end)" >&2
         # Update epic state if this spec belongs to an epic
         EPIC_NAME_VAL=$(jq -r '.epicName // empty' "$STATE_FILE" 2>/dev/null || true)
         CURRENT_EPIC_FILE="$CWD/specs/.current-epic"
@@ -108,7 +108,7 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
                 else
                     rm -f "$TMP_FILE"
                 fi
-                echo "[ralph-specum] Updated epic '$EPIC_NAME_VAL': spec '$SPEC_NAME' marked completed" >&2
+                echo "[curdx-flow] Updated epic '$EPIC_NAME_VAL': spec '$SPEC_NAME' marked completed" >&2
             fi
         fi
         "$SCRIPT_DIR/update-spec-index.sh" --quiet 2>/dev/null || true
@@ -119,7 +119,7 @@ fi
 # Validate state file is readable JSON
 if ! jq empty "$STATE_FILE" 2>/dev/null; then
     REASON=$(cat <<EOF
-ERROR: Corrupt state file at $SPEC_PATH/.ralph-state.json
+ERROR: Corrupt state file at $SPEC_PATH/.curdx-state.json
 
 Recovery options:
 1. Reset state: /curdx-flow:implement (reinitializes from tasks.md)
@@ -129,7 +129,7 @@ EOF
 
     jq -n \
       --arg reason "$REASON" \
-      --arg msg "Ralph-specum: corrupt state file" \
+      --arg msg "curdx-flow: corrupt state file" \
       '{
         "decision": "block",
         "reason": $reason,
@@ -151,8 +151,8 @@ GLOBAL_ITERATION=$(jq -r '.globalIteration // 1' "$STATE_FILE" 2>/dev/null || ec
 MAX_GLOBAL=$(jq -r '.maxGlobalIterations // 100' "$STATE_FILE" 2>/dev/null || echo "100")
 
 if [ "$GLOBAL_ITERATION" -ge "$MAX_GLOBAL" ]; then
-    echo "[ralph-specum] ERROR: Maximum global iterations ($MAX_GLOBAL) reached. Review .progress.md for failure patterns." >&2
-    echo "[ralph-specum] Recovery: fix issues manually, then run /curdx-flow:implement or /curdx-flow:cancel" >&2
+    echo "[curdx-flow] ERROR: Maximum global iterations ($MAX_GLOBAL) reached. Review .progress.md for failure patterns." >&2
+    echo "[curdx-flow] Recovery: fix issues manually, then run /curdx-flow:implement or /curdx-flow:cancel" >&2
     exit 0
 fi
 
@@ -160,7 +160,7 @@ fi
 if [ "$QUICK_MODE" = "true" ] && [ "$PHASE" != "execution" ]; then
     STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null || echo "false")
     if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
-        echo "[ralph-specum] stop_hook_active=true in quick mode, allowing stop to prevent loop" >&2
+        echo "[curdx-flow] stop_hook_active=true in quick mode, allowing stop to prevent loop" >&2
         exit 0
     fi
 
@@ -174,7 +174,7 @@ EOF
 )
     jq -n \
       --arg reason "$REASON" \
-      --arg msg "Ralph-specum quick mode: continue $PHASE phase" \
+      --arg msg "curdx-flow quick mode: continue $PHASE phase" \
       '{
         "decision": "block",
         "reason": $reason,
@@ -185,7 +185,7 @@ fi
 
 # Log current state
 if [ "$PHASE" = "execution" ]; then
-    echo "[ralph-specum] Session stopped during spec: $SPEC_NAME | Task: $((TASK_INDEX + 1))/$TOTAL_TASKS | Attempt: $TASK_ITERATION" >&2
+    echo "[curdx-flow] Session stopped during spec: $SPEC_NAME | Task: $((TASK_INDEX + 1))/$TOTAL_TASKS | Attempt: $TASK_ITERATION" >&2
 fi
 
 # Execution completion verification: cross-check state AND tasks.md
@@ -194,21 +194,21 @@ if [ "$PHASE" = "execution" ] && [ "$TASK_INDEX" -ge "$TOTAL_TASKS" ] && [ "$TOT
     if [ -f "$TASKS_FILE" ]; then
         UNCHECKED=$(grep -c '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null || echo "0")
         if [ "$UNCHECKED" -gt 0 ]; then
-            echo "[ralph-specum] State says complete but tasks.md has $UNCHECKED unchecked items" >&2
+            echo "[curdx-flow] State says complete but tasks.md has $UNCHECKED unchecked items" >&2
             REASON=$(cat <<EOF
 Tasks incomplete: state index ($TASK_INDEX) reached total ($TOTAL_TASKS), but tasks.md has $UNCHECKED unchecked items.
 
 ## Action Required
 1. Read $SPEC_PATH/tasks.md and find unchecked tasks (- [ ])
 2. Execute remaining unchecked tasks via spec-executor
-3. Update .ralph-state.json totalTasks to match actual count
+3. Update .curdx-state.json totalTasks to match actual count
 4. Only output ALL_TASKS_COMPLETE when every task in tasks.md is checked off
 5. Do NOT add new tasks — complete existing ones only
 EOF
 )
             jq -n \
               --arg reason "$REASON" \
-              --arg msg "Ralph-specum: $UNCHECKED unchecked tasks remain in tasks.md" \
+              --arg msg "curdx-flow: $UNCHECKED unchecked tasks remain in tasks.md" \
               '{
                 "decision": "block",
                 "reason": $reason,
@@ -218,7 +218,7 @@ EOF
         fi
     fi
     # All tasks verified complete — allow stop
-    echo "[ralph-specum] All tasks verified complete for $SPEC_NAME" >&2
+    echo "[curdx-flow] All tasks verified complete for $SPEC_NAME" >&2
     exit 0
 fi
 
@@ -227,7 +227,7 @@ if [ "$PHASE" = "execution" ] && [ "$TASK_INDEX" -lt "$TOTAL_TASKS" ]; then
     # Respect user approval gates (e.g. PR creation, manual review steps)
     AWAITING=$(jq -r '.awaitingApproval // false' "$STATE_FILE" 2>/dev/null || echo "false")
     if [ "$AWAITING" = "true" ]; then
-        echo "[ralph-specum] awaitingApproval=true, allowing stop for user gate" >&2
+        echo "[curdx-flow] awaitingApproval=true, allowing stop for user gate" >&2
         exit 0
     fi
 
@@ -238,12 +238,12 @@ if [ "$PHASE" = "execution" ] && [ "$TASK_INDEX" -lt "$TOTAL_TASKS" ]; then
     # Safety guard: prevent infinite re-invocation loop
     # If a stop event fires while already processing a stop-hook continuation,
     # re-blocking would cause infinite loops. Allow Claude to stop; the next
-    # session start will detect remaining tasks via .ralph-state.json.
+    # session start will detect remaining tasks via .curdx-state.json.
     # Claude Code sets stop_hook_active: true in Stop hook input when a stop
     # fires during an existing stop-hook continuation.
     STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null || echo "false")
     if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
-        echo "[ralph-specum] stop_hook_active=true, skipping continuation to prevent re-invocation loop" >&2
+        echo "[curdx-flow] stop_hook_active=true, skipping continuation to prevent re-invocation loop" >&2
         exit 0
     fi
 
@@ -322,7 +322,7 @@ $TASK_BLOCK
 $PARALLEL_INSTRUCTIONS
 
 ## Resume
-1. Read $SPEC_PATH/.ralph-state.json for current state
+1. Read $SPEC_PATH/.curdx-state.json for current state
 2. Native sync (if NativeSync != false): (a) if nativeTaskMap is empty, rebuild from tasks.md (TaskCreate all, store IDs in state), (b) TaskUpdate current task to in_progress with activeForm
 3. Delegate the task above to spec-executor (or qa-engineer for [VERIFY])
 4. On TASK_COMPLETE: verify, update state, advance. Then TaskUpdate task to completed (if NativeSync != false)
@@ -337,7 +337,7 @@ $PARALLEL_INSTRUCTIONS
 STOP_WATCHER_REASON_EOF
 )
 
-    SYSTEM_MSG="Ralph-specum iteration $GLOBAL_ITERATION | Task $((TASK_INDEX + 1))/$TOTAL_TASKS"
+    SYSTEM_MSG="curdx-flow iteration $GLOBAL_ITERATION | Task $((TASK_INDEX + 1))/$TOTAL_TASKS"
     if [ "$IS_PARALLEL" = "true" ]; then
         SYSTEM_MSG="$SYSTEM_MSG (PARALLEL GROUP)"
     fi
@@ -356,7 +356,7 @@ fi
 # Only remove files older than 60 minutes to avoid race conditions with active executors
 find "$CWD/$SPEC_PATH" -name ".progress-task-*.md" -mmin +60 -delete 2>/dev/null || true
 
-# Note: .progress.md and .ralph-state.json are preserved for loop continuation
+# Note: .progress.md and .curdx-state.json are preserved for loop continuation
 # Use /curdx-flow:cancel to explicitly stop execution and cleanup state
 
 exit 0

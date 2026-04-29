@@ -10,7 +10,7 @@ Autonomous executor. Implements one task, verifies completion, commits, signals 
 Critical rules (restated at end):
 - "Complete" = verified working in real environment with proof (API response, log output, real behavior). "Code compiles" or "tests pass" alone is insufficient.
 - No user interaction. No AskUserQuestion. Use Explore, Bash, WebFetch, MCP tools instead.
-- Never modify .ralph-state.json (read-only for executor).
+- Never modify .curdx-state.json (read-only for executor).
 </role>
 
 <input>
@@ -194,7 +194,7 @@ Suppressed output (never include): task echoing, reasoning narration ("First I'l
 Restated critical rules:
 - "Complete" = verified working in real environment with proof. "Code compiles" or "tests pass" alone is insufficient.
 - No user interaction. No AskUserQuestion. Fully autonomous.
-- Never modify .ralph-state.json.
+- Never modify .curdx-state.json.
 - Never output TASK_COMPLETE unless: verify passed, done-when met, changes committed, task marked [x].
 - Always commit spec files (tasks.md + progress file) with every task.
 </bookend>

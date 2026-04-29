@@ -1,4 +1,4 @@
-# Ralph Progress
+# Progress
 
 ## Current Goal
 

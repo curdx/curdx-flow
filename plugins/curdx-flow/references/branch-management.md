@@ -110,14 +110,14 @@ In `--quick` mode, still perform branch check but skip the user prompt for non-d
 ### State Files Copied to Worktree
 
 - `$DEFAULT_SPECS_DIR/.current-spec` - Active spec name/path pointer
-- `$SPEC_PATH/.ralph-state.json` - Loop state (phase, taskIndex, iterations)
+- `$SPEC_PATH/.curdx-state.json` - Loop state (phase, taskIndex, iterations)
 - `$SPEC_PATH/.progress.md` - Progress tracking and learnings
 
-**Note**: The spec may be in any configured specs_dir, not just `./specs/`. Use `ralph_resolve_current()` to get the full spec path.
+**Note**: The spec may be in any configured specs_dir, not just `./specs/`. Use `curdx_resolve_current()` to get the full spec path.
 
 These files are copied when:
 1. The worktree is created via `git worktree add`
-2. A spec is currently active (resolved via `ralph_resolve_current()`)
+2. A spec is currently active (resolved via `curdx_resolve_current()`)
 3. The source files exist in the main worktree
 
 Copy uses non-overwrite semantics (skips if file already exists in target).
@@ -129,12 +129,12 @@ Copy uses non-overwrite semantics (skips if file already exists in target).
 REPO_NAME=$(basename $(git rev-parse --show-toplevel))
 
 # Get default specs dir and resolve current spec path using path resolver
-DEFAULT_SPECS_DIR=$(ralph_get_default_dir)  # e.g., "./specs"
+DEFAULT_SPECS_DIR=$(curdx_get_default_dir)  # e.g., "./specs"
 SPEC_PATH=""
 SPEC_NAME=""
 
 # Resolve current spec (handles both bare names and full paths)
-if SPEC_PATH=$(ralph_resolve_current 2>/dev/null); then
+if SPEC_PATH=$(curdx_resolve_current 2>/dev/null); then
     SPEC_NAME=$(basename "$SPEC_PATH")
 fi
 
@@ -164,8 +164,8 @@ if [ -n "$SPEC_PATH" ] && [ -d "$SPEC_PATH" ]; then
     mkdir -p "$WORKTREE_PATH/$SPEC_PATH" || echo "Warning: Failed to create spec directory in worktree"
 
     # Copy state files (don't overwrite existing)
-    if [ -f "$SPEC_PATH/.ralph-state.json" ] && [ ! -f "$WORKTREE_PATH/$SPEC_PATH/.ralph-state.json" ]; then
-        cp "$SPEC_PATH/.ralph-state.json" "$WORKTREE_PATH/$SPEC_PATH/" || echo "Warning: Failed to copy .ralph-state.json to worktree"
+    if [ -f "$SPEC_PATH/.curdx-state.json" ] && [ ! -f "$WORKTREE_PATH/$SPEC_PATH/.curdx-state.json" ]; then
+        cp "$SPEC_PATH/.curdx-state.json" "$WORKTREE_PATH/$SPEC_PATH/" || echo "Warning: Failed to copy .curdx-state.json to worktree"
     fi
 
     if [ -f "$SPEC_PATH/.progress.md" ] && [ ! -f "$WORKTREE_PATH/$SPEC_PATH/.progress.md" ]; then

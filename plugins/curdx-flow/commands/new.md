@@ -30,17 +30,17 @@ This command uses the path resolver for multi-directory support:
 # Source path resolver (conceptually - commands don't execute bash directly)
 # These functions are available via the path-resolver.sh helper:
 
-ralph_get_specs_dirs()    # Returns all configured spec directories
-ralph_get_default_dir()   # Returns first specs_dir (default for new specs)
-ralph_find_spec(name)     # Find spec by name, returns full path
-ralph_list_specs()        # List all specs as "name|path" pairs
-ralph_resolve_current()   # Resolve .current-spec to full path
+curdx_get_specs_dirs()    # Returns all configured spec directories
+curdx_get_default_dir()   # Returns first specs_dir (default for new specs)
+curdx_find_spec(name)     # Find spec by name, returns full path
+curdx_list_specs()        # List all specs as "name|path" pairs
+curdx_resolve_current()   # Resolve .current-spec to full path
 ```
 
 ## --specs-dir Validation
 
 When `--specs-dir` is provided:
-1. Call `ralph_get_specs_dirs()` to get configured directories
+1. Call `curdx_get_specs_dirs()` to get configured directories
 2. Check if provided path matches one of the configured directories
 3. If NOT in configured list: Error "Invalid --specs-dir: '$path' is not in configured specs_dirs"
 4. If valid: Use this path as the spec root instead of default
@@ -49,7 +49,7 @@ When `--specs-dir` is provided:
 --specs-dir Validation Logic:
 
 1. Extract --specs-dir value from $ARGUMENTS
-2. Get configured dirs: dirs = ralph_get_specs_dirs()
+2. Get configured dirs: dirs = curdx_get_specs_dirs()
 3. Normalize paths (remove trailing slashes)
 4. Check: specsDir in dirs?
    - YES: Use specsDir for spec creation
@@ -63,10 +63,10 @@ Spec Directory Logic:
 
 1. Check if --specs-dir in $ARGUMENTS
    - YES: Validate against configured specs_dirs, use if valid
-   - NO: Use ralph_get_default_dir() (first configured dir, defaults to ./specs)
+   - NO: Use curdx_get_default_dir() (first configured dir, defaults to ./specs)
 
 2. Determine spec base path:
-   specsDir = validated --specs-dir OR ralph_get_default_dir()
+   specsDir = validated --specs-dir OR curdx_get_default_dir()
    basePath = "$specsDir/$name"
 
 3. For .current-spec:
@@ -90,16 +90,16 @@ The goal MUST be captured before proceeding:
 1. Verify spec name is provided
 2. Verify spec name is kebab-case (lowercase, hyphens only)
 3. If --specs-dir provided, validate against configured specs_dirs
-4. Determine target directory: specsDir = (validated --specs-dir) OR ralph_get_default_dir()
+4. Determine target directory: specsDir = (validated --specs-dir) OR curdx_get_default_dir()
 5. Check if `$specsDir/$name/` already exists. If so, ask user if they want to resume or overwrite
 
 ## Initialize
 
 1. Determine spec directory and base path:
    ```text
-   specsDir = (validated --specs-dir) OR ralph_get_default_dir()
+   specsDir = (validated --specs-dir) OR curdx_get_default_dir()
    basePath = "$specsDir/$name"
-   defaultDir = ralph_get_default_dir()
+   defaultDir = curdx_get_default_dir()
    ```
 
 2. Create directory structure:
@@ -129,7 +129,7 @@ The goal MUST be captured before proceeding:
    fi
    ```
 
-5. Create `.ralph-state.json` in the spec directory (note: basePath uses resolved path):
+5. Create `.curdx-state.json` in the spec directory (note: basePath uses resolved path):
    ```json
    {
      "source": "spec",

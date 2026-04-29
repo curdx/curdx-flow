@@ -14,24 +14,24 @@ Create a task for each item and complete in order:
 
 1. **Validate prerequisites** -- check spec and tasks.md exist
 2. **Parse arguments** -- extract flags and options
-3. **Initialize state** -- write .ralph-state.json
+3. **Initialize state** -- write .curdx-state.json
 4. **Execute task loop** -- delegate tasks via coordinator pattern
 5. **Handle completion** -- cleanup and output ALL_TASKS_COMPLETE
 
 ## Step 1: Determine Active Spec and Validate
 
 **Multi-Directory Resolution**: This command uses the path resolver for dynamic spec path resolution.
-- `ralph_resolve_current()` -- resolves .current-spec to full path (bare name = ./specs/$name, full path = as-is)
-- `ralph_find_spec(name)` -- find spec by name across all configured roots
+- `curdx_resolve_current()` -- resolves .current-spec to full path (bare name = ./specs/$name, full path = as-is)
+- `curdx_find_spec(name)` -- find spec by name across all configured roots
 
-**Configuration**: Specs directories are configured in `.claude/ralph-specum.local.md`:
+**Configuration**: Specs directories are configured in `.claude/curdx-flow.local.md`:
 ```yaml
 specs_dirs: ["./specs", "./packages/api/specs", "./packages/web/specs"]
 ```
 
 **Resolve**:
-1. If `$ARGUMENTS` contains a spec name, use `ralph_find_spec()` to resolve it
-2. Otherwise, use `ralph_resolve_current()` to get the active spec path
+1. If `$ARGUMENTS` contains a spec name, use `curdx_find_spec()` to resolve it
+2. Otherwise, use `curdx_resolve_current()` to get the active spec path
 3. If no active spec, error: "No active spec. Run /curdx-flow:new <name> first."
 
 **Validate**:
@@ -60,10 +60,10 @@ Key: Use `-e` flag so grep doesn't interpret the pattern's leading hyphen as an 
 
 **CRITICAL: Merge into existing state -- do NOT overwrite the file.**
 
-Read the existing `.ralph-state.json` first, then **merge** the execution fields into it.
+Read the existing `.curdx-state.json` first, then **merge** the execution fields into it.
 This preserves fields set by earlier phases (e.g., `source`, `name`, `basePath`, `commitSpec`, `relatedSpecs`).
 
-Update `.ralph-state.json` by merging these fields into the existing object:
+Update `.curdx-state.json` by merging these fields into the existing object:
 ```json
 {
   "phase": "execution",
@@ -115,8 +115,8 @@ jq --argjson taskIndex <first_incomplete> \
      nativeSyncEnabled: true,
      nativeSyncFailureCount: 0
    }
-   ' "$SPEC_PATH/.ralph-state.json" > "$SPEC_PATH/.ralph-state.json.tmp" && \
-   mv "$SPEC_PATH/.ralph-state.json.tmp" "$SPEC_PATH/.ralph-state.json"
+   ' "$SPEC_PATH/.curdx-state.json" > "$SPEC_PATH/.curdx-state.json.tmp" && \
+   mv "$SPEC_PATH/.curdx-state.json.tmp" "$SPEC_PATH/.curdx-state.json"
 ```
 
 **Preserved fields** (set by earlier phases, must NOT be removed):
@@ -158,7 +158,7 @@ Then Read and follow these references in order. They contain the complete coordi
 
 - **You are a COORDINATOR, not an implementer.** Delegate via Task tool. Never implement yourself.
 - **Fully autonomous.** Never ask questions or wait for user input.
-- **State-driven loop.** Read .ralph-state.json each iteration to determine current task.
+- **State-driven loop.** Read .curdx-state.json each iteration to determine current task.
 - **Completion check.** If taskIndex >= totalTasks, verify all [x] marks, delete state file, output ALL_TASKS_COMPLETE.
 - **Task delegation.** Extract full task block from tasks.md, delegate to spec-executor (or qa-engineer for [VERIFY] tasks).
 - **After TASK_COMPLETE.** Run all 3 verification layers, then update state (advance taskIndex, reset taskIteration).
@@ -177,7 +177,7 @@ Then Read and follow these references in order. They contain the complete coordi
 
 When all tasks complete (taskIndex >= totalTasks):
 1. Verify all tasks marked [x] in tasks.md
-2. Delete .ralph-state.json
+2. Delete .curdx-state.json
 3. Keep .progress.md (preserve learnings and history)
 4. Cleanup orphaned temp progress files: `find "$SPEC_PATH" -name ".progress-task-*.md" -mmin +60 -delete 2>/dev/null || true`
 5. Update spec index: `./plugins/curdx-flow/hooks/scripts/update-spec-index.sh --quiet`

@@ -1,17 +1,18 @@
 ---
-name: smart-ralph
-description: This skill should be used when the user asks about "ralph arguments", "quick mode", "commit spec", "max iterations", "ralph state file", "execution modes", "ralph loop", "coordinator behavior", "delegate to subagent", or needs guidance on Ralph plugin arguments, state management, delegation patterns, or execution loop behavior. Core behavioral skill for all Ralph Specum operations.
+name: curdx-core
+description: |
+  Core behavioral skill for curdx-flow plugin. Use proactively when user mentions curdx-flow arguments, quick mode, commit spec, max iterations, state file, execution loop, coordinator behavior, delegate to subagent, or needs guidance on plugin arguments, state management, delegation patterns, or execution loop behavior. 当用户提到 curdx-flow 参数、快速模式、提交 spec、最大迭代次数、状态文件、执行循环、协调器行为、委托子 agent，或需要插件参数、状态管理、委托模式、执行循环行为的指引时使用。Core behavioral skill for all curdx-flow operations.
 version: 0.2.0
 user-invocable: false
 ---
 
-# Smart Ralph
+# curdx-core
 
-Core skill for all Ralph plugins. Defines common arguments, execution modes, shared behaviors, and coordinator delegation rules.
+Core skill for curdx-flow plugin. Defines common arguments, execution modes, shared behaviors, and coordinator delegation rules.
 
 ## Common Arguments
 
-All Ralph commands support these standard arguments:
+All curdx-flow commands support these standard arguments:
 
 | Argument | Short | Description | Default |
 |----------|-------|-------------|---------|
@@ -44,7 +45,7 @@ Argument precedence: `--no-commit` > `--commit` > mode default.
 
 ## State File
 
-All Ralph plugins use `.ralph-state.json` for execution state. See `references/state-file-schema.md` for full schema.
+curdx-flow uses `.curdx-state.json` for execution state. See `references/state-file-schema.md` for full schema.
 
 Key fields: `phase`, `taskIndex`, `totalTasks`, `taskIteration`, `maxTaskIterations`, `awaitingApproval`.
 
@@ -63,7 +64,7 @@ When `commitSpec` is false:
 
 ## Task Execution Loop
 
-Ralph Specum v3.0.0+ has a self-contained execution loop via the stop-hook. No external dependencies required.
+curdx-flow v3.0.0+ has a self-contained execution loop via the stop-hook. No external dependencies required.
 
 Key signals:
 - `TASK_COMPLETE` - executor finished task
@@ -77,7 +78,7 @@ If state file missing/invalid: output error, suggest re-running implement comman
 
 ## Branch Management
 
-All Ralph plugins follow consistent branch strategy:
+curdx-flow follows a consistent branch strategy:
 
 1. Check current branch before starting
 2. If on default branch (main/master): prompt for branch strategy

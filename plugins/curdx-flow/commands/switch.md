@@ -14,9 +14,9 @@ This command uses the path resolver for multi-root spec discovery:
 
 ```bash
 # Source the path resolver (conceptual - commands use these patterns)
-# ralph_find_spec(name)   - Find spec by name across all roots
-# ralph_list_specs()      - List all specs as "name|path" pairs
-# ralph_resolve_current() - Get current spec's full path
+# curdx_find_spec(name)   - Find spec by name across all roots
+# curdx_list_specs()      - List all specs as "name|path" pairs
+# curdx_resolve_current() - Get current spec's full path
 ```
 
 ## Parse Arguments
@@ -33,7 +33,7 @@ From `$ARGUMENTS`:
    - Check if path exists as directory
    - If not, error: "Spec path '$input' not found"
 3. If input is a spec name:
-   - Use `ralph_find_spec()` pattern to search all configured specs_dirs
+   - Use `curdx_find_spec()` pattern to search all configured specs_dirs
    - Exit code 0 (found unique): proceed with switch
    - Exit code 1 (not found): error with list of searched directories
    - Exit code 2 (ambiguous): show disambiguation prompt
@@ -42,8 +42,8 @@ From `$ARGUMENTS`:
 
 If `$ARGUMENTS` is empty:
 
-1. Use `ralph_list_specs()` pattern to gather all specs from all roots
-2. Read current active spec using `ralph_resolve_current()` pattern
+1. Use `curdx_list_specs()` pattern to gather all specs from all roots
+2. Read current active spec using `curdx_resolve_current()` pattern
 3. Group specs by their root directory with numbered options
 4. Show list with current marked and directory context
 5. If no specs found, guide user to create one
@@ -142,7 +142,7 @@ List all configured specs_dirs that were searched, helping user understand where
    ```
 
 3. Read the spec's state:
-   - `.ralph-state.json` for phase and progress
+   - `.curdx-state.json` for phase and progress
    - `.progress.md` for context
 
 ## Output

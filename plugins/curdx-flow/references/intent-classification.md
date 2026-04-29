@@ -44,11 +44,11 @@ From `$ARGUMENTS`, extract:
 ```text
 1. Determine target specs directory:
    - If --specs-dir provided: Use validated path
-   - Else: Use ralph_get_default_dir()
+   - Else: Use curdx_get_default_dir()
    |
 2. Check if name provided in arguments
    |
-   +-- Yes: Use ralph_find_spec(name) to check if spec exists
+   +-- Yes: Use curdx_find_spec(name) to check if spec exists
    |   |
    |   +-- Found + no --fresh: Ask "Resume '$name' or start fresh?"
    |   |   +-- Resume: Go to resume flow (use found path)
@@ -60,7 +60,7 @@ From `$ARGUMENTS`, extract:
    |   |
    |   +-- Ambiguous (exit 2): Show paths, ask user to specify
    |
-   +-- No: Use ralph_resolve_current() to check active spec
+   +-- No: Use curdx_resolve_current() to check active spec
        |
        +-- Has active spec: Go to resume flow (use resolved path)
        |
@@ -89,7 +89,7 @@ Input Classification:
       - Example: `./my-plan.md --quick` -> read file, infer name
 
    b. KEBAB-CASE NAME: matches ^[a-z0-9-]+$
-      - Use `ralph_find_spec($name)` to resolve spec path
+      - Use `curdx_find_spec($name)` to resolve spec path
       - If found and `$specPath/plan.md` exists: use plan.md content, name=$name
       - If found but no plan.md: error "No plan.md found in $specPath/. Provide goal: /curdx-flow:start $name 'your goal' --quick"
       - If not found: error "Spec '$name' not found. Provide goal: /curdx-flow:start $name 'your goal' --quick"
@@ -117,7 +117,7 @@ When file path detected:
 ### Existing Plan Check
 
 When kebab-case name provided without goal:
-1. Use `ralph_find_spec(name)` to locate existing spec
+1. Use `curdx_find_spec(name)` to locate existing spec
 2. If found: Check if `$specPath/plan.md` exists
    - If plan.md exists: read content, use as planContent
    - If plan.md not exists: error "No plan.md found in $specPath. Provide goal: /curdx-flow:start $name 'your goal' --quick"

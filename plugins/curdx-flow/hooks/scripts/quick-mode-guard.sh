@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PreToolUse hook: Block AskUserQuestion in quick mode
-# Reads .ralph-state.json and denies the call if quickMode is true.
+# Reads .curdx-state.json and denies the call if quickMode is true.
 
 set -euo pipefail
 
@@ -17,17 +17,17 @@ fi
 
 # Source path resolver
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RALPH_CWD="$CWD"
-export RALPH_CWD
+CURDX_CWD="$CWD"
+export CURDX_CWD
 source "$SCRIPT_DIR/path-resolver.sh"
 
 # Resolve current spec
-SPEC_PATH=$(ralph_resolve_current 2>/dev/null) || true
+SPEC_PATH=$(curdx_resolve_current 2>/dev/null) || true
 if [ -z "$SPEC_PATH" ]; then
     exit 0
 fi
 
-STATE_FILE="$CWD/$SPEC_PATH/.ralph-state.json"
+STATE_FILE="$CWD/$SPEC_PATH/.curdx-state.json"
 if [ ! -f "$STATE_FILE" ]; then
     exit 0
 fi

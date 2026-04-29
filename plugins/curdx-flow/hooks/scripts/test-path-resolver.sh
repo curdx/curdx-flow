@@ -17,8 +17,8 @@ NC='\033[0m' # No Color
 # Setup test environment
 setup() {
     TEST_TMPDIR=$(mktemp -d)
-    export RALPH_CWD="$TEST_TMPDIR"
-    export RALPH_SETTINGS_FILE="$TEST_TMPDIR/.claude/ralph-specum.local.md"
+    export CURDX_CWD="$TEST_TMPDIR"
+    export CURDX_SETTINGS_FILE="$TEST_TMPDIR/.claude/curdx-flow.local.md"
 
     # Source the path resolver
     source "$SCRIPT_DIR/path-resolver.sh"
@@ -118,7 +118,7 @@ assert_line_count() {
 create_settings() {
     local dirs_json="$1"
     mkdir -p "$TEST_TMPDIR/.claude"
-    cat > "$RALPH_SETTINGS_FILE" << EOF
+    cat > "$CURDX_SETTINGS_FILE" << EOF
 ---
 specs_dirs: $dirs_json
 ---
@@ -127,7 +127,7 @@ EOF
 }
 
 # =============================================================================
-# Tests for ralph_get_specs_dirs()
+# Tests for curdx_get_specs_dirs()
 # =============================================================================
 
 test_get_specs_dirs_no_settings() {
@@ -137,7 +137,7 @@ test_get_specs_dirs_no_settings() {
 
     # No settings file exists
     local result
-    result=$(ralph_get_specs_dirs)
+    result=$(curdx_get_specs_dirs)
 
     assert_eq "./specs" "$result" "Returns default ./specs when no settings file"
 
@@ -152,7 +152,7 @@ test_get_specs_dirs_empty_array() {
     create_settings "[]"
 
     local result
-    result=$(ralph_get_specs_dirs)
+    result=$(curdx_get_specs_dirs)
 
     assert_eq "./specs" "$result" "Returns default ./specs when specs_dirs is empty array"
 
@@ -168,7 +168,7 @@ test_get_specs_dirs_single_dir() {
     create_settings '["./my-specs"]'
 
     local result
-    result=$(ralph_get_specs_dirs)
+    result=$(curdx_get_specs_dirs)
 
     assert_eq "./my-specs" "$result" "Returns single configured dir"
 
@@ -186,7 +186,7 @@ test_get_specs_dirs_multiple_dirs() {
     create_settings '["./specs", "./packages/api/specs", "./packages/web/specs"]'
 
     local result
-    result=$(ralph_get_specs_dirs)
+    result=$(curdx_get_specs_dirs)
 
     assert_line_count 3 "$result" "Returns 3 configured dirs"
     assert_contains "$result" "./specs" "Contains ./specs"
@@ -206,7 +206,7 @@ test_get_specs_dirs_skips_invalid_paths() {
     create_settings '["./valid-specs", "./invalid-specs"]'
 
     local result
-    result=$(ralph_get_specs_dirs 2>/dev/null)
+    result=$(curdx_get_specs_dirs 2>/dev/null)
 
     assert_eq "./valid-specs" "$result" "Only returns valid paths"
 
@@ -214,7 +214,7 @@ test_get_specs_dirs_skips_invalid_paths() {
 }
 
 # =============================================================================
-# Tests for ralph_get_default_dir()
+# Tests for curdx_get_default_dir()
 # =============================================================================
 
 test_get_default_dir_no_settings() {
@@ -223,7 +223,7 @@ test_get_default_dir_no_settings() {
     setup
 
     local result
-    result=$(ralph_get_default_dir)
+    result=$(curdx_get_default_dir)
 
     assert_eq "./specs" "$result" "Returns ./specs as default when no settings"
 
@@ -240,7 +240,7 @@ test_get_default_dir_returns_first() {
     create_settings '["./first-specs", "./second-specs"]'
 
     local result
-    result=$(ralph_get_default_dir)
+    result=$(curdx_get_default_dir)
 
     assert_eq "./first-specs" "$result" "Returns first configured dir as default"
 
@@ -248,7 +248,7 @@ test_get_default_dir_returns_first() {
 }
 
 # =============================================================================
-# Tests for ralph_resolve_current()
+# Tests for curdx_resolve_current()
 # =============================================================================
 
 test_resolve_current_bare_name() {
@@ -260,7 +260,7 @@ test_resolve_current_bare_name() {
     echo "my-feature" > "$TEST_TMPDIR/specs/.current-spec"
 
     local result
-    result=$(ralph_resolve_current)
+    result=$(curdx_resolve_current)
 
     assert_eq "./specs/my-feature" "$result" "Resolves bare name to default dir path"
 
@@ -276,7 +276,7 @@ test_resolve_current_full_path() {
     echo "./packages/api/specs/my-api-feature" > "$TEST_TMPDIR/specs/.current-spec"
 
     local result
-    result=$(ralph_resolve_current)
+    result=$(curdx_resolve_current)
 
     assert_eq "./packages/api/specs/my-api-feature" "$result" "Preserves full path from .current-spec"
 
@@ -292,7 +292,7 @@ test_resolve_current_missing_file() {
     # Don't create .current-spec
 
     local exit_code=0
-    ralph_resolve_current >/dev/null 2>&1 || exit_code=$?
+    curdx_resolve_current >/dev/null 2>&1 || exit_code=$?
 
     assert_exit 1 "$exit_code" "Returns exit 1 when .current-spec missing"
 
@@ -308,7 +308,7 @@ test_resolve_current_empty_file() {
     echo "" > "$TEST_TMPDIR/specs/.current-spec"
 
     local exit_code=0
-    ralph_resolve_current >/dev/null 2>&1 || exit_code=$?
+    curdx_resolve_current >/dev/null 2>&1 || exit_code=$?
 
     assert_exit 1 "$exit_code" "Returns exit 1 when .current-spec empty"
 
@@ -324,7 +324,7 @@ test_resolve_current_with_trailing_slash() {
     echo "./packages/api/specs/my-feature/" > "$TEST_TMPDIR/specs/.current-spec"
 
     local result
-    result=$(ralph_resolve_current)
+    result=$(curdx_resolve_current)
 
     assert_eq "./packages/api/specs/my-feature" "$result" "Normalizes trailing slash"
 
@@ -332,7 +332,7 @@ test_resolve_current_with_trailing_slash() {
 }
 
 # =============================================================================
-# Tests for ralph_find_spec()
+# Tests for curdx_find_spec()
 # =============================================================================
 
 test_find_spec_unique_name() {
@@ -343,7 +343,7 @@ test_find_spec_unique_name() {
     mkdir -p "$TEST_TMPDIR/specs/my-feature"
 
     local result
-    result=$(ralph_find_spec "my-feature")
+    result=$(curdx_find_spec "my-feature")
     local exit_code=$?
 
     assert_exit 0 "$exit_code" "Returns exit 0 for unique spec"
@@ -362,7 +362,7 @@ test_find_spec_in_non_default_dir() {
     create_settings '["./specs", "./packages/api/specs"]'
 
     local result
-    result=$(ralph_find_spec "api-feature")
+    result=$(curdx_find_spec "api-feature")
     local exit_code=$?
 
     assert_exit 0 "$exit_code" "Returns exit 0 for spec in non-default dir"
@@ -381,7 +381,7 @@ test_find_spec_ambiguous_name() {
     create_settings '["./specs", "./packages/api/specs"]'
 
     local exit_code=0
-    ralph_find_spec "shared-feature" >/dev/null 2>&1 || exit_code=$?
+    curdx_find_spec "shared-feature" >/dev/null 2>&1 || exit_code=$?
 
     assert_exit 2 "$exit_code" "Returns exit 2 for ambiguous spec"
 
@@ -396,7 +396,7 @@ test_find_spec_not_found() {
     mkdir -p "$TEST_TMPDIR/specs"
 
     local exit_code=0
-    ralph_find_spec "nonexistent" >/dev/null 2>&1 || exit_code=$?
+    curdx_find_spec "nonexistent" >/dev/null 2>&1 || exit_code=$?
 
     assert_exit 1 "$exit_code" "Returns exit 1 for nonexistent spec"
 
@@ -409,7 +409,7 @@ test_find_spec_empty_name() {
     setup
 
     local exit_code=0
-    ralph_find_spec "" >/dev/null 2>&1 || exit_code=$?
+    curdx_find_spec "" >/dev/null 2>&1 || exit_code=$?
 
     assert_exit 1 "$exit_code" "Returns exit 1 for empty name"
 
@@ -424,7 +424,7 @@ test_find_spec_with_leading_dot_slash() {
     mkdir -p "$TEST_TMPDIR/specs/my-feature"
 
     local result
-    result=$(ralph_find_spec "./my-feature")
+    result=$(curdx_find_spec "./my-feature")
     local exit_code=$?
 
     assert_exit 0 "$exit_code" "Returns exit 0 when name has leading ./"
@@ -434,7 +434,7 @@ test_find_spec_with_leading_dot_slash() {
 }
 
 # =============================================================================
-# Tests for ralph_list_specs()
+# Tests for curdx_list_specs()
 # =============================================================================
 
 test_list_specs_empty() {
@@ -445,7 +445,7 @@ test_list_specs_empty() {
     mkdir -p "$TEST_TMPDIR/specs"
 
     local result
-    result=$(ralph_list_specs)
+    result=$(curdx_list_specs)
 
     assert_eq "" "$result" "Returns empty when no specs exist"
 
@@ -461,7 +461,7 @@ test_list_specs_single_root() {
     mkdir -p "$TEST_TMPDIR/specs/feature-b"
 
     local result
-    result=$(ralph_list_specs)
+    result=$(curdx_list_specs)
 
     assert_line_count 2 "$result" "Returns 2 specs"
     assert_contains "$result" "feature-a|./specs/feature-a" "Contains feature-a"
@@ -481,7 +481,7 @@ test_list_specs_multiple_roots() {
     create_settings '["./specs", "./packages/api/specs", "./packages/web/specs"]'
 
     local result
-    result=$(ralph_list_specs)
+    result=$(curdx_list_specs)
 
     assert_line_count 3 "$result" "Returns 3 specs from all roots"
     assert_contains "$result" "main-feature|./specs/main-feature" "Contains main-feature"
@@ -500,7 +500,7 @@ test_list_specs_skips_hidden_dirs() {
     mkdir -p "$TEST_TMPDIR/specs/.hidden-dir"
 
     local result
-    result=$(ralph_list_specs)
+    result=$(curdx_list_specs)
 
     assert_line_count 1 "$result" "Returns only non-hidden specs"
     assert_contains "$result" "visible-spec" "Contains visible-spec"
@@ -513,12 +513,12 @@ test_list_specs_with_invalid_cwd() {
     echo "=== test_list_specs_with_invalid_cwd ==="
     setup
 
-    export RALPH_CWD="/nonexistent/path"
+    export CURDX_CWD="/nonexistent/path"
 
     local result
-    result=$(ralph_list_specs 2>/dev/null)
+    result=$(curdx_list_specs 2>/dev/null)
 
-    assert_eq "" "$result" "Returns empty when RALPH_CWD invalid"
+    assert_eq "" "$result" "Returns empty when CURDX_CWD invalid"
 
     cleanup
 }
@@ -531,25 +531,25 @@ echo "====================================="
 echo "Unit Tests for path-resolver.sh"
 echo "====================================="
 
-# ralph_get_specs_dirs tests
+# curdx_get_specs_dirs tests
 test_get_specs_dirs_no_settings
 test_get_specs_dirs_empty_array
 test_get_specs_dirs_single_dir
 test_get_specs_dirs_multiple_dirs
 test_get_specs_dirs_skips_invalid_paths
 
-# ralph_get_default_dir tests
+# curdx_get_default_dir tests
 test_get_default_dir_no_settings
 test_get_default_dir_returns_first
 
-# ralph_resolve_current tests
+# curdx_resolve_current tests
 test_resolve_current_bare_name
 test_resolve_current_full_path
 test_resolve_current_missing_file
 test_resolve_current_empty_file
 test_resolve_current_with_trailing_slash
 
-# ralph_find_spec tests
+# curdx_find_spec tests
 test_find_spec_unique_name
 test_find_spec_in_non_default_dir
 test_find_spec_ambiguous_name
@@ -557,7 +557,7 @@ test_find_spec_not_found
 test_find_spec_empty_name
 test_find_spec_with_leading_dot_slash
 
-# ralph_list_specs tests
+# curdx_list_specs tests
 test_list_specs_empty
 test_list_specs_single_root
 test_list_specs_multiple_roots
