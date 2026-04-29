@@ -1,7 +1,6 @@
 ---
 name: curdx-core
-description: |
-  Core behavioral skill for curdx-flow plugin. Use proactively when user mentions curdx-flow arguments, quick mode, commit spec, max iterations, state file, execution loop, coordinator behavior, delegate to subagent, or needs guidance on plugin arguments, state management, delegation patterns, or execution loop behavior. 当用户提到 curdx-flow 参数、快速模式、提交 spec、最大迭代次数、状态文件、执行循环、协调器行为、委托子 agent，或需要插件参数、状态管理、委托模式、执行循环行为的指引时使用。Core behavioral skill for all curdx-flow operations.
+description: Core behavioral skill for curdx-flow plugin. Use proactively when user mentions curdx-flow arguments, quick mode, commit spec, max iterations, state file, execution loop, coordinator behavior, delegate to subagent, or needs guidance on plugin arguments, state management, delegation patterns, or execution loop behavior.
 version: 0.2.0
 user-invocable: false
 ---
