@@ -10,7 +10,7 @@
     {
       "name": "curdx-flow",
       "description": "Spec-driven development with research, requirements, design, tasks, autonomous execution, and epic triage. Fresh context per task.",
-      "version": "6.0.4",
+      "version": "6.0.5",
       "author": {
         "name": "curdx"
       },

@@ -2,6 +2,12 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 6.0.5 — 2026-04-29
+
+### Changed
+
+- **Drop legacy upstream-attribution chrome from user-facing surfaces.** `src/registry/plugins/curdx-flow.ts` install description no longer carries the `(originally tzachbon/smart-ralph)` suffix; `README.md`'s tools table and the v3.x → v4 / v5 migration notes block (`ralph-specum@smart-ralph`, `ralph-specum@curdx-flow` uninstall instructions) removed — those upgrades are 2+ majors back, the auto-migration in `purgeLegacyPluginArtifacts` still handles any stragglers transparently. Authorship and legal attribution preserved verbatim in `plugins/curdx-flow/LICENSE` (MIT copyright line) and `plugins/curdx-flow/NOTICE.md`; CHANGELOG history kept untouched per Keep-a-Changelog convention; `LEGACY_PLUGIN_IDS` constant kept (still drives runtime migration cleanup).
+
 ## 6.0.4 — 2026-04-29
 
 ### Changed

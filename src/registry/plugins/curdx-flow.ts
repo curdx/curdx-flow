@@ -35,7 +35,7 @@ async function uninstallLegacyIfPresent(ctx: InstallCtx): Promise<void> {
 const curdxFlow: Pkg = {
   id: 'curdx-flow',
   name: 'curdx-flow',
-  description: 'curdx-flow (originally tzachbon/smart-ralph) — spec-driven dev with autonomous task execution',
+  description: 'curdx-flow — spec-driven dev with autonomous task execution',
   type: 'plugin',
   required: true,
   slashNamespace: '/curdx-flow:*',
