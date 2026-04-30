@@ -35,14 +35,6 @@ export function claudeMdPath(): string {
 
 // ---------- pure rendering ----------
 
-function renderItemLine(item: ManagedItem): string {
-  let line = `- ${item.name}`;
-  if (item.version) line += ` (v${item.version})`;
-  if (item.slashNamespace) line += ` — \`${item.slashNamespace}\``;
-  if (item.whenToUse) line += ` — ${item.whenToUse}`;
-  return line;
-}
-
 function buildCombinationPatterns(ids: Set<string>): string[] {
   const has = (k: string) => ids.has(k);
   const out: string[] = ['按场景串联，不要一个个孤立调用：', ''];
@@ -131,26 +123,17 @@ function buildDecisionTree(ids: Set<string>): string[] {
 
 export function renderBlock(items: ManagedItem[]): string {
   const installedIds = new Set(items.map((i) => i.id));
-  const lines: string[] = [
-    BEGIN_MARKER,
-    '## Tool Usage',
-    '',
-    'Available tools/plugins:',
-    ...items.map(renderItemLine),
+  const sections: Array<[string, string[]]> = [
+    ['## Tool Combination Patterns（组合工作流）', buildCombinationPatterns(installedIds)],
+    ['## Skip Rules（防过度工具化）', buildSkipRules(installedIds)],
+    ['## Decision Tree（遇到模糊请求时）', buildDecisionTree(installedIds)],
   ];
-  const combo = buildCombinationPatterns(installedIds);
-  if (combo.length > 0) {
-    lines.push('', '## Tool Combination Patterns（组合工作流）', '', ...combo);
+  const lines: string[] = [BEGIN_MARKER];
+  for (const [heading, body] of sections) {
+    if (body.length === 0) continue;
+    lines.push(heading, '', ...body, '');
   }
-  const skip = buildSkipRules(installedIds);
-  if (skip.length > 0) {
-    lines.push('', '## Skip Rules（防过度工具化）', '', ...skip);
-  }
-  const tree = buildDecisionTree(installedIds);
-  if (tree.length > 0) {
-    lines.push('', '## Decision Tree（遇到模糊请求时）', '', ...tree);
-  }
-  lines.push('', 'Run `npx @curdx/flow` to install / update / uninstall.', END_MARKER);
+  lines.push('Run `npx @curdx/flow` to install / update / uninstall.', END_MARKER);
   return lines.join('\n');
 }
 
