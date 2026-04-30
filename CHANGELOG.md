@@ -2,11 +2,19 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 6.0.6 — 2026-04-29
+
+### Removed
+
+- **Legacy plugin migration code path.** `LEGACY_PLUGIN_IDS`, `uninstallLegacyIfPresent`, and the entire `src/runner/legacy-cleanup.ts` file removed. Users still on v3.x slugs will need to manually `claude plugin uninstall` the old slug before upgrading — the auto-cleanup is gone.
+- **Historical CHANGELOG entries for the v3.x rename releases** (3.4.0, 3.5.0, 4.0.0, 4.0.1) deleted. Keep-a-Changelog convention deliberately violated at the user's request.
+- LICENSE copyright line and NOTICE.md attribution intentionally untouched (MIT licensing requires these).
+
 ## 6.0.5 — 2026-04-29
 
 ### Changed
 
-- **Drop legacy upstream-attribution chrome from user-facing surfaces.** `src/registry/plugins/curdx-flow.ts` install description no longer carries the `(originally tzachbon/smart-ralph)` suffix; `README.md`'s tools table and the v3.x → v4 / v5 migration notes block (`ralph-specum@smart-ralph`, `ralph-specum@curdx-flow` uninstall instructions) removed — those upgrades are 2+ majors back, the auto-migration in `purgeLegacyPluginArtifacts` still handles any stragglers transparently. Authorship and legal attribution preserved verbatim in `plugins/curdx-flow/LICENSE` (MIT copyright line) and `plugins/curdx-flow/NOTICE.md`; CHANGELOG history kept untouched per Keep-a-Changelog convention; `LEGACY_PLUGIN_IDS` constant kept (still drives runtime migration cleanup).
+- **Drop legacy upstream-attribution chrome from user-facing surfaces.** Install description and README tools table / migration notes block scrubbed. MIT `LICENSE` copyright line and `NOTICE.md` attribution preserved verbatim (legal requirement).
 
 ## 6.0.4 — 2026-04-29
 
@@ -30,50 +38,6 @@ All notable changes to `@curdx/flow` are documented here. Format follows [Keep a
 ### Notes
 
 - Both additions are repo-internal — neither file ships in the npm tarball (`files: ["dist", "CHANGELOG.md"]` is unchanged), so the published artifact is byte-identical to 6.0.1 modulo version metadata. This release exists to dogfood the new `bump-version` flow end-to-end.
-
-## 4.0.1 — 2026-04-27
-
-### Fixed
-
-- **Migration cleanup is now exhaustive.** v4.0.0's auto-migration for the `ralph-specum` → `curdx-flow` rename only invoked `claude plugin uninstall`, which leaves substantial residue when the marketplace's plugin id has been renamed (the CLI can't resolve the legacy id and bails). The installer now manually purges every leftover artifact for legacy slugs (`ralph-specum@curdx-flow`, `ralph-specum@smart-ralph`):
-  - `~/.claude/settings.json` → removes `enabledPlugins[<legacyId>]`
-  - `~/.claude/plugins/installed_plugins.json` → removes `plugins[<legacyId>]`
-  - `~/.claude/plugins/cache/<marketplace>/<name>/` → recursive remove
-  - `~/.claude/plugins/data/<name>-<marketplace>/` → recursive remove
-  - Marketplace registrations (`known_marketplaces.json`, `extraKnownMarketplaces`) are deliberately left alone — those are user-managed.
-- Implementation lives in `src/runner/legacy-cleanup.ts::purgeLegacyPluginArtifacts`. Idempotent and safe: every step swallows ENOENT silently and reports JSON / IO errors via the install task log without failing the flow.
-
-## 4.0.0 — 2026-04-27
-
-### Breaking
-
-- **Plugin renamed `ralph-specum` → `curdx-flow`.** The bundled spec-driven workflow plugin now lives under the `curdx-flow` brand, slash namespace `/curdx-flow:*`, full slug `curdx-flow@curdx`. The marketplace identifier was simultaneously shortened from `curdx-flow` to `curdx` (the GitHub repo source `curdx/curdx-flow` is unchanged). All in-plugin slash references, env vars (`RALPH_SPECUM_*` → `CURDX_FLOW_*`), and labels were updated accordingly.
-- **Auto-migration:** the installer now detects legacy `ralph-specum@curdx-flow` and `ralph-specum@smart-ralph` installs and uninstalls them automatically before installing the new slug, so users on v3.4 / v3.5 transparently transition. Your `specs/` directory and any in-progress spec state files are not touched — the rename is purely a plugin-identity change.
-- **Manual fallback:** if you'd rather run the migration yourself, execute `claude plugin uninstall ralph-specum@curdx-flow` (or `@smart-ralph`) before re-running `npx @curdx/flow install`. The old marketplace `curdx-flow` may remain registered alongside the new `curdx` marketplace; this is harmless and you can `claude plugin marketplace remove curdx-flow` if you want to clean up.
-
-### Notes
-
-- The plugin's authorship and license lineage (smart-ralph by tzachbon → ralph-specum fork → curdx-flow) is recorded in `plugins/curdx-flow/NOTICE.md`. MIT License preserved.
-- `.claude-plugin/marketplace.json` now declares one plugin: `curdx-flow` v4.9.1 sourced from `./plugins/curdx-flow`.
-
-## 3.5.0 — 2026-04-27
-
-### Changed
-
-- **`ralph-specum` is now a required bundled plugin** — it no longer appears as an optional checkbox in the install multiselect. Instead, it's listed in a dedicated "always installed" header above the prompt, alongside its current state (not installed / up-to-date / update available). When the flow runs, ralph-specum is auto-installed or auto-updated whenever it needs action; up-to-date installs are silently skipped. The other six items (pua, claude-mem, chrome-devtools-mcp, frontend-design, sequential-thinking, context7) remain optional. `--ids X` now also auto-includes required plugins that need action; users can still explicitly run `--ids ralph-specum` to force a reinstall confirmation. Uninstall flow is unchanged — users may still uninstall ralph-specum, and the next install will re-add it.
-- **Internal:** `Pkg` type gains a `required?: boolean` field so future bundled plugins can opt into the same "always installed" semantics without touching install-flow code.
-
-## 3.4.0 — 2026-04-27
-
-### Added
-
-- **`ralph-specum` is now a bundled plugin** — spec-driven development with autonomous task-by-task execution (research → requirements → design → tasks → implement, plus epic triage). Originally authored by [tzachbon](https://github.com/tzachbon/smart-ralph); ralph-specum v4.9.1 has been migrated into this repository as the canonical home and is no longer tracked against upstream. MIT license and authorship are preserved at `plugins/ralph-specum/LICENSE` and `plugins/ralph-specum/NOTICE.md`.
-- **curdx-flow itself is now a Claude Code marketplace** — the repo ships `.claude-plugin/marketplace.json` so Claude CLI can install bundled plugins via `claude plugin marketplace add curdx/curdx-flow` + `claude plugin install ralph-specum@curdx-flow`. The flow installer wires this up automatically; users just run `npx @curdx/flow install` and ralph-specum is pre-checked in the multiselect along with the other not-installed items.
-
-### Notes
-
-- If you previously installed ralph-specum from the upstream `tzachbon/smart-ralph` marketplace, run `claude plugin uninstall ralph-specum@smart-ralph` before installing this version to avoid a name collision. Going forward, only the `ralph-specum@curdx-flow` build is maintained.
-- Plugin files are not shipped in the npm tarball (`package.json` `files` is unchanged: `["dist", "CHANGELOG.md"]`). They live in the GitHub repo and are pulled by Claude CLI when the marketplace is added — so a `git push` of this repo must precede `npm publish` for a new release to be installable.
 
 ## 3.3.2 — 2026-04-27
 
