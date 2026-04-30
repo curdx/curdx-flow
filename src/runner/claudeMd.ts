@@ -43,44 +43,115 @@ function renderItemLine(item: ManagedItem): string {
   return line;
 }
 
-const ALWAYS_ON_RULES: string[] = [
-  'Do not call every tool by default; pick by the trigger condition above.',
-  'For first-attempt failures or simple edits, skip extra tools.',
-];
+function buildCombinationPatterns(ids: Set<string>): string[] {
+  const has = (k: string) => ids.has(k);
+  const out: string[] = ['按场景串联，不要一个个孤立调用：', ''];
 
-function buildConditionalRules(installedIds: Set<string>): string[] {
+  // 新需求 / 新 feature
+  if (has('claude-mem') || has('context7') || has('curdx-flow')) {
+    out.push('- **接到新需求 / 新 feature 起手式**');
+    let step = 1;
+    if (has('claude-mem')) out.push(`  ${step++}. \`claude-mem:mem-search\` 查历史——"以前有没有类似的活/坑"`);
+    if (has('context7')) out.push(`  ${step++}. 涉及外部库 → \`context7\` 拉最新文档`);
+    const planners: string[] = [];
+    if (has('claude-mem')) planners.push('`claude-mem:make-plan` 出 phased plan');
+    if (has('curdx-flow')) planners.push('`/curdx-flow:new` 起 spec');
+    if (planners.length > 0) out.push(`  ${step++}. 复杂多步 → ${planners.join('，或 ')}`);
+    out.push(`  ${step++}. 简单一次性改动 → 直接动手，跳过上面几步`);
+    out.push('');
+  }
+
+  // bug / 卡住
+  const stuckLines: string[] = [];
+  let s = 1;
+  if (has('claude-mem')) stuckLines.push(`  ${s++}. 先看 \`claude-mem:mem-search\`——以前是否解过同样的 bug`);
+  if (has('chrome-devtools-mcp')) stuckLines.push(`  ${s++}. 浏览器侧 bug → \`chrome-devtools-mcp\`（network / console / perf trace）`);
+  if (has('context7')) stuckLines.push(`  ${s++}. 库 / API 行为不符预期 → \`context7\` 查官方 doc，不要凭记忆`);
+  const stillStuck: string[] = [];
+  if (has('sequential-thinking')) stillStuck.push('`sequential-thinking` 拆假设');
+  if (has('pua')) stillStuck.push('`/pua:pua-loop` 自动迭代');
+  if (stillStuck.length > 0) stuckLines.push(`  ${s++}. 还卡 → ${stillStuck.join('，或 ')}`);
+  if (stuckLines.length > 0) {
+    out.push('- **遇到 bug / 卡住 2 次以上**', ...stuckLines, '');
+  }
+
+  // UI
+  if (has('frontend-design') || has('chrome-devtools-mcp')) {
+    out.push('- **做 UI / 前端页面**');
+    if (has('frontend-design')) out.push('  - `frontend-design` 自动 fire，无需手动调');
+    if (has('chrome-devtools-mcp')) out.push('  - 渲染异常或交互 bug → `chrome-devtools-mcp` 验证，不靠肉眼');
+    out.push('');
+  }
+
+  // 大型协作
+  if (has('pua') || has('curdx-flow')) {
+    out.push('- **大型 / 跨模块 / 多 agent 协作**');
+    if (has('pua')) out.push('  - `/pua:p9` 拆 task prompt + 管 P8 团队');
+    if (has('curdx-flow')) out.push('  - `/curdx-flow:triage` 把大 feature 拆成多个 spec');
+    if (has('pua')) out.push('  - 战略级 → `/pua:p10`');
+  }
+
+  while (out.length > 0 && out[out.length - 1] === '') out.pop();
+  return out;
+}
+
+function buildSkipRules(ids: Set<string>): string[] {
+  const has = (k: string) => ids.has(k);
   const out: string[] = [];
+  out.push('- 一行改动 / typo / 重命名变量 —— 不要 plan，不要 mem-search，直接 Edit');
+  const skips: string[] = [];
+  if (has('pua')) skips.push('`/pua:pua`');
+  if (has('sequential-thinking')) skips.push('`sequential-thinking`');
+  if (skips.length > 0) {
+    out.push(`- 已知确定的 fix —— 不要 ${skips.join('、')}`);
+  }
+  out.push('- 用户问"这是什么意思"类的解释题 —— 不调任何工具，直接答');
+  if (has('curdx-flow')) {
+    out.push('- 单文件局部重构 —— 不起 spec，不进 curdx-flow');
+  }
+  return out;
+}
+
+function buildDecisionTree(ids: Set<string>): string[] {
+  const has = (k: string) => ids.has(k);
+  const out: string[] = [];
+  out.push('1. 能 1–2 步搞定？→ 直接做');
+  out.push('2. 多步骤但路径清晰？→ TaskCreate 拆任务，不进 spec');
   const planners: string[] = [];
-  if (installedIds.has('sequential-thinking')) planners.push('sequential-thinking');
-  if (installedIds.has('claude-mem')) planners.push('claude-mem `make-plan`');
+  if (has('curdx-flow')) planners.push('`/curdx-flow:new`');
+  if (has('claude-mem')) planners.push('`claude-mem:make-plan`');
   if (planners.length > 0) {
-    out.push(`For complex / risky changes, plan first (${planners.join(' or ')}).`);
+    out.push(`3. 需求模糊 / 跨模块 / 要分阶段交付？→ ${planners.join(' 或 ')}`);
   }
-  if (installedIds.has('context7')) {
-    out.push('For library / SDK lookups, prefer context7 over web search.');
-  }
-  if (installedIds.has('chrome-devtools-mcp')) {
-    out.push('For browser-rendered behavior, verify in chrome-devtools-mcp instead of guessing.');
+  if (has('claude-mem')) {
+    out.push('4. 同样的活以前可能干过？→ 先 `claude-mem:mem-search`');
   }
   return out;
 }
 
 export function renderBlock(items: ManagedItem[]): string {
   const installedIds = new Set(items.map((i) => i.id));
-  const rules = [...ALWAYS_ON_RULES, ...buildConditionalRules(installedIds)];
-  return [
+  const lines: string[] = [
     BEGIN_MARKER,
     '## Tool Usage',
     '',
     'Available tools/plugins:',
     ...items.map(renderItemLine),
-    '',
-    'Rules:',
-    ...rules.map((r) => `- ${r}`),
-    '',
-    'Run `npx @curdx/flow` to install / update / uninstall.',
-    END_MARKER,
-  ].join('\n');
+  ];
+  const combo = buildCombinationPatterns(installedIds);
+  if (combo.length > 0) {
+    lines.push('', '## Tool Combination Patterns（组合工作流）', '', ...combo);
+  }
+  const skip = buildSkipRules(installedIds);
+  if (skip.length > 0) {
+    lines.push('', '## Skip Rules（防过度工具化）', '', ...skip);
+  }
+  const tree = buildDecisionTree(installedIds);
+  if (tree.length > 0) {
+    lines.push('', '## Decision Tree（遇到模糊请求时）', '', ...tree);
+  }
+  lines.push('', 'Run `npx @curdx/flow` to install / update / uninstall.', END_MARKER);
+  return lines.join('\n');
 }
 
 // ---------- pure file mutation ----------
