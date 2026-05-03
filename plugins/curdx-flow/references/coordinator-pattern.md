@@ -547,7 +547,7 @@ Before outputting:
    ```
 5. **Update Spec Index** (marks spec as completed):
    ```bash
-   ./plugins/curdx-flow/hooks/scripts/update-spec-index.sh --quiet
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet
    ```
 6. **Commit all remaining spec changes** (progress, tasks, index):
    ```bash

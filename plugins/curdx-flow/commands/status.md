@@ -19,7 +19,7 @@ If `--update-index` is present in `$ARGUMENTS`:
 
 ```bash
 # Regenerate spec index files
-./plugins/curdx-flow/hooks/scripts/update-spec-index.sh
+node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs"
 ```
 
 This updates:
