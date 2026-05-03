@@ -264,7 +264,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-10, AC-10.1, AC-10.3_
   - _Design: Lib utilities → merge-state_
 
-- [ ] 1.23 [P] Create lib/count-tasks.ts
+- [x] 1.23 [P] Create lib/count-tasks.ts
   - **Do**:
     1. Create `src/hooks/lib/count-tasks.ts` — CLI: `node count-tasks.mjs <tasks.md>`
     2. Use `_shared/markdown-task-parser` to count task blocks + completion (`[x]` markers)
