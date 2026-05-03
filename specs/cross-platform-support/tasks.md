@@ -293,7 +293,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - **Done when**: First batch of lib utilities builds clean
   - **Commit**: None
 
-- [ ] 1.26 [P] Create lib/ensure-gitignore.ts
+- [x] 1.26 [P] Create lib/ensure-gitignore.ts
   - **Do**:
     1. Create `src/hooks/lib/ensure-gitignore.ts` — CLI: `node ensure-gitignore.mjs <entry>`
     2. Idempotent append-if-missing to `.gitignore`
