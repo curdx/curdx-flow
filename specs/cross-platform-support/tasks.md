@@ -500,7 +500,7 @@ Goal: clean up structure, error handling, types, normalize cross-platform path h
   - _Requirements: NFR-7, AC-4.1_
   - _Design: Cross-Platform Path Handling_
 
-- [ ] 2.5 Lib catalog convergence review (11 → potentially 9-10)
+- [x] 2.5 Lib catalog convergence review (11 → potentially 9-10)
   - **Do**:
     1. Read design open-q #1: candidate merges (`get-fix-attempts` → `merge-state`; `mark-task-complete` → `update-fix-task-map`)
     2. Apply jobs-to-be-done lens: each lib must have ≥2 distinct callers OR a non-trivial impl (≥30 LOC)
