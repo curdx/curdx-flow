@@ -49,7 +49,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
 
 ### Shared utilities (_shared/)
 
-- [ ] 1.5 Scaffold _shared/stdin.ts (async iterator JSON reader)
+- [x] 1.5 Scaffold _shared/stdin.ts (async iterator JSON reader)
   - **Do**:
     1. Create `src/hooks/_shared/stdin.ts` exporting `readStdinJson<T>(): Promise<T>`
     2. Implement async iterator over `process.stdin`, JSON.parse, exit 0 on parse error per design.md
