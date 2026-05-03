@@ -782,7 +782,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - **Done when**: Plugin install simulated successfully
   - **Commit**: None
 
-- [ ] VE2 [VERIFY] E2E check: spawn each hook via bash shim with realistic fixture
+- [x] VE2 [VERIFY] E2E check: spawn each hook via bash shim with realistic fixture
   - **Do**:
     1. Read INSTALL_DIR from `/tmp/ve-pids.txt`
     2. For each of 4 hooks, run via the exact hooks.json contract:
