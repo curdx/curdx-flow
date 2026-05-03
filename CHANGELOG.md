@@ -2,6 +2,19 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.0.0-beta.1 — 2026-05-03
+
+### Fixed
+
+- **Windows hook tests now pass.** beta.0's 6-leg CI matrix exposed 8 Windows-specific failures (3 update-spec-index TypeError + 5 hook tests asserting `undefined`/`active:false`). Two distinct bugs fixed in test infrastructure (no hook source changes):
+  - **Bug 1 (`tests/hooks/_helpers.ts:87`)**: `result.stdout.trim()` crashed with `TypeError: Cannot read properties of undefined` on Windows when `spawnSync` returned `stdout === undefined` for child processes that exited before producing output. Fix: nullish-coalesce both `stdout` and `stderr` (`result.stdout ?? ""`) before any string operations.
+  - **Bug 2 (hardcoded `/tmp/curdx-fixture-*` paths)**: 4 fixture JSONs embedded `cwd` paths that existed on the macOS dev box (created during task 3.2 baseline generation) but did NOT exist on GitHub's Windows runner. Hooks resolved `active:false` because the spec dir was missing. Fix: new `tests/hooks/_fixture-setup.ts` exports `createFixtureSpec()` which builds a self-contained spec via `mkdtempSync(os.tmpdir(), 'curdx-fixture-')` per test + cleanup in `afterEach`. `_helpers.ts.runHook(..., { cwd })` now also rewrites the stdin fixture's `cwd` field to the runtime temp path. Both hook smoke tests (load-spec-context, quick-mode-guard, stop-watcher) and the update-spec-index invocation-spec tests refactored to per-test fixture setup.
+
+### Notes
+
+- **Test count unchanged (55/55).** No tests removed or skipped — only restructured to be cross-platform-safe.
+- **Beta.0 served its purpose.** The 3-OS CI matrix surfaced 2 distinct Windows bugs that the POSIX-only dev box could not have caught — exactly the gating outcome the alpha→beta→rc rhythm was designed for.
+
 ## 7.0.0 — YYYY-MM-DD
 
 ### Breaking

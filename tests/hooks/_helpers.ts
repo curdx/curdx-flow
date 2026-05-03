@@ -60,9 +60,24 @@ export function runHook(
       Array.isArray(parsed.args) &&
       typeof parsed.hookEvent !== "string"
     ) {
+      // Invocation-spec format (update-spec-index): cwd + args, no stdin.
       stdin = "";
       cwd = options.cwd ?? parsed.cwd;
       args = [...parsed.args, ...(options.args ?? [])];
+    } else if (
+      options.cwd &&
+      parsed &&
+      typeof parsed === "object" &&
+      typeof parsed.cwd === "string"
+    ) {
+      // Stdin-fixture format (load-spec-context, quick-mode-guard, stop-watcher):
+      // when the caller supplied an override cwd, rewrite the fixture's `cwd`
+      // field so the hook sees the cross-platform temp dir created by
+      // `createFixtureSpec()` (Bug 2 fix in v7.0.0-beta.1). The original
+      // fixture JSON's `cwd` (e.g., "/tmp/curdx-fixture-spec") is irrelevant
+      // on Windows; we substitute the runtime path here.
+      parsed.cwd = options.cwd;
+      stdin = JSON.stringify(parsed);
     }
   } catch {
     // Not JSON -> treated as raw stdin (e.g., malformed-input fixtures)
@@ -83,8 +98,14 @@ export function runHook(
     timeout: 5000,
   });
 
+  // Bug 1 fix (v7.0.0-beta.1): on Windows, spawnSync may return `stdout`/`stderr`
+  // as `undefined` (instead of "") when the child exits via uncaught exception
+  // before producing output. Nullish-coalesce both before any string ops.
+  const stdout = result.stdout ?? "";
+  const stderr = result.stderr ?? "";
+
   let json: unknown | undefined;
-  const trimmed = result.stdout.trim();
+  const trimmed = stdout.trim();
   if (trimmed.length > 0) {
     try {
       json = JSON.parse(trimmed);
@@ -95,8 +116,8 @@ export function runHook(
 
   return {
     exitCode: result.status ?? -1,
-    stdout: result.stdout,
-    stderr: result.stderr,
+    stdout,
+    stderr,
     json,
   };
 }

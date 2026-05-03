@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-05-03T14:18:14Z",
+  "updated": "2026-05-03T22:38:10Z",
   "directories": [
     {
       "path": "./specs",
@@ -10,16 +10,16 @@
   ],
   "specs": [
     {
-      "name": "superpowers-inline-review",
-      "path": "./specs/superpowers-inline-review",
-      "phase": "new"
-    },
-    {
       "name": "cross-platform-support",
       "path": "./specs/cross-platform-support",
       "phase": "execution",
-      "taskIndex": 40,
+      "taskIndex": 60,
       "totalTasks": 76
+    },
+    {
+      "name": "superpowers-inline-review",
+      "path": "./specs/superpowers-inline-review",
+      "phase": "new"
     }
   ]
 }
