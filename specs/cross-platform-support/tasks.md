@@ -12,7 +12,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
 
 ### Bootstrap: dev deps + scaffolding
 
-- [ ] 1.1 Add esbuild + vitest dev deps
+- [x] 1.1 Add esbuild + vitest dev deps
   - **Do**:
     1. `npm install --save-dev esbuild@^0.24 vitest@^2`
     2. Verify entries present in `package.json` `devDependencies`
