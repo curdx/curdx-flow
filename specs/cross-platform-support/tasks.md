@@ -566,7 +566,7 @@ Goal: vitest smoke + lib unit + byte-equal regression vs v6.0.6 baseline.
   - _Requirements: NFR-7, AC-4.1_
   - _Design: Byte-equal regression test_
 
-- [ ] 3.3 [P] Smoke tests for 4 hook entrypoints (3 fixtures each)
+- [x] 3.3 [P] Smoke tests for 4 hook entrypoints (3 fixtures each)
   - **Do**:
     1. Create `tests/hooks/load-spec-context.test.ts`, `quick-mode-guard.test.ts`, `stop-watcher.test.ts`, `update-spec-index.test.ts`
     2. Each test file: 3 cases (happy / edge / error) using `runHook(bundlePath, fixture)` helper from design.md
@@ -578,7 +578,7 @@ Goal: vitest smoke + lib unit + byte-equal regression vs v6.0.6 baseline.
   - _Requirements: FR-13, AC-5.2_
   - _Design: Test Strategy_
 
-- [ ] 3.4 [P] Unit tests for 11 lib utilities (1+ test each)
+- [x] 3.4 [P] Unit tests for 11 lib utilities (1+ test each)
   - **Do**:
     1. Create `tests/hooks/lib/<each>.test.ts` for the final lib catalog
     2. Each test: 1 happy-path case (more if non-trivial)
