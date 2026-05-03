@@ -8,6 +8,9 @@ const __dirname = __ccd(__filename);
 // src/hooks/load-spec-context.ts
 import { existsSync as existsSync2, readFileSync as readFileSync2 } from "node:fs";
 import { basename as basename2, join as join2 } from "node:path";
+import process4 from "node:process";
+
+// src/hooks/_shared/run-hook.ts
 import process3 from "node:process";
 
 // src/hooks/_shared/stdin.ts
@@ -26,6 +29,24 @@ async function readStdinJson() {
     process2.stderr.write(`[hook] invalid stdin JSON: ${msg}
 `);
     process2.exit(0);
+  }
+}
+
+// src/hooks/_shared/run-hook.ts
+async function runHook(handler, options = {}) {
+  const { readStdin = true } = options;
+  try {
+    const stdin = readStdin ? await readStdinJson() : {};
+    const output = await handler(stdin);
+    if (output !== void 0 && output !== null) {
+      process3.stdout.write(JSON.stringify(output) + "\n");
+    }
+    process3.exit(0);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process3.stderr.write(`[hook] ${msg}
+`);
+    process3.exit(0);
   }
 }
 
@@ -135,14 +156,7 @@ function resolveCurrent(opts) {
 
 // src/hooks/load-spec-context.ts
 var SETTINGS_REL_PATH2 = ".claude/curdx-flow.local.md";
-function emit(block) {
-  const output = block;
-  process3.stdout.write(JSON.stringify(output) + "\n");
-  process3.exit(0);
-}
-function emitInactive() {
-  emit({ active: false });
-}
+var INACTIVE = { active: false };
 function readEnabledSetting(settingsPath) {
   let raw;
   try {
@@ -176,41 +190,35 @@ function readGoalFromProgress(progressPath) {
   }
   return null;
 }
-async function main() {
-  const input = await readStdinJson();
+runHook(async (input) => {
   const cwd = input?.cwd;
   if (!cwd) {
-    emitInactive();
-    return;
+    return INACTIVE;
   }
   const settingsPath = join2(cwd, SETTINGS_REL_PATH2);
   if (existsSync2(settingsPath)) {
     const enabled = readEnabledSetting(settingsPath);
     if (enabled === "false") {
-      emitInactive();
-      return;
+      return INACTIVE;
     }
   }
   const specRelativePath = resolveCurrent({ cwd });
   if (!specRelativePath) {
-    emitInactive();
-    return;
+    return INACTIVE;
   }
   const specPath = join2(cwd, specRelativePath);
   const specName = basename2(specRelativePath);
   try {
     const { statSync: statSync2 } = await import("node:fs");
     if (!statSync2(specPath).isDirectory()) {
-      emitInactive();
-      return;
+      return INACTIVE;
     }
   } catch {
-    emitInactive();
-    return;
+    return INACTIVE;
   }
   const stateFile = join2(specPath, ".curdx-state.json");
   const progressFile = join2(specPath, ".progress.md");
-  process3.stderr.write(`[curdx-flow] Active spec detected: ${specName}
+  process4.stderr.write(`[curdx-flow] Active spec detected: ${specName}
 `);
   const block = {
     active: true,
@@ -234,37 +242,37 @@ async function main() {
     block.taskIndex = taskIndex;
     block.totalTasks = totalTasks;
     block.awaitingApproval = awaiting;
-    process3.stderr.write(
+    process4.stderr.write(
       `[curdx-flow] Phase: ${phase} | Task: ${taskIndex + 1}/${totalTasks} | Awaiting approval: ${awaiting}
 `
     );
     if (phase === "execution" && !awaiting) {
-      process3.stderr.write(
+      process4.stderr.write(
         `[curdx-flow] Execution in progress. Run /curdx-flow:implement to continue.
 `
       );
     } else if (awaiting) {
       switch (phase) {
         case "research":
-          process3.stderr.write(
+          process4.stderr.write(
             `[curdx-flow] Research complete. Run /curdx-flow:requirements to continue.
 `
           );
           break;
         case "requirements":
-          process3.stderr.write(
+          process4.stderr.write(
             `[curdx-flow] Requirements complete. Run /curdx-flow:design to continue.
 `
           );
           break;
         case "design":
-          process3.stderr.write(
+          process4.stderr.write(
             `[curdx-flow] Design complete. Run /curdx-flow:tasks to continue.
 `
           );
           break;
         case "tasks":
-          process3.stderr.write(
+          process4.stderr.write(
             `[curdx-flow] Tasks complete. Run /curdx-flow:implement to start execution.
 `
           );
@@ -273,22 +281,22 @@ async function main() {
     }
   } else {
     if (existsSync2(join2(specPath, "tasks.md"))) {
-      process3.stderr.write(
+      process4.stderr.write(
         `[curdx-flow] Tasks defined but no execution state. Run /curdx-flow:implement to start.
 `
       );
     } else if (existsSync2(join2(specPath, "design.md"))) {
-      process3.stderr.write(
+      process4.stderr.write(
         `[curdx-flow] Design exists. Run /curdx-flow:tasks to generate tasks.
 `
       );
     } else if (existsSync2(join2(specPath, "requirements.md"))) {
-      process3.stderr.write(
+      process4.stderr.write(
         `[curdx-flow] Requirements exist. Run /curdx-flow:design to continue.
 `
       );
     } else if (existsSync2(join2(specPath, "research.md"))) {
-      process3.stderr.write(
+      process4.stderr.write(
         `[curdx-flow] Research exists. Run /curdx-flow:requirements to continue.
 `
       );
@@ -298,16 +306,10 @@ async function main() {
     const goal = readGoalFromProgress(progressFile);
     if (goal) {
       block.goal = goal;
-      process3.stderr.write(`[curdx-flow] Goal: ${goal}
+      process4.stderr.write(`[curdx-flow] Goal: ${goal}
 `);
     }
   }
-  emit(block);
-}
-main().catch((err) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  process3.stderr.write(`[load-spec-context] error: ${msg}
-`);
-  process3.exit(0);
+  return block;
 });
 //# sourceMappingURL=load-spec-context.mjs.map

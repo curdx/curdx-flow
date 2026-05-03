@@ -8,6 +8,8 @@ const __dirname = __ccd(__filename);
 // src/hooks/quick-mode-guard.ts
 import { readFileSync as readFileSync2, existsSync as existsSync2 } from "node:fs";
 import { join as join2 } from "node:path";
+
+// src/hooks/_shared/run-hook.ts
 import process3 from "node:process";
 
 // src/hooks/_shared/stdin.ts
@@ -26,6 +28,24 @@ async function readStdinJson() {
     process2.stderr.write(`[hook] invalid stdin JSON: ${msg}
 `);
     process2.exit(0);
+  }
+}
+
+// src/hooks/_shared/run-hook.ts
+async function runHook(handler, options = {}) {
+  const { readStdin = true } = options;
+  try {
+    const stdin = readStdin ? await readStdinJson() : {};
+    const output = await handler(stdin);
+    if (output !== void 0 && output !== null) {
+      process3.stdout.write(JSON.stringify(output) + "\n");
+    }
+    process3.exit(0);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process3.stderr.write(`[hook] ${msg}
+`);
+    process3.exit(0);
   }
 }
 
@@ -135,59 +155,35 @@ function resolveCurrent(opts) {
 
 // src/hooks/quick-mode-guard.ts
 var QUICK_MODE_REASON = "Quick mode active: do NOT ask the user any questions. Make opinionated decisions autonomously. Choose the simplest, most conventional approach.";
-function emitAllow() {
-  const payload = { decision: "allow" };
-  const out = payload;
-  process3.stdout.write(JSON.stringify(out) + "\n");
-  process3.exit(0);
-}
-function emitDeny() {
-  const payload = {
-    decision: "deny",
-    reason: QUICK_MODE_REASON,
-    hookSpecificOutput: {
-      permissionDecision: "deny"
-    },
-    systemMessage: QUICK_MODE_REASON
-  };
-  const out = payload;
-  process3.stdout.write(JSON.stringify(out) + "\n");
-  process3.exit(0);
-}
-async function main() {
-  const input = await readStdinJson();
+var ALLOW = { decision: "allow" };
+var DENY = {
+  decision: "deny",
+  reason: QUICK_MODE_REASON,
+  hookSpecificOutput: {
+    permissionDecision: "deny"
+  },
+  systemMessage: QUICK_MODE_REASON
+};
+runHook(async (input) => {
   const cwd = input?.cwd;
   if (!cwd) {
-    emitAllow();
-    return;
+    return ALLOW;
   }
   const specPath = resolveCurrent({ cwd });
   if (!specPath) {
-    emitAllow();
-    return;
+    return ALLOW;
   }
   const stateFile = join2(cwd, specPath, ".curdx-state.json");
   if (!existsSync2(stateFile)) {
-    emitAllow();
-    return;
+    return ALLOW;
   }
   let state;
   try {
     state = JSON.parse(readFileSync2(stateFile, "utf8"));
   } catch {
-    emitAllow();
-    return;
+    return ALLOW;
   }
-  if (state.quickMode === true) {
-    emitDeny();
-    return;
-  }
-  emitAllow();
-}
-main().catch((err) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  process3.stderr.write(`[quick-mode-guard] error: ${msg}
-`);
-  process3.exit(0);
+  const out = state.quickMode === true ? DENY : ALLOW;
+  return out;
 });
 //# sourceMappingURL=quick-mode-guard.mjs.map

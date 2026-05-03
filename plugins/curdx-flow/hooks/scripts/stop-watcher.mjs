@@ -16,6 +16,9 @@ import {
 import { spawn } from "node:child_process";
 import { basename as basename2, dirname, join as join2 } from "node:path";
 import { fileURLToPath } from "node:url";
+import process4 from "node:process";
+
+// src/hooks/_shared/run-hook.ts
 import process3 from "node:process";
 
 // src/hooks/_shared/stdin.ts
@@ -34,6 +37,24 @@ async function readStdinJson() {
     process2.stderr.write(`[hook] invalid stdin JSON: ${msg}
 `);
     process2.exit(0);
+  }
+}
+
+// src/hooks/_shared/run-hook.ts
+async function runHook(handler, options = {}) {
+  const { readStdin = true } = options;
+  try {
+    const stdin = readStdin ? await readStdinJson() : {};
+    const output = await handler(stdin);
+    if (output !== void 0 && output !== null) {
+      process3.stdout.write(JSON.stringify(output) + "\n");
+    }
+    process3.exit(0);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process3.stderr.write(`[hook] ${msg}
+`);
+    process3.exit(0);
   }
 }
 
@@ -222,10 +243,6 @@ function normalizeText(input) {
   if (s.charCodeAt(0) === 65279) s = s.slice(1);
   return s.replace(/\r\n?/g, "\n");
 }
-function emitBlock(decision) {
-  const out = decision;
-  process3.stdout.write(JSON.stringify(out) + "\n");
-}
 function readEnabledSetting(settingsPath) {
   let raw;
   try {
@@ -294,7 +311,7 @@ function markSpecCompletedInEpic(cwd, epicName, specName) {
   if (!mutated) return;
   try {
     writeFileAtomic(epicStateFile, JSON.stringify(epic, null, 2) + "\n");
-    process3.stderr.write(
+    process4.stderr.write(
       `[curdx-flow] Updated epic '${epicName}': spec '${specName}' marked completed
 `
     );
@@ -312,7 +329,7 @@ function fireUpdateSpecIndex() {
   const target = join2(scriptDir, "update-spec-index.mjs");
   if (!existsSync2(target)) return;
   try {
-    const child = spawn(process3.execPath, [target, "--quiet"], {
+    const child = spawn(process4.execPath, [target, "--quiet"], {
       stdio: ["ignore", "ignore", "ignore"],
       detached: true
     });
@@ -466,35 +483,26 @@ ${parallelInstructions}
   if (args.isParallel) systemMessage += " (PARALLEL GROUP)";
   return { decision: "block", reason, systemMessage };
 }
-async function main() {
-  const input = await readStdinJson();
+runHook(async (input) => {
   const cwd = input?.cwd;
-  if (!cwd) {
-    process3.exit(0);
-  }
+  if (!cwd) return;
   const settingsPath = join2(cwd, SETTINGS_REL_PATH2);
   if (existsSync2(settingsPath)) {
     const enabled = readEnabledSetting(settingsPath);
-    if (enabled === "false") {
-      process3.exit(0);
-    }
+    if (enabled === "false") return;
   }
   const rawSpecPath = resolveCurrent({ cwd });
-  if (!rawSpecPath) {
-    process3.exit(0);
-  }
+  if (!rawSpecPath) return;
   const specPath = preserveDotPrefix(rawSpecPath, getSpecsDirs({ cwd }));
   const specName = basename2(specPath);
   const stateFile = join2(cwd, specPath, ".curdx-state.json");
-  if (!existsSync2(stateFile)) {
-    process3.exit(0);
-  }
+  if (!existsSync2(stateFile)) return;
   await maybeWaitForRecentStateFile(stateFile);
   const transcriptPath = input.transcript_path;
   if (transcriptPath && existsSync2(transcriptPath)) {
     const handleCompletion = (variant) => {
       const label = variant === "primary" ? "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript" : "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript (tail-end)";
-      process3.stderr.write(label + "\n");
+      process4.stderr.write(label + "\n");
       let epicName;
       try {
         const st = JSON.parse(readFileSync2(stateFile, "utf8"));
@@ -510,19 +518,18 @@ async function main() {
     };
     if (tailContainsCompletionMarker(transcriptPath, 500)) {
       handleCompletion("primary");
-      process3.exit(0);
+      return;
     }
     if (tailContainsCompletionMarker(transcriptPath, 20)) {
       handleCompletion("fallback");
-      process3.exit(0);
+      return;
     }
   }
   let state;
   try {
     state = JSON.parse(readFileSync2(stateFile, "utf8"));
   } catch {
-    emitBlock(buildCorruptStateBlock(specPath));
-    process3.exit(0);
+    return buildCorruptStateBlock(specPath);
   }
   const phase = typeof state.phase === "string" ? state.phase : "unknown";
   const taskIndex = typeof state.taskIndex === "number" ? state.taskIndex : 0;
@@ -533,29 +540,28 @@ async function main() {
   const globalIteration = typeof state.globalIteration === "number" ? state.globalIteration : 1;
   const maxGlobal = typeof state.maxGlobalIterations === "number" ? state.maxGlobalIterations : 100;
   if (globalIteration >= maxGlobal) {
-    process3.stderr.write(
+    process4.stderr.write(
       `[curdx-flow] ERROR: Maximum global iterations (${maxGlobal}) reached. Review .progress.md for failure patterns.
 `
     );
-    process3.stderr.write(
+    process4.stderr.write(
       `[curdx-flow] Recovery: fix issues manually, then run /curdx-flow:implement or /curdx-flow:cancel
 `
     );
-    process3.exit(0);
+    return;
   }
   if (quickMode && phase !== "execution") {
     if (input.stop_hook_active === true) {
-      process3.stderr.write(
+      process4.stderr.write(
         `[curdx-flow] stop_hook_active=true in quick mode, allowing stop to prevent loop
 `
       );
-      process3.exit(0);
+      return;
     }
-    emitBlock(buildQuickModeBlock(phase, specName));
-    process3.exit(0);
+    return buildQuickModeBlock(phase, specName);
   }
   if (phase === "execution") {
-    process3.stderr.write(
+    process4.stderr.write(
       `[curdx-flow] Session stopped during spec: ${specName} | Task: ${taskIndex + 1}/${totalTasks} | Attempt: ${taskIteration}
 `
     );
@@ -565,38 +571,40 @@ async function main() {
     if (existsSync2(tasksFile)) {
       const unchecked = countUncheckedTasks(tasksFile);
       if (unchecked > 0) {
-        process3.stderr.write(
+        process4.stderr.write(
           `[curdx-flow] State says complete but tasks.md has ${unchecked} unchecked items
 `
         );
-        emitBlock(
-          buildUncheckedTasksBlock(specPath, taskIndex, totalTasks, unchecked)
+        return buildUncheckedTasksBlock(
+          specPath,
+          taskIndex,
+          totalTasks,
+          unchecked
         );
-        process3.exit(0);
       }
     }
-    process3.stderr.write(
+    process4.stderr.write(
       `[curdx-flow] All tasks verified complete for ${specName}
 `
     );
-    process3.exit(0);
+    return;
   }
   if (phase === "execution" && taskIndex < totalTasks) {
     if (state.awaitingApproval === true) {
-      process3.stderr.write(
+      process4.stderr.write(
         `[curdx-flow] awaitingApproval=true, allowing stop for user gate
 `
       );
-      process3.exit(0);
+      return;
     }
     const recoveryMode = state.recoveryMode === true;
     const maxTaskIter = typeof state.maxTaskIterations === "number" ? state.maxTaskIterations : 5;
     if (input.stop_hook_active === true) {
-      process3.stderr.write(
+      process4.stderr.write(
         `[curdx-flow] stop_hook_active=true, skipping continuation to prevent re-invocation loop
 `
       );
-      process3.exit(0);
+      return;
     }
     const tasksFile = join2(cwd, specPath, "tasks.md");
     let taskBlock = "";
@@ -625,29 +633,21 @@ async function main() {
         isParallel = false;
       }
     }
-    emitBlock(
-      buildContinuationBlock({
-        specName,
-        specPath,
-        taskIndex,
-        totalTasks,
-        taskIteration,
-        maxTaskIter,
-        globalIteration,
-        recoveryMode,
-        nativeSync,
-        taskBlock,
-        isParallel
-      })
-    );
+    cleanupStaleProgressFiles(join2(cwd, specPath));
+    return buildContinuationBlock({
+      specName,
+      specPath,
+      taskIndex,
+      totalTasks,
+      taskIteration,
+      maxTaskIter,
+      globalIteration,
+      recoveryMode,
+      nativeSync,
+      taskBlock,
+      isParallel
+    });
   }
   cleanupStaleProgressFiles(join2(cwd, specPath));
-  process3.exit(0);
-}
-main().catch((err) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  process3.stderr.write(`[stop-watcher] error: ${msg}
-`);
-  process3.exit(0);
 });
 //# sourceMappingURL=stop-watcher.mjs.map

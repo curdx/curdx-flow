@@ -14,15 +14,15 @@
  *      there is no byte-equal baseline to break for the JSON channel — same
  *      pattern used by quick-mode-guard.ts (task 1.12).
  *
- * Error policy (FR-8): any thrown error → console.error + process.exit(0).
- * Never block the Claude Code session.
+ * Error policy (FR-8): all uncaught errors are funneled through `runHook`,
+ * which logs to stderr and exits 0. Hook NEVER blocks the Claude Code session.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import process from "node:process";
-import { readStdinJson } from "./_shared/stdin.js";
+import { runHook } from "./_shared/run-hook.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
-import type { ContextBlockOutput, HookOutput, HookStdin } from "./_shared/types.js";
+import type { ContextBlockOutput } from "./_shared/types.js";
 
 interface CurdxState {
   phase?: string;
@@ -35,15 +35,7 @@ type ContextBlock = ContextBlockOutput;
 
 const SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
 
-function emit(block: ContextBlock): void {
-  const output: HookOutput = block;
-  process.stdout.write(JSON.stringify(output) + "\n");
-  process.exit(0);
-}
-
-function emitInactive(): void {
-  emit({ active: false });
-}
+const INACTIVE: ContextBlock = { active: false };
 
 /**
  * Parse `enabled:` from YAML frontmatter (between the first two `---` lines).
@@ -93,12 +85,10 @@ function readGoalFromProgress(progressPath: string): string | null {
   return null;
 }
 
-async function main(): Promise<void> {
-  const input = await readStdinJson<HookStdin>();
+runHook(async (input) => {
   const cwd = input?.cwd;
   if (!cwd) {
-    emitInactive();
-    return;
+    return INACTIVE;
   }
 
   // Honor enabled:false toggle in settings frontmatter.
@@ -106,16 +96,14 @@ async function main(): Promise<void> {
   if (existsSync(settingsPath)) {
     const enabled = readEnabledSetting(settingsPath);
     if (enabled === "false") {
-      emitInactive();
-      return;
+      return INACTIVE;
     }
   }
 
   // Resolve current spec relative path.
   const specRelativePath = resolveCurrent({ cwd });
   if (!specRelativePath) {
-    emitInactive();
-    return;
+    return INACTIVE;
   }
 
   const specPath = join(cwd, specRelativePath);
@@ -128,12 +116,10 @@ async function main(): Promise<void> {
   try {
     const { statSync } = await import("node:fs");
     if (!statSync(specPath).isDirectory()) {
-      emitInactive();
-      return;
+      return INACTIVE;
     }
   } catch {
-    emitInactive();
-    return;
+    return INACTIVE;
   }
 
   const stateFile = join(specPath, ".curdx-state.json");
@@ -232,12 +218,5 @@ async function main(): Promise<void> {
     }
   }
 
-  emit(block);
-}
-
-main().catch((err: unknown) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`[load-spec-context] error: ${msg}\n`);
-  // Never block the session — exit 0 even on unexpected errors.
-  process.exit(0);
+  return block;
 });

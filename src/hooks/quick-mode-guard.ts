@@ -16,19 +16,17 @@
  *   - Allow path emits `{decision:"allow"}`. v6 bash exited 0 silently for allow,
  *     so there is no byte-equal baseline to break.
  *
- * Error policy: any thrown error → console.error + process.exit(0). Never block
- * the Claude Code session (FR-8).
+ * Error policy (FR-8): all uncaught errors are funneled through `runHook`,
+ * which logs to stderr and exits 0. Hook NEVER blocks the Claude Code session.
  */
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import process from "node:process";
-import { readStdinJson } from "./_shared/stdin.js";
+import { runHook } from "./_shared/run-hook.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
 import type {
   AllowDecisionOutput,
   DenyDecisionOutput,
   HookOutput,
-  HookStdin,
 } from "./_shared/types.js";
 
 interface CurdxState {
@@ -38,47 +36,33 @@ interface CurdxState {
 const QUICK_MODE_REASON =
   "Quick mode active: do NOT ask the user any questions. Make opinionated decisions autonomously. Choose the simplest, most conventional approach.";
 
-function emitAllow(): void {
-  const payload: AllowDecisionOutput = { decision: "allow" };
-  const out: HookOutput = payload;
-  process.stdout.write(JSON.stringify(out) + "\n");
-  process.exit(0);
-}
+const ALLOW: AllowDecisionOutput = { decision: "allow" };
 
-function emitDeny(): void {
-  const payload: DenyDecisionOutput = {
-    decision: "deny",
-    reason: QUICK_MODE_REASON,
-    hookSpecificOutput: {
-      permissionDecision: "deny",
-    },
-    systemMessage: QUICK_MODE_REASON,
-  };
-  const out: HookOutput = payload;
-  process.stdout.write(JSON.stringify(out) + "\n");
-  process.exit(0);
-}
+const DENY: DenyDecisionOutput = {
+  decision: "deny",
+  reason: QUICK_MODE_REASON,
+  hookSpecificOutput: {
+    permissionDecision: "deny",
+  },
+  systemMessage: QUICK_MODE_REASON,
+};
 
-async function main(): Promise<void> {
-  const input = await readStdinJson<HookStdin>();
+runHook(async (input) => {
   const cwd = input?.cwd;
   if (!cwd) {
-    emitAllow();
-    return;
+    return ALLOW;
   }
 
   // Resolve active spec (uses CURDX_CWD env or process.cwd by default).
   const specPath = resolveCurrent({ cwd });
   if (!specPath) {
-    emitAllow();
-    return;
+    return ALLOW;
   }
 
   // path.join handles both absolute and relative spec paths correctly.
   const stateFile = join(cwd, specPath, ".curdx-state.json");
   if (!existsSync(stateFile)) {
-    emitAllow();
-    return;
+    return ALLOW;
   }
 
   let state: CurdxState;
@@ -86,20 +70,9 @@ async function main(): Promise<void> {
     state = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
   } catch {
     // Malformed state file — treat as no quick-mode signal, allow.
-    emitAllow();
-    return;
+    return ALLOW;
   }
 
-  if (state.quickMode === true) {
-    emitDeny();
-    return;
-  }
-  emitAllow();
-}
-
-main().catch((err: unknown) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`[quick-mode-guard] error: ${msg}\n`);
-  // Never block the session — exit 0 even on unexpected errors.
-  process.exit(0);
+  const out: HookOutput = state.quickMode === true ? DENY : ALLOW;
+  return out;
 });

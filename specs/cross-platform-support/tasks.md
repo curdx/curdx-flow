@@ -469,7 +469,7 @@ Goal: clean up structure, error handling, types, normalize cross-platform path h
   - _Requirements: NFR-10_
   - _Design: Stdin/Stdout Contract_
 
-- [ ] 2.2 Standardize global error handler across all 4 hooks
+- [x] 2.2 Standardize global error handler across all 4 hooks
   - **Do**:
     1. Add `_shared/run-hook.ts` exporting `runHook(handler: (stdin: HookStdin) => Promise<HookOutput>)`
     2. Wraps with global try/catch → stderr log + `process.exit(0)` (NEVER exit 1, never block session)

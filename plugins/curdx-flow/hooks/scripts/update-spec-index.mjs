@@ -8,7 +8,7 @@ const __dirname = __ccd(__filename);
 // src/hooks/update-spec-index.ts
 import { existsSync as existsSync2, mkdirSync, readFileSync as readFileSync2, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
 import { join as join2, posix as posix2 } from "node:path";
-import process2 from "node:process";
+import process4 from "node:process";
 
 // src/hooks/_shared/atomic-write.ts
 import { writeFileSync, renameSync } from "node:fs";
@@ -136,6 +136,46 @@ function listSpecs(opts) {
     }
   }
   return out;
+}
+
+// src/hooks/_shared/run-hook.ts
+import process3 from "node:process";
+
+// src/hooks/_shared/stdin.ts
+import process2 from "node:process";
+async function readStdinJson() {
+  const chunks = [];
+  for await (const chunk of process2.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  const raw = Buffer.concat(chunks).toString("utf-8").trim();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    process2.stderr.write(`[hook] invalid stdin JSON: ${msg}
+`);
+    process2.exit(0);
+  }
+}
+
+// src/hooks/_shared/run-hook.ts
+async function runHook(handler, options = {}) {
+  const { readStdin = true } = options;
+  try {
+    const stdin = readStdin ? await readStdinJson() : {};
+    const output = await handler(stdin);
+    if (output !== void 0 && output !== null) {
+      process3.stdout.write(JSON.stringify(output) + "\n");
+    }
+    process3.exit(0);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process3.stderr.write(`[hook] ${msg}
+`);
+    process3.exit(0);
+  }
 }
 
 // src/hooks/update-spec-index.ts
@@ -348,42 +388,39 @@ function formatIndexJson(state) {
 }
 function log(opts, msg) {
   if (!opts.quiet) {
-    process2.stderr.write(`${msg}
+    process4.stderr.write(`${msg}
 `);
   }
 }
-async function main() {
-  const opts = parseArgs(process2.argv.slice(2));
-  const cwd = findRepoRoot();
-  const state = buildIndexState(cwd);
-  const markdown = buildIndexMarkdown(state, cwd);
-  const jsonText = formatIndexJson(state);
-  if (opts.dryRun) {
-    process2.stdout.write(jsonText);
-    return;
-  }
-  const defaultDir = getDefaultDir({ cwd });
-  const indexDirFs = join2(cwd, defaultDir, ".index");
-  mkdirSync(indexDirFs, { recursive: true });
-  const jsonOut = join2(indexDirFs, "index-state.json");
-  const mdOut = join2(indexDirFs, "index.md");
-  writeFileAtomic(jsonOut, jsonText);
-  log(opts, `Updated ${jsonOut}`);
-  writeFileAtomic(mdOut, markdown);
-  log(opts, `Updated ${mdOut}`);
-  const totalSpecs = state.directories.reduce(
-    (acc, d) => acc + d.specsCount,
-    0
-  );
-  log(
-    opts,
-    `Spec index updated: ${totalSpecs} specs in ${state.directories.length} directories`
-  );
-}
-main().catch((err) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  process2.stderr.write(`[update-spec-index] error: ${msg}
-`);
-  process2.exit(0);
-});
+runHook(
+  async () => {
+    const opts = parseArgs(process4.argv.slice(2));
+    const cwd = findRepoRoot();
+    const state = buildIndexState(cwd);
+    const markdown = buildIndexMarkdown(state, cwd);
+    const jsonText = formatIndexJson(state);
+    if (opts.dryRun) {
+      process4.stdout.write(jsonText);
+      return;
+    }
+    const defaultDir = getDefaultDir({ cwd });
+    const indexDirFs = join2(cwd, defaultDir, ".index");
+    mkdirSync(indexDirFs, { recursive: true });
+    const jsonOut = join2(indexDirFs, "index-state.json");
+    const mdOut = join2(indexDirFs, "index.md");
+    writeFileAtomic(jsonOut, jsonText);
+    log(opts, `Updated ${jsonOut}`);
+    writeFileAtomic(mdOut, markdown);
+    log(opts, `Updated ${mdOut}`);
+    const totalSpecs = state.directories.reduce(
+      (acc, d) => acc + d.specsCount,
+      0
+    );
+    log(
+      opts,
+      `Spec index updated: ${totalSpecs} specs in ${state.directories.length} directories`
+    );
+  },
+  { readStdin: false }
+);
 //# sourceMappingURL=update-spec-index.mjs.map

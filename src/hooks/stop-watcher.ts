@@ -61,11 +61,11 @@ import { spawn } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import process from "node:process";
-import { readStdinJson } from "./_shared/stdin.js";
+import { runHook } from "./_shared/run-hook.js";
 import { getSpecsDirs, resolveCurrent } from "./_shared/path-resolver.js";
 import { writeFileAtomic } from "./_shared/atomic-write.js";
 import { extractTaskBlock } from "./_shared/markdown-task-parser.js";
-import type { BlockDecisionOutput, HookOutput, HookStdin } from "./_shared/types.js";
+import type { BlockDecisionOutput } from "./_shared/types.js";
 
 interface CurdxState {
   phase?: string;
@@ -152,11 +152,9 @@ function normalizeText(input: string): string {
   return s.replace(/\r\n?/g, "\n");
 }
 
-/** Block-decision JSON emitter. v6 shell JSON-emit produces trailing-newline output. */
-function emitBlock(decision: BlockDecision): void {
-  const out: HookOutput = decision;
-  process.stdout.write(JSON.stringify(out) + "\n");
-}
+// Note: pre-2.2 there was a local `emitBlock(decision)` helper that wrote
+// JSON to stdout. Post-2.2 the runHook wrapper owns serialization — handlers
+// just `return decision` and runHook does `process.stdout.write(JSON.stringify(...) + "\n")`.
 
 /**
  * YAML-frontmatter `enabled:` extractor — same algorithm as load-spec-context.ts
@@ -541,34 +539,25 @@ function buildContinuationBlock(args: {
   return { decision: "block", reason, systemMessage };
 }
 
-async function main(): Promise<void> {
-  const input = await readStdinJson<HookStdin>();
+runHook(async (input) => {
   const cwd = input?.cwd;
-  if (!cwd) {
-    process.exit(0);
-  }
+  if (!cwd) return;
 
   // Honor enabled:false toggle.
   const settingsPath = join(cwd, SETTINGS_REL_PATH);
   if (existsSync(settingsPath)) {
     const enabled = readEnabledSetting(settingsPath);
-    if (enabled === "false") {
-      process.exit(0);
-    }
+    if (enabled === "false") return;
   }
 
   // Resolve current spec. Re-attach `./` prefix that posix.join strips, so
   // the continuation prompt embeds a path byte-equal to the v6 bash baseline.
   const rawSpecPath = resolveCurrent({ cwd });
-  if (!rawSpecPath) {
-    process.exit(0);
-  }
+  if (!rawSpecPath) return;
   const specPath = preserveDotPrefix(rawSpecPath, getSpecsDirs({ cwd }));
   const specName = basename(specPath);
   const stateFile = join(cwd, specPath, ".curdx-state.json");
-  if (!existsSync(stateFile)) {
-    process.exit(0);
-  }
+  if (!existsSync(stateFile)) return;
 
   // Race-condition safeguard.
   await maybeWaitForRecentStateFile(stateFile);
@@ -601,11 +590,11 @@ async function main(): Promise<void> {
 
     if (tailContainsCompletionMarker(transcriptPath, 500)) {
       handleCompletion("primary");
-      process.exit(0);
+      return;
     }
     if (tailContainsCompletionMarker(transcriptPath, 20)) {
       handleCompletion("fallback");
-      process.exit(0);
+      return;
     }
   }
 
@@ -614,8 +603,7 @@ async function main(): Promise<void> {
   try {
     state = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
   } catch {
-    emitBlock(buildCorruptStateBlock(specPath));
-    process.exit(0);
+    return buildCorruptStateBlock(specPath);
   }
 
   // Read state fields with v6 defaults.
@@ -650,7 +638,7 @@ async function main(): Promise<void> {
     process.stderr.write(
       `[curdx-flow] Recovery: fix issues manually, then run /curdx-flow:implement or /curdx-flow:cancel\n`,
     );
-    process.exit(0);
+    return;
   }
 
   // Quick-mode guard: block stop during ANY phase except execution.
@@ -659,10 +647,9 @@ async function main(): Promise<void> {
       process.stderr.write(
         `[curdx-flow] stop_hook_active=true in quick mode, allowing stop to prevent loop\n`,
       );
-      process.exit(0);
+      return;
     }
-    emitBlock(buildQuickModeBlock(phase, specName));
-    process.exit(0);
+    return buildQuickModeBlock(phase, specName);
   }
 
   // Log current state during execution phase.
@@ -685,16 +672,18 @@ async function main(): Promise<void> {
         process.stderr.write(
           `[curdx-flow] State says complete but tasks.md has ${unchecked} unchecked items\n`,
         );
-        emitBlock(
-          buildUncheckedTasksBlock(specPath, taskIndex, totalTasks, unchecked),
+        return buildUncheckedTasksBlock(
+          specPath,
+          taskIndex,
+          totalTasks,
+          unchecked,
         );
-        process.exit(0);
       }
     }
     process.stderr.write(
       `[curdx-flow] All tasks verified complete for ${specName}\n`,
     );
-    process.exit(0);
+    return;
   }
 
   // Loop control: continuation prompt when more tasks remain.
@@ -703,7 +692,7 @@ async function main(): Promise<void> {
       process.stderr.write(
         `[curdx-flow] awaitingApproval=true, allowing stop for user gate\n`,
       );
-      process.exit(0);
+      return;
     }
 
     const recoveryMode = state.recoveryMode === true;
@@ -717,7 +706,7 @@ async function main(): Promise<void> {
       process.stderr.write(
         `[curdx-flow] stop_hook_active=true, skipping continuation to prevent re-invocation loop\n`,
       );
-      process.exit(0);
+      return;
     }
 
     // Extract current task block via shared parser (replaces v6 awk + sed).
@@ -753,32 +742,26 @@ async function main(): Promise<void> {
       }
     }
 
-    emitBlock(
-      buildContinuationBlock({
-        specName,
-        specPath,
-        taskIndex,
-        totalTasks,
-        taskIteration,
-        maxTaskIter,
-        globalIteration,
-        recoveryMode,
-        nativeSync,
-        taskBlock,
-        isParallel,
-      }),
-    );
+    // Pre-2.2 v6 path: emitBlock() (no exit) → fall through to cleanup → exit.
+    // Preserve same effect by running cleanup BEFORE returning the block, so
+    // runHook serializes the JSON last. Cleanup is best-effort (>60 min files)
+    // and produces no stdout/stderr in steady state, so reordering is safe.
+    cleanupStaleProgressFiles(join(cwd, specPath));
+    return buildContinuationBlock({
+      specName,
+      specPath,
+      taskIndex,
+      totalTasks,
+      taskIteration,
+      maxTaskIter,
+      globalIteration,
+      recoveryMode,
+      nativeSync,
+      taskBlock,
+      isParallel,
+    });
   }
 
   // Cleanup orphaned temp progress files (>60 min old).
   cleanupStaleProgressFiles(join(cwd, specPath));
-
-  process.exit(0);
-}
-
-main().catch((err: unknown) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`[stop-watcher] error: ${msg}\n`);
-  // Never block the session — exit 0 even on unexpected errors.
-  process.exit(0);
 });

@@ -35,6 +35,7 @@ import {
   listSpecs,
   type SpecEntry,
 } from "./_shared/path-resolver.js";
+import { runHook } from "./_shared/run-hook.js";
 // NOTE: this CLI does NOT emit a HookOutput (it writes IndexState to a file
 // rather than emitting a decision to stdout). The type is imported here as
 // the canonical reference so the shared envelope module is the single source
@@ -366,45 +367,48 @@ function log(opts: CliOptions, msg: string): void {
   }
 }
 
-async function main(): Promise<void> {
-  const opts = parseArgs(process.argv.slice(2));
+// CLI driver — invoked as `node update-spec-index.mjs [--quiet] [--dry-run]`.
+// `runHook(..., { readStdin: false })` skips stdin parsing (would hang on TTY)
+// while still owning the global try/catch + exit-0-always contract (FR-8).
+//
+// Handler returns `void`: dry-run mode writes JSON directly to stdout (no
+// HookOutput envelope), and write mode produces no stdout payload — runHook
+// emits nothing in either case, byte-equal to the v6 baseline.
+runHook(
+  async () => {
+    const opts = parseArgs(process.argv.slice(2));
 
-  // Anchor on the repo root rather than naked cwd so this hook still works
-  // when invoked from a sub-directory.
-  const cwd = findRepoRoot();
-  const state = buildIndexState(cwd);
-  const markdown = buildIndexMarkdown(state, cwd);
-  const jsonText = formatIndexJson(state);
+    // Anchor on the repo root rather than naked cwd so this hook still works
+    // when invoked from a sub-directory.
+    const cwd = findRepoRoot();
+    const state = buildIndexState(cwd);
+    const markdown = buildIndexMarkdown(state, cwd);
+    const jsonText = formatIndexJson(state);
 
-  if (opts.dryRun) {
-    process.stdout.write(jsonText);
-    return;
-  }
+    if (opts.dryRun) {
+      process.stdout.write(jsonText);
+      return;
+    }
 
-  const defaultDir = getDefaultDir({ cwd });
-  const indexDirFs = join(cwd, defaultDir, ".index");
-  mkdirSync(indexDirFs, { recursive: true });
+    const defaultDir = getDefaultDir({ cwd });
+    const indexDirFs = join(cwd, defaultDir, ".index");
+    mkdirSync(indexDirFs, { recursive: true });
 
-  const jsonOut = join(indexDirFs, "index-state.json");
-  const mdOut = join(indexDirFs, "index.md");
-  writeFileAtomic(jsonOut, jsonText);
-  log(opts, `Updated ${jsonOut}`);
-  writeFileAtomic(mdOut, markdown);
-  log(opts, `Updated ${mdOut}`);
+    const jsonOut = join(indexDirFs, "index-state.json");
+    const mdOut = join(indexDirFs, "index.md");
+    writeFileAtomic(jsonOut, jsonText);
+    log(opts, `Updated ${jsonOut}`);
+    writeFileAtomic(mdOut, markdown);
+    log(opts, `Updated ${mdOut}`);
 
-  const totalSpecs = state.directories.reduce(
-    (acc, d) => acc + d.specsCount,
-    0,
-  );
-  log(
-    opts,
-    `Spec index updated: ${totalSpecs} specs in ${state.directories.length} directories`,
-  );
-}
-
-main().catch((err: unknown) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`[update-spec-index] error: ${msg}\n`);
-  // Never block callers — exit 0 even on unexpected errors.
-  process.exit(0);
-});
+    const totalSpecs = state.directories.reduce(
+      (acc, d) => acc + d.specsCount,
+      0,
+    );
+    log(
+      opts,
+      `Spec index updated: ${totalSpecs} specs in ${state.directories.length} directories`,
+    );
+  },
+  { readStdin: false },
+);
