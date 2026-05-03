@@ -106,7 +106,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-7, FR-14_
   - _Design: Build Pipeline → esbuild 配置_
 
-- [ ] 1.10 First-bundle smoke test: throwaway hello-world hook
+- [x] 1.10 First-bundle smoke test: throwaway hello-world hook
   - **Do**:
     1. Create temp `src/hooks/__hello.ts` that reads stdin via `_shared/stdin` and prints `{"hello":true}`
     2. Add to HOOK_ENTRIES in build-hooks.mjs (temp)
