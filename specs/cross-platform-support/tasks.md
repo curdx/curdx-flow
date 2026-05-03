@@ -362,7 +362,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - **Commit**: `feat(lib): add 3 state-tracking lib utilities`
   - _Requirements: FR-10_
 
-- [ ] 1.33 [VERIFY] Quality checkpoint: all 11 lib bundles + typecheck
+- [x] 1.33 [VERIFY] Quality checkpoint: all 11 lib bundles + typecheck
   - **Do**: `npm run typecheck && npm run build:hooks && ls plugins/curdx-flow/hooks/scripts/lib/*.mjs | wc -l | awk '$1>=11'`
   - **Verify**: Exit 0
   - **Done when**: 11 lib utilities bundled
