@@ -170,7 +170,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-6, AC-4.1_
   - _Design: Component Catalog → update-spec-index_
 
-- [ ] 1.15 [VERIFY] Quality checkpoint: 3 hooks bundled + typecheck
+- [x] 1.15 [VERIFY] Quality checkpoint: 3 hooks bundled + typecheck
   - **Do**: `npm run typecheck && npm run build:hooks && ls plugins/curdx-flow/hooks/scripts/*.mjs`
   - **Verify**: All exit 0; bundle dir contains 3 `.mjs` files
   - **Done when**: 3-of-4 hooks bundled successfully
