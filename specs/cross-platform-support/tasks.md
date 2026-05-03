@@ -636,7 +636,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - _Requirements: FR-14, AC-6.1, AC-6.2_
   - _Design: npm scripts table_
 
-- [ ] 4.2 Update .github/workflows/ci.yml to 6-leg matrix
+- [x] 4.2 Update .github/workflows/ci.yml to 6-leg matrix
   - **Do**:
     1. Replace ci.yml with 4 jobs per design.md CI 矩阵设计:
        - `typecheck` (ubuntu, node 22)
