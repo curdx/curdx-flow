@@ -26,7 +26,7 @@ All notable changes to `@curdx/flow` are documented here. Format follows [Keep a
 - **Test count unchanged (55/55).** No tests removed or skipped — only restructured to be cross-platform-safe.
 - **Beta.0 served its purpose.** The 3-OS CI matrix surfaced 2 distinct Windows bugs that the POSIX-only dev box could not have caught — exactly the gating outcome the alpha→beta→rc rhythm was designed for.
 
-## 7.0.0 — YYYY-MM-DD
+## 7.0.0 — 2026-05-03
 
 ### Breaking
 
