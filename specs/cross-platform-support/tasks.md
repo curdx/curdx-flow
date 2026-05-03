@@ -313,7 +313,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - **Commit**: `feat(lib): add lib/search-files cross-platform grep`
   - _Requirements: FR-10_
 
-- [ ] 1.28 [P] Create lib/count-mocks.ts
+- [x] 1.28 [P] Create lib/count-mocks.ts
   - **Do**:
     1. Create `src/hooks/lib/count-mocks.ts` — CLI: count `vi.mock` / `jest.mock` / `mock.fn` occurrences in test files
     2. Output JSON `{tests, mockUsages, ratio}`
