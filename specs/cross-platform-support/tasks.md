@@ -810,7 +810,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
 
 Goal: autonomous PR loop until merged + final v7.0.0 release.
 
-- [ ] 5.1 Monitor CI 6-leg matrix; fix Windows-specific issues if any
+- [x] 5.1 Monitor CI 6-leg matrix; fix Windows-specific issues if any
   - **Do**:
     1. `gh pr checks --watch`
     2. If a leg fails (especially windows-latest), read logs: `gh run view <run-id> --log-failed`
@@ -823,7 +823,7 @@ Goal: autonomous PR loop until merged + final v7.0.0 release.
   - **Verify**: `gh pr checks --watch && echo CI_GREEN`
   - **Commit**: `fix(<scope>): <issue>` (per fix)
 
-- [ ] 5.2 Address review comments
+- [x] 5.2 Address review comments
   - **Do**:
     1. `gh pr view --json reviews,comments`
     2. For each comment requiring change: implement, commit, push
@@ -859,7 +859,7 @@ Goal: autonomous PR loop until merged + final v7.0.0 release.
   - _Requirements: FR-15, FR-19, AC-11.2_
   - _Design: Release 节奏 → final_
 
-- [ ] 5.5 Merge gate + close spec
+- [x] 5.5 Merge gate + close spec
   - **Do**:
     1. Confirm all Phase 1-4 + 5.1-5.4 tasks marked [x]
     2. CI all green + no unresolved review comments
