@@ -748,7 +748,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - **Verify**: `gh pr view --json url -q .url`
   - **Commit**: None (PR creation, no code changes)
 
-- [ ] 4.12 V5 [VERIFY] CI pipeline passes (3-OS matrix)
+- [x] 4.12 V5 [VERIFY] CI pipeline passes (3-OS matrix)
   - **Do**: `gh pr checks --watch` until all green or fail
   - **Verify**: `gh pr checks` shows all 6 legs ✓
   - **Done when**: ubuntu+macos+windows × node 20/22 matrix all green
