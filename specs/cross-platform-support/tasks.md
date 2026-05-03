@@ -755,7 +755,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - **Commit**: None
   - **If CI fails**: read failures via `gh pr checks`, fix, push, re-watch
 
-- [ ] 4.13 V6 [VERIFY] AC checklist (programmatic)
+- [x] 4.13 V6 [VERIFY] AC checklist (programmatic)
   - **Do**:
     1. AC-1.1/2.1/3.1: `gh pr checks` shows windows-latest leg green
     2. AC-1.4/4.1: byte-equal test passing on macos+linux legs
