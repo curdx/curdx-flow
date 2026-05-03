@@ -251,7 +251,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
 
 ### Lib utilities (11 — bundle into hooks/scripts/lib/)
 
-- [ ] 1.22 [P] Create lib/merge-state.ts (jq `.field = val` replacement)
+- [x] 1.22 [P] Create lib/merge-state.ts (jq `.field = val` replacement)
   - **Do**:
     1. Create `src/hooks/lib/merge-state.ts` — CLI: `node merge-state.mjs <state-file> <json-patch>`
     2. Read existing JSON, deep-merge patch, atomic write back
