@@ -329,7 +329,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - **Done when**: 6 lib utilities bundled
   - **Commit**: None
 
-- [ ] 1.30 [P] Create lib/get-default-branch.ts
+- [x] 1.30 [P] Create lib/get-default-branch.ts
   - **Do**:
     1. Create `src/hooks/lib/get-default-branch.ts` — exec `git symbolic-ref refs/remotes/origin/HEAD` cross-platform
     2. Fallback chain: origin/HEAD → main → master → first remote branch
@@ -339,7 +339,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - **Commit**: `feat(lib): add lib/get-default-branch cross-platform`
   - _Requirements: FR-10_
 
-- [ ] 1.31 [P] Create lib/kill-port.ts
+- [x] 1.31 [P] Create lib/kill-port.ts
   - **Do**:
     1. Create `src/hooks/lib/kill-port.ts` — CLI: `node kill-port.mjs <port>`
     2. Linux/macOS: `lsof -ti :<port> | xargs kill`; Windows: `netstat -ano | findstr :<port>` + `taskkill /F /PID`
@@ -350,7 +350,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - **Commit**: `feat(lib): add lib/kill-port cross-platform`
   - _Requirements: FR-10_
 
-- [ ] 1.32 [P] Create lib/update-modification-map.ts + lib/update-fix-task-map.ts + lib/init-execution-state.ts
+- [x] 1.32 [P] Create lib/update-modification-map.ts + lib/update-fix-task-map.ts + lib/init-execution-state.ts
   - **Do**:
     1. Create three small CLIs, each ~30-50 LOC
     2. update-modification-map: maintain `.file-modifications.json` (task → files)
