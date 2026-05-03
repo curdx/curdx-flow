@@ -120,7 +120,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-7_
   - _Design: 关键链路_
 
-- [ ] 1.11 [VERIFY] Quality checkpoint: bundle pipeline proven
+- [x] 1.11 [VERIFY] Quality checkpoint: bundle pipeline proven
   - **Do**: `npm run typecheck && npm run build:hooks`
   - **Verify**: Both exit 0
   - **Done when**: TS compiles + bundle runs without entries
