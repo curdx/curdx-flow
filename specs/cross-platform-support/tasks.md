@@ -406,7 +406,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-9, AC-8.1_
   - _Design: Markdown Sweep 实现策略_
 
-- [ ] 1.37 [VERIFY] Markdown sweep gate: zero jq references
+- [x] 1.37 [VERIFY] Markdown sweep gate: zero jq references
   - **Do**: `! grep -rn '\bjq\b' plugins/curdx-flow`
   - **Verify**: Command exits 0 (no jq found anywhere)
   - **Done when**: NFR-6 verified — no jq references in plugin tree
