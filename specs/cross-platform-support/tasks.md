@@ -606,7 +606,7 @@ Goal: vitest smoke + lib unit + byte-equal regression vs v6.0.6 baseline.
   - _Requirements: NFR-7, AC-4.1_
   - _Design: Byte-equal regression test_
 
-- [ ] 3.7 [VERIFY] Quality checkpoint: full Phase 3 wrap
+- [x] 3.7 [VERIFY] Quality checkpoint: full Phase 3 wrap
   - **Do**: `npm run typecheck && npm run build:hooks && npm run test:hooks`
   - **Verify**: All exit 0
   - **Done when**: All tests including byte-equal green
