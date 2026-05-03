@@ -2,7 +2,7 @@
   "source": "spec",
   "name": "cross-platform-support",
   "basePath": "./specs/cross-platform-support",
-  "phase": "requirements",
+  "phase": "design",
   "taskIndex": 0,
   "totalTasks": 0,
   "taskIteration": 1,
@@ -13,11 +13,36 @@
   "quickMode": false,
   "awaitingApproval": true,
   "discoveredSkills": [
-    {"name": "curdx-core", "source": "plugin", "matchedAt": "start", "invoked": true},
-    {"name": "spec-workflow", "source": "plugin", "matchedAt": "start", "invoked": true},
-    {"name": "interview-framework", "source": "plugin", "matchedAt": "start", "invoked": true},
-    {"name": "communication-style", "source": "plugin", "matchedAt": "start", "invoked": true},
-    {"name": "reality-verification", "source": "plugin", "matchedAt": "start", "invoked": true}
+    {
+      "name": "curdx-core",
+      "source": "plugin",
+      "matchedAt": "start",
+      "invoked": true
+    },
+    {
+      "name": "spec-workflow",
+      "source": "plugin",
+      "matchedAt": "start",
+      "invoked": true
+    },
+    {
+      "name": "interview-framework",
+      "source": "plugin",
+      "matchedAt": "start",
+      "invoked": true
+    },
+    {
+      "name": "communication-style",
+      "source": "plugin",
+      "matchedAt": "start",
+      "invoked": true
+    },
+    {
+      "name": "reality-verification",
+      "source": "plugin",
+      "matchedAt": "start",
+      "invoked": true
+    }
   ],
   "relatedSpecs": []
 }
