@@ -663,7 +663,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - _Requirements: FR-19, AC-11.1, AC-11.2_
   - _Design: release.yml 触发链_
 
-- [ ] 4.4 [VERIFY] Quality checkpoint: typecheck + verify
+- [x] 4.4 [VERIFY] Quality checkpoint: typecheck + verify
   - **Do**: `npm run verify`
   - **Verify**: Exit 0 (typecheck + check-versions + check:hooks-fresh + test:hooks all green)
   - **Done when**: Full local verify chain green
