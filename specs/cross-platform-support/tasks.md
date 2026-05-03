@@ -84,7 +84,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-3_
   - _Design: Component Catalog → _shared/path-resolver_
 
-- [ ] 1.8 [VERIFY] Quality checkpoint: typecheck after _shared scaffolding
+- [x] 1.8 [VERIFY] Quality checkpoint: typecheck after _shared scaffolding
   - **Do**: `npm run typecheck`
   - **Verify**: Exit 0
   - **Done when**: No type errors across new _shared/ files
