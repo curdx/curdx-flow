@@ -128,7 +128,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
 
 ### Hook ports (small first → biggest last)
 
-- [ ] 1.12 Port quick-mode-guard.sh → quick-mode-guard.ts (smallest, 47 LOC)
+- [x] 1.12 Port quick-mode-guard.sh → quick-mode-guard.ts (smallest, 47 LOC)
   - **Do**:
     1. Create `src/hooks/quick-mode-guard.ts`
     2. Read stdin via `_shared/stdin`; use `_shared/path-resolver` to find spec
