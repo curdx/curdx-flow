@@ -92,7 +92,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
 
 ### esbuild driver + first bundle proof
 
-- [ ] 1.9 Create scripts/build-hooks.mjs (esbuild driver)
+- [x] 1.9 Create scripts/build-hooks.mjs (esbuild driver)
   - **Do**:
     1. Create `scripts/build-hooks.mjs` per design.md Build Pipeline section
     2. Wire HOOK_ENTRIES (4 entrypoints) + LIB_ENTRIES (glob `src/hooks/lib/*.ts`)
