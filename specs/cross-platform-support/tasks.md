@@ -323,7 +323,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - **Commit**: `feat(lib): add lib/count-mocks for reality-verification`
   - _Requirements: FR-10_
 
-- [ ] 1.29 [VERIFY] Quality checkpoint: 6 lib bundles + typecheck
+- [x] 1.29 [VERIFY] Quality checkpoint: 6 lib bundles + typecheck
   - **Do**: `npm run typecheck && npm run build:hooks && ls plugins/curdx-flow/hooks/scripts/lib/*.mjs | wc -l | awk '$1>=6'`
   - **Verify**: Exit 0
   - **Done when**: 6 lib utilities bundled
