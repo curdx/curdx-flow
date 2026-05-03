@@ -693,7 +693,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - **Commit**: `docs(changelog): add v7.0.0 entry with breaking changes`
   - _Requirements: FR-17, AC-9.4_
 
-- [ ] 4.7 Delete legacy .sh scripts (separate commit for revert ease)
+- [x] 4.7 Delete legacy .sh scripts (separate commit for revert ease)
   - **Do**:
     1. `git rm plugins/curdx-flow/hooks/scripts/{load-spec-context,path-resolver,quick-mode-guard,stop-watcher,update-spec-index}.sh`
     2. `git rm plugins/curdx-flow/hooks/scripts/{test-path-resolver,test-multi-dir-integration}.sh`
