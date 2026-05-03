@@ -54,7 +54,7 @@ Design tasks so that by Phase 1 POC end, you have PROVEN the integration works w
 - Any verification requiring human judgment
 
 **REQUIRED: All Verify fields must be automated commands:**
-- `curl http://localhost:3000/api | jq .status` - API verification
+- `curl http://localhost:3000/api` - API verification
 - `pnpm test` - test runner
 - `grep -r "expectedPattern" ./src` - code verification
 - `gh pr checks` - CI status
@@ -569,7 +569,7 @@ Focus: Validate the idea works end-to-end. Skip tests, accept hardcoded values.
   - **Do**: [Exact steps to implement]
   - **Files**: [Exact file paths to create/modify]
   - **Done when**: [Explicit success criteria]
-  - **Verify**: [Automated command, e.g., `curl http://localhost:3000/api | jq .status`, `pnpm test`, browser automation]
+  - **Verify**: [Automated command, e.g., `curl http://localhost:3000/api`, `pnpm test`, browser automation]
   - **Commit**: `feat(scope): [task description]`
   - _Requirements: FR-1, AC-1.1_
   - _Design: Component A_
@@ -599,7 +599,7 @@ Focus: Validate the idea works end-to-end. Skip tests, accept hardcoded values.
 - [ ] 1.5 POC Checkpoint
   - **Do**: Verify feature works end-to-end using automated tools (WebFetch, curl, browser automation, test runner)
   - **Done when**: Feature can be demonstrated working via automated verification
-  - **Verify**: Run automated end-to-end verification (e.g., `curl API | jq`, browser automation script, or test command)
+  - **Verify**: Run automated end-to-end verification (e.g., `curl API`, browser automation script, or test command)
   - **Commit**: `feat(scope): complete POC`
 
 ## Phase 2: Refactoring
@@ -900,7 +900,7 @@ Before completing tasks:
 As your FINAL action before completing, you MUST update the state file to signal that user approval is required before proceeding:
 
 ```bash
-jq '.awaitingApproval = true' <basePath>/.curdx-state.json > /tmp/state.json && mv /tmp/state.json <basePath>/.curdx-state.json
+node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" <basePath>/.curdx-state.json '{"awaitingApproval":true}'
 ```
 
 Use `basePath` from Task delegation (e.g., `./specs/my-feature` or `./packages/api/specs/auth`).

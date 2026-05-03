@@ -169,7 +169,7 @@ Focus: Validate the idea works end-to-end. Skip tests, accept hardcoded values.
   - **Do**: {{Exact steps to implement}}
   - **Files**: {{Exact file paths to create/modify}}
   - **Done when**: {{Explicit success criteria}}
-  - **Verify**: {{Command to verify, e.g., `curl localhost:3000/api | jq .status`}}
+  - **Verify**: {{Command to verify, e.g., `curl localhost:3000/api`}}
   - **Commit**: `feat(scope): {{task description}}`
   - _Requirements: FR-1, AC-1.1_
   - _Design: Component A_
@@ -202,7 +202,7 @@ Focus: Validate the idea works end-to-end. Skip tests, accept hardcoded values.
 - [ ] 1.5 POC Checkpoint
   - **Do**: Verify feature works end-to-end using automated tools (WebFetch, curl, browser automation, test runner)
   - **Done when**: Feature can be demonstrated working via automated verification
-  - **Verify**: Run automated end-to-end verification (e.g., `curl API | jq`, browser automation script, or test command)
+  - **Verify**: Run automated end-to-end verification (e.g., `curl API`, browser automation script, or test command)
   - **Commit**: `feat(scope): complete POC`
 
 ## Phase 2: Refactoring
@@ -316,8 +316,8 @@ After POC validated, clean up code.
     # Or check current status
     gh pr checks
 
-    # Get detailed status
-    gh pr view --json statusCheckRollup --jq '.statusCheckRollup[] | "\(.name): \(.conclusion)"'
+    # Get detailed status (cross-platform via Node)
+    gh pr view --json statusCheckRollup | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); d.statusCheckRollup.forEach(c=>console.log(c.name+': '+c.conclusion))"
     ```
   - **Done when**: All CI checks show ✓ (passing), PR ready for review
   - **If CI fails**:
@@ -406,7 +406,7 @@ EOF
 
 - [ ] 5.3 Address code review comments
   - **Do**:
-    1. Fetch reviews: `gh pr view --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUESTED" or .state == "PENDING")'`
+    1. Fetch reviews: `gh pr view --json reviews | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(JSON.stringify(d.reviews.filter(r=>r.state==='CHANGES_REQUESTED'||r.state==='PENDING'),null,2))"`
        - Note: For inline comment threads, use: `gh api repos/{owner}/{repo}/pulls/{number}/comments`
     2. For each unresolved review/comment:
        - Read review body and inline comments
