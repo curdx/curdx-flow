@@ -594,7 +594,7 @@ Goal: vitest smoke + lib unit + byte-equal regression vs v6.0.6 baseline.
   - **Done when**: All Phase 3 tests green
   - **Commit**: None
 
-- [ ] 3.6 Add byte-equal regression test (vs v6.0.6 baseline)
+- [x] 3.6 Add byte-equal regression test (vs v6.0.6 baseline)
   - **Do**:
     1. Create `tests/hooks/byte-equal.test.ts`
     2. For each hook + fixture: spawn v7 bundle, normalize output (`replace(/\\/g,'/').replace(/"mtime":\d+/g,'"mtime":<NUM>')`), compare to baseline file
