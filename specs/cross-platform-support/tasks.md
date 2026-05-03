@@ -303,7 +303,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - **Commit**: `feat(lib): add lib/ensure-gitignore (idempotent)`
   - _Requirements: FR-10_
 
-- [ ] 1.27 [P] Create lib/search-files.ts
+- [x] 1.27 [P] Create lib/search-files.ts
   - **Do**:
     1. Create `src/hooks/lib/search-files.ts` — cross-platform grep: `node search-files.mjs <pattern> <root> [--name-only]`
     2. Recursive `fs.readdir` + `RegExp` content match; respect `.gitignore` minimally (skip `node_modules`, `dist`, `.git`)
