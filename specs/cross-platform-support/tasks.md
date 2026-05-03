@@ -276,7 +276,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-10, AC-10.1_
   - _Design: Lib utilities → count-tasks_
 
-- [ ] 1.24 [P] Create lib/cleanup-files.ts
+- [x] 1.24 [P] Create lib/cleanup-files.ts
   - **Do**:
     1. Create `src/hooks/lib/cleanup-files.ts` — CLI: `node cleanup-files.mjs <pattern1> <pattern2> ...`
     2. Glob → unlink mock/scaffold/tmp files; idempotent
