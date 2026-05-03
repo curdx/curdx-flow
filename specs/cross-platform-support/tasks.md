@@ -143,7 +143,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-4, AC-2.1, AC-2.2, AC-2.3_
   - _Design: Component Catalog → quick-mode-guard_
 
-- [ ] 1.13 Port load-spec-context.sh → load-spec-context.ts (110 LOC)
+- [x] 1.13 Port load-spec-context.sh → load-spec-context.ts (110 LOC)
   - **Do**:
     1. Create `src/hooks/load-spec-context.ts`
     2. Read stdin {cwd} via _shared/stdin; resolve active spec via _shared/path-resolver
