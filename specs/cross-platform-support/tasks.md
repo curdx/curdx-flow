@@ -513,13 +513,13 @@ Goal: clean up structure, error handling, types, normalize cross-platform path h
   - _Requirements: FR-10_
   - _Design: Open for Tasks Phase #1_
 
-- [ ] 2.6 [VERIFY] Quality checkpoint: typecheck + build:hooks + grep guard
+- [x] 2.6 [VERIFY] Quality checkpoint: typecheck + build:hooks + grep guard
   - **Do**: `npm run typecheck && npm run build:hooks && ! grep -rn '\bjq\b' plugins/curdx-flow`
   - **Verify**: All exit 0
   - **Done when**: Refactor preserves all gates
   - **Commit**: None
 
-- [ ] 2.7 Add tsconfig.json paths for hooks subtree
+- [x] 2.7 Add tsconfig.json paths for hooks subtree
   - **Do**:
     1. Edit `tsconfig.json` `include` to add `src/hooks/**/*.ts`, `tests/**/*.ts`
     2. Verify no overlap conflicts with existing `src/` tsup workspace
@@ -529,7 +529,7 @@ Goal: clean up structure, error handling, types, normalize cross-platform path h
   - **Commit**: `chore(ts): include src/hooks + tests in tsconfig`
   - _Requirements: design.md File Plan → modify tsconfig.json_
 
-- [ ] 2.8 [VERIFY] Quality checkpoint: full Phase 2 wrap
+- [x] 2.8 [VERIFY] Quality checkpoint: full Phase 2 wrap
   - **Do**: `npm run typecheck && npm run build:hooks && ! grep -rn '\bjq\b' plugins/curdx-flow`
   - **Verify**: All exit 0
   - **Done when**: Phase 2 refactor stable
