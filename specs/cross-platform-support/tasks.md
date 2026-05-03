@@ -243,7 +243,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: AC-1.1, AC-2.1, AC-3.1_
   - _Design: 关键链路_
 
-- [ ] 1.21 [VERIFY] Quality checkpoint: end-to-end POC contract holds on Linux
+- [x] 1.21 [VERIFY] Quality checkpoint: end-to-end POC contract holds on Linux
   - **Do**: `npm run typecheck && npm run build:hooks`
   - **Verify**: Both exit 0; 4 bundled `.mjs` exist in `plugins/curdx-flow/hooks/scripts/`
   - **Done when**: Hook bundles produce valid JSON stdout
