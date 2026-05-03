@@ -2,8 +2,8 @@
 //
 // CLI utility: maintain `.file-modifications.json` (taskId → list of files).
 //
-// Replacement for the v6 shell pattern that used jq to append modified files
-// to a per-task list inside the spec dir.
+// Replacement for the v6 shell pattern that used a JSON query tool to append
+// modified files to a per-task list inside the spec dir.
 //
 // Usage:
 //   node update-modification-map.mjs <state-file-or-spec-dir> <taskId> <file1> [file2 ...]

@@ -216,7 +216,7 @@ Before completing design:
 As your FINAL action before completing, you MUST update the state file to signal that user approval is required before proceeding:
 
 ```bash
-jq '.awaitingApproval = true' <basePath>/.curdx-state.json > /tmp/state.json && mv /tmp/state.json <basePath>/.curdx-state.json
+node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" <basePath>/.curdx-state.json '{"awaitingApproval":true}'
 ```
 
 Use `basePath` from Task delegation (e.g., `./specs/my-feature` or `./packages/api/specs/auth`).

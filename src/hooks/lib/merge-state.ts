@@ -2,8 +2,9 @@
 //
 // CLI utility: deep-merge a JSON patch into a state file, atomically.
 //
-// Replacement for the v6 shell pattern:
-//   jq '.fieldA.fieldB = "value"' state.json > tmp && mv tmp state.json
+// Replacement for the v6 shell pattern that did `<query-tool> '.fieldA.fieldB =
+// "value"' state.json > tmp && mv tmp state.json` — i.e. parse JSON, mutate a
+// nested field, write atomically.
 //
 // Usage:
 //   node merge-state.mjs <state-file> <json-patch>
@@ -95,8 +96,8 @@ function main(): void {
   }
 
   const merged = deepMerge(base, patch);
-  // Compact form: matches `jq -c` output style and keeps the file's keys
-  // dense (Done-when grep `'"a":1'` depends on the no-space form).
+  // Compact form (no whitespace between tokens) keeps the file's keys dense
+  // and matches the verify gate `grep '"a":1'` (no-space-after-colon).
   const serialized = JSON.stringify(merged) + "\n";
   writeFileAtomic(stateFile, serialized);
   process.stdout.write(serialized);

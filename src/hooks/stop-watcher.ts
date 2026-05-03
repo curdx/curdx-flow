@@ -7,26 +7,26 @@
  *
  * Shell-op translation table (see .progress.md for the full audit):
  *
- *   v6 shell                                            | TS replacement
- *   ----------------------------------------------------|----------------------------------------
- *   cat (stdin)                                         | readStdinJson()
- *   jq -r '.cwd // empty' (and similar)                 | direct field access on parsed JSON
- *   awk on YAML frontmatter (enabled:)                  | regex extraction (mirrors load-spec-context)
- *   curdx_resolve_current                               | resolveCurrent({ cwd })
- *   basename                                            | path.basename
- *   stat -f %m / stat -c %Y                             | fs.statSync(p).mtimeMs / 1000
- *   date +%s                                            | Math.floor(Date.now() / 1000)
- *   sleep 1                                             | await new Promise(r => setTimeout(r, 1000))
- *   tail -N | grep -qE '(^|\W)ALL_TASKS_COMPLETE(\W|$)' | split-by-line, slice last N, regex test
- *   jq empty (validation)                               | JSON.parse in try/catch
- *   jq --arg ... '.specs |= map(if ...)'                | parse → mutate → writeFileAtomic
- *   mktemp ... + mv                                     | _shared/atomic-write.writeFileAtomic
- *   update-spec-index.sh --quiet                        | spawn bundled update-spec-index.mjs
- *   awk single-task block (L258-267)                    | extractTaskBlock from _shared/markdown-task-parser
- *   awk parallel-group block (L278-289)                 | hand-written scanner mirroring awk arms
- *   grep -c '^\\s*- \\[ \\]'                            | string.match regex count
- *   find -mmin +60 -delete                              | readdirSync + statSync.mtimeMs age + unlinkSync
- *   jq -n '{decision:"block", reason:$r, systemMessage:$m}' | direct JSON.stringify of object literal
+ *   v6 shell                                                | TS replacement
+ *   --------------------------------------------------------|----------------------------------------
+ *   cat (stdin)                                             | readStdinJson()
+ *   JSON-extract '.cwd // empty' (and similar)              | direct field access on parsed JSON
+ *   awk on YAML frontmatter (enabled:)                      | regex extraction (mirrors load-spec-context)
+ *   curdx_resolve_current                                   | resolveCurrent({ cwd })
+ *   basename                                                | path.basename
+ *   stat -f %m / stat -c %Y                                 | fs.statSync(p).mtimeMs / 1000
+ *   date +%s                                                | Math.floor(Date.now() / 1000)
+ *   sleep 1                                                 | await new Promise(r => setTimeout(r, 1000))
+ *   tail -N | grep -qE '(^|\W)ALL_TASKS_COMPLETE(\W|$)'     | split-by-line, slice last N, regex test
+ *   JSON validation pass                                    | JSON.parse in try/catch
+ *   shell JSON-mutate '.specs |= map(if ...)'               | parse → mutate → writeFileAtomic
+ *   mktemp ... + mv                                         | _shared/atomic-write.writeFileAtomic
+ *   update-spec-index.sh --quiet                            | spawn bundled update-spec-index.mjs
+ *   awk single-task block (L258-267)                        | extractTaskBlock from _shared/markdown-task-parser
+ *   awk parallel-group block (L278-289)                     | hand-written scanner mirroring awk arms
+ *   grep -c '^\\s*- \\[ \\]'                                | string.match regex count
+ *   find -mmin +60 -delete                                  | readdirSync + statSync.mtimeMs age + unlinkSync
+ *   shell JSON-emit '{decision:"block", reason:$r, systemMessage:$m}' | direct JSON.stringify of object literal
  *
  * Stat-mtime unit conversion (Risk R8, audit point):
  *   `stat -f %m` (BSD/macOS) and `stat -c %Y` (GNU/Linux) both return SECONDS.
@@ -42,8 +42,8 @@
  * Output contract:
  *   - Allow stop (exit 0 silently): no JSON written; matches v6 silent exit.
  *     The hook still prints a single-line newline-terminated stdout payload
- *     ONLY when emitting a block decision. (v6 jq -n always trailing-newlines
- *     its output; we mirror that.)
+ *     ONLY when emitting a block decision. (v6 shell JSON-emit always
+ *     trailing-newlines its output; we mirror that.)
  *   - Block: `{decision:"block", reason, systemMessage}` (newline-terminated).
  *
  * Error policy (FR-8): any thrown error → stderr log + process.exit(0).
@@ -110,15 +110,15 @@ const ALL_TASKS_COMPLETE_RE = /(^|\W)ALL_TASKS_COMPLETE(\W|$)/;
  * Re-attach a `./` prefix that `posix.join` strips from serialized spec paths.
  *
  * `path-resolver.resolveCurrent()` returns `posix.join("./specs", "name")`
- * which yields `"specs/name"` (jq + bash kept `"./specs/name"` because it
- * built paths via plain string concat). v6 embeds `$SPEC_PATH` directly into
- * the continuation prompt, so to preserve byte-equal-ish parity with the v6
- * baseline we re-attach the `./` whenever a configured specs-dir starts with
- * `./` and the resolved path matches its body.
+ * which yields `"specs/name"` (the v6 shell pipeline kept `"./specs/name"`
+ * because it built paths via plain string concat). v6 embeds `$SPEC_PATH`
+ * directly into the continuation prompt, so to preserve byte-equal-ish parity
+ * with the v6 baseline we re-attach the `./` whenever a configured specs-dir
+ * starts with `./` and the resolved path matches its body.
  *
  * Same helper pattern as `preserveDotPrefix` in update-spec-index.ts (1.14).
  * Kept local rather than DRY-extracted because the shared module would have
- * to grow a single-use export — the awk/jq-replacement audit is per-hook.
+ * to grow a single-use export — the shell-replacement audit is per-hook.
  */
 function preserveDotPrefix(specPath: string, specsDirs: string[]): string {
   for (const dir of specsDirs) {
@@ -131,24 +131,25 @@ function preserveDotPrefix(specPath: string, specsDirs: string[]): string {
 }
 
 /**
- * Mirror of jq's `// true` default-coalesce on a boolean field.
+ * Mirror of the v6 shell `// true` default-coalesce on a boolean field.
  *
- * jq's `//` operator treats BOTH `null` and `false` as default-triggers, so
- * `.x // true` on a value of `false` evaluates to `true`. v6 stop-watcher uses
- * this on `nativeSyncEnabled` for the continuation prompt; preserve the
- * byte-equal output here by returning `true` unless the input is some
- * non-boolean, non-null value JSON would render distinctly. In practice
- * the state schema constrains this field to bool/missing, so this always
- * returns `true`. We keep the helper small and explicit for documentation.
+ * The v6 default-coalesce operator treats BOTH `null` and `false` as
+ * default-triggers, so `.x // true` on a value of `false` evaluates to `true`.
+ * v6 stop-watcher uses this on `nativeSyncEnabled` for the continuation
+ * prompt; preserve the byte-equal output here by returning `true` unless the
+ * input is some non-boolean, non-null value JSON would render distinctly. In
+ * practice the state schema constrains this field to bool/missing, so this
+ * always returns `true`. We keep the helper small and explicit for
+ * documentation.
  */
-function jqDefaultTrue(value: unknown): boolean {
+function defaultTrueIfFalsyOrNull(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   if (value === false) return true;
   if (value === true) return true;
-  // Non-boolean, non-null/undefined value: jq would print it verbatim. The
-  // continuation prompt then renders it as-is. We return true for the
-  // boolean-typed slot in the prompt (the rendered output is governed by
-  // the source-of-truth boolean here, not this helper).
+  // Non-boolean, non-null/undefined value: the v6 shell would print it
+  // verbatim. The continuation prompt then renders it as-is. We return true
+  // for the boolean-typed slot in the prompt (the rendered output is governed
+  // by the source-of-truth boolean here, not this helper).
   return true;
 }
 
@@ -160,7 +161,7 @@ function normalizeText(input: string): string {
   return s.replace(/\r\n?/g, "\n");
 }
 
-/** Block-decision JSON emitter. v6 jq -n produces trailing-newline output. */
+/** Block-decision JSON emitter. v6 shell JSON-emit produces trailing-newline output. */
 function emitBlock(decision: BlockDecision): void {
   process.stdout.write(JSON.stringify(decision) + "\n");
 }
@@ -236,7 +237,8 @@ function tailContainsCompletionMarker(
 
 /**
  * Mark a spec as completed in its parent epic's state file.
- * Mirrors v6 jq mutation `.specs |= map(if .name == $spec then .status = "completed" else . end)`.
+ * Mirrors the v6 shell JSON mutation `.specs |= map(if .name == $spec then
+ * .status = "completed" else . end)`.
  *
  * Atomic write via `_shared/atomic-write` (replaces v6 mktemp + mv).
  */
@@ -269,9 +271,9 @@ function markSpecCompletedInEpic(
   }
   if (!mutated) return;
   try {
-    // v6 used 2-space pretty JSON via jq's default (compact false). jq's
-    // default-ish output for piped objects is 2-space indent; we keep that
-    // for byte-equivalent epic state diffs.
+    // v6 used 2-space pretty JSON via the shell tool's default (compact
+    // false). That tool's default-ish output for piped objects is 2-space
+    // indent; we keep that for byte-equivalent epic state diffs.
     writeFileAtomic(epicStateFile, JSON.stringify(epic, null, 2) + "\n");
     process.stderr.write(
       `[curdx-flow] Updated epic '${epicName}': spec '${specName}' marked completed\n`,
@@ -633,14 +635,14 @@ async function main(): Promise<void> {
   const taskIteration =
     typeof state.taskIteration === "number" ? state.taskIteration : 1;
   const quickMode = state.quickMode === true;
-  // nativeSyncEnabled: v6 used `jq -r '.nativeSyncEnabled // true'` which —
-  // because jq's `//` operator treats both `null` AND `false` as
+  // nativeSyncEnabled: v6 used a shell coalesce `// true` on this field
+  // which — because that operator treats both `null` AND `false` as
   // default-triggers — returns the string "true" whenever the field is
   // null/missing OR explicitly `false`. The only way to get "false" out of
-  // jq here would be a non-boolean truthy-ish value in the field, which
-  // the state schema disallows. Preserve byte-equal continuation prompts
-  // by returning the v6 stringified result faithfully.
-  const nativeSync = jqDefaultTrue(state.nativeSyncEnabled);
+  // that pipeline would be a non-boolean truthy-ish value in the field,
+  // which the state schema disallows. Preserve byte-equal continuation
+  // prompts by returning the v6 stringified result faithfully.
+  const nativeSync = defaultTrueIfFalsyOrNull(state.nativeSyncEnabled);
   const globalIteration =
     typeof state.globalIteration === "number" ? state.globalIteration : 1;
   const maxGlobal =

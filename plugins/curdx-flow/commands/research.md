@@ -166,12 +166,11 @@ Ask ONE question: "How do you want to proceed?" with these options via AskUserQu
 ### Update State
 
 1. Parse "Related Specs" table from research.md
-2. **Merge** into `.curdx-state.json` (preserve all existing fields):
+2. **Merge** into `.curdx-state.json` (preserve all existing fields). `$RELATED_SPECS_JSON` is a JSON array literal (e.g. `'[{"name":"foo","path":"./specs/foo"}]'`):
    ```bash
-   jq --argjson specs "$RELATED_SPECS_JSON" \
-     '. + {"phase": "research", "awaitingApproval": true, "relatedSpecs": $specs}' \
-     "$SPEC_PATH/.curdx-state.json" > "$SPEC_PATH/.curdx-state.json.tmp" && \
-     mv "$SPEC_PATH/.curdx-state.json.tmp" "$SPEC_PATH/.curdx-state.json"
+   PATCH=$(node -e 'const s=process.argv[1]||"[]"; process.stdout.write(JSON.stringify({phase:"research",awaitingApproval:true,relatedSpecs:JSON.parse(s)}))' "$RELATED_SPECS_JSON")
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" \
+     "$SPEC_PATH/.curdx-state.json" "$PATCH"
    ```
 3. Update `.progress.md` with research completion
 

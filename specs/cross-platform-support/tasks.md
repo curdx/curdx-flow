@@ -395,7 +395,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-9, AC-8.1, AC-8.4_
   - _Design: Markdown Sweep 实现策略_
 
-- [ ] 1.36 [P] Markdown sweep batch 3: remaining markdown files (~24 occurrences)
+- [x] 1.36 [P] Markdown sweep batch 3: remaining markdown files (~24 occurrences)
   - **Do**:
     1. `grep -rln '\bjq\b' plugins/curdx-flow` → list remaining files
     2. Apply classifier per file

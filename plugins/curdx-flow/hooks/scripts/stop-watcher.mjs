@@ -210,7 +210,7 @@ function preserveDotPrefix(specPath, specsDirs) {
   }
   return specPath;
 }
-function jqDefaultTrue(value) {
+function defaultTrueIfFalsyOrNull(value) {
   if (value === null || value === void 0) return true;
   if (value === false) return true;
   if (value === true) return true;
@@ -528,7 +528,7 @@ async function main() {
   const totalTasks = typeof state.totalTasks === "number" ? state.totalTasks : 0;
   const taskIteration = typeof state.taskIteration === "number" ? state.taskIteration : 1;
   const quickMode = state.quickMode === true;
-  const nativeSync = jqDefaultTrue(state.nativeSyncEnabled);
+  const nativeSync = defaultTrueIfFalsyOrNull(state.nativeSyncEnabled);
   const globalIteration = typeof state.globalIteration === "number" ? state.globalIteration : 1;
   const maxGlobal = typeof state.maxGlobalIterations === "number" ? state.maxGlobalIterations : 100;
   if (globalIteration >= maxGlobal) {
