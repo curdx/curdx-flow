@@ -110,4 +110,9 @@ npm run build
 node dist/index.mjs  # smoke test the CLI
 ```
 
-The bundled plugin (`plugins/curdx-flow/`) is shipped as static files — there's no build step for it. Edits to plugin manifests / hooks / skills take effect on the next `claude plugin install` / `update`.
+The bundled plugin (`plugins/curdx-flow/`) ships TWO categories of files:
+
+- **Static artifacts** — manifests (`.claude-plugin/plugin.json`, `hooks/hooks.json`), `agents/*.md`, `commands/*.md`, `skills/*.md`, `references/*.md`, `schemas/*.json`. Edits take effect on the next `claude plugin install` / `update`.
+- **Built artifacts** — `hooks/scripts/**/*.mjs` (4 hooks + 11 lib utilities) bundled from `src/hooks/**/*.ts` via esbuild. Run `npm run build:hooks` after editing any TypeScript hook source. CI gates this with `npm run check:hooks-fresh` to catch desynced bundles (build output that drifted from source).
+
+See `specs/cross-platform-support/design.md` → "Build Pipeline → esbuild 配置" for the full rationale (bundled `.mjs` vs gitignored, ESM target, single-file zero-runtime-deps output, `outbase` flattening).

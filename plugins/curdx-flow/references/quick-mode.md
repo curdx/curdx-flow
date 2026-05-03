@@ -75,7 +75,7 @@ Validation Sequence:
      quickMode: true, discoveredSkills: [] }
 6. Write .progress.md with original goal
 7. Update .current-spec (bare name or full path)
-8. Update Spec Index: ./plugins/curdx-flow/hooks/scripts/update-spec-index.sh --quiet
+8. Update Spec Index: node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet
 9. Skill Discovery Pass 1: scan skills, match against goal text, invoke matches
 10. Goal Type Detection (BUG_FIX BEFORE state capture):
     - Classify as "fix" or "add" using regex indicators

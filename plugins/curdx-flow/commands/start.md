@@ -181,7 +181,7 @@ Continuing...
       - **<skill-name>** (<source>): skipped (no description)
       ```
       If no skills match: `- No skills matched`
-10. Update Spec Index: `./plugins/curdx-flow/hooks/scripts/update-spec-index.sh --quiet`
+10. Update Spec Index: `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet`
 11. **Goal Interview** -- Read `${CLAUDE_PLUGIN_ROOT}/references/goal-interview.md` and follow brainstorming dialogue
 12. **Team Research Phase** -- Read `${CLAUDE_PLUGIN_ROOT}/references/parallel-research.md` and follow the dispatch pattern
 13. **Skill Discovery Pass 2 (Post-Research Retry)** -- Re-scan skills with enriched context after research completes:

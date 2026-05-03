@@ -1,6 +1,6 @@
 {
   "name": "@curdx/flow",
-  "version": "6.0.6",
+  "version": "7.0.0-beta.2",
   "description": "Interactive installer for Claude Code plugins and MCP servers",
   "type": "module",
   "bin": "./dist/index.mjs",
@@ -13,12 +13,16 @@
   },
   "scripts": {
     "build": "tsup",
+    "build:hooks": "node scripts/build-hooks.mjs",
+    "check:hooks-fresh": "node scripts/check-hooks-fresh.mjs",
     "dev": "tsup --watch",
+    "test:hooks": "npm run build:hooks && vitest run tests/hooks --passWithNoTests",
     "start": "node ./dist/index.mjs",
     "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm run check-versions && npm run check:hooks-fresh && npm run test:hooks",
     "check-versions": "node scripts/check-versions.mjs",
     "bump-version": "node scripts/bump-version.mjs",
-    "prepublishOnly": "node scripts/check-versions.mjs && npm run typecheck && npm run build"
+    "prepublishOnly": "node scripts/check-versions.mjs && npm run typecheck && npm run check:hooks-fresh && npm run build"
   },
   "keywords": [
     "claude",
@@ -47,7 +51,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "esbuild": "^0.24.2",
     "tsup": "^8.3.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.9"
   }
 }

@@ -26,9 +26,9 @@ Examples:
 
 This command uses the path resolver for multi-directory support:
 
-```bash
-# Source path resolver (conceptually - commands don't execute bash directly)
-# These functions are available via the path-resolver.sh helper:
+```text
+# Multi-directory resolution is provided via the _shared/path-resolver module
+# bundled into each hook (.mjs). The functions exposed are:
 
 curdx_get_specs_dirs()    # Returns all configured spec directories
 curdx_get_default_dir()   # Returns first specs_dir (default for new specs)

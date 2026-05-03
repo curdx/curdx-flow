@@ -247,26 +247,21 @@ TASK_ID="X.Y"           # Original task ID (e.g., "1.3")
 FIX_TASK_ID="X.Y.N"     # Generated fix task ID (e.g., "1.3.1")
 ERROR_MSG="$failure_error"  # Escaped error message from failure object
 
-# Read current state, update fixTaskMap, write back
-jq --arg taskId "$TASK_ID" \
-   --arg fixId "$FIX_TASK_ID" \
-   --arg error "$ERROR_MSG" \
-   '
-   # Initialize fixTaskMap if it does not exist
-   .fixTaskMap //= {} |
-
-   # Initialize entry for this task if it does not exist
-   .fixTaskMap[$taskId] //= {attempts: 0, fixTaskIds: [], lastError: ""} |
-
-   # Update the entry
-   .fixTaskMap[$taskId].attempts += 1 |
-   .fixTaskMap[$taskId].fixTaskIds += [$fixId] |
-   .fixTaskMap[$taskId].lastError = $error |
-
-   # Also increment totalTasks to account for inserted fix task
-   .totalTasks += 1
-   ' "$SPEC_PATH/.curdx-state.json" > "$SPEC_PATH/.curdx-state.json.tmp" && \
-   mv "$SPEC_PATH/.curdx-state.json.tmp" "$SPEC_PATH/.curdx-state.json"
+# Read current state, update fixTaskMap, write back (cross-platform Node)
+node -e '
+  const fs = require("node:fs");
+  const [stateFile, taskId, fixId, error] = process.argv.slice(1);
+  const s = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  s.fixTaskMap ??= {};
+  s.fixTaskMap[taskId] ??= { attempts: 0, fixTaskIds: [], lastError: "" };
+  s.fixTaskMap[taskId].attempts += 1;
+  s.fixTaskMap[taskId].fixTaskIds.push(fixId);
+  s.fixTaskMap[taskId].lastError = error;
+  s.totalTasks += 1;
+  const tmp = stateFile + ".tmp." + process.pid;
+  fs.writeFileSync(tmp, JSON.stringify(s) + "\n");
+  fs.renameSync(tmp, stateFile);
+' "$SPEC_PATH/.curdx-state.json" "$TASK_ID" "$FIX_TASK_ID" "$ERROR_MSG"
 ```
 
 **Example state after fix task generation**:
@@ -313,20 +308,24 @@ After second failure (fix task 1.3.2 generated):
 }
 ```
 
-**Reading fixTaskMap for limit checks**:
+**Reading fixTaskMap for limit checks** (cross-platform Node):
 
 ```bash
-# Check current attempts for a task
-CURRENT_ATTEMPTS=$(jq -r --arg taskId "$TASK_ID" \
-  '.fixTaskMap[$taskId].attempts // 0' "$SPEC_PATH/.curdx-state.json")
+# Read attempts, max-limit, and fix history in one shot
+read CURRENT_ATTEMPTS MAX_FIX FIX_HISTORY < <(node -e '
+  const fs = require("node:fs");
+  const [stateFile, taskId] = process.argv.slice(1);
+  const s = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  const entry = (s.fixTaskMap || {})[taskId] || {};
+  const attempts = entry.attempts ?? 0;
+  const max = s.maxFixTasksPerOriginal ?? 3;
+  const ids = (entry.fixTaskIds || []).join(",") || "-";
+  process.stdout.write(attempts + " " + max + " " + ids);
+' "$SPEC_PATH/.curdx-state.json" "$TASK_ID")
 
-# Check if limit exceeded
-MAX_FIX=$(jq -r '.maxFixTasksPerOriginal // 3' "$SPEC_PATH/.curdx-state.json")
 if [ "$CURRENT_ATTEMPTS" -ge "$MAX_FIX" ]; then
   echo "ERROR: Max fix attempts ($MAX_FIX) reached for task $TASK_ID"
-  # Show fix history
-  jq -r --arg taskId "$TASK_ID" \
-    '.fixTaskMap[$taskId].fixTaskIds | join(", ")' "$SPEC_PATH/.curdx-state.json"
+  echo "$FIX_HISTORY"
   exit 1
 fi
 ```

@@ -72,7 +72,7 @@ If state file exists, read and display:
 
 4. Update Spec Index (removes deleted spec from index):
    ```bash
-   ./plugins/curdx-flow/hooks/scripts/update-spec-index.sh --quiet
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet
    ```
 
 ## Output

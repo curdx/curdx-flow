@@ -5,3 +5,6 @@ dist
 .idea
 .vscode
 *.tgz
+specs/.current-spec
+specs/.current-epic
+**/.progress.md

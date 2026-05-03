@@ -1,0 +1,59 @@
+{
+  "source": "spec",
+  "name": "cross-platform-support",
+  "basePath": "./specs/cross-platform-support",
+  "phase": "execution",
+  "taskIndex": 65,
+  "totalTasks": 76,
+  "taskIteration": 1,
+  "maxTaskIterations": 5,
+  "globalIteration": 49,
+  "maxGlobalIterations": 100,
+  "commitSpec": true,
+  "quickMode": false,
+  "awaitingApproval": false,
+  "granularity": "fine",
+  "discoveredSkills": [
+    {
+      "name": "curdx-core",
+      "source": "plugin",
+      "matchedAt": "start",
+      "invoked": true
+    },
+    {
+      "name": "spec-workflow",
+      "source": "plugin",
+      "matchedAt": "start",
+      "invoked": true
+    },
+    {
+      "name": "interview-framework",
+      "source": "plugin",
+      "matchedAt": "start",
+      "invoked": true
+    },
+    {
+      "name": "communication-style",
+      "source": "plugin",
+      "matchedAt": "start",
+      "invoked": true
+    },
+    {
+      "name": "reality-verification",
+      "source": "plugin",
+      "matchedAt": "start",
+      "invoked": true
+    }
+  ],
+  "relatedSpecs": [],
+  "recoveryMode": false,
+  "maxFixTasksPerOriginal": 3,
+  "maxFixTaskDepth": 3,
+  "fixTaskMap": {},
+  "modificationMap": {},
+  "maxModificationsPerTask": 3,
+  "maxModificationDepth": 2,
+  "nativeTaskMap": {},
+  "nativeSyncEnabled": false,
+  "nativeSyncFailureCount": 0
+}

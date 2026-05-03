@@ -1,0 +1,6 @@
+{
+  "decision": "block",
+  "reason": "Quick mode active — do NOT stop. Continue spec phase: design for quick-spec.\n\nYou are running in quick mode. Do NOT stop, do NOT ask the user questions.\nContinue generating artifacts for the current phase (design) and proceed to the next phase.\nMake strong, opinionated decisions autonomously.",
+  "systemMessage": "curdx-flow quick mode: continue design phase"
+}
+EXIT_CODE=0

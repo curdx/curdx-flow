@@ -1,0 +1,2 @@
+[curdx-flow] ALL_TASKS_COMPLETE detected in transcript
+EXIT_CODE=0

@@ -156,9 +156,8 @@ Ask ONE question: "How do you want to proceed?" with these options via AskUserQu
 
 1. **Merge** into `.curdx-state.json` (preserve all existing fields):
    ```bash
-   jq '. + {"phase": "design", "awaitingApproval": true}' \
-     "$SPEC_PATH/.curdx-state.json" > "$SPEC_PATH/.curdx-state.json.tmp" && \
-     mv "$SPEC_PATH/.curdx-state.json.tmp" "$SPEC_PATH/.curdx-state.json"
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" \
+     "$SPEC_PATH/.curdx-state.json" '{"phase":"design","awaitingApproval":true}'
    ```
 2. Update `.progress.md`: mark requirements as implicitly approved, set current phase
 

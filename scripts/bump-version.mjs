@@ -66,7 +66,10 @@ const pkg = readJson('package.json');
 const current = pkg.version;
 
 let target;
-if (/^\d+\.\d+\.\d+$/.test(arg)) {
+// Accept exact semver, including pre-release suffixes (e.g. 7.0.0-alpha.0,
+// 7.0.0-beta.1, 7.0.0-rc.0). Build metadata (`+build.123`) is intentionally
+// not supported — npm strips it and we want the gate to flag the difference.
+if (/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(arg)) {
   target = arg;
 } else if (['patch', 'minor', 'major'].includes(arg)) {
   const [maj, min, pat] = current.split('.').map(Number);

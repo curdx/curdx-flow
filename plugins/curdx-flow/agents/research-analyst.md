@@ -120,7 +120,7 @@ Quality Command discovery is essential because projects use different tools and 
 
 1. **package.json** (primary):
    ```bash
-   cat package.json | jq '.scripts'
+   node -e 'console.log(JSON.stringify(require("./package.json").scripts || {}, null, 2))'
    ```
    Look for keywords: `lint`, `typecheck`, `type-check`, `check-types`, `test`, `build`, `e2e`, `integration`, `unit`, `verify`, `validate`, `check`
 
@@ -141,8 +141,8 @@ Quality Command discovery is essential because projects use different tools and 
 Run these discovery commands during research:
 
 ```bash
-# Check package.json scripts
-cat package.json | jq -r '.scripts | keys[]' 2>/dev/null || echo "No package.json"
+# Check package.json scripts (cross-platform Node)
+node -e 'try{console.log(Object.keys(require("./package.json").scripts||{}).join("\n"))}catch{console.log("No package.json")}'
 
 # Check Makefile targets
 grep -E '^[a-z_-]+:' Makefile 2>/dev/null | head -20 || echo "No Makefile"
@@ -185,12 +185,12 @@ Run these commands to detect available verification tooling:
 
 1. **Dev server scripts** — parse package.json for dev/start/serve scripts:
    ```bash
-   jq -r '.scripts | to_entries[] | select(.key | test("dev|start|serve")) | "\(.key): \(.value)"' package.json 2>/dev/null || echo "No dev server scripts"
+   node -e 'try{const s=require("./package.json").scripts||{};const m=Object.entries(s).filter(([k])=>/dev|start|serve/.test(k));console.log(m.length?m.map(([k,v])=>k+": "+v).join("\n"):"No dev server scripts")}catch{console.log("No dev server scripts")}'
    ```
 
 2. **Browser automation deps** — check dependencies and devDependencies:
    ```bash
-   jq -r '[(.dependencies // {}), (.devDependencies // {})] | add | to_entries[] | select(.key | test("playwright|puppeteer|cypress|selenium")) | "\(.key): \(.value)"' package.json 2>/dev/null || echo "No browser automation deps"
+   node -e 'try{const p=require("./package.json");const all={...(p.dependencies||{}),...(p.devDependencies||{})};const m=Object.entries(all).filter(([k])=>/playwright|puppeteer|cypress|selenium/.test(k));console.log(m.length?m.map(([k,v])=>k+": "+v).join("\n"):"No browser automation deps")}catch{console.log("No browser automation deps")}'
    ```
 
 3. **E2E config files** — look for framework config files in project root:
@@ -201,7 +201,7 @@ Run these commands to detect available verification tooling:
 4. **Port detection** — extract port numbers from env files and package.json scripts:
    ```bash
    grep -ohE '(PORT|port)[=:]\s*[0-9]+' .env .env.local .env.development 2>/dev/null | head -5 || echo "No port in env files"
-   jq -r '.scripts | to_entries[] | .value' package.json 2>/dev/null | grep -oE '\-\-port[= ][0-9]+|:[0-9]{4}' | head -5 || echo "No port in scripts"
+   node -e 'try{Object.values(require("./package.json").scripts||{}).forEach(v=>console.log(v))}catch{}' 2>/dev/null | grep -oE '\-\-port[= ][0-9]+|:[0-9]{4}' | head -5 || echo "No port in scripts"
    ```
 
 5. **Health endpoints** — search source for health/ready route definitions:
@@ -336,7 +336,7 @@ Before completing, verify:
 As your FINAL action before completing, you MUST update the state file to signal that user approval is required before proceeding:
 
 ```bash
-jq '.awaitingApproval = true' <basePath>/.curdx-state.json > /tmp/state.json && mv /tmp/state.json <basePath>/.curdx-state.json
+node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "<basePath>/.curdx-state.json" '{"awaitingApproval":true}'
 ```
 
 Use `basePath` from Task delegation (e.g., `./specs/my-feature` or `./packages/api/specs/auth`).

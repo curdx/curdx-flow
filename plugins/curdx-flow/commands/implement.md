@@ -87,37 +87,13 @@ Update `.curdx-state.json` by merging these fields into the existing object:
 }
 ```
 
-Use a jq merge pattern to preserve existing fields:
+Use the merge-state lib to preserve existing fields (atomic deep-merge, cross-platform):
 ```bash
-jq --argjson taskIndex <first_incomplete> \
-   --argjson totalTasks <count> \
-   --argjson maxTaskIter <parsed or 5> \
-   --argjson recoveryMode <true|false> \
-   --argjson maxGlobalIter <parsed or 100> \
-   '
-   . + {
-     phase: "execution",
-     taskIndex: $taskIndex,
-     totalTasks: $totalTasks,
-     taskIteration: 1,
-     maxTaskIterations: $maxTaskIter,
-     recoveryMode: $recoveryMode,
-     maxFixTasksPerOriginal: 3,
-     maxFixTaskDepth: 3,
-     globalIteration: 1,
-     maxGlobalIterations: $maxGlobalIter,
-     fixTaskMap: {},
-     modificationMap: {},
-     maxModificationsPerTask: 3,
-     maxModificationDepth: 2,
-     awaitingApproval: false,
-     nativeTaskMap: {},
-     nativeSyncEnabled: true,
-     nativeSyncFailureCount: 0
-   }
-   ' "$SPEC_PATH/.curdx-state.json" > "$SPEC_PATH/.curdx-state.json.tmp" && \
-   mv "$SPEC_PATH/.curdx-state.json.tmp" "$SPEC_PATH/.curdx-state.json"
+PATCH=$(node -e "console.log(JSON.stringify({phase:'execution',taskIndex:$FIRST_INCOMPLETE,totalTasks:$TOTAL,taskIteration:1,maxTaskIterations:$MAX_TASK_ITER,recoveryMode:$RECOVERY_MODE,maxFixTasksPerOriginal:3,maxFixTaskDepth:3,globalIteration:1,maxGlobalIterations:$MAX_GLOBAL_ITER,fixTaskMap:{},modificationMap:{},maxModificationsPerTask:3,maxModificationDepth:2,awaitingApproval:false,nativeTaskMap:{},nativeSyncEnabled:true,nativeSyncFailureCount:0}))")
+node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "$PATCH"
 ```
+
+Where `$MAX_TASK_ITER`, `$RECOVERY_MODE`, `$MAX_GLOBAL_ITER` come from parsed arguments (Step 2). The merge-state lib handles atomic write internally — no tmp+mv needed.
 
 **Preserved fields** (set by earlier phases, must NOT be removed):
 - `source`, `name`, `basePath`, `commitSpec`, `relatedSpecs`
@@ -180,7 +156,7 @@ When all tasks complete (taskIndex >= totalTasks):
 2. Delete .curdx-state.json
 3. Keep .progress.md (preserve learnings and history)
 4. Cleanup orphaned temp progress files: `find "$SPEC_PATH" -name ".progress-task-*.md" -mmin +60 -delete 2>/dev/null || true`
-5. Update spec index: `./plugins/curdx-flow/hooks/scripts/update-spec-index.sh --quiet`
+5. Update spec index: `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet`
 6. Commit remaining spec changes:
    ```bash
    git add "$SPEC_PATH/tasks.md" "$SPEC_PATH/.progress.md" ./specs/.index/
