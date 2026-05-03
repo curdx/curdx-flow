@@ -620,7 +620,7 @@ Goal: 6-leg CI matrix wired, prepublishOnly hardened, full local CI green, PR op
 
 NEVER push directly to default branch. Verify current branch is feature branch first.
 
-- [ ] 4.1 Add scripts/check-hooks-fresh.mjs + npm script
+- [x] 4.1 Add scripts/check-hooks-fresh.mjs + npm script
   - **Do**:
     1. Create `scripts/check-hooks-fresh.mjs`:
        - Run `node scripts/build-hooks.mjs`
