@@ -481,7 +481,7 @@ Goal: clean up structure, error handling, types, normalize cross-platform path h
   - _Requirements: design.md Failure Modes; AC-1.1, AC-2.1, AC-3.1_
   - _Design: Failure Modes & Graceful Degradation_
 
-- [ ] 2.3 [VERIFY] Quality checkpoint: typecheck + build after refactor
+- [x] 2.3 [VERIFY] Quality checkpoint: typecheck + build after refactor
   - **Do**: `npm run typecheck && npm run build:hooks`
   - **Verify**: Both exit 0
   - **Done when**: Refactor preserves bundle correctness
