@@ -71,7 +71,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-5_
   - _Design: Cross-Platform Path Handling_
 
-- [ ] 1.7 [P] Port path-resolver.sh → _shared/path-resolver.ts
+- [x] 1.7 [P] Port path-resolver.sh → _shared/path-resolver.ts
   - **Do**:
     1. Create `src/hooks/_shared/path-resolver.ts` as ES module
     2. Port `curdx_find_spec`, `curdx_resolve_specs_dirs`, repo-root walking from path-resolver.sh (252 LOC)
