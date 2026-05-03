@@ -216,7 +216,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
 
 ### hooks.json switch + local manual smoke
 
-- [ ] 1.19 Update hooks.json to invoke node + .mjs + shell:bash + async
+- [x] 1.19 Update hooks.json to invoke node + .mjs + shell:bash + async
   - **Do**:
     1. Edit `plugins/curdx-flow/hooks/hooks.json`
     2. Each hook command → `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/<name>.mjs"`
