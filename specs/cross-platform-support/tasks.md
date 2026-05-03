@@ -588,7 +588,7 @@ Goal: vitest smoke + lib unit + byte-equal regression vs v6.0.6 baseline.
   - **Commit**: `test(lib): add unit tests for lib utilities`
   - _Requirements: FR-13, AC-10.2_
 
-- [ ] 3.5 [VERIFY] Quality checkpoint: typecheck + smoke + unit
+- [x] 3.5 [VERIFY] Quality checkpoint: typecheck + smoke + unit
   - **Do**: `npm run typecheck && npm run build:hooks && npm run test:hooks`
   - **Verify**: All exit 0
   - **Done when**: All Phase 3 tests green
