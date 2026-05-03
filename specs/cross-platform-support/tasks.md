@@ -771,7 +771,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - **Done when**: 11 user stories' AC's confirmed via automated grep/test
   - **Commit**: None
 
-- [ ] VE1 [VERIFY] E2E startup: install plugin into clean dir + spawn each hook with fixture
+- [x] VE1 [VERIFY] E2E startup: install plugin into clean dir + spawn each hook with fixture
   - **Do**:
     1. Create clean install dir: `INSTALL_DIR=/tmp/curdx-ve-$$; mkdir -p "$INSTALL_DIR/curdx-flow"`
     2. `cp -R plugins/curdx-flow/* "$INSTALL_DIR/curdx-flow/"`
