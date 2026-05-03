@@ -2,6 +2,27 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.0.0-alpha.0 — 2026-05-03
+
+### Added
+
+- **Cross-platform plugin runtime.** Bundled hooks and lib utilities now run as ESM `.mjs` instead of bash `.sh`. 4 hooks (load-spec-context, quick-mode-guard, stop-watcher, update-spec-index) + 11 lib utilities (cleanup-files, count-mocks, count-tasks, ensure-gitignore, get-default-branch, init-execution-state, kill-port, merge-state, search-files, update-fix-task-map, update-modification-map). Sources in `src/hooks/`; bundled via esbuild to `plugins/curdx-flow/hooks/scripts/`.
+- **`scripts/build-hooks.mjs`** esbuild driver — single-file ESM bundles, node20 target, atomic-write helper, cross-platform path utilities, awk-parity markdown task parser.
+- **`.gitattributes`** pinning `*.sh`, `*.mjs`, `*.cjs`, `*.js` to LF line endings for Windows compatibility.
+- **`hooks/scripts/package.json`** with `"type": "module"` to mitigate npm `.mjs` ESM-resolution edge case (Node #267) on Windows nvm.
+
+### Breaking
+
+- **`hooks.json` changes invocation contract from `bash *.sh` to `node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/*.mjs`** with `"shell": "bash"` for cross-platform routing and `"async": true` on SessionStart (mitigates Anthropic CC #34457 Windows event-loop deadlock).
+- **Legacy bash hook scripts deleted**: `load-spec-context.sh`, `quick-mode-guard.sh`, `stop-watcher.sh`, `update-spec-index.sh`, `path-resolver.sh`, plus `test-path-resolver.sh` / `test-multi-dir-integration.sh`. Anyone forking the v6 `.sh` paths will break — switch to the `.mjs` invocations.
+- **`jq` is no longer a runtime dependency.** All 30 markdown sweep occurrences replaced (lib calls, inline `node -e`, prose rewords, `gh --jq` → pipe-to-Node). NFR-6 verified by `! grep -rn '\bjq\b' plugins/curdx-flow`.
+
+### Notes
+
+- **Pre-release validation** — this is a POC checkpoint at the end of Phase 1 of `specs/cross-platform-support/`. CI matrix expansion to Windows + macOS lands in Phase 4. For now, ubuntu-latest CI run on the alpha.0 tag validates the toolchain end-to-end. Phase 2 (refactoring) and Phase 3 (vitest smoke tests) follow before `7.0.0-beta.0`.
+- **CLAUDE.md** updated to describe the new build pipeline (replaces the v6 "no build step" sentence).
+- **Schema mismatch flagged** for follow-up: `lib/update-fix-task-map.mjs` schema (`{count, depth, fixes}`) diverges from `spec.schema.json` and prose docs (`{attempts, fixTaskIds, lastError}`). Markdown sweep used inline `node -e` over the lib to preserve doc-schema consistency. Will reconcile in Phase 2.
+
 ## 6.0.6 — 2026-04-29
 
 ### Removed
