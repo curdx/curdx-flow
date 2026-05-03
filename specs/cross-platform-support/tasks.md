@@ -60,7 +60,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-8_
   - _Design: Stdin/Stdout Contract_
 
-- [ ] 1.6 [P] Scaffold _shared/atomic-write.ts
+- [x] 1.6 [P] Scaffold _shared/atomic-write.ts
   - **Do**:
     1. Create `src/hooks/_shared/atomic-write.ts` exporting `writeFileAtomic(path, data)`
     2. Use `writeFileSync(temp)` + `renameSync(temp, dst)` (NTFS MoveFile = atomic on same volume)
