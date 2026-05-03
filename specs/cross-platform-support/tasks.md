@@ -178,7 +178,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
 
 ### Stop-watcher (the hard one) with markdown-task-parser
 
-- [ ] 1.16 Create _shared/markdown-task-parser.ts (regex state machine, replaces awk)
+- [x] 1.16 Create _shared/markdown-task-parser.ts (regex state machine, replaces awk)
   - **Do**:
     1. Create `src/hooks/_shared/markdown-task-parser.ts`
     2. Define small fixture inline: 3 `## Task N` blocks with sub-content
