@@ -208,7 +208,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-5, AC-3.1, AC-3.2, AC-3.3, AC-3.4_
   - _Design: Component Catalog → stop-watcher; Risk R8_
 
-- [ ] 1.18 [VERIFY] Quality checkpoint: 4 hooks bundled + typecheck
+- [x] 1.18 [VERIFY] Quality checkpoint: 4 hooks bundled + typecheck
   - **Do**: `npm run typecheck && npm run build:hooks && ls plugins/curdx-flow/hooks/scripts/*.mjs | wc -l | awk '$1>=4'`
   - **Verify**: All exit 0
   - **Done when**: 4 hook bundles exist
