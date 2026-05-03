@@ -157,7 +157,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-2, AC-1.4_
   - _Design: Component Catalog → load-spec-context_
 
-- [ ] 1.14 Port update-spec-index.sh → update-spec-index.ts (275 LOC)
+- [x] 1.14 Port update-spec-index.sh → update-spec-index.ts (275 LOC)
   - **Do**:
     1. Create `src/hooks/update-spec-index.ts`
     2. Walk specs_dirs from path-resolver, scan each spec for state + meta, generate `index.json`
