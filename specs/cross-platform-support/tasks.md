@@ -230,7 +230,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-1, AC-1.1, AC-2.1, AC-3.1_
   - _Design: hooks.json 改造前后对比_
 
-- [ ] 1.20 Local manual smoke: install plugin into clean dir + spawn each hook
+- [x] 1.20 Local manual smoke: install plugin into clean dir + spawn each hook
   - **Do**:
     1. Create temp install dir `/tmp/curdx-test-install/curdx-flow/`
     2. `cp -R plugins/curdx-flow/* /tmp/curdx-test-install/curdx-flow/`
