@@ -671,7 +671,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
 
 ### Migration docs + .sh deletion
 
-- [ ] 4.5 Draft docs/MIGRATION-V7.md
+- [x] 4.5 Draft docs/MIGRATION-V7.md
   - **Do**:
     1. Create `docs/MIGRATION-V7.md` per design.md outline
     2. Sections: TL;DR, BREAKING CHANGE list, Why, Step-by-step upgrade (v6.0.x), Custom .sh fork users, Downgrade path (`@curdx/flow@6.0.6`), FAQ, Verification checklist
