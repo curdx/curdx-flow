@@ -415,7 +415,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
 
 ### POC Checkpoint: alpha.0 git tag
 
-- [ ] 1.38 Update CLAUDE.md to reflect new build pipeline
+- [x] 1.38 Update CLAUDE.md to reflect new build pipeline
   - **Do**:
     1. Edit `CLAUDE.md` line ~"bundled plugin shipped as static files — no build step"
     2. Replace with description of v7 esbuild pipeline + `build:hooks` + `check:hooks-fresh` flow
