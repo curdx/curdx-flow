@@ -41,7 +41,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-11_
   - _Design: BundledTier_
 
-- [ ] 1.4 [VERIFY] Quality checkpoint: typecheck still passes after dep + scaffolding
+- [x] 1.4 [VERIFY] Quality checkpoint: typecheck still passes after dep + scaffolding
   - **Do**: `npm run typecheck`
   - **Verify**: Command exits 0
   - **Done when**: No TS errors
