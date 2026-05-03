@@ -427,7 +427,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: design.md "CLAUDE.md 矛盾说明"_
   - _Design: File Plan → modify CLAUDE.md_
 
-- [ ] 1.39 [VERIFY] Phase 1 POC end-to-end check (Linux baseline)
+- [x] 1.39 [VERIFY] Phase 1 POC end-to-end check (Linux baseline)
   - **Do**:
     1. `npm run typecheck && npm run build:hooks`
     2. Smoke each of 4 hooks with realistic stdin fixture
