@@ -38,6 +38,7 @@ function globToRegExp(pattern: string): RegExp {
   let re = "";
   for (let i = 0; i < pattern.length; i++) {
     const ch = pattern[i];
+    if (ch === undefined) continue;
     if (ch === "*") {
       if (pattern[i + 1] === "*") {
         re += ".*";

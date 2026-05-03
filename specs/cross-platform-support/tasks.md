@@ -287,7 +287,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-10_
   - _Design: Lib utilities → cleanup-files_
 
-- [ ] 1.25 [VERIFY] Quality checkpoint: 3 lib bundles + typecheck
+- [x] 1.25 [VERIFY] Quality checkpoint: 3 lib bundles + typecheck
   - **Do**: `npm run typecheck && npm run build:hooks && ls plugins/curdx-flow/hooks/scripts/lib/*.mjs | wc -l`
   - **Verify**: Exit 0; ≥3 lib bundles
   - **Done when**: First batch of lib utilities builds clean
