@@ -370,7 +370,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
 
 ### Markdown sweep (79 occurrences in 3 batches)
 
-- [ ] 1.34 [P] Markdown sweep batch 1: hot files (templates/tasks.md + agents/task-planner.md + commands/implement.md, ~30 occurrences)
+- [x] 1.34 [P] Markdown sweep batch 1: hot files (templates/tasks.md + agents/task-planner.md + commands/implement.md, ~30 occurrences)
   - **Do**:
     1. For each `jq` instance in 3 files: pick replacement strategy
        - Single line + ≤80 char → inline `node -e '...'`
@@ -384,7 +384,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-9, AC-8.1, AC-8.2, AC-8.3, AC-8.4_
   - _Design: Markdown Sweep 实现策略_
 
-- [ ] 1.35 [P] Markdown sweep batch 2: agents/research-analyst.md + references/* (~25 occurrences)
+- [x] 1.35 [P] Markdown sweep batch 2: agents/research-analyst.md + references/* (~25 occurrences)
   - **Do**:
     1. Apply same classifier rules to agents/research-analyst.md and all `plugins/curdx-flow/references/*.md`
     2. Most references are inline-prose explanations → reword without executable jq token
