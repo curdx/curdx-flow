@@ -437,7 +437,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - **Done when**: POC works end-to-end on Linux; jq fully eliminated
   - **Commit**: None
 
-- [ ] 1.40 POC Checkpoint: Bump v7.0.0-alpha.0 + push tag for early CI validation
+- [x] 1.40 POC Checkpoint: Bump v7.0.0-alpha.0 + push tag for early CI validation
   - **Do**:
     1. `npm run bump-version 7.0.0-alpha.0`
     2. Verify 5 fields synced via `npm run check-versions`
