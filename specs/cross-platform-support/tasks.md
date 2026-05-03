@@ -651,7 +651,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - _Requirements: FR-12, AC-5.1, AC-5.2, AC-5.3_
   - _Design: CI 矩阵设计_
 
-- [ ] 4.3 Update .github/workflows/release.yml to workflow_run trigger
+- [x] 4.3 Update .github/workflows/release.yml to workflow_run trigger
   - **Do**:
     1. Replace `on: push: tags:` with `on: workflow_run: workflows: ['CI']: types: [completed]: branches: ['main']`
     2. Job condition: `if: github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'refs/tags/v')`
