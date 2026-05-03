@@ -487,7 +487,7 @@ Goal: clean up structure, error handling, types, normalize cross-platform path h
   - **Done when**: Refactor preserves bundle correctness
   - **Commit**: None
 
-- [ ] 2.4 Cross-platform path normalization audit
+- [x] 2.4 Cross-platform path normalization audit
   - **Do**:
     1. `grep -rn "path\.join" src/hooks/` → review each call site
     2. State-file path serialization → swap to `path.posix.join`

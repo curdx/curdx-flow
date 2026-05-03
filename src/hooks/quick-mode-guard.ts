@@ -59,7 +59,9 @@ runHook(async (input) => {
     return ALLOW;
   }
 
-  // path.join handles both absolute and relative spec paths correctly.
+  // fs IO — use `path.join` (native sep). `specPath` is posix-form from
+  // resolveCurrent; Node's fs APIs accept the mixed separator on Windows.
+  // Path policy: see _shared/path-resolver.ts header.
   const stateFile = join(cwd, specPath, ".curdx-state.json");
   if (!existsSync(stateFile)) {
     return ALLOW;

@@ -16,11 +16,50 @@ import { basename, isAbsolute, join, posix } from "node:path";
  * v6 implicitly assumed `cwd === repo root`; the TS port makes that walk
  * explicit so hooks invoked from sub-directories still resolve.
  *
- * Path discipline (see design.md "Cross-Platform Path Handling"):
- *   - Use `path.join` (native sep) for any path that hits the filesystem.
- *   - Use `path.posix.join` for paths that get **serialized** (returned to
- *     the caller for embedding into context blocks or `.curdx-state.json`)
- *     so the on-disk representation stays byte-equal across OSes.
+ * ──────────────────────────────────────────────────────────────────────────
+ * Path-handling policy (NFR-7, design.md "Cross-Platform Path Handling")
+ * ──────────────────────────────────────────────────────────────────────────
+ *
+ * Two `node:path` namespaces, two distinct uses:
+ *
+ *   1. fs IO operations (readFileSync, writeFileSync, statSync, existsSync,
+ *      readdirSync, unlinkSync, mkdirSync, spawn target, etc.)
+ *      → use `path.join` / `path.resolve`
+ *      Reason: the OS gets its native separator (`/` on POSIX, `\\` on
+ *      Windows). Node's fs APIs accept both on Windows but native sep is
+ *      the canonical form and matches what `process.cwd()` returns.
+ *
+ *   2. Path serialization to JSON, stdout, env vars, hook continuation
+ *      prompts, markdown columns, or any cross-process / on-disk channel
+ *      → use `path.posix.join` (alias `posix.join` here)
+ *      Reason: the output must be byte-stable across operating systems.
+ *      A path written into `.curdx-state.json` on Windows must read back
+ *      identically on macOS — `\\` vs `/` would break diffs, hashes, and
+ *      string comparisons in downstream tooling.
+ *
+ * Rule of thumb:
+ *   - Path goes into `node:fs`              → `path.join`
+ *   - Path goes into a JSON file / stdout
+ *     / env var / cross-process channel     → `path.posix.join`
+ *
+ * Both are equivalent on POSIX (single sep). The split only matters on
+ * Windows, where `path.join` produces `\\` and `path.posix.join` produces `/`.
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * This module's contract
+ * ──────────────────────────────────────────────────────────────────────────
+ *
+ * Resolvers in this file return *posix-form* paths from their public surface
+ * (`findSpec`, `resolveCurrent`, `listSpecs` → `SpecEntry.path`) because
+ * those values are typically embedded in `.curdx-state.json` or printed
+ * to stdout. Callers that re-anchor those paths to the local filesystem
+ * (e.g., `existsSync(join(cwd, specPath, ".curdx-state.json"))`) MUST use
+ * `path.join` for the fs side — Node tolerates the mixed separators on
+ * Windows and the fs path stays correct.
+ *
+ * Internal helpers in this file use `path.join` for filesystem walks
+ * (`findRepoRoot`, `isDir(join(cwd, dir))`, `readdirSync(rootFs)`) and
+ * `posix.join` only at the public-return boundary.
  */
 
 const DEFAULT_SPECS_DIR = "./specs";
