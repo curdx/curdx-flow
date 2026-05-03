@@ -2,6 +2,17 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.0.0-beta.2 — 2026-05-03
+
+### Fixed
+
+- **Hybrid release.yml trigger.** beta.1's `workflow_run`-only trigger didn't fire because that trigger requires the workflow file on the default branch (release.yml lives on the feature branch). v7.0.0-beta.2 fixes this by also accepting `push: tags: ['v*']` events with a concurrency guard against double-publish. Future releases from main will use the workflow_run path; pre-release tags from feature branches use push:tags directly. No code changes — just a CI plumbing fix.
+
+### Notes
+
+- v7.0.0-beta.1 was tagged but did not publish to npm due to the trigger mismatch above. v7.0.0-beta.2 IS the first beta on npm.
+- All Windows-specific test failures from v7.0.0-beta.0 were already fixed in v7.0.0-beta.1's commits (Bug 1: stdout undefined; Bug 2: hardcoded /tmp fixture paths). CI run 25292873783 confirmed Windows / Node 22 PASS at the beta.1 commit, so beta.2 should also pass cleanly.
+
 ## 7.0.0-beta.1 — 2026-05-03
 
 ### Fixed

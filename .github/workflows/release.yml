@@ -1,6 +1,8 @@
 name: Release
 
 on:
+  push:
+    tags: ['v*']
   workflow_run:
     workflows: ['CI']
     types: [completed]
@@ -9,16 +11,23 @@ permissions:
   contents: write
   id-token: write
 
+# Prevent duplicate publishes when both push:tags and workflow_run fire for the same tag
+concurrency:
+  group: release-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
     if: |
-      github.event.workflow_run.conclusion == 'success' &&
-      startsWith(github.event.workflow_run.head_branch, 'v')
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -34,4 +43,4 @@ jobs:
       - uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
-          tag_name: ${{ github.event.workflow_run.head_branch }}
+          tag_name: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
