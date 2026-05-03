@@ -36,6 +36,30 @@ All notable changes to `@curdx/flow` are documented here. Format follows [Keep a
 - **Pre-release rhythm**: v7.0.0-alpha.0 (2026-05-03, POC checkpoint) → v7.0.0-beta.0 (Phase 4 close, CI matrix validated) → v7.0.0-rc.0 (Phase 5, docs freeze + 2-week soak) → 7.0.0 (final).
 - **See [docs/MIGRATION-V7.md](./docs/MIGRATION-V7.md)** for upgrade steps, downgrade path, FAQ, and verification checklist.
 
+## 7.0.0-beta.0 — 2026-05-03
+
+### Added
+
+- **3-OS CI matrix runs against bundled .mjs.** First exposure of v7 hooks/lib on `windows-latest` (PowerShell + Git Bash routing), `macos-latest`, and `ubuntu-latest` (Node 20 + 22). 6 legs total + typecheck + check-fresh + all-green aggregator.
+- **`scripts/check-hooks-fresh.mjs`** + `npm run check:hooks-fresh` CI gate — detects source/bundle drift via rebuild + git diff.
+- **`npm run verify`** aggregate — typecheck + check-versions + check:hooks-fresh + test:hooks chain.
+- **Vitest test suite (55 tests)** — 12 hook smoke + 10 lib unit + 16 byte-equal regression vs v6.0.6 baseline + carry-over.
+- **Hardened `prepublishOnly`** — now also runs check:hooks-fresh, preventing published tarball with stale .mjs vs src.
+- **`docs/MIGRATION-V7.md`** migration guide (8 sections: TL;DR, Breaking, Why, Upgrade steps, Custom .sh fork users, Downgrade, FAQ, Verification checklist).
+- **Refactored hooks**: `_shared/types.ts` (HookStdin/HookOutput tagged union) + `_shared/run-hook.ts` (global try/catch wrapper, FR-8 contract).
+- **Lib catalog converged to 10** (was 11) — `update-fix-task-map` dropped due to schema mismatch with spec.schema.json; `_shared/atomic-write` adopted as canonical state-mutation pattern.
+- **Path-handling policy** documented in `_shared/path-resolver.ts` (NFR-7): `path.join` for fs IO, `path.posix.join` for serialization.
+
+### Changed
+
+- **Release workflow gated on CI green.** `release.yml` now uses `workflow_run` trigger waiting for ci.yml `conclusion: 'success'` before publishing. Compared to alpha.0 (direct tag-push trigger), beta.0+ requires Windows + macOS + ubuntu CI legs all green before npm publish fires.
+- **`tests/hooks/baselines/v6.0.6/`** — 16 frozen byte-equal reference outputs (4 hooks × 4 fixtures) generated from v6.0.6 worktree, normalized for cross-platform/timestamp divergences.
+
+### Notes
+
+- This is the **second pre-release** in the v7 rhythm: alpha.0 (POC) → **beta.0 (CI matrix validated)** → rc.0 (docs freeze) → 7.0.0 (final).
+- See [docs/MIGRATION-V7.md](./docs/MIGRATION-V7.md) for upgrade guidance.
+
 ## 7.0.0-alpha.0 — 2026-05-03
 
 ### Added
