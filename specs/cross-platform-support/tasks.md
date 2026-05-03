@@ -191,7 +191,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-5_
   - _Design: Component Catalog → markdown-task-parser; Risk R8_
 
-- [ ] 1.17 Port stop-watcher.sh → stop-watcher.ts (largest, 362 LOC)
+- [x] 1.17 Port stop-watcher.sh → stop-watcher.ts (largest, 362 LOC)
   - **Do**:
     1. Create `src/hooks/stop-watcher.ts`
     2. Read stdin {cwd, transcript_path, stop_hook_active}
