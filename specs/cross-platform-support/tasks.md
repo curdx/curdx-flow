@@ -832,7 +832,7 @@ Goal: autonomous PR loop until merged + final v7.0.0 release.
   - **Verify**: `gh pr view --json reviewDecision -q .reviewDecision | grep -q 'APPROVED\|null'`
   - **Commit**: `fix(review): address <comment-summary>` (per comment)
 
-- [ ] 5.3 Bump v7.0.0-rc.0 + push tag (docs freeze gate)
+- [x] 5.3 Bump v7.0.0-rc.0 + push tag (docs freeze gate)
   - **Do**:
     1. Confirm MIGRATION-V7.md + CHANGELOG.md reviewed
     2. `npm run bump-version 7.0.0-rc.0`
@@ -845,7 +845,7 @@ Goal: autonomous PR loop until merged + final v7.0.0 release.
   - _Requirements: FR-15_
   - _Design: Release 节奏 → rc.0_
 
-- [ ] 5.4 Final v7.0.0 bump + tag + verify release.yml fires
+- [x] 5.4 Final v7.0.0 bump + tag + verify release.yml fires
   - **Do**:
     1. `npm run bump-version 7.0.0`
     2. Update CHANGELOG.md `## 7.0.0 — <today>`
