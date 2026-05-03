@@ -26,8 +26,8 @@ Read `<basePath>/research.md` and parse the Quality Commands table. This is the 
 If research.md has no Quality Commands section, inspect `package.json`:
 
 ```bash
-# Check for common script names
-cat package.json | jq '.scripts'
+# Check for common script names (cross-platform Node)
+node -e 'console.log(JSON.stringify(require("./package.json").scripts || {}, null, 2))'
 ```
 
 Standard scripts to look for:
@@ -111,5 +111,5 @@ When a task's Verify field seems to require manual testing, use these automated 
 | User flow testing | Browser automation (Puppeteer/Playwright), MCP browser tools |
 | Dashboard verification | API queries to the dashboard backend, WebFetch |
 | Extension testing | `web-ext lint`, manifest validation, build output checks |
-| API verification | `curl http://localhost:PORT/endpoint \| jq .field` |
+| API verification | `curl -s http://localhost:PORT/endpoint \| node -e 'process.stdin.on("data",d=>console.log(JSON.parse(d).field))'` |
 | Auth flow testing | Test tokens, mock auth, CLI-based OAuth flows |

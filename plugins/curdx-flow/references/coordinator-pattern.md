@@ -413,7 +413,7 @@ After all 3 verification layers pass:
 
 After successful completion (TASK_COMPLETE for sequential or all parallel tasks complete):
 
-**CRITICAL: Always use jq merge pattern to preserve all existing fields (source, name, basePath, commitSpec, relatedSpecs, etc.). Never write a new object from scratch.**
+**CRITICAL: Always use the deep-merge pattern (via `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs`) to preserve all existing fields (source, name, basePath, commitSpec, relatedSpecs, etc.). Never write a new object from scratch.**
 
 **Sequential Update**:
 1. Read current .curdx-state.json
@@ -631,22 +631,23 @@ Extract the JSON payload:
 **Update State (modificationMap)**:
 
 ```bash
-jq --arg taskId "$TASK_ID" \
-   --arg modId "$MOD_TASK_ID" \
-   --arg reason "$REASONING" \
-   --arg type "$MOD_TYPE" \
-   --argjson delta "$PROPOSED_COUNT" \
-   '
-   .modificationMap //= {} |
-   .modificationMap[$taskId] //= {count: 0, modifications: []} |
-   .modificationMap[$taskId].count += 1 |
-   .modificationMap[$taskId].modifications += [{id: $modId, type: $type, reason: $reason}] |
-   .totalTasks += $delta
-   ' "$SPEC_PATH/.curdx-state.json" > "$SPEC_PATH/.curdx-state.json.tmp" && \
-   mv "$SPEC_PATH/.curdx-state.json.tmp" "$SPEC_PATH/.curdx-state.json"
+node -e '
+  const fs = require("node:fs");
+  const [stateFile, taskId, modId, reason, type, deltaStr] = process.argv.slice(1);
+  const delta = Number(deltaStr);
+  const s = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  s.modificationMap ??= {};
+  s.modificationMap[taskId] ??= { count: 0, modifications: [] };
+  s.modificationMap[taskId].count += 1;
+  s.modificationMap[taskId].modifications.push({ id: modId, type, reason });
+  s.totalTasks += delta;
+  const tmp = stateFile + ".tmp." + process.pid;
+  fs.writeFileSync(tmp, JSON.stringify(s) + "\n");
+  fs.renameSync(tmp, stateFile);
+' "$SPEC_PATH/.curdx-state.json" "$TASK_ID" "$MOD_TASK_ID" "$REASONING" "$MOD_TYPE" "$PROPOSED_COUNT"
 ```
 
-> **Note**: Set `PROPOSED_COUNT` to the number of proposed tasks (e.g., `PROPOSED_COUNT=$(echo "$PROPOSED_TASKS" | jq 'length')`). For SPLIT_TASK this is N (the number of sub-tasks), for ADD_PREREQUISITE and ADD_FOLLOWUP this is 1.
+> **Note**: Set `PROPOSED_COUNT` to the number of proposed tasks. Compute via Node, e.g.: `PROPOSED_COUNT=$(printf '%s' "$PROPOSED_TASKS" | node -e 'const s=require("node:fs").readFileSync(0,"utf8");process.stdout.write(String(JSON.parse(s).length))')`. For SPLIT_TASK this is N (the number of sub-tasks), for ADD_PREREQUISITE and ADD_FOLLOWUP this is 1.
 
 **Insertion Algorithm** (same pattern as fix task insertion):
 
