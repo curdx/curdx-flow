@@ -32,7 +32,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-11, NFR-9_
   - _Design: Cross-Platform Path Handling_
 
-- [ ] 1.3 [P] Colocated package.json forces ESM in bundle dir
+- [x] 1.3 [P] Colocated package.json forces ESM in bundle dir
   - **Do**: Create `plugins/curdx-flow/hooks/scripts/package.json` with `{"type":"module"}` (mitigation for Issue #267)
   - **Files**: `plugins/curdx-flow/hooks/scripts/package.json`
   - **Done when**: File parses + `type` field is `module`
