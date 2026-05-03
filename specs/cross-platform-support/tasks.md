@@ -23,7 +23,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
   - _Requirements: FR-7, FR-13_
   - _Design: Build / test 基础设施_
 
-- [ ] 1.2 [P] Pin LF line endings via .gitattributes
+- [x] 1.2 [P] Pin LF line endings via .gitattributes
   - **Do**: Create repo-root `.gitattributes` with `*.sh *.mjs *.cjs *.js text eol=lf`
   - **Files**: `.gitattributes`
   - **Done when**: File contains 4 LF-pin lines
