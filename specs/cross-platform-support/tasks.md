@@ -738,7 +738,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - **Done when**: Full local CI suite passes
   - **Commit**: `chore(spec): pass local CI` (only if fixes needed)
 
-- [ ] 4.11 Push branch + create PR
+- [x] 4.11 Push branch + create PR
   - **Do**:
     1. `git branch --show-current` → must NOT be `main`/`master`
     2. If on default branch: STOP and alert user
