@@ -22,10 +22,7 @@ import { basename, join } from "node:path";
 import process from "node:process";
 import { readStdinJson } from "./_shared/stdin.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
-
-interface HookInput {
-  cwd?: string;
-}
+import type { ContextBlockOutput, HookOutput, HookStdin } from "./_shared/types.js";
 
 interface CurdxState {
   phase?: string;
@@ -34,21 +31,13 @@ interface CurdxState {
   awaitingApproval?: boolean;
 }
 
-interface ContextBlock {
-  active: boolean;
-  specName?: string;
-  specPath?: string;
-  phase?: string;
-  taskIndex?: number;
-  totalTasks?: number;
-  awaitingApproval?: boolean;
-  goal?: string;
-}
+type ContextBlock = ContextBlockOutput;
 
 const SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
 
 function emit(block: ContextBlock): void {
-  process.stdout.write(JSON.stringify(block) + "\n");
+  const output: HookOutput = block;
+  process.stdout.write(JSON.stringify(output) + "\n");
   process.exit(0);
 }
 
@@ -105,7 +94,7 @@ function readGoalFromProgress(progressPath: string): string | null {
 }
 
 async function main(): Promise<void> {
-  const input = await readStdinJson<HookInput>();
+  const input = await readStdinJson<HookStdin>();
   const cwd = input?.cwd;
   if (!cwd) {
     emitInactive();

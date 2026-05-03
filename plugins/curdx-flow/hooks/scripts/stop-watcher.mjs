@@ -223,7 +223,8 @@ function normalizeText(input) {
   return s.replace(/\r\n?/g, "\n");
 }
 function emitBlock(decision) {
-  process3.stdout.write(JSON.stringify(decision) + "\n");
+  const out = decision;
+  process3.stdout.write(JSON.stringify(out) + "\n");
 }
 function readEnabledSetting(settingsPath) {
   let raw;

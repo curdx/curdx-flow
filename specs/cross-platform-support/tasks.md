@@ -457,7 +457,7 @@ Goal: 5 hooks bundled .mjs running on Linux + macOS + Windows runner; markdown s
 
 Goal: clean up structure, error handling, types, normalize cross-platform path handling.
 
-- [ ] 2.1 Extract shared HookInput / HookOutput types to _shared/types.ts
+- [x] 2.1 Extract shared HookInput / HookOutput types to _shared/types.ts
   - **Do**:
     1. Create `src/hooks/_shared/types.ts`
     2. Define `HookStdin`, `HookDecision = 'allow' | 'deny'`, `HookOutput` interfaces matching Anthropic hook spec

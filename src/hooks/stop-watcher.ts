@@ -65,12 +65,7 @@ import { readStdinJson } from "./_shared/stdin.js";
 import { getSpecsDirs, resolveCurrent } from "./_shared/path-resolver.js";
 import { writeFileAtomic } from "./_shared/atomic-write.js";
 import { extractTaskBlock } from "./_shared/markdown-task-parser.js";
-
-interface HookInput {
-  cwd?: string;
-  transcript_path?: string;
-  stop_hook_active?: boolean;
-}
+import type { BlockDecisionOutput, HookOutput, HookStdin } from "./_shared/types.js";
 
 interface CurdxState {
   phase?: string;
@@ -92,11 +87,7 @@ interface EpicState {
   [k: string]: unknown;
 }
 
-interface BlockDecision {
-  decision: "block";
-  reason: string;
-  systemMessage: string;
-}
+type BlockDecision = BlockDecisionOutput;
 
 const SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
 
@@ -163,7 +154,8 @@ function normalizeText(input: string): string {
 
 /** Block-decision JSON emitter. v6 shell JSON-emit produces trailing-newline output. */
 function emitBlock(decision: BlockDecision): void {
-  process.stdout.write(JSON.stringify(decision) + "\n");
+  const out: HookOutput = decision;
+  process.stdout.write(JSON.stringify(out) + "\n");
 }
 
 /**
@@ -550,7 +542,7 @@ function buildContinuationBlock(args: {
 }
 
 async function main(): Promise<void> {
-  const input = await readStdinJson<HookInput>();
+  const input = await readStdinJson<HookStdin>();
   const cwd = input?.cwd;
   if (!cwd) {
     process.exit(0);

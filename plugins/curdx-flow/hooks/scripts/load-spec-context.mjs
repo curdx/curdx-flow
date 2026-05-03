@@ -136,7 +136,8 @@ function resolveCurrent(opts) {
 // src/hooks/load-spec-context.ts
 var SETTINGS_REL_PATH2 = ".claude/curdx-flow.local.md";
 function emit(block) {
-  process3.stdout.write(JSON.stringify(block) + "\n");
+  const output = block;
+  process3.stdout.write(JSON.stringify(output) + "\n");
   process3.exit(0);
 }
 function emitInactive() {

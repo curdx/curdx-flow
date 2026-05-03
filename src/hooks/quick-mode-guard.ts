@@ -24,10 +24,12 @@ import { join } from "node:path";
 import process from "node:process";
 import { readStdinJson } from "./_shared/stdin.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
-
-interface HookInput {
-  cwd?: string;
-}
+import type {
+  AllowDecisionOutput,
+  DenyDecisionOutput,
+  HookOutput,
+  HookStdin,
+} from "./_shared/types.js";
 
 interface CurdxState {
   quickMode?: boolean;
@@ -37,12 +39,14 @@ const QUICK_MODE_REASON =
   "Quick mode active: do NOT ask the user any questions. Make opinionated decisions autonomously. Choose the simplest, most conventional approach.";
 
 function emitAllow(): void {
-  process.stdout.write(JSON.stringify({ decision: "allow" }) + "\n");
+  const payload: AllowDecisionOutput = { decision: "allow" };
+  const out: HookOutput = payload;
+  process.stdout.write(JSON.stringify(out) + "\n");
   process.exit(0);
 }
 
 function emitDeny(): void {
-  const payload = {
+  const payload: DenyDecisionOutput = {
     decision: "deny",
     reason: QUICK_MODE_REASON,
     hookSpecificOutput: {
@@ -50,12 +54,13 @@ function emitDeny(): void {
     },
     systemMessage: QUICK_MODE_REASON,
   };
-  process.stdout.write(JSON.stringify(payload) + "\n");
+  const out: HookOutput = payload;
+  process.stdout.write(JSON.stringify(out) + "\n");
   process.exit(0);
 }
 
 async function main(): Promise<void> {
-  const input = await readStdinJson<HookInput>();
+  const input = await readStdinJson<HookStdin>();
   const cwd = input?.cwd;
   if (!cwd) {
     emitAllow();

@@ -136,7 +136,9 @@ function resolveCurrent(opts) {
 // src/hooks/quick-mode-guard.ts
 var QUICK_MODE_REASON = "Quick mode active: do NOT ask the user any questions. Make opinionated decisions autonomously. Choose the simplest, most conventional approach.";
 function emitAllow() {
-  process3.stdout.write(JSON.stringify({ decision: "allow" }) + "\n");
+  const payload = { decision: "allow" };
+  const out = payload;
+  process3.stdout.write(JSON.stringify(out) + "\n");
   process3.exit(0);
 }
 function emitDeny() {
@@ -148,7 +150,8 @@ function emitDeny() {
     },
     systemMessage: QUICK_MODE_REASON
   };
-  process3.stdout.write(JSON.stringify(payload) + "\n");
+  const out = payload;
+  process3.stdout.write(JSON.stringify(out) + "\n");
   process3.exit(0);
 }
 async function main() {

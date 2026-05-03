@@ -35,6 +35,12 @@ import {
   listSpecs,
   type SpecEntry,
 } from "./_shared/path-resolver.js";
+// NOTE: this CLI does NOT emit a HookOutput (it writes IndexState to a file
+// rather than emitting a decision to stdout). The type is imported here as
+// the canonical reference so the shared envelope module is the single source
+// of truth across all 4 hooks (per task 2.1).
+import type { HookOutput as _HookOutputRef } from "./_shared/types.js";
+type _UnusedHookOutput = _HookOutputRef;
 
 interface CliOptions {
   quiet: boolean;
