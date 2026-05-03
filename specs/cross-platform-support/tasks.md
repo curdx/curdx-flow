@@ -794,7 +794,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - **Done when**: Real hook contract works against installed plugin
   - **Commit**: None
 
-- [ ] VE3 [VERIFY] E2E cleanup: remove install dir + clear PID marker
+- [x] VE3 [VERIFY] E2E cleanup: remove install dir + clear PID marker
   - **Do**:
     1. INSTALL_DIR=$(cat /tmp/ve-pids.txt)
     2. `rm -rf "$INSTALL_DIR"`
