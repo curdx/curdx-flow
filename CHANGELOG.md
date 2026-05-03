@@ -2,6 +2,40 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.0.0 — YYYY-MM-DD
+
+### Breaking
+
+- **`jq` is no longer required.** All 30 plugin markdown jq invocations replaced with Node `node -e` inline scripts or bundled lib utilities. NFR-6 verified: `! grep -rn '\bjq\b' plugins/curdx-flow` exits 0. **Action required**: see [docs/MIGRATION-V7.md](./docs/MIGRATION-V7.md) for details — most users need no manual change, but anyone forking the v6 `.sh` files breaks.
+- **`hooks.json` invocation contract changed.** v6 invoked hooks via `bash *.sh`; v7 invokes via `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/*.mjs"` with `shell: bash` for cross-platform routing and `async: true` on SessionStart (Issue #34457 mitigation).
+- **Legacy `.sh` files deleted.** `load-spec-context.sh`, `quick-mode-guard.sh`, `stop-watcher.sh`, `update-spec-index.sh`, `path-resolver.sh`, plus `test-path-resolver.sh` / `test-multi-dir-integration.sh`. Anyone forking the v6 `.sh` paths must port to TypeScript or pin to v6.0.6.
+- **Node ≥20.12 required** (was Node 18+ in v6). esbuild output target. See migration guide for upgrade paths.
+- **Spec ordering in `update-spec-index` is now alphabetical** (was filesystem-inode order in v6). Output bytes change but content equivalent.
+- **mtime precision in `stop-watcher` is now milliseconds** (was seconds via `stat -f %m`/`stat -c %Y`).
+
+### Added
+
+- **Cross-platform plugin runtime.** 4 hooks (load-spec-context, quick-mode-guard, stop-watcher, update-spec-index) bundled to single-file ESM `.mjs` via esbuild. Sources in `src/hooks/`.
+- **10 lib utilities.** cleanup-files, count-mocks, count-tasks, ensure-gitignore, get-default-branch, init-execution-state, kill-port, merge-state, search-files, update-modification-map. Each ~30-100 LOC, single-responsibility CLIs callable from markdown.
+- **`scripts/build-hooks.mjs`** esbuild driver — single-file ESM, node20 target, atomic-write helper, cross-platform path utilities, awk-parity markdown task parser.
+- **`scripts/check-hooks-fresh.mjs`** CI gate — detects source/bundle drift via rebuild + git diff.
+- **`npm run verify`** aggregate script — typecheck + check-versions + check:hooks-fresh + test:hooks.
+- **6-leg GitHub Actions matrix.** ubuntu × node[20,22], macos × 22, windows × 22. New `typecheck` / `check-fresh` / `test-matrix` / `all-green` jobs.
+- **Vitest test suite.** 55 tests: 12 hook smoke + 10 lib unit + 16 byte-equal regression vs v6.0.6 baseline + 17 carry-over.
+- **`.gitattributes`** LF pinning for cross-platform line endings.
+- **Colocated `package.json {"type":"module"}`** in `plugins/curdx-flow/hooks/scripts/` — npm Issue #267 mitigation for Windows nvm + .mjs ESM resolution.
+- **Release workflow gating.** `release.yml` now waits for CI green via `workflow_run` trigger before publishing.
+
+### Changed
+
+- **`CLAUDE.md` build pipeline section** updated. Old "shipped as static files — no build step" replaced with two-category description (static manifests + built `.mjs` bundles via esbuild). Cross-references `specs/cross-platform-support/design.md`.
+- **`scripts/bump-version.mjs`** regex extended to accept SemVer pre-release labels (`-alpha.N`, `-beta.N`, `-rc.N`).
+
+### Notes
+
+- **Pre-release rhythm**: v7.0.0-alpha.0 (2026-05-03, POC checkpoint) → v7.0.0-beta.0 (Phase 4 close, CI matrix validated) → v7.0.0-rc.0 (Phase 5, docs freeze + 2-week soak) → 7.0.0 (final).
+- **See [docs/MIGRATION-V7.md](./docs/MIGRATION-V7.md)** for upgrade steps, downgrade path, FAQ, and verification checklist.
+
 ## 7.0.0-alpha.0 — 2026-05-03
 
 ### Added

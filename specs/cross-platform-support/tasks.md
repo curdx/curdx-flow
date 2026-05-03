@@ -682,7 +682,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - _Requirements: FR-16, AC-9.1, AC-9.2, AC-9.3_
   - _Design: Migration Documentation Outline_
 
-- [ ] 4.6 Update CHANGELOG.md with v7.0.0 entry
+- [x] 4.6 Update CHANGELOG.md with v7.0.0 entry
   - **Do**:
     1. Prepend `## 7.0.0 — YYYY-MM-DD` section
     2. Subsections: `### Breaking` (jq removed; hooks.json format; Node 20.12+; .sh deleted), `### Added` (esbuild pipeline + lib utilities + 3-OS CI), `### Changed` (CLAUDE.md build description)
