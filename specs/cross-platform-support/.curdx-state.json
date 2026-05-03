@@ -2,9 +2,9 @@
   "source": "spec",
   "name": "cross-platform-support",
   "basePath": "./specs/cross-platform-support",
-  "phase": "design",
+  "phase": "tasks",
   "taskIndex": 0,
-  "totalTasks": 0,
+  "totalTasks": 76,
   "taskIteration": 1,
   "maxTaskIterations": 5,
   "globalIteration": 1,
@@ -12,37 +12,13 @@
   "commitSpec": true,
   "quickMode": false,
   "awaitingApproval": true,
+  "granularity": "fine",
   "discoveredSkills": [
-    {
-      "name": "curdx-core",
-      "source": "plugin",
-      "matchedAt": "start",
-      "invoked": true
-    },
-    {
-      "name": "spec-workflow",
-      "source": "plugin",
-      "matchedAt": "start",
-      "invoked": true
-    },
-    {
-      "name": "interview-framework",
-      "source": "plugin",
-      "matchedAt": "start",
-      "invoked": true
-    },
-    {
-      "name": "communication-style",
-      "source": "plugin",
-      "matchedAt": "start",
-      "invoked": true
-    },
-    {
-      "name": "reality-verification",
-      "source": "plugin",
-      "matchedAt": "start",
-      "invoked": true
-    }
+    {"name": "curdx-core", "source": "plugin", "matchedAt": "start", "invoked": true},
+    {"name": "spec-workflow", "source": "plugin", "matchedAt": "start", "invoked": true},
+    {"name": "interview-framework", "source": "plugin", "matchedAt": "start", "invoked": true},
+    {"name": "communication-style", "source": "plugin", "matchedAt": "start", "invoked": true},
+    {"name": "reality-verification", "source": "plugin", "matchedAt": "start", "invoked": true}
   ],
   "relatedSpecs": []
 }
