@@ -705,7 +705,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - _Requirements: FR-18_
   - _Design: File Plan → delete entries_
 
-- [ ] 4.8 Bump v7.0.0-beta.0 + push tag
+- [x] 4.8 Bump v7.0.0-beta.0 + push tag
   - **Do**:
     1. `npm run bump-version 7.0.0-beta.0`
     2. `npm run check-versions` to confirm 5-field sync
