@@ -553,7 +553,7 @@ Goal: vitest smoke + lib unit + byte-equal regression vs v6.0.6 baseline.
   - _Requirements: FR-13, AC-5.2_
   - _Design: Test Strategy → vitest.config.ts_
 
-- [ ] 3.2 Generate v6.0.6 baseline snapshots for byte-equal regression
+- [x] 3.2 Generate v6.0.6 baseline snapshots for byte-equal regression
   - **Do**:
     1. `git worktree add /tmp/v6 v6.0.6`
     2. For each of 4 hooks: feed fixed fixtures from `tests/hooks/fixtures/`; capture stdout to `tests/hooks/baselines/v6.0.6/<hook>/<fixture>.txt`

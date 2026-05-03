@@ -1,0 +1,5 @@
+[curdx-flow] Session stopped during spec: done-spec | Task: 3/2 | Attempt: 1
+/tmp/v6/plugins/curdx-flow/hooks/scripts/stop-watcher.sh: line 196: [: 0
+0: integer expression expected
+[curdx-flow] All tasks verified complete for done-spec
+EXIT_CODE=0

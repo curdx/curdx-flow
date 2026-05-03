@@ -1,0 +1,6 @@
+{
+  "decision": "block",
+  "reason": "ERROR: Corrupt state file at ./specs/corrupt-spec/.curdx-state.json\n\nRecovery options:\n1. Reset state: /curdx-flow:implement (reinitializes from tasks.md)\n2. Cancel spec: /curdx-flow:cancel",
+  "systemMessage": "curdx-flow: corrupt state file"
+}
+EXIT_CODE=0
