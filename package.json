@@ -15,6 +15,7 @@
     "build": "tsup",
     "build:hooks": "node scripts/build-hooks.mjs",
     "dev": "tsup --watch",
+    "test:hooks": "vitest run tests/hooks --passWithNoTests",
     "start": "node ./dist/index.mjs",
     "typecheck": "tsc --noEmit",
     "check-versions": "node scripts/check-versions.mjs",

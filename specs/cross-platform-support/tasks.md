@@ -541,7 +541,7 @@ Goal: clean up structure, error handling, types, normalize cross-platform path h
 
 Goal: vitest smoke + lib unit + byte-equal regression vs v6.0.6 baseline.
 
-- [ ] 3.1 Set up vitest.config.ts + tests/hooks/ structure
+- [x] 3.1 Set up vitest.config.ts + tests/hooks/ structure
   - **Do**:
     1. Create `vitest.config.ts` with `include: ['tests/hooks/**/*.test.ts']`, `pool: 'forks'`, `testTimeout: 5000`
     2. Create `tests/hooks/` and `tests/hooks/fixtures/` directories
