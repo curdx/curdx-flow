@@ -718,7 +718,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
   - _Requirements: FR-15_
   - _Design: Release 节奏 → beta.0_
 
-- [ ] 4.9 [VERIFY] Quality checkpoint: pre-PR full verify
+- [x] 4.9 [VERIFY] Quality checkpoint: pre-PR full verify
   - **Do**: `npm run verify && npm run build`
   - **Verify**: All exit 0
   - **Done when**: All gates green locally
@@ -726,7 +726,7 @@ NEVER push directly to default branch. Verify current branch is feature branch f
 
 ### Final verification sequence (V4 → V5 → V6 → VE1 → VE2 → VE3)
 
-- [ ] 4.10 V4 [VERIFY] Full local CI: typecheck + check-versions + check:hooks-fresh + test:hooks + build
+- [x] 4.10 V4 [VERIFY] Full local CI: typecheck + check-versions + check:hooks-fresh + test:hooks + build
   - **Do**:
     1. `npm run typecheck`
     2. `npm run check-versions`
