@@ -3,7 +3,7 @@
 Auto-generated summary of all specs across configured directories.
 See [index-state.json](./index-state.json) for machine-readable data.
 
-**Last updated:** 2026-05-03T12:32:47Z
+**Last updated:** 2026-05-03T13:07:38Z
 
 ## Directories (1)
 
@@ -15,8 +15,8 @@ See [index-state.json](./index-state.json) for machine-readable data.
 
 | Spec | Directory | Phase | Status |
 |------|-----------|-------|--------|
-| cross-platform-support | ./specs | execution | 13/76 tasks |
 | superpowers-inline-review | ./specs | new |  |
+| cross-platform-support | ./specs | execution | 22/76 tasks |
 
 ---
 
