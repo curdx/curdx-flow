@@ -66,21 +66,7 @@ import { getSpecsDirs, resolveCurrent } from "./_shared/path-resolver.js";
 import { writeFileAtomic } from "./_shared/atomic-write.js";
 import { extractTaskBlock } from "./_shared/markdown-task-parser.js";
 import type { BlockDecisionOutput } from "./_shared/types.js";
-
-interface CurdxState {
-  phase?: string;
-  taskIndex?: number;
-  totalTasks?: number;
-  taskIteration?: number;
-  quickMode?: boolean;
-  nativeSyncEnabled?: boolean;
-  globalIteration?: number;
-  maxGlobalIterations?: number;
-  awaitingApproval?: boolean;
-  recoveryMode?: boolean;
-  maxTaskIterations?: number;
-  epicName?: string;
-}
+import type { CurdxState } from "./_shared/types.js";
 
 interface EpicState {
   specs?: Array<{ name: string; status?: string; [k: string]: unknown }>;
@@ -604,6 +590,13 @@ runHook(async (input) => {
     state = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
   } catch {
     return buildCorruptStateBlock(specPath);
+  }
+
+  // Completion marker (v7.1.0): if the spec has been finalized, exit silently.
+  // Strict equality on `completed === true` (NFR-2 backwards-compat: v7.0.x
+  // states lack the field; treat undefined as in-progress).
+  if (state.completed === true) {
+    return;
   }
 
   // Read state fields with v6 defaults.
