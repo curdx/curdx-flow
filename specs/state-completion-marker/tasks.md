@@ -318,7 +318,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
 
 ### 2E. Doc/comment sync
 
-- [ ] 2.16 [P] Update `commit-discipline.md` L70 comment
+- [x] 2.16 [P] Update `commit-discipline.md` L70 comment
   - **Do**:
     1. Open `plugins/curdx-flow/references/commit-discipline.md`; change L70 comment to: `# .curdx-state.json - never committed (retained on completion with completed:true marker)`
   - **Files**: `plugins/curdx-flow/references/commit-discipline.md`
@@ -328,7 +328,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-15_
   - _Design: §15_
 
-- [ ] 2.17 [P] Update `help.md` L110 comment
+- [x] 2.17 [P] Update `help.md` L110 comment
   - **Do**:
     1. Open `plugins/curdx-flow/commands/help.md`; change L110 comment to: `# Loop state (marked completed:true on completion, retained for audit)`
   - **Files**: `plugins/curdx-flow/commands/help.md`
