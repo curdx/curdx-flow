@@ -55,6 +55,7 @@ For each spec directory found:
    - Current phase
    - Task progress (taskIndex/totalTasks)
    - Iteration count
+   - Completion marker: when `state.completed === true`, render `completed (<completedAt>)` in place of the phase label (use literal `unknown` if `completedAt` is missing). See §15 in design.md.
 
 2. Check which files exist:
    - research.md
@@ -128,6 +129,7 @@ Show phase status with indicators:
 - design: "Design"
 - tasks: "Tasks"
 - execution: "Executing" with task progress
+- completed: "completed (<completedAt>)" — shown when `state.completed === true` (overrides phase label)
 
 ## File Indicators
 

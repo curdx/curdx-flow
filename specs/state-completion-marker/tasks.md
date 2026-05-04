@@ -338,7 +338,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-15_
   - _Design: §15_
 
-- [ ] 2.18 [P] Update `status.md` L54 to display completed marker
+- [x] 2.18 [P] Update `status.md` L54 to display completed marker
   - **Do**:
     1. Open `plugins/curdx-flow/commands/status.md`
     2. After parse-state line, add display logic: when `state.completed === true`, render `completed (<completedAt>)` instead of phase
@@ -349,7 +349,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-15, AC-9.1_
   - _Design: §15_
 
-- [ ] 2.19 [P] Update `state-file-schema.md` with completion fields + phase transition
+- [x] 2.19 [P] Update `state-file-schema.md` with completion fields + phase transition
   - **Do**:
     1. Open `plugins/curdx-flow/skills/curdx-core/references/state-file-schema.md`
     2. Add `completed: boolean` and `completedAt: string (date-time)` field documentation
