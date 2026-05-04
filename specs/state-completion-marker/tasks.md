@@ -105,7 +105,7 @@ Focus: stand up the foundation primitives so all downstream readers / writers co
   - _Requirements: NFR-7_
   - _Design: §16_
 
-- [ ] 1.8 POC milestone: foundation primitives compile + tested
+- [x] 1.8 POC milestone: foundation primitives compile + tested
   - **Do**:
     1. Confirm `_shared/types.ts` exports `CurdxState` with `completed?: boolean`
     2. Confirm `merge-state.ts` `$unset` lib + 6 unit tests green
