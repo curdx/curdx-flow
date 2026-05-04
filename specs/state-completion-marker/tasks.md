@@ -228,7 +228,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-2, AC-1.1, AC-1.2, AC-1.4_
   - _Design: §10 #1_
 
-- [ ] 2.9 [P] Rewrite `coordinator-pattern.md` Native Sync Completion site (L540-543)
+- [x] 2.9 [P] Rewrite `coordinator-pattern.md` Native Sync Completion site (L540-543)
   - **Do**:
     1. Open `plugins/curdx-flow/references/coordinator-pattern.md`
     2. Replace the "Delete .curdx-state.json (cleanup execution state)" instruction at the Native Sync Completion section with the same merge-state write as 2.8

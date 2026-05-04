@@ -540,7 +540,12 @@ Before outputting ALL_TASKS_COMPLETE:
 
 Before outputting:
 1. Verify all tasks marked [x] in tasks.md
-2. Delete .curdx-state.json (cleanup execution state)
+2. Write completion marker to `.curdx-state.json` (preserve execution state for audit):
+   ```bash
+   COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
+   ```
+   > Note: This write is idempotent with the Check Completion write — coordinator may invoke either path; both produce the same final state.
 3. Keep .progress.md (preserve learnings and history)
 4. **Cleanup orphaned temp progress files** (from interrupted parallel batches):
    ```bash
