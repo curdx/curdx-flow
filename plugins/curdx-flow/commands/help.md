@@ -107,7 +107,7 @@ Specs are stored in `./specs/` by default:
 ./specs/
 ├── .current-spec           # Active spec name (or full path for multi-dir)
 ├── my-feature/
-│   ├── .curdx-state.json   # Loop state (deleted on completion)
+│   ├── .curdx-state.json   # Loop state (marked completed:true on completion, retained for audit)
 │   ├── .progress.md        # Progress tracking (persists)
 │   ├── research.md         # Research findings
 │   ├── requirements.md     # Requirements
