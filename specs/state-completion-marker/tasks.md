@@ -84,7 +84,7 @@ Focus: stand up the foundation primitives so all downstream readers / writers co
   - _Requirements: NFR-4, NFR-10_
   - _Design: §Test Strategy_
 
-- [ ] 1.6 [P] Stub `init-execution-state` test asserting `completed:false` is written
+- [x] 1.6 [P] Stub `init-execution-state` test asserting `completed:false` is written
   - **Do**:
     1. Open `tests/hooks/lib/init-execution-state.test.ts`; in the existing "writes embedded template" test (and parallel test cases at L7/L35/L52) add an assertion that the parsed JSON contains `completed: false`
   - **Files**: `tests/hooks/lib/init-execution-state.test.ts`
