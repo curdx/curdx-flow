@@ -304,7 +304,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-13, FR-14, FR-16, AC-1.2, AC-4.1, AC-10.1, AC-10.2, AC-10.3, AC-10.4_
   - _Design: §12, K-10_
 
-- [ ] 2.15 Update `spec-scanner.md` Resume Flow with completed branch
+- [x] 2.15 Update `spec-scanner.md` Resume Flow with completed branch
   - **Do**:
     1. Open `plugins/curdx-flow/references/spec-scanner.md`
     2. Locate Resume Flow (~L206-220)
