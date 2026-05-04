@@ -216,7 +216,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
 
 ### 2C. Writer prompts (coordinator-pattern + implement)
 
-- [ ] 2.8 [P] Rewrite `coordinator-pattern.md` Check Completion site (L75-84)
+- [x] 2.8 [P] Rewrite `coordinator-pattern.md` Check Completion site (L75-84)
   - **Do**:
     1. Open `plugins/curdx-flow/references/coordinator-pattern.md`
     2. Replace the `rm -f "$SPEC_PATH/.curdx-state.json"` line in the Check Completion section with the merge-state pattern (per design §10 #1): `COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")` + `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"`

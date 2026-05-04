@@ -76,9 +76,10 @@ If `nativeSyncEnabled` is `false`: skip all sync operations silently.
 
 If taskIndex >= totalTasks:
 1. Verify all tasks marked [x] in tasks.md
-2. Delete state file explicitly:
+2. Mark state as completed (preserve audit fields):
    ```bash
-   rm -f "$SPEC_PATH/.curdx-state.json"
+   COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
    ```
 3. Output: ALL_TASKS_COMPLETE
 4. STOP - do not delegate any task
