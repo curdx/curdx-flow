@@ -290,7 +290,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-10, AC-6.1, AC-6.3, AC-6.4_
   - _Design: §11, K-9_
 
-- [ ] 2.14 Update `start.md` Initialize state template + Resume Flow + ensure-gitignore wire
+- [x] 2.14 Update `start.md` Initialize state template + Resume Flow + ensure-gitignore wire
   - **Do**:
     1. Open `plugins/curdx-flow/commands/start.md`
     2. Locate Initialize state JSON template (~L131-141); add `"completed": false` field at end of object
