@@ -264,7 +264,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-2, AC-1.5_
   - _Design: §9_
 
-- [ ] 2.12 [VERIFY] Quality checkpoint after writer prompts
+- [x] 2.12 [VERIFY] Quality checkpoint after writer prompts
   - **Do**:
     1. Re-grep all writer prompt files for `rm -f .*\.curdx-state\.json` to confirm 0 occurrences
     2. Re-grep for `merge-state.mjs` references in coordinator-pattern.md (≥ 3) and implement.md (≥ 1)
