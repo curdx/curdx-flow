@@ -72,7 +72,7 @@ Focus: stand up the foundation primitives so all downstream readers / writers co
   - _Requirements: FR-10, AC-6.1_
   - _Design: §2, §Test Strategy U-1..U-6_
 
-- [ ] 1.5 [VERIFY] Quality checkpoint after foundation
+- [x] 1.5 [VERIFY] Quality checkpoint after foundation
   - **Do**:
     1. Run `npm run build:hooks` to bundle `merge-state.mjs` and `init-execution-state.mjs`
     2. Run `npm run typecheck`

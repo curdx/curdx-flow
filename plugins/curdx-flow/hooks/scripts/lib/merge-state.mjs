@@ -36,6 +36,23 @@ function deepMerge(base, patch) {
   }
   return out;
 }
+function stripUnset(patch) {
+  if (!isPlainObject(patch)) return patch;
+  const { $unset: _drop, ...rest } = patch;
+  return rest;
+}
+function applyUnset(target, patch) {
+  if (!isPlainObject(target) || !isPlainObject(patch)) return target;
+  const unsetVal = patch["$unset"];
+  if (unsetVal === void 0) return target;
+  if (!Array.isArray(unsetVal) || !unsetVal.every((k) => typeof k === "string")) {
+    process.stderr.write("merge-state: $unset must be string[]\n");
+    process.exit(1);
+  }
+  const out = { ...target };
+  for (const key of unsetVal) delete out[key];
+  return out;
+}
 function main() {
   const args = process.argv.slice(2);
   const stateFile = args[0];
@@ -71,7 +88,9 @@ function main() {
     );
     process.exit(1);
   }
-  const merged = deepMerge(base, patch);
+  const cleanPatch = stripUnset(patch);
+  let merged = deepMerge(base, cleanPatch);
+  merged = applyUnset(merged, patch);
   const serialized = JSON.stringify(merged) + "\n";
   writeFileAtomic(stateFile, serialized);
   process.stdout.write(serialized);
