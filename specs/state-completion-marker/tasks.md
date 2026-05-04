@@ -141,7 +141,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
 
 ### 2B. Reader hooks (5 files; [P] within layer because separate files)
 
-- [ ] 2.2 [P] Refactor `stop-watcher.ts` — drop inline interface + import shared + add strict guard
+- [x] 2.2 [P] Refactor `stop-watcher.ts` — drop inline interface + import shared + add strict guard
   - **Do**:
     1. Delete the inline `interface CurdxState { ... }` block (~L70-83)
     2. Add `import type { CurdxState } from "./_shared/types.js";` at top
@@ -167,7 +167,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-6, FR-7, FR-12, AC-3.1, AC-3.2, AC-3.3, AC-3.4_
   - _Design: §5, K-3_
 
-- [ ] 2.4 [P] Refactor `load-spec-context.ts` — drop inline interface + completed hint
+- [x] 2.4 [P] Refactor `load-spec-context.ts` — drop inline interface + completed hint
   - **Do**:
     1. Delete the inline `interface CurdxState { ... }` (~L27-32)
     2. Add `import type { CurdxState } from "./_shared/types.js";`
