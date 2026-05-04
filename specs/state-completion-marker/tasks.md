@@ -192,7 +192,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-9, FR-12, AC-5.1, AC-5.3_
   - _Design: §6, K-2_
 
-- [ ] 2.6 [VERIFY] Strict equality lint — assert `state.completed === true` ≥ 4 times across reader hooks
+- [x] 2.6 [VERIFY] Strict equality lint — assert `state.completed === true` ≥ 4 times across reader hooks
   - **Do**:
     1. Grep all 4 reader hooks for `state.completed === true`
     2. Grep for the forbidden truthy form `if (state.completed)` (without `=== true`) — must be 0 occurrences
