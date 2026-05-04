@@ -15,6 +15,10 @@
  *
  * No behavior change from extraction — every field below mirrors what the
  * 4 hooks already declared inline.
+ *
+ * NOTE: types-only module, no runtime exports. All declarations below are
+ * `export interface` / `export type` only and are erased at compile time
+ * (esbuild ESM bundling drops type-only imports — see design.md §6 K-2).
  */
 
 /**
@@ -96,3 +100,48 @@ export type HookOutput =
   | ContextBlockOutput
   | DenyDecisionOutput
   | BlockDecisionOutput;
+
+/**
+ * Per-spec runtime state, persisted at `<basePath>/.curdx-state.json`.
+ *
+ * Single source of truth for the 4 readers (load-spec-context,
+ * quick-mode-guard, stop-watcher, update-spec-index) — replaces the inline
+ * `interface CurdxState` copies that previously existed in each hook
+ * (per design.md §1, K-2; FR-12 same-name constraint auto-satisfied via
+ * shared module). esbuild bundling collapses these `import type` references
+ * to zero runtime cost.
+ *
+ * All fields optional — readers must tolerate v7.0.x states that lack
+ * `completed` / `completedAt` and treat `completed === undefined` as
+ * in-progress (NFR-2 backwards-compat). All consumers use strict
+ * `state.completed === true` equality, never truthiness.
+ *
+ * NOTE: this interface is for hook readers. Writers (coordinator /
+ * `commands/implement.md` via `merge-state.mjs`) are not type-checked
+ * against this — the persistent schema lives in
+ * `plugins/curdx-flow/schemas/spec.schema.json`.
+ */
+export interface CurdxState {
+  // identity
+  source?: "spec" | "plan" | "direct";
+  name?: string;
+  basePath?: string;
+  phase?: string;
+  // ephemeral / loop control
+  taskIndex?: number;
+  totalTasks?: number;
+  taskIteration?: number;
+  maxTaskIterations?: number;
+  globalIteration?: number;
+  maxGlobalIterations?: number;
+  awaitingApproval?: boolean;
+  recoveryMode?: boolean;
+  nativeSyncEnabled?: boolean;
+  // mode
+  quickMode?: boolean;
+  granularity?: "fine" | "coarse";
+  epicName?: string;
+  // completion marker (v7.1.0)
+  completed?: boolean;
+  completedAt?: string;
+}

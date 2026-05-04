@@ -27,7 +27,7 @@
 
 Focus: stand up the foundation primitives so all downstream readers / writers compile and have $unset semantics. POC milestone = `npm run typecheck` + new merge-state $unset unit cases pass.
 
-- [ ] 1.1 Add `CurdxState` interface to `_shared/types.ts`
+- [x] 1.1 Add `CurdxState` interface to `_shared/types.ts`
   - **Do**:
     1. Open `src/hooks/_shared/types.ts`; append new `export interface CurdxState { ... }` block per design §1 (full set of optional fields incl. `completed?: boolean`, `completedAt?: string`)
     2. Add file-level JSDoc note: "types-only module, no runtime exports"
