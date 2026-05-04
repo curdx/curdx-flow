@@ -462,6 +462,8 @@ Replace generic "Quality Checkpoint" tasks with [VERIFY] tagged tasks:
   - **Commit**: None
 ```
 
+**AC list format inside V6 task body**: when V6 enumerates the AC checklist, write each item as a plain bullet (e.g. `- AC-1.1 — covered by …`) or a numbered list (`1. AC-1.1 — …`). Do **NOT** use `- [ ] AC-1.1` checkbox bullets — those collide with the task-progress regex (`^[-*]\s+\[[\sxX]\]\s+(?:\d+\.\d+|V\d+|VE\d+|VF)`). Reserved checkbox prefixes are limited to task IDs like `1.1`, `V1`, `VE1`, `VF`. Same rule applies to FR / NFR / US enumerations embedded in any task body.
+
 **Standard format**: All [VERIFY] tasks follow Do/Verify/Done when/Commit format like regular tasks.
 
 **Discovery**: Read research.md for actual project commands. Do NOT assume `pnpm lint` or `npm test` exists.
@@ -862,9 +864,27 @@ Every tasks output follows this order:
 - Production TODOs: [list]
 ```
 
+## Tasks.md Format Contract
+
+<mandatory>
+**This contract is enforced by `hooks/scripts/update-spec-index.mjs` — any deviation breaks progress tracking.**
+
+1. **Every task is a top-level list-item with a checkbox and a task-id token immediately after**:
+   `- [ ] 1.1 …` / `- [x] 1.2 [P] …` / `- [ ] V1 [VERIFY] …` / `- [ ] VE1 [VERIFY] …` / `- [ ] VF [VERIFY] …`
+   Recognized id tokens: `\d+\.\d+`, `V\d+`, `VE\d+`, `VF`. Anything else (e.g. `### Task X.Y: … [x]` headlines) will NOT be tracked.
+
+2. **Reserved tokens that MUST NOT appear after a `- [ ]` / `- [x]` checkbox**: `AC-…`, `FR-…`, `NFR-…`, `US-…`. These are reference identifiers, not units of execution work — putting them after a checkbox makes the progress tracker count requirements as tasks (real-world breakage: test003/specs/helloworld, May 2026 → reported `0/10 tasks` for a fully-completed 4-task spec).
+
+3. **AC / FR / NFR / US lists embedded inside any task body**: write them as plain bullets (`- AC-1.1 — …`) or numbered (`1. AC-1.1 — …`). Never `- [ ] AC-1.1`.
+
+4. **Headlines (`### Task X.Y: …`) are forbidden as the primary task line** — they are not parsed and even if they carry a `[x]` suffix the tracker ignores them.
+</mandatory>
+
 ## Quality Checklist
 
 Before completing tasks:
+- [ ] All tasks use the `- [ ] <task-id> …` list-item format (no `### Task` headlines)
+- [ ] No `- [ ]` checkbox lines reference AC/FR/NFR/US ids (use plain bullets instead)
 - [ ] All tasks have <= 4 Do steps
 - [ ] All tasks touch <= 3 files (except test+impl pairs)
 - [ ] All tasks reference requirements/design

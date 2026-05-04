@@ -2,6 +2,16 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.0.2 — 2026-05-04
+
+### Fixed
+
+- **`update-spec-index` fallback no longer mis-counts AC/FR/NFR/US checklist items as tasks.** Inherited from the v6 `update-spec-index.sh` shell baseline, the fallback regex (`/- \[x\]/g`, `/- \[.\]/g`) counted any markdown checkbox in `tasks.md` — including `- [ ] AC-1.1: …` lines that task-planner's V6 verify task body emits as the AC enumeration. Real-world breakage: `test003/specs/helloworld` (a fully-completed 4-task spec authored with `### Task X.Y: … [x]` headlines + 10 `- [ ] AC-X.Y` entries) reported as `0/10 tasks` in `tasks` phase. Verified the same bug reproduces 1:1 in upstream `ralph-specum`'s shell hook — this is an inherited issue, not a v7 regression.
+  - **Tracker pattern is now strict and aligned with OpenSpec's tracker** (`^[-*]\s+\[[\sxX]\]`): `^[-*]\s+\[([ xX])\]\s+(?:\d+\.\d+|V\d+|VE\d+|VF)(?:\s|$)` — checkbox MUST be followed by a recognized task-id token (`1.1`, `V1`, `VE1`, `VF`). AC/FR/NFR/US prefixes are excluded.
+  - **`.curdx-state.json` missing + zero recognizable tasks + `.progress.md` present → `phase: completed`** (no fabricated `taskIndex` / `totalTasks`). Honest "I can't reliably parse this format" silence over a half-confident count.
+  - **Format contract published in two places**: `agents/task-planner.md` gains a "Tasks.md Format Contract" mandatory section + Quality Checklist entries; `schemas/spec.schema.json` documents the regex and the reserved id prefixes on the `task` definition.
+  - Files: `src/hooks/update-spec-index.ts`, `plugins/curdx-flow/agents/task-planner.md`, `plugins/curdx-flow/schemas/spec.schema.json`, `tests/hooks/update-spec-index.test.ts` (+2 regression tests: AC pollution + test003 reality). All 57 hook tests + 16 byte-equal v6.0.6 baselines pass.
+
 ## 7.0.1 — 2026-05-03
 
 ### Fixed

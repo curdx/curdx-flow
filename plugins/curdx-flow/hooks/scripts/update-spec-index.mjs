@@ -232,6 +232,16 @@ function readState(specFs) {
     return null;
   }
 }
+var TASK_LIST_PATTERN = /^[-*]\s+\[([ xX])\]\s+(?:\d+\.\d+|V\d+|VE\d+|VF)(?:\s|$)/gm;
+function countTasks(raw) {
+  let completed = 0;
+  let total = 0;
+  for (const m of raw.matchAll(TASK_LIST_PATTERN)) {
+    total++;
+    if (m[1] === "x" || m[1] === "X") completed++;
+  }
+  return { completed, total };
+}
 function inferPhaseFromFiles(specFs) {
   const tasksFile = join2(specFs, "tasks.md");
   if (existsSync2(tasksFile)) {
@@ -241,10 +251,12 @@ function inferPhaseFromFiles(specFs) {
     } catch {
       raw = "";
     }
-    const completed = (raw.match(/- \[x\]/g) ?? []).length;
-    const total = (raw.match(/- \[.\]/g) ?? []).length;
+    const { completed, total } = countTasks(raw);
     if (total > 0 && completed === total) {
       return { phase: "completed", completed, total };
+    }
+    if (total === 0 && existsSync2(join2(specFs, ".progress.md"))) {
+      return { phase: "completed", completed: 0, total: 0 };
     }
     return { phase: "tasks", completed, total };
   }

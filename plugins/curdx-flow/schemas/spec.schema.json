@@ -251,7 +251,7 @@
 
     "task": {
       "type": "object",
-      "description": "Individual task structure in tasks.md",
+      "description": "Individual task structure in tasks.md. PROGRESS-TRACKING CONTRACT: each task MUST be authored as a top-level list-item with a checkbox followed immediately by a recognized task-id token, e.g. `- [ ] 1.1 …`, `- [x] 1.2 [P] …`, `- [ ] V1 [VERIFY] …`, `- [ ] VE1 [VERIFY] …`, `- [ ] VF [VERIFY] …`. Recognized id tokens: `\\d+\\.\\d+`, `V\\d+`, `VE\\d+`, `VF`. The hook `update-spec-index.mjs` parses tasks.md with `^[-*]\\s+\\[([ xX])\\]\\s+(?:\\d+\\.\\d+|V\\d+|VE\\d+|VF)(?:\\s|$)` and ignores everything else (including `### Task X.Y: … [x]` headlines). Reserved id prefixes that MUST NOT appear after a `- [ ]` / `- [x]` checkbox: `AC-`, `FR-`, `NFR-`, `US-` — those are reference identifiers, not units of work; embedding them as `- [ ] AC-1.1` collides with the tracker (real-world breakage: test003/specs/helloworld May 2026 reported 0/10 for a completed 4-task spec). Inside task bodies, render AC/FR/NFR/US enumerations as plain bullets (`- AC-1.1 — …`) or numbered lists.",
       "required": ["id", "do", "files", "done_when", "verify"],
       "properties": {
         "id": {

@@ -153,9 +153,66 @@ function readState(specFs: string): CurdxState | null {
 }
 
 /**
- * Mirrors v6 fallback phase detection used when no state file exists.
- * Returns phase + completed/total task counts (counts only meaningful for
- * the `tasks`/`completed` phases).
+ * Task-line pattern for fallback progress detection.
+ *
+ * Why this precise pattern (vs v6's loose `- [x]` / `- [.]` greps):
+ *
+ * v6 counted any markdown checkbox, including AC/FR/NFR reference lists that
+ * task-planner's V6 task body embeds for the AC-checklist verify
+ * (`- [ ] AC-1.1: …`). Those are NOT tasks, but v6 treated them as such — so
+ * a finished spec whose tasks used `### Task X.Y … [x]` headlines (a
+ * non-standard LLM-written form) and whose only `- [ ]` lines were 10 AC
+ * items reported `0/10 in tasks phase`. Real-world repro:
+ * test003/specs/helloworld (May 2026).
+ *
+ * Aligning with OpenSpec's tracker (`^[-*]\s+\[[\sxX]\]`), we additionally
+ * REQUIRE a task-id token immediately after the checkbox, matching the
+ * curdx-flow convention from `templates/tasks.md` / `agents/task-planner.md`:
+ *   - `- [ ] 1.1 …`           regular task (Phase.Task numbering)
+ *   - `- [ ] 1.2 [P] …`       parallel task
+ *   - `- [ ] 1.3 [VERIFY] …`  verify task
+ *   - `- [ ] V1 [VERIFY] …`   quality-gate task
+ *   - `- [ ] VE1 [VERIFY] …`  E2E task
+ *   - `- [ ] VF [VERIFY] …`   bug-fix verification
+ * AC/FR/NFR/US tokens are reserved for reference lists and are explicitly
+ * excluded — those don't represent units of execution work.
+ *
+ * Non-standard formats (`### Task` headlines, etc.) are intentionally NOT
+ * counted. The fallback prefers honest "I can't parse this" silence over
+ * a half-confident count: when no list-items match we still infer the
+ * lifecycle phase from `.progress.md` presence, but we do not fabricate
+ * task numerators/denominators we can't justify.
+ */
+const TASK_LIST_PATTERN =
+  /^[-*]\s+\[([ xX])\]\s+(?:\d+\.\d+|V\d+|VE\d+|VF)(?:\s|$)/gm;
+
+/** Count completed and total tasks in tasks.md content. */
+function countTasks(raw: string): { completed: number; total: number } {
+  let completed = 0;
+  let total = 0;
+  for (const m of raw.matchAll(TASK_LIST_PATTERN)) {
+    total++;
+    if (m[1] === "x" || m[1] === "X") completed++;
+  }
+  return { completed, total };
+}
+
+/**
+ * Fallback phase detection used when `.curdx-state.json` is absent.
+ *
+ * Phase resolution order:
+ *   1. tasks.md present + every task `[x]` → "completed"
+ *   2. tasks.md present + zero task lines recognized + .progress.md present
+ *      → "completed" (lifecycle: implement loop deletes state on success
+ *      while preserving .progress.md; tasks.md may be in any format)
+ *   3. tasks.md present + at least one task line                → "tasks"
+ *   4. design.md / requirements.md / research.md presence       → that phase
+ *   5. nothing                                                  → "new"
+ *
+ * The completed/total counts are returned but only treated as meaningful by
+ * `buildSpecRecord` / `computeStatusCell` when total > 0. A "completed via
+ * .progress.md presence" branch returns 0/0 — we don't fabricate task
+ * counts when we couldn't actually parse any.
  */
 function inferPhaseFromFiles(specFs: string): {
   phase: string;
@@ -170,11 +227,12 @@ function inferPhaseFromFiles(specFs: string): {
     } catch {
       raw = "";
     }
-    // v6 used `grep -c '\- \[x\]'` and `grep -c '\- \[.\]'`.
-    const completed = (raw.match(/- \[x\]/g) ?? []).length;
-    const total = (raw.match(/- \[.\]/g) ?? []).length;
+    const { completed, total } = countTasks(raw);
     if (total > 0 && completed === total) {
       return { phase: "completed", completed, total };
+    }
+    if (total === 0 && existsSync(join(specFs, ".progress.md"))) {
+      return { phase: "completed", completed: 0, total: 0 };
     }
     return { phase: "tasks", completed, total };
   }
