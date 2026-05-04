@@ -180,7 +180,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-8, FR-12, AC-4.1, AC-4.2, AC-4.3_
   - _Design: §4, K-3_
 
-- [ ] 2.5 [P] Refactor `quick-mode-guard.ts` — type-only swap (drop inline + import shared)
+- [x] 2.5 [P] Refactor `quick-mode-guard.ts` — type-only swap (drop inline + import shared)
   - **Do**:
     1. Delete the inline `interface CurdxState { ... }` (~L25-27)
     2. Add `import type { CurdxState } from "./_shared/types.js";`

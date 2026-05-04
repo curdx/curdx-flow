@@ -20,11 +20,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { runHook } from "./_shared/run-hook.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
-import type { DenyDecisionOutput } from "./_shared/types.js";
-
-interface CurdxState {
-  quickMode?: boolean;
-}
+import type { CurdxState, DenyDecisionOutput } from "./_shared/types.js";
 
 const QUICK_MODE_REASON =
   "Quick mode active: do NOT ask the user any questions. Make opinionated decisions autonomously. Choose the simplest, most conventional approach.";
