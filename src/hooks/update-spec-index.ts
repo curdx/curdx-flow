@@ -41,6 +41,7 @@ import { runHook } from "./_shared/run-hook.js";
 // the canonical reference so the shared envelope module is the single source
 // of truth across all 4 hooks (per task 2.1).
 import type { HookOutput as _HookOutputRef } from "./_shared/types.js";
+import type { CurdxState } from "./_shared/types.js";
 type _UnusedHookOutput = _HookOutputRef;
 
 interface CliOptions {
@@ -68,13 +69,6 @@ interface IndexState {
   updated: string;
   directories: DirectoryRecord[];
   specs: SpecRecord[];
-}
-
-interface CurdxState {
-  phase?: string;
-  taskIndex?: number;
-  totalTasks?: number;
-  awaitingApproval?: boolean;
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -276,6 +270,24 @@ function buildSpecRecord(
   };
 
   if (state) {
+    // v7.1.0 completion marker: when the executor has written
+    // `completed: true`, surface phase=completed in the index regardless of
+    // any stale `phase` field. Short-circuits inferPhaseFromFiles entirely
+    // (FR-6, AC-3.1/3.2). Only emit task counters when totalTasks > 0 so
+    // we don't fabricate `0/0 tasks` for state that lacks the counter.
+    if (state.completed === true) {
+      record.phase = "completed";
+      const totalTasks =
+        typeof state.totalTasks === "number" ? state.totalTasks : 0;
+      if (totalTasks > 0) {
+        const taskIndex =
+          typeof state.taskIndex === "number" ? state.taskIndex : 0;
+        record.taskIndex = taskIndex;
+        record.totalTasks = totalTasks;
+      }
+      return record;
+    }
+
     const phase = state.phase ?? "unknown";
     const taskIndex =
       typeof state.taskIndex === "number" ? state.taskIndex : 0;

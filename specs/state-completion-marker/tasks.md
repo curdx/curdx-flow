@@ -154,7 +154,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-5, FR-12, AC-2.1, AC-2.2, AC-2.3, AC-2.4_
   - _Design: §3, K-3_
 
-- [ ] 2.3 [P] Refactor `update-spec-index.ts` — drop inline interface + short-circuit phase=completed
+- [x] 2.3 [P] Refactor `update-spec-index.ts` — drop inline interface + short-circuit phase=completed
   - **Do**:
     1. Delete the inline `interface CurdxState { ... }` block (~L73-78)
     2. Add `import type { CurdxState } from "./_shared/types.js";`
