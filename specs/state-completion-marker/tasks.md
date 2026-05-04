@@ -240,7 +240,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-2, AC-1.4_
   - _Design: §10 #2_
 
-- [ ] 2.10 [P] Rewrite `coordinator-pattern.md` PR Lifecycle Step 5 site (L758-765)
+- [x] 2.10 [P] Rewrite `coordinator-pattern.md` PR Lifecycle Step 5 site (L758-765)
   - **Do**:
     1. Open `plugins/curdx-flow/references/coordinator-pattern.md`
     2. Replace the "Delete .curdx-state.json" line in PR Lifecycle Step 5 with the same merge-state pattern

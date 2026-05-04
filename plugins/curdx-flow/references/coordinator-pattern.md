@@ -765,7 +765,11 @@ All must be true:
 
 When all Step 4 criteria met:
 1. Update .progress.md with final state
-2. Delete .curdx-state.json
+2. Mark spec completed in `.curdx-state.json`:
+   ```bash
+   COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
+   ```
 3. Get PR URL: `gh pr view --json url -q .url`
 4. Output: ALL_TASKS_COMPLETE
 5. Output: PR link
