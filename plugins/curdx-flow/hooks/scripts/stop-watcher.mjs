@@ -531,6 +531,9 @@ runHook(async (input) => {
   } catch {
     return buildCorruptStateBlock(specPath);
   }
+  if (state.completed === true) {
+    return;
+  }
   const phase = typeof state.phase === "string" ? state.phase : "unknown";
   const taskIndex = typeof state.taskIndex === "number" ? state.taskIndex : 0;
   const totalTasks = typeof state.totalTasks === "number" ? state.totalTasks : 0;

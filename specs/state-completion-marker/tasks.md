@@ -203,7 +203,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-12, NFR-2, AC-8.1_
   - _Design: K-3_
 
-- [ ] 2.7 [VERIFY] Quality checkpoint after reader refactor
+- [x] 2.7 [VERIFY] Quality checkpoint after reader refactor
   - **Do**:
     1. Run `npm run typecheck`
     2. Run `npm run build:hooks`

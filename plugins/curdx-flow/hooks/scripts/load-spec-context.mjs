@@ -234,6 +234,16 @@ runHook(async (input) => {
     }
   }
   if (state) {
+    if (state.completed === true) {
+      const at = typeof state.completedAt === "string" ? state.completedAt : "unknown";
+      process4.stderr.write(
+        `[curdx-flow] Spec completed: ${specName} (${at}). Run /curdx-flow:refactor to reopen or /curdx-flow:new for a new spec.
+`
+      );
+      block.phase = "completed";
+      block.awaitingApproval = false;
+      return block;
+    }
     const phase = state.phase ?? "unknown";
     const taskIndex = typeof state.taskIndex === "number" ? state.taskIndex : 0;
     const totalTasks = typeof state.totalTasks === "number" ? state.totalTasks : 0;
