@@ -126,7 +126,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
 
 ### 2A. Schema (no behavior change)
 
-- [ ] 2.1 Extend `spec.schema.json` with `completed` + `completedAt` properties
+- [x] 2.1 Extend `spec.schema.json` with `completed` + `completedAt` properties
   - **Do**:
     1. Open `plugins/curdx-flow/schemas/spec.schema.json`; in `definitions.state.properties` append:
        - `completed`: `{ "type": "boolean", "default": false, "description": "..." }`
