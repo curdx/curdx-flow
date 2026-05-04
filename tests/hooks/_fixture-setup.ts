@@ -78,6 +78,7 @@ const DEFAULT_STATE = {
   recoveryMode: false,
   nativeSyncEnabled: false,
   granularity: "fine",
+  completed: false,
 };
 
 const DEFAULT_TASKS_MD =

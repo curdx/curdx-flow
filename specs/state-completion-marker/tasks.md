@@ -94,7 +94,7 @@ Focus: stand up the foundation primitives so all downstream readers / writers co
   - _Requirements: FR-13, AC-1.2_
   - _Design: §7, §Test Strategy fixture clean-up_
 
-- [ ] 1.7 [P] Update `_fixture-setup.ts` `DEFAULT_STATE` with `completed:false`
+- [x] 1.7 [P] Update `_fixture-setup.ts` `DEFAULT_STATE` with `completed:false`
   - **Do**:
     1. Open `tests/hooks/_fixture-setup.ts`; locate `DEFAULT_STATE` (L64-81)
     2. Append `completed: false` to default state object (preserve other keys; do not change `createFixtureSpec` signature)
