@@ -2,6 +2,12 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.0.1 — 2026-05-03
+
+### Fixed
+
+- **`/curdx-flow:start` and any non-quick command crashed at the first `AskUserQuestion`** (branch decision, specs-dir prompt, goal clarification, etc.). Root cause: v7.0.0's `quick-mode-guard.mjs` (PreToolUse hook) emitted `{decision:"allow"}` on the allow path and `{decision:"deny", reason:..., ...}` on the deny path. Claude Code's PreToolUse output schema rejects `decision` values other than `"approve"|"block"`, causing `Hook JSON output validation failed — (root): Invalid input` and silently blocking `AskUserQuestion`. The v6 bash baseline emitted nothing on allow (`exit 0`) and only `{hookSpecificOutput:{permissionDecision:"deny"}, systemMessage:"..."}` on deny — fixed by reverting v7's output to byte-equal v6 shape. Files: `src/hooks/quick-mode-guard.ts`, `src/hooks/_shared/types.ts` (removed `AllowDecisionOutput`, narrowed `DenyDecisionOutput`), `tests/hooks/quick-mode-guard.test.ts` (updated assertions). All 55 hook tests + 16 byte-equal regression tests against v6.0.6 pass.
+
 ## 7.0.0-beta.2 — 2026-05-03
 
 ### Fixed

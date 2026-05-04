@@ -155,10 +155,7 @@ function resolveCurrent(opts) {
 
 // src/hooks/quick-mode-guard.ts
 var QUICK_MODE_REASON = "Quick mode active: do NOT ask the user any questions. Make opinionated decisions autonomously. Choose the simplest, most conventional approach.";
-var ALLOW = { decision: "allow" };
 var DENY = {
-  decision: "deny",
-  reason: QUICK_MODE_REASON,
   hookSpecificOutput: {
     permissionDecision: "deny"
   },
@@ -167,23 +164,25 @@ var DENY = {
 runHook(async (input) => {
   const cwd = input?.cwd;
   if (!cwd) {
-    return ALLOW;
+    return;
   }
   const specPath = resolveCurrent({ cwd });
   if (!specPath) {
-    return ALLOW;
+    return;
   }
   const stateFile = join2(cwd, specPath, ".curdx-state.json");
   if (!existsSync2(stateFile)) {
-    return ALLOW;
+    return;
   }
   let state;
   try {
     state = JSON.parse(readFileSync2(stateFile, "utf8"));
   } catch {
-    return ALLOW;
+    return;
   }
-  const out = state.quickMode === true ? DENY : ALLOW;
-  return out;
+  if (state.quickMode === true) {
+    return DENY;
+  }
+  return;
 });
 //# sourceMappingURL=quick-mode-guard.mjs.map

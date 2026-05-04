@@ -18,13 +18,15 @@
  */
 
 /**
- * Decision tags emitted by hooks.
- *  - `allow` / `deny`  : PreToolUse permission decisions (quick-mode-guard).
- *  - `block`           : Stop hook continuation (stop-watcher).
+ * Decision tags emitted by hooks at the top-level `decision` field.
+ *  - `block` : Stop hook continuation (stop-watcher).
  *
- * Matches Anthropic's PermissionDecision plus Stop's `block` verb.
+ * Note: PreToolUse permission decisions (quick-mode-guard) do NOT use the
+ * top-level `decision` field — Claude Code's schema rejects values other
+ * than `"approve"|"block"` there. Allow path emits nothing; deny path uses
+ * the `hookSpecificOutput.permissionDecision` shape only.
  */
-export type HookDecision = "allow" | "deny" | "block";
+export type HookDecision = "block";
 
 /**
  * Hook stdin envelope — superset of fields observed across the 4 hooks.
@@ -59,22 +61,13 @@ export interface ContextBlockOutput {
 }
 
 /**
- * PreToolUse permission decision (allow path) — emitted by quick-mode-guard
- * when AskUserQuestion is permitted.
- */
-export interface AllowDecisionOutput {
-  decision: "allow";
-}
-
-/**
  * PreToolUse permission decision (deny path) — emitted by quick-mode-guard
- * when quick mode is active. Carries both the simplified `decision`/`reason`
- * shape AND Claude Code's native `hookSpecificOutput` payload for
- * byte-equal-ish parity with the v6 bash baseline.
+ * when quick mode is active. Byte-equal to v6 bash baseline (NFR-7).
+ *
+ * Allow path is intentionally absent from this union: per v6 contract and
+ * Claude Code's PreToolUse schema, allow = empty stdout (no JSON).
  */
 export interface DenyDecisionOutput {
-  decision: "deny";
-  reason: string;
   hookSpecificOutput: {
     permissionDecision: "deny";
   };
@@ -95,9 +88,11 @@ export interface BlockDecisionOutput {
 /**
  * Tagged union of every JSON shape any curdx-flow hook emits on stdout.
  * Each emit-site narrows to one variant via the `decision`/`active` tag.
+ *
+ * Note: quick-mode-guard's allow path emits NOTHING (handler returns void),
+ * so it has no entry in this union. Only the deny path produces JSON.
  */
 export type HookOutput =
   | ContextBlockOutput
-  | AllowDecisionOutput
   | DenyDecisionOutput
   | BlockDecisionOutput;

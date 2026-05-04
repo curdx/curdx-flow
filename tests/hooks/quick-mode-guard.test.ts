@@ -21,7 +21,7 @@ describe("quick-mode-guard (PreToolUse hook for AskUserQuestion)", () => {
     quickInactive.cleanup();
   });
 
-  it("happy: quick mode active → exit 0, JSON decision=deny + permission-deny payload", () => {
+  it("happy: quick mode active → exit 0, deny payload (hookSpecificOutput + systemMessage, byte-equal to v6)", () => {
     const r = runHook(
       "quick-mode-guard",
       "tests/hooks/fixtures/quick-mode-guard/quick-active.json",
@@ -29,24 +29,25 @@ describe("quick-mode-guard (PreToolUse hook for AskUserQuestion)", () => {
     );
     expect(r.exitCode).toBe(0);
     expect(r.json).toBeDefined();
-    expect(r.json).toMatchObject({
-      decision: "deny",
-    });
+    // No top-level `decision` field — Claude Code's PreToolUse schema
+    // rejects `decision:"deny"` (only `"approve"|"block"` are valid).
+    expect((r.json as any).decision).toBeUndefined();
     expect((r.json as any).hookSpecificOutput).toMatchObject({
       permissionDecision: "deny",
     });
     expect((r.json as any).systemMessage).toMatch(/quick mode/i);
   });
 
-  it("edge: spec exists but quick mode is OFF → exit 0, JSON decision=allow", () => {
+  it("edge: spec exists but quick mode is OFF → exit 0, empty stdout (allow = no output)", () => {
     const r = runHook(
       "quick-mode-guard",
       "tests/hooks/fixtures/quick-mode-guard/quick-inactive.json",
       { cwd: quickInactive.cwd },
     );
     expect(r.exitCode).toBe(0);
-    expect(r.json).toBeDefined();
-    expect((r.json as any).decision).toBe("allow");
+    // Allow path emits NOTHING (matches v6 bash `exit 0` with no stdout).
+    expect(r.stdout).toBe("");
+    expect(r.json).toBeUndefined();
   });
 
   it("error: malformed stdin JSON → exit 0 (FR-8 never block) + stderr error message", () => {

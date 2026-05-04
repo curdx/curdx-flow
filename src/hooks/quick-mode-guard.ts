@@ -1,20 +1,17 @@
 /**
  * PreToolUse:AskUserQuestion hook — block AskUserQuestion when quick mode is on.
  *
- * Behaviour mirrors v6 `quick-mode-guard.sh` (47 LOC):
- *   1. Read JSON from stdin; need `cwd` field. Missing/empty → exit 0 (allow).
- *   2. Resolve current spec via _shared/path-resolver. No active spec → allow.
- *   3. Read `<cwd>/<specPath>/.curdx-state.json`. Missing → allow.
- *   4. If `quickMode === true`, emit deny JSON; otherwise allow JSON.
+ * Output contract (byte-equal to v6 `quick-mode-guard.sh` baseline, NFR-7):
+ *   - Allow path: emit nothing (return undefined). Claude Code's PreToolUse
+ *     hook treats empty stdout as implicit allow.
+ *   - Deny path: emit only `{hookSpecificOutput:{permissionDecision:"deny"},
+ *     systemMessage:"..."}`. This is the exact shape v6 bash produced.
  *
- * Output contract (per task 1.12 + design.md "Component Catalog → quick-mode-guard"):
- *   - Deny path emits BOTH the simplified `{decision:"deny",reason}` form AND the
- *     Claude Code native `{hookSpecificOutput:{permissionDecision:"deny"},systemMessage}`
- *     payload. The native fields preserve byte-equal-ish parity with v6 bash output
- *     (NFR-7) so the hook still suppresses AskUserQuestion in real sessions; the
- *     `decision`/`reason` fields satisfy task verify (`JSON.parse` on stdout).
- *   - Allow path emits `{decision:"allow"}`. v6 bash exited 0 silently for allow,
- *     so there is no byte-equal baseline to break.
+ * Why no top-level `decision` field: Claude Code's PreToolUse hook output
+ * schema validates `decision` against `"approve"|"block"` only. Earlier
+ * v7.0.0 added `decision:"allow"|"deny"` for "task verify parity"; that
+ * tripped schema validation ("(root): Invalid input") and silently blocked
+ * AskUserQuestion in normal-mode sessions. Fixed in v7.0.1.
  *
  * Error policy (FR-8): all uncaught errors are funneled through `runHook`,
  * which logs to stderr and exits 0. Hook NEVER blocks the Claude Code session.
@@ -23,11 +20,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { runHook } from "./_shared/run-hook.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
-import type {
-  AllowDecisionOutput,
-  DenyDecisionOutput,
-  HookOutput,
-} from "./_shared/types.js";
+import type { DenyDecisionOutput } from "./_shared/types.js";
 
 interface CurdxState {
   quickMode?: boolean;
@@ -36,11 +29,7 @@ interface CurdxState {
 const QUICK_MODE_REASON =
   "Quick mode active: do NOT ask the user any questions. Make opinionated decisions autonomously. Choose the simplest, most conventional approach.";
 
-const ALLOW: AllowDecisionOutput = { decision: "allow" };
-
 const DENY: DenyDecisionOutput = {
-  decision: "deny",
-  reason: QUICK_MODE_REASON,
   hookSpecificOutput: {
     permissionDecision: "deny",
   },
@@ -50,31 +39,28 @@ const DENY: DenyDecisionOutput = {
 runHook(async (input) => {
   const cwd = input?.cwd;
   if (!cwd) {
-    return ALLOW;
+    return;
   }
 
-  // Resolve active spec (uses CURDX_CWD env or process.cwd by default).
   const specPath = resolveCurrent({ cwd });
   if (!specPath) {
-    return ALLOW;
+    return;
   }
 
-  // fs IO — use `path.join` (native sep). `specPath` is posix-form from
-  // resolveCurrent; Node's fs APIs accept the mixed separator on Windows.
-  // Path policy: see _shared/path-resolver.ts header.
   const stateFile = join(cwd, specPath, ".curdx-state.json");
   if (!existsSync(stateFile)) {
-    return ALLOW;
+    return;
   }
 
   let state: CurdxState;
   try {
     state = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
   } catch {
-    // Malformed state file — treat as no quick-mode signal, allow.
-    return ALLOW;
+    return;
   }
 
-  const out: HookOutput = state.quickMode === true ? DENY : ALLOW;
-  return out;
+  if (state.quickMode === true) {
+    return DENY;
+  }
+  return;
 });
