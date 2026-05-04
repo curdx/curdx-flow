@@ -277,7 +277,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
 
 ### 2D. refactor + start
 
-- [ ] 2.13 Update `refactor.md` Step 6 Update State to use `$unset` reset
+- [x] 2.13 Update `refactor.md` Step 6 Update State to use `$unset` reset
   - **Do**:
     1. Open `plugins/curdx-flow/commands/refactor.md`
     2. Locate Step 6 / Update State section (~L108-114)
