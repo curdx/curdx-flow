@@ -50,7 +50,7 @@ Focus: stand up the foundation primitives so all downstream readers / writers co
   - _Requirements: FR-10, AC-6.1, AC-6.3_
   - _Design: §2, K-1_
 
-- [ ] 1.3 [P] Add `completed: false` default to `init-execution-state.ts` `EMBEDDED_TEMPLATE`
+- [x] 1.3 [P] Add `completed: false` default to `init-execution-state.ts` `EMBEDDED_TEMPLATE`
   - **Do**:
     1. Open `src/hooks/lib/init-execution-state.ts`; locate `EMBEDDED_TEMPLATE` block (~L22-36)
     2. Append `completed: false,` field at the end of the object literal (preserve existing field order)

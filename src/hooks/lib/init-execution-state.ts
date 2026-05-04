@@ -33,6 +33,7 @@ const EMBEDDED_TEMPLATE = {
   nativeTaskMap: {},
   nativeSyncEnabled: true,
   nativeSyncFailureCount: 0,
+  completed: false,
 };
 
 function loadTemplate(): string {
