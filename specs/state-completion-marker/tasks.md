@@ -10,7 +10,7 @@
 
 ## Phase 0: Scaffold
 
-- [ ] 0.1 Create feature branch
+- [x] 0.1 Create feature branch
   - **Do**:
     1. Run `git checkout -b feat/state-completion-marker` (or `git switch -c feat/state-completion-marker`)
     2. Confirm working tree clean before any edits
