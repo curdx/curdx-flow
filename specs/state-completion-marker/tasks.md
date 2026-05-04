@@ -38,7 +38,7 @@ Focus: stand up the foundation primitives so all downstream readers / writers co
   - _Requirements: FR-12, AC-2.4, AC-4.3, AC-5.3_
   - _Design: §1, K-2_
 
-- [ ] 1.2 [P] Implement `$unset` in `merge-state.ts` (`stripUnset` + `applyUnset`)
+- [x] 1.2 [P] Implement `$unset` in `merge-state.ts` (`stripUnset` + `applyUnset`)
   - **Do**:
     1. Open `src/hooks/lib/merge-state.ts`; add `applyUnset(target, patch)` and `stripUnset(patch)` helpers per design §2 / §Implementation Skeleton
     2. Replace the existing `const merged = deepMerge(base, patch)` (~L98) with: `const cleanPatch = stripUnset(patch); let merged = deepMerge(base, cleanPatch); merged = applyUnset(merged, patch);`

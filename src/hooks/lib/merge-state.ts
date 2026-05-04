@@ -57,6 +57,39 @@ function deepMerge(base: JsonValue, patch: JsonValue): JsonValue {
   return out;
 }
 
+/**
+ * Return a shallow copy of `patch` with the reserved `$unset` key removed.
+ * Used so deepMerge does not see `$unset` as a regular field. If `patch` is
+ * not a plain object, returns it unchanged.
+ */
+function stripUnset(patch: JsonValue): JsonValue {
+  if (!isPlainObject(patch)) return patch;
+  const { $unset: _drop, ...rest } = patch as { [key: string]: JsonValue };
+  return rest as JsonValue;
+}
+
+/**
+ * Apply MongoDB-style `$unset` semantics: read `patch.$unset` (string[]) and
+ * `delete` each listed key from `target` at the root level only (no recursion).
+ * Validates shape — non-array or non-string elements exit 1 with stderr.
+ * Returns `target` unchanged when `$unset` is absent.
+ */
+function applyUnset(target: JsonValue, patch: JsonValue): JsonValue {
+  if (!isPlainObject(target) || !isPlainObject(patch)) return target;
+  const unsetVal = patch["$unset"];
+  if (unsetVal === undefined) return target;
+  if (
+    !Array.isArray(unsetVal) ||
+    !unsetVal.every((k) => typeof k === "string")
+  ) {
+    process.stderr.write("merge-state: $unset must be string[]\n");
+    process.exit(1);
+  }
+  const out: { [key: string]: JsonValue } = { ...target };
+  for (const key of unsetVal as string[]) delete out[key];
+  return out;
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   const stateFile = args[0];
@@ -95,7 +128,9 @@ function main(): void {
     process.exit(1);
   }
 
-  const merged = deepMerge(base, patch);
+  const cleanPatch = stripUnset(patch);
+  let merged = deepMerge(base, cleanPatch);
+  merged = applyUnset(merged, patch);
   // Compact form (no whitespace between tokens) keeps the file's keys dense
   // and matches the verify gate `grep '"a":1'` (no-space-after-colon).
   const serialized = JSON.stringify(merged) + "\n";
