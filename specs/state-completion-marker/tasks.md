@@ -361,7 +361,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
   - _Requirements: FR-15, AC-9.5_
   - _Design: §14_
 
-- [ ] 2.20 [VERIFY] Quality checkpoint after refactor + start + docs
+- [x] 2.20 [VERIFY] Quality checkpoint after refactor + start + docs
   - **Do**:
     1. Run `npm run typecheck && npm run build:hooks && npm run test:hooks`
     2. Confirm legacy tests still pass (no failures)
