@@ -61,7 +61,7 @@ Focus: stand up the foundation primitives so all downstream readers / writers co
   - _Requirements: FR-13, AC-1.2_
   - _Design: §7_
 
-- [ ] 1.4 [P] Add merge-state `$unset` unit tests (U-1..U-6 from design §Test Strategy)
+- [x] 1.4 [P] Add merge-state `$unset` unit tests (U-1..U-6 from design §Test Strategy)
   - **Do**:
     1. Open `tests/hooks/lib/merge-state.test.ts`; append 6 new `it()` cases covering U-1 (basic unset), U-2 (combined with normal patch), U-3 (missing key no-op), U-4 (non-array invalid → exit 1 + stderr), U-5 (no-$unset patch transparent), U-6 (empty array no-op)
     2. Use existing test harness (spawn merge-state.mjs via tmpdir fixture)
