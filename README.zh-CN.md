@@ -191,24 +191,8 @@ Claude Code 写代码很快。但真实项目里它会跳过测试、跨会话�
 
 ---
 
-## 🧪 本地开发
-
-```bash
-git clone https://github.com/curdx/curdx-flow.git
-cd curdx-flow
-npm install
-npm run dev          # tsup watch 模式
-npm run typecheck
-npm run build
-node dist/index.mjs  # 烟雾测试
-```
-
-内置插件在 `plugins/curdx-flow/`。Hook（TypeScript）通过 `npm run build:hooks` 编出 `.mjs`；CI 用 `check:hooks-fresh` 把关，防止 bundle 跟源码错位。
-
-发版 SOP：看 [`CLAUDE.md`](./CLAUDE.md) — `npm run bump-version <patch|minor|major>` 原子化同步全部 5 个版本号字段，然后 `git tag vX.Y.Z && git push --tags` 触发发布工作流。
-
----
-
 ## 📜 许可证
 
 MIT。Fork 它。Ship 它。让它变成你的。
+
+> 想给项目贡献代码？看 [`CLAUDE.md`](./CLAUDE.md) — 本地开发环境和发版 SOP 都在那儿。

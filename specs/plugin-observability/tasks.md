@@ -87,7 +87,7 @@ created: 2026-05-05
   - _Requirements: FR-2, FR-3, FR-4, FR-6, FR-16, FR-17, FR-18, FR-20, NFR-7, AC-6.1_
   - _Design: D-1 size 倒退 / D-2 双键 / D-3 fallback_
 
-- [ ] **Task 2.2: 7 报告全量铺开 + schema map JSON + report 模块**
+- [x] **Task 2.2: 7 报告全量铺开 + schema map JSON + report 模块**
   - **Do**:
     1. 创建 `plugins/curdx-flow/schemas/transcript-events.json`（~150 行）：含 `hook_success` / `tool_use` / `assistant` / `user` 4 类 declarative 映射 + `extractCommandName: true` for user
     2. 创建 `src/analyze/report.ts`（~400 行）：7 段渲染（Hook失败 / Slash command 频次 / Subagent 热度 / Spec 漏斗扫 `./specs/*/.curdx-state.json.phase` / duration P50/P95/P99（样本<5 标"样本不足"）/ unknown_type / parentUuid 断链率）+ `--json` 切换

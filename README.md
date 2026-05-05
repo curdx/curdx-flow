@@ -191,24 +191,8 @@ The `<!-- BEGIN @curdx/flow v1 -->` block in your global `~/.claude/CLAUDE.md` t
 
 ---
 
-## 🧪 Local development
-
-```bash
-git clone https://github.com/curdx/curdx-flow.git
-cd curdx-flow
-npm install
-npm run dev          # tsup watch mode
-npm run typecheck
-npm run build
-node dist/index.mjs  # smoke test the CLI
-```
-
-The bundled plugin lives in `plugins/curdx-flow/`. Hooks (TypeScript) build to `.mjs` via `npm run build:hooks`; CI gates this with `check:hooks-fresh` to catch desynced bundles.
-
-Release SOP: see [`CLAUDE.md`](./CLAUDE.md) — `npm run bump-version <patch|minor|major>` syncs all 5 version fields atomically, then `git tag vX.Y.Z && git push --tags` triggers the publish workflow.
-
----
-
 ## 📜 License
 
 MIT. Fork it. Ship it. Make it yours.
+
+> Want to contribute? See [`CLAUDE.md`](./CLAUDE.md) for local dev setup and release SOP.

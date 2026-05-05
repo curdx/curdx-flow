@@ -1,64 +1,29 @@
-// Orchestrator for `analyze`. Wires parser → filter → (inline render).
-// Phase 2 Task 2.2 will pull rendering into report.ts; Task 2.3 adds redact.
-// For now we keep the POC's hookFailures rollup inline so 1.3's behaviour
-// does not regress.
+// Orchestrator for `analyze`. Wires schema-map → parser → filter → report.
+//
+// Phase 2 Task 2.2 retired the inline POC renderer in favour of report.ts and
+// pulled in two sidecar inputs: ./specs/*\/.curdx-state.json (spec funnel) and
+// ~/.claude/curdx-flow/errors.jsonl (R-9 fuzzy join with jsonl hook failures).
+// Task 2.3 will layer redact.ts in front of the renderer.
 
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
 import { filterEvents } from './filter.ts';
-import { getStateForPath, parseTranscript, shouldRotate } from './parser.ts';
+import { getStateForPath, loadSchemaMap, parseTranscript, shouldRotate } from './parser.ts';
+import { renderReport } from './report.ts';
+import type { ErrorLogEntry, ReportJson, SpecStateInfo } from './report.ts';
 import type { Counters, Event, Options, StateFile } from './types.ts';
 
 export type RunAnalyzeOptions = Options;
 
-type HookFailureAccumulator = {
-  count: number;
-  lastStderr: string;
-};
+export type AnalyzeReport = ReportJson;
 
-type HookFailureEntry = {
-  hook: string;
-  count: number;
-  lastStderr: string;
-};
-
-export type AnalyzeReport = {
-  hookFailures: HookFailureEntry[];
-};
-
-const STDERR_MAX = 200;
 const POC_FIXTURE_REL = 'tests/analyze/fixtures/sample.jsonl';
 const STATE_DIR = path.join(homedir(), '.claude', 'curdx-flow');
 const STATE_PATH = path.join(STATE_DIR, 'observability-state.json');
-
-function truncate(s: string | undefined, max = STDERR_MAX): string {
-  if (!s) return '';
-  return s.length <= max ? s : s.slice(0, max);
-}
-
-function escapeCell(s: string): string {
-  return s.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
-}
-
-function renderMarkdown(failures: HookFailureEntry[], limit: number): string {
-  const lines: string[] = [];
-  lines.push(`## Hook Failures Top-${limit}`);
-  lines.push('');
-  if (failures.length === 0) {
-    lines.push('_No hook failures recorded._');
-    lines.push('');
-    return lines.join('\n');
-  }
-  lines.push('| Hook | Count | Last stderr |');
-  lines.push('| --- | --- | --- |');
-  for (const f of failures) {
-    lines.push(`| ${escapeCell(f.hook)} | ${f.count} | ${escapeCell(f.lastStderr)} |`);
-  }
-  lines.push('');
-  return lines.join('\n');
-}
+const ERRORS_LOG_PATH = path.join(STATE_DIR, 'errors.jsonl');
+const SPECS_DIR_REL = 'specs';
 
 function readState(): StateFile {
   if (!existsSync(STATE_PATH)) return { version: 1, files: {} };
@@ -78,32 +43,68 @@ function writeState(state: StateFile): void {
 }
 
 /**
- * Roll up hook_success failures from the parsed events. Mirrors POC behaviour
- * (Task 1.2 / 1.3) so the diff between phase-1 and phase-2 stdout is empty.
+ * Scan ./specs/*\/.curdx-state.json and pluck `phase` from each. Missing dir,
+ * missing file, or corrupt JSON all degrade to "skip the spec" rather than
+ * throw — this is a sidecar input, not a hard dep.
  */
-function rollupHookFailures(events: Event[]): HookFailureEntry[] {
-  const counts = new Map<string, HookFailureAccumulator>();
-  for (const ev of events) {
-    if (ev.kind !== 'hook_invocation') continue;
-    const att = (ev.payload as { attachment?: unknown }).attachment;
-    if (!att || typeof att !== 'object') continue;
-    const a = att as { type?: unknown; hookName?: unknown; exitCode?: unknown; stderr?: unknown };
-    if (a.type !== 'hook_success') continue;
-    const hookName = typeof a.hookName === 'string' ? a.hookName : undefined;
-    const exitCode = typeof a.exitCode === 'number' ? a.exitCode : undefined;
-    if (!hookName || exitCode === undefined || exitCode === 0) continue;
-    const stderr = truncate(typeof a.stderr === 'string' ? a.stderr : '');
-    const prev = counts.get(hookName);
-    if (prev) {
-      prev.count += 1;
-      prev.lastStderr = stderr;
-    } else {
-      counts.set(hookName, { count: 1, lastStderr: stderr });
+function loadSpecStates(): SpecStateInfo[] {
+  const specsDir = path.resolve(process.cwd(), SPECS_DIR_REL);
+  if (!existsSync(specsDir)) return [];
+  let entries: string[];
+  try {
+    entries = readdirSync(specsDir);
+  } catch {
+    return [];
+  }
+  const out: SpecStateInfo[] = [];
+  for (const name of entries) {
+    if (name.startsWith('.')) continue; // skip ./specs/.index/
+    const stateFile = path.join(specsDir, name, '.curdx-state.json');
+    if (!existsSync(stateFile)) continue;
+    try {
+      const raw = readFileSync(stateFile, 'utf8');
+      const parsed = JSON.parse(raw) as { phase?: unknown; name?: unknown };
+      const phase = typeof parsed.phase === 'string' ? parsed.phase : undefined;
+      if (!phase) continue;
+      out.push({ name, phase });
+    } catch {
+      continue;
     }
   }
-  return Array.from(counts.entries())
-    .map(([hook, v]) => ({ hook, count: v.count, lastStderr: v.lastStderr }))
-    .sort((a, b) => b.count - a.count);
+  return out;
+}
+
+/**
+ * Read `errors.jsonl` lazily — one JSON object per line. Same FR-20 stance:
+ * missing file or corrupt lines are silent (counted only locally, not surfaced
+ * here; parser.ts handles the schema-drift counters for the transcript path).
+ */
+function loadErrorEntries(): ErrorLogEntry[] {
+  if (!existsSync(ERRORS_LOG_PATH)) return [];
+  let raw: string;
+  try {
+    raw = readFileSync(ERRORS_LOG_PATH, 'utf8');
+  } catch {
+    return [];
+  }
+  const out: ErrorLogEntry[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line) continue;
+    try {
+      const parsed = JSON.parse(line) as Record<string, unknown>;
+      out.push({
+        ts: typeof parsed.ts === 'string' ? parsed.ts : '',
+        ...(typeof parsed.hook === 'string' ? { hook: parsed.hook } : {}),
+        ...(typeof parsed.event === 'string' ? { event: parsed.event } : {}),
+        ...(typeof parsed.msg === 'string' ? { msg: parsed.msg } : {}),
+        ...(typeof parsed.cwd === 'string' ? { cwd: parsed.cwd } : {}),
+        ...(typeof parsed.transcript_path === 'string' ? { transcript_path: parsed.transcript_path } : {}),
+      });
+    } catch {
+      continue;
+    }
+  }
+  return out;
 }
 
 export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
@@ -118,9 +119,6 @@ export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
 
   // Incremental tail with no new bytes → replay the last persisted report so
   // `analyze` is idempotent across runs (verifies via `diff /tmp/a.json /tmp/b.json`).
-  // We only short-circuit when we are NOT rotating AND the offset has caught
-  // up to file size AND we have a cached report. Otherwise fall through and
-  // re-render (could be empty), which still writes state.
   if (
     !rotate &&
     prevForPath &&
@@ -129,7 +127,6 @@ export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
   ) {
     if (opts.json && state.lastReportJson) {
       process.stdout.write(state.lastReportJson);
-      // Touch state (mtime/size unchanged but still rewrite to keep schema fresh).
       writeState(state);
       return;
     }
@@ -140,21 +137,31 @@ export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
     }
   }
 
+  const schemaMap = loadSchemaMap();
   const counters: Counters = { unknown_type: 0, parse_error: 0, processed: 0 };
   const collected: Event[] = [];
   try {
-    for await (const ev of parseTranscript(fixturePath, startOffset, undefined, counters)) {
+    for await (const ev of parseTranscript(fixturePath, startOffset, schemaMap, counters)) {
       collected.push(ev);
     }
 
     const filtered = filterEvents(collected, { ...opts, limit });
-    const hookFailures = rollupHookFailures(filtered).slice(0, limit);
-    const report: AnalyzeReport = { hookFailures };
+    const errorEntries = loadErrorEntries();
+    const specStates = loadSpecStates();
+
+    const { markdown, json } = renderReport(filtered, errorEntries, specStates, {
+      ...opts,
+      limit,
+      schemaDrift: {
+        unknownTypeCount: counters.unknown_type,
+        parseErrorCount: counters.parse_error,
+      },
+    });
 
     void opts.out;
 
-    const jsonStr = `${JSON.stringify(report)}\n`;
-    const markdownStr = renderMarkdown(hookFailures, limit);
+    const jsonStr = `${JSON.stringify(json)}\n`;
+    const markdownStr = markdown;
 
     // Cache last report so the next idempotent run replays this exact bytes.
     state.lastReportJson = jsonStr;
@@ -166,15 +173,12 @@ export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
       process.stdout.write(markdownStr);
     }
 
-    // Surface counters on stderr (debug only — does not affect stdout diff).
     if (counters.parse_error || counters.unknown_type) {
       process.stderr.write(
         `(analyze: parse_error=${counters.parse_error} unknown_type=${counters.unknown_type} processed=${counters.processed})\n`,
       );
     }
   } finally {
-    // Always persist offset — even on error mid-stream we don't want to
-    // re-process bytes that already produced events.
     state.files[fixturePath] = {
       byteOffset: stat.size,
       lastModifiedMs: stat.mtimeMs,

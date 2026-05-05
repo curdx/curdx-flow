@@ -12,8 +12,10 @@
 // will move the canonical list into plugins/curdx-flow/schemas/transcript-events.json
 // and this fallback becomes the safety net.
 
-import { createReadStream, statSync } from 'node:fs';
+import { createReadStream, readFileSync, statSync } from 'node:fs';
 import readline from 'node:readline';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import type { Counters, Event, SchemaMap, StateFile } from './types.ts';
 
@@ -23,10 +25,9 @@ interface BuiltinKindMap {
   [type: string]: Event['kind'];
 }
 
-// Minimal whitelist used both as fallback and for schemaMap-less callers
-// (Task 2.1 keeps the orchestrator passing schemaMap=undefined; Task 2.2 wires
-// the JSON file). attachment.type='hook_success' is unwrapped by the caller
-// below — see `classify()`.
+// Minimal whitelist used both as fallback and for schemaMap-less callers.
+// attachment.type='hook_success' is unwrapped before classify() sees it —
+// see `classify()`.
 const BUILTIN_KIND_MAP: BuiltinKindMap = {
   hook_success: 'hook_invocation',
   attachment: 'hook_invocation', // overridden by attachment.type when present
@@ -35,9 +36,116 @@ const BUILTIN_KIND_MAP: BuiltinKindMap = {
   user: 'user_turn',
 };
 
+// Built-in fallback schema map mirrors the canonical JSON at
+// plugins/curdx-flow/schemas/transcript-events.json. Used when the JSON is
+// missing/corrupt so analyze still runs (D-1 robustness).
+const BUILTIN_SCHEMA_MAP: SchemaMap = {
+  hook_success: {
+    action: 'hook_invocation',
+    fields: ['hookName', 'hookEvent', 'exitCode', 'durationMs', 'stderr'],
+    stderrMaxBytes: 500,
+  },
+  tool_use: {
+    action: 'tool_call',
+    fields: ['name', 'input.subagent_type'],
+    filter: { name: ['Agent', 'Task'] },
+  },
+  assistant: {
+    action: 'assistant_turn',
+    fields: ['attributionPlugin', 'attributionSkill'],
+  },
+  user: {
+    action: 'user_turn',
+    fields: ['content'],
+    extractCommandName: true,
+  },
+};
+
+/**
+ * Resolve the schema map JSON file with two probes:
+ *   1. <bundle dir>/../../plugins/curdx-flow/schemas/transcript-events.json
+ *      — works when running from dist/index.mjs (bundle is one level deep
+ *      under repo root).
+ *   2. process.cwd()/plugins/curdx-flow/schemas/transcript-events.json
+ *      — covers `node dist/index.mjs analyze` from repo root or any other
+ *      cwd that contains the plugin tree.
+ * Either probe wins → return its parsed map. Both miss → return undefined and
+ * let the caller fall back to the built-in map (with stderr breadcrumb).
+ */
+export function loadSchemaMap(schemaPath?: string): SchemaMap {
+  const candidates: string[] = [];
+  if (schemaPath) candidates.push(schemaPath);
+
+  // Probe 1: relative to this module file (post-bundle this resolves to the
+  // dist/ directory, so we walk up two levels to reach repo root).
+  try {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    candidates.push(
+      path.resolve(here, '..', '..', 'plugins', 'curdx-flow', 'schemas', 'transcript-events.json'),
+      path.resolve(here, '..', 'plugins', 'curdx-flow', 'schemas', 'transcript-events.json'),
+    );
+  } catch {
+    // import.meta.url not available — skip this probe.
+  }
+
+  // Probe 2: cwd-relative.
+  candidates.push(
+    path.resolve(process.cwd(), 'plugins', 'curdx-flow', 'schemas', 'transcript-events.json'),
+  );
+
+  for (const candidate of candidates) {
+    try {
+      const raw = readFileSync(candidate, 'utf8');
+      const parsed = JSON.parse(raw) as { events?: Record<string, unknown> };
+      if (parsed && typeof parsed === 'object' && parsed.events && typeof parsed.events === 'object') {
+        const out: SchemaMap = {};
+        for (const [type, def] of Object.entries(parsed.events)) {
+          if (!def || typeof def !== 'object') continue;
+          const d = def as {
+            action?: unknown;
+            fields?: unknown;
+            filter?: unknown;
+            extractCommandName?: unknown;
+            stderrMaxBytes?: unknown;
+          };
+          if (typeof d.action !== 'string') continue;
+          out[type] = {
+            action: d.action,
+            fields: Array.isArray(d.fields) ? (d.fields.filter((f) => typeof f === 'string') as string[]) : [],
+            ...(d.filter && typeof d.filter === 'object'
+              ? { filter: d.filter as Record<string, unknown> }
+              : {}),
+            ...(typeof d.extractCommandName === 'boolean' ? { extractCommandName: d.extractCommandName } : {}),
+            ...(typeof d.stderrMaxBytes === 'number' ? { stderrMaxBytes: d.stderrMaxBytes } : {}),
+          };
+        }
+        if (Object.keys(out).length > 0) return out;
+      }
+      // File found but malformed — try next candidate after a stderr breadcrumb.
+      process.stderr.write(`[analyze] schema map at ${candidate} malformed, trying next probe\n`);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') continue; // probe miss — silent
+      // EACCES / EISDIR / parse error — note and try next.
+      process.stderr.write(`[analyze] schema map probe failed at ${candidate}: ${(err as Error).message}\n`);
+    }
+  }
+
+  process.stderr.write('[analyze] schema map not found, using builtin fallback\n');
+  return BUILTIN_SCHEMA_MAP;
+}
+
+// Map a schema-map `action` string to the runtime Event['kind'] union. Keep
+// this whitelist small — anything outside this set is treated as 'unknown'
+// so consumers can rely on the discriminated union in types.ts.
+const ACTION_TO_KIND: Record<string, Event['kind']> = {
+  hook_invocation: 'hook_invocation',
+  tool_call: 'tool_call',
+  assistant_turn: 'assistant_turn',
+  user_turn: 'user_turn',
+};
+
 function classify(raw: RawJsonLine, schemaMap: SchemaMap | undefined): Event['kind'] | undefined {
-  // Schema map takes precedence — when supplied (Task 2.2), it controls
-  // dispatch. Until then, schemaMap stays undefined and we use BUILTIN_KIND_MAP.
   const top = typeof raw.type === 'string' ? (raw.type as string) : undefined;
   if (!top) return undefined;
 
@@ -49,13 +157,16 @@ function classify(raw: RawJsonLine, schemaMap: SchemaMap | undefined): Event['ki
     if (typeof att.type === 'string') effectiveType = att.type;
   }
 
+  // Schema map wins when supplied — its `action` decides the kind.
   if (schemaMap && schemaMap[effectiveType]) {
-    // Task 2.2 reads schemaMap[effectiveType].action; for now just acknowledge
-    // it as known by mapping to a kind via the builtin list as best-effort.
-    const kind = BUILTIN_KIND_MAP[effectiveType];
-    return kind ?? 'unknown';
+    const action = schemaMap[effectiveType]?.action;
+    if (action) {
+      const kind = ACTION_TO_KIND[action];
+      return kind ?? 'unknown';
+    }
   }
 
+  // Fallback: built-in whitelist (used when schemaMap is undefined).
   return BUILTIN_KIND_MAP[effectiveType];
 }
 
