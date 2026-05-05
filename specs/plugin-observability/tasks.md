@@ -27,7 +27,7 @@ created: 2026-05-05
 
 ## Phase 1 — POC（让最小回路活起来）
 
-- [ ] **Task 1.1: 准备 fixture jsonl + 注册 analyze CLI 骨架**
+- [x] **Task 1.1: 准备 fixture jsonl + 注册 analyze CLI 骨架**
   - **Do**:
     1. 创建 `tests/analyze/fixtures/sample.jsonl`（≥10 行，至少含 2 个 `hook_success.exitCode=1`、1 个 `tool_use.name=Agent`、1 个未知 type、1 行半行截断、1 个 user `<command-name>` XML）
     2. 创建 `src/flows/analyze.ts`：citty `defineCommand`，args 暂只接 `--out`/`--json`/`--limit`，body 调 `runAnalyze(opts)`

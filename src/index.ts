@@ -6,6 +6,7 @@ import { installFlow } from './flows/install.ts';
 import { uninstallFlow } from './flows/uninstall.ts';
 import { updateFlow } from './flows/update.ts';
 import { statusFlow } from './flows/status.ts';
+import analyzeCmd from './flows/analyze.ts';
 import { t, type Lang } from './i18n/index.ts';
 
 function parseLang(v: unknown): Lang | undefined {
@@ -103,7 +104,7 @@ const statusCmd = defineCommand({
   },
 });
 
-const SUBCOMMANDS = new Set(['install', 'uninstall', 'update', 'status']);
+const SUBCOMMANDS = new Set(['install', 'uninstall', 'update', 'status', 'analyze']);
 
 const root = defineCommand({
   meta: {
@@ -117,6 +118,7 @@ const root = defineCommand({
     uninstall: uninstallCmd,
     update: updateCmd,
     status: statusCmd,
+    analyze: analyzeCmd,
   },
   // No root run() — citty 0.1.6 calls parent.run AFTER a matching subcommand,
   // which would render the menu after a subcommand finishes. We dispatch the
