@@ -1,5 +1,7 @@
 <div align="center">
 
+**English** · [中文](./README.zh-CN.md)
+
 # `@curdx/flow`
 
 ### *Spec-driven dev for Claude Code, with autonomous task execution.*
@@ -11,7 +13,7 @@
 [![Built for Claude Code](https://img.shields.io/badge/Built%20for-Claude%20Code-5B6CFF)](https://claude.ai/code)
 [![Node](https://img.shields.io/badge/Node-%E2%89%A520.12-3C873A)](https://nodejs.org)
 
-[Quick start](#-quick-start) · [How it works](#-how-it-works) · [Commands](#-commands) · [Why it exists](#-why-it-exists) · [中文](#中文版)
+[Quick start](#-quick-start) · [How it works](#-how-it-works) · [Commands](#-commands) · [Why it exists](#-why-it-exists)
 
 ```bash
 npx @curdx/flow
@@ -210,38 +212,3 @@ Release SOP: see [`CLAUDE.md`](./CLAUDE.md) — `npm run bump-version <patch|min
 ## 📜 License
 
 MIT. Fork it. Ship it. Make it yours.
-
----
-
-<a id="中文版"></a>
-
-## 中文版
-
-`@curdx/flow` 是一个 npm 包，给 Claude Code 用户提供两样东西：
-
-1. **`/curdx-flow:*` 插件** — 规格驱动（spec-driven）开发工作流，从一句模糊需求到带测试的代码，5 个阶段全自动跑完。
-2. **一键安装器** — 挑选你真正想用的 Claude Code 插件和 MCP 服务器（claude-mem 跨会话记忆、pua 抗失败模式、chrome-devtools-mcp、context7、sequential-thinking…），更新、卸载都干净。
-
-### 30 秒上手
-
-```bash
-npx @curdx/flow             # 启动交互式安装器
-```
-
-在 Claude Code 里：
-
-```text
-/curdx-flow:start
-> 我想给后端加一个限流的 /api/upload 接口，要支持 S3 分片上传
-```
-
-flow 会跑 60 秒的需求访谈，分发并行研究团队，把 `research.md` 写出来，然后**停下等你确认**。一路点 `/curdx-flow:requirements` → `design` → `tasks` → `implement`，最后那一步会自动循环跑完所有任务。你只管去喝杯咖啡，回来看 diff。
-
-### 为什么造它
-
-- **规格就是合约，不是感觉**。代码动手前必须有 4 份 Markdown，存在仓库里，能 review。
-- **子 agent 各司其职**。每个阶段一个专家 agent，独立 context，不搞 50 个 agent 的乱炖。
-- **执行 loop 自己跑完**。`/curdx-flow:implement` 任务一个个执行 → 验证 → 提交 → 下一个，直到 `tasks.md` 全部勾完。
-- **安装器 + 插件一体**。不用挑 marketplace、不用改配置，`npx @curdx/flow` 一条命令搞定。
-
-更多命令、目录结构、release 流程见上方英文文档。
