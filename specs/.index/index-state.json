@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-05-05T04:34:25Z",
+  "updated": "2026-05-05T05:54:15Z",
   "directories": [
     {
       "path": "./specs",
@@ -19,7 +19,7 @@
     {
       "name": "plugin-observability",
       "path": "./specs/plugin-observability",
-      "phase": "requirements"
+      "phase": "design"
     },
     {
       "name": "state-completion-marker",
