@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 460" role="img" aria-label="curdx-flow architecture: one npm package, two products">
+  <style>
+    .title    { fill: currentColor; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 18px; font-weight: 700; }
+    .head     { fill: currentColor; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; font-weight: 700; }
+    .item     { fill: currentColor; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 12.5px; opacity: 0.8; }
+    .cmd      { fill: currentColor; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12.5px; opacity: 0.92; }
+    .sub      { fill: currentColor; font-family: -apple-system, system-ui, sans-serif; font-size: 11.5px; opacity: 0.62; }
+    .badge    { fill: currentColor; font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; opacity: 0.85; }
+    .box      { fill: rgba(91,108,255,0.06); stroke: #5B6CFF; stroke-width: 1.5; }
+    .box-acc  { fill: rgba(255,107,53,0.08); stroke: #FF6B35; stroke-width: 1.8; }
+    .box-out  { fill: none; stroke: currentColor; stroke-width: 1.2; opacity: 0.35; stroke-dasharray: 4 3; }
+    .arrow    { fill: none; stroke: currentColor; stroke-width: 1.4; opacity: 0.55; }
+  </style>
+
+  <defs>
+    <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" opacity="0.55"/>
+    </marker>
+  </defs>
+
+  <text x="40" y="40" class="title">One npm package, two products</text>
+  <text x="40" y="62" class="sub">Run once. Get a Claude Code dev environment that's already wired up.</text>
+
+  <!-- Top: npm command -->
+  <g transform="translate(380, 95)">
+    <rect class="box-acc" width="340" height="58" rx="10"/>
+    <text x="170" y="25" class="cmd" text-anchor="middle">npx @curdx/flow</text>
+    <text x="170" y="45" class="sub" text-anchor="middle">interactive — pick what to install</text>
+  </g>
+
+  <!-- Left arrow -->
+  <line class="arrow" x1="450" y1="160" x2="240" y2="200" marker-end="url(#ah2)"/>
+  <!-- Right arrow -->
+  <line class="arrow" x1="650" y1="160" x2="860" y2="200" marker-end="url(#ah2)"/>
+
+  <!-- Left product: bundled curdx-flow plugin -->
+  <g transform="translate(40, 200)">
+    <rect class="box-acc" width="420" height="195" rx="12"/>
+    <text x="20" y="30" class="badge" fill="#FF6B35">PRODUCT 1 — bundled in this repo</text>
+    <text x="20" y="55" class="head">curdx-flow plugin</text>
+    <text x="20" y="76" class="sub">Spec-driven dev workflow with autonomous execution.</text>
+
+    <text x="20" y="106" class="cmd">/curdx-flow:start</text>
+    <text x="200" y="106" class="sub">smart entry — new spec or resume</text>
+
+    <text x="20" y="128" class="cmd">/curdx-flow:research</text>
+    <text x="200" y="128" class="sub">→ requirements → design → tasks</text>
+
+    <text x="20" y="150" class="cmd">/curdx-flow:implement</text>
+    <text x="200" y="150" class="sub">autonomous task loop until done</text>
+
+    <text x="20" y="172" class="cmd">/curdx-flow:triage</text>
+    <text x="200" y="172" class="sub">decompose epics into spec graphs</text>
+  </g>
+
+  <!-- Right product: marketplace installer -->
+  <g transform="translate(640, 200)">
+    <rect class="box" width="420" height="195" rx="12"/>
+    <text x="20" y="30" class="badge" fill="#5B6CFF">PRODUCT 2 — installs &amp; manages</text>
+    <text x="20" y="55" class="head">Plugin &amp; MCP marketplace</text>
+    <text x="20" y="76" class="sub">One installer, idempotent updates, status &amp; uninstall.</text>
+
+    <text x="20" y="106" class="item">• claude-mem      <tspan class="sub">— cross-session memory</tspan></text>
+    <text x="20" y="128" class="item">• pua             <tspan class="sub">— anti-failure pressure mode</tspan></text>
+    <text x="20" y="150" class="item">• chrome-devtools-mcp  <tspan class="sub">— browser MCP</tspan></text>
+    <text x="20" y="172" class="item">• context7 / sequential-thinking  <tspan class="sub">— MCP servers</tspan></text>
+  </g>
+
+  <!-- Bottom: filesystem destination -->
+  <g transform="translate(380, 415)">
+    <rect class="box-out" width="340" height="36" rx="8"/>
+    <text x="170" y="23" class="cmd" text-anchor="middle">~/.claude/  ·  CLAUDE.md (managed block)</text>
+  </g>
+
+  <!-- Connector lines down to ~/.claude -->
+  <line class="arrow" x1="250" y1="395" x2="450" y2="425" marker-end="url(#ah2)"/>
+  <line class="arrow" x1="850" y1="395" x2="650" y2="425" marker-end="url(#ah2)"/>
+</svg>
