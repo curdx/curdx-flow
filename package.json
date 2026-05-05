@@ -17,6 +17,7 @@
     "check:hooks-fresh": "node scripts/check-hooks-fresh.mjs",
     "dev": "tsup --watch",
     "test:hooks": "npm run build:hooks && vitest run tests/hooks --passWithNoTests",
+    "test:analyze": "vitest run tests/analyze",
     "start": "node ./dist/index.mjs",
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm run check-versions && npm run check:hooks-fresh && npm run test:hooks",

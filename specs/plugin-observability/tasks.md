@@ -138,7 +138,7 @@ created: 2026-05-05
   - _Requirements: NFR-7, NFR-10, NFR-11, FR-4, FR-6, FR-13, FR-14, FR-20, AT-3, AT-4, AT-5, AT-7, AT-8_
   - _Design: 测试策略-单元_
 
-- [ ] **Task 3.2: report snapshot + error-logger fake-fs 测试**
+- [x] **Task 3.2: report snapshot + error-logger fake-fs 测试**
   - **Do**:
     1. 创建 `tests/analyze/report.test.ts`：snapshot 整体 markdown（7 段全在）+ `--json` schema 验证 + AC-1.2 双源 join 校验（jsonl 失败 + errors.jsonl 行同 hook+ts 应去重为 1） —— 对应 AT-1 / AT-6a
     2. 创建 `tests/hooks/error-logger.test.ts`：inject fake fs 验证 4 case：
