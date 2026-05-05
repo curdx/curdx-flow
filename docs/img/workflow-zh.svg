@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 380" role="img" aria-label="curdx-flow 规格驱动工作流：研究、需求、设计、任务、实现">
+  <style>
+    .title    { fill: currentColor; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; }
+    .phase    { fill: currentColor; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; font-size: 15px; font-weight: 700; }
+    .cmd      { fill: currentColor; font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace; font-size: 12px; opacity: 0.78; }
+    .sub      { fill: currentColor; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; font-size: 11.5px; opacity: 0.62; }
+    .badge    { fill: currentColor; font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace; font-size: 10.5px; opacity: 0.85; font-weight: 700; }
+    .node     { fill: rgba(91,108,255,0.07); stroke: #5B6CFF; stroke-width: 1.5; }
+    .node-hot { fill: rgba(255,107,53,0.10); stroke: #FF6B35; stroke-width: 2; }
+    .arrow    { fill: none; stroke: currentColor; stroke-width: 1.4; opacity: 0.5; }
+    .loop     { fill: none; stroke: #FF6B35; stroke-width: 1.8; stroke-dasharray: 5 4; opacity: 0.85; }
+    .num      { fill: #5B6CFF; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; font-weight: 700; }
+    .num-hot  { fill: #FF6B35; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; font-weight: 700; }
+  </style>
+
+  <defs>
+    <marker id="arrowhead-zh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" opacity="0.5"/>
+    </marker>
+    <marker id="arrowhot-zh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#FF6B35"/>
+    </marker>
+  </defs>
+
+  <text x="40" y="40" class="title">规格驱动工作流</text>
+  <text x="40" y="62" class="sub">输入：一句模糊需求。输出：经过测试并已提交的代码 — 逐任务执行，每个任务独立上下文。</text>
+
+  <g transform="translate(40, 110)">
+    <rect class="node" width="180" height="120" rx="12"/>
+    <text x="14" y="24" class="num">01</text>
+    <text x="14" y="50" class="phase">研究 · research</text>
+    <text x="14" y="74" class="cmd">/curdx-flow:research</text>
+    <text x="14" y="98" class="sub">并行研究小组</text>
+    <text x="14" y="112" class="sub">→ research.md</text>
+  </g>
+
+  <g transform="translate(240, 110)">
+    <rect class="node" width="180" height="120" rx="12"/>
+    <text x="14" y="24" class="num">02</text>
+    <text x="14" y="50" class="phase">需求 · requirements</text>
+    <text x="14" y="74" class="cmd">/curdx-flow:requirements</text>
+    <text x="14" y="98" class="sub">product-manager agent</text>
+    <text x="14" y="112" class="sub">→ requirements.md</text>
+  </g>
+
+  <g transform="translate(440, 110)">
+    <rect class="node" width="180" height="120" rx="12"/>
+    <text x="14" y="24" class="num">03</text>
+    <text x="14" y="50" class="phase">设计 · design</text>
+    <text x="14" y="74" class="cmd">/curdx-flow:design</text>
+    <text x="14" y="98" class="sub">architect-reviewer</text>
+    <text x="14" y="112" class="sub">→ design.md</text>
+  </g>
+
+  <g transform="translate(640, 110)">
+    <rect class="node" width="180" height="120" rx="12"/>
+    <text x="14" y="24" class="num">04</text>
+    <text x="14" y="50" class="phase">任务 · tasks</text>
+    <text x="14" y="74" class="cmd">/curdx-flow:tasks</text>
+    <text x="14" y="98" class="sub">task-planner</text>
+    <text x="14" y="112" class="sub">→ tasks.md</text>
+  </g>
+
+  <g transform="translate(840, 110)">
+    <rect class="node-hot" width="220" height="120" rx="12"/>
+    <text x="14" y="24" class="num-hot">05</text>
+    <text x="14" y="50" class="phase">实现 · implement</text>
+    <text x="14" y="74" class="cmd">/curdx-flow:implement</text>
+    <text x="14" y="98" class="sub">spec-executor（自主执行）</text>
+    <text x="14" y="112" class="sub">→ 经测试并已提交的代码</text>
+  </g>
+
+  <line class="arrow" x1="225" y1="170" x2="235" y2="170" marker-end="url(#arrowhead-zh)"/>
+  <line class="arrow" x1="425" y1="170" x2="435" y2="170" marker-end="url(#arrowhead-zh)"/>
+  <line class="arrow" x1="625" y1="170" x2="635" y2="170" marker-end="url(#arrowhead-zh)"/>
+  <line class="arrow" x1="825" y1="170" x2="835" y2="170" marker-end="url(#arrowhead-zh)"/>
+
+  <path class="loop" d="M 1060 170 q 40 0 40 50 q 0 50 -110 50 q -110 0 -110 -50 q 0 -30 30 -45" marker-end="url(#arrowhot-zh)"/>
+  <text x="935" y="320" class="badge" fill="#FF6B35">↻ 任务 ✓ → 下一任务 → ALL_TASKS_COMPLETE</text>
+
+  <text x="40" y="320" class="sub">每个阶段产出后暂停，由人工审核确认。implement 阶段自主循环，直至所有任务通过验证。</text>
+  <text x="40" y="340" class="sub">所有产出物存放于 <tspan class="cmd">specs/&lt;名称&gt;/</tspan>，纳入代码仓库版本管理。</text>
+</svg>

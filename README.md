@@ -4,16 +4,16 @@
 
 # `@curdx/flow`
 
-### *Spec-driven dev for Claude Code, with autonomous task execution.*
+### *Spec-driven development for Claude Code, with autonomous task execution.*
 
-**Describe what you want. Get research, requirements, design, tasks, and tested code — task by task, fresh context per task.**
+A complete development workflow that turns a vague feature request into structured specifications, then executes them task-by-task in fresh contexts. Bundles a curated marketplace of complementary plugins and MCP servers — installed, updated, and uninstalled with one command.
 
 [![npm version](https://img.shields.io/npm/v/@curdx/flow?color=FF6B35&label=npm)](https://www.npmjs.com/package/@curdx/flow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Built for Claude Code](https://img.shields.io/badge/Built%20for-Claude%20Code-5B6CFF)](https://claude.ai/code)
 [![Node](https://img.shields.io/badge/Node-%E2%89%A520.12-3C873A)](https://nodejs.org)
 
-[Quick start](#-quick-start) · [How it works](#-how-it-works) · [Commands](#-commands) · [Why it exists](#-why-it-exists)
+[Installation](#-installation) · [Quick start](#-quick-start) · [How it works](#-how-it-works) · [Concepts](#-core-concepts) · [Commands](#%EF%B8%8F-commands) · [Configuration](#%EF%B8%8F-configuration) · [FAQ](#-faq)
 
 ```bash
 npx @curdx/flow
@@ -23,27 +23,71 @@ npx @curdx/flow
 
 ---
 
-## 🚀 What is this?
+## Table of contents
 
-`@curdx/flow` is **one npm package that delivers two things**:
+- [What is `@curdx/flow`](#-what-is-curdxflow)
+- [Who it is for](#-who-it-is-for)
+- [How it works](#-how-it-works)
+- [Installation](#-installation)
+- [Quick start](#-quick-start)
+- [Walkthrough — your first spec](#-walkthrough--your-first-spec)
+- [Core concepts](#-core-concepts)
+- [Commands](#%EF%B8%8F-commands)
+- [Subagents](#-subagents)
+- [The marketplace](#-the-marketplace)
+- [Configuration](#%EF%B8%8F-configuration)
+- [Project layout](#-project-layout)
+- [Why it exists](#-why-it-exists)
+- [FAQ](#-faq)
+- [Requirements](#-requirements)
+- [License](#-license)
 
-1. **A Claude Code plugin** — `/curdx-flow:*` slash commands for spec-driven development. Vague idea in, structured spec + working code out.
-2. **A one-shot installer** — pick the Claude Code plugins and MCP servers you actually want (claude-mem, pua, chrome-devtools-mcp, context7, sequential-thinking, …), keep them updated, uninstall cleanly.
+---
+
+## 🚀 What is `@curdx/flow`
+
+`@curdx/flow` is **a single npm package that delivers two products** built around Claude Code:
+
+1. **A spec-driven development plugin.** Provides the `/curdx-flow:*` slash commands. Turns an unstructured feature request into a research report, requirements document, technical design, and a task list — then executes the task list autonomously in fresh contexts, one task at a time, with verification gates between every task.
+
+2. **A curated plugin & MCP marketplace.** A single interactive installer that picks, installs, updates, and uninstalls a set of complementary tools for Claude Code (cross-session memory, browser automation, live documentation lookup, etc.) — keeping a managed manifest in `~/.claude/CLAUDE.md` so Claude knows what is available.
+
+The plugin and the installer ship in the same npm package and share a single version number. Run `npx @curdx/flow` once and you have a fully wired Claude Code environment.
 
 ```text
 You:    /curdx-flow:start "Add OAuth login with token refresh"
-flow:   *interviews you for 60s, asks clarifying questions*
-flow:   *parallel research team investigates — research.md*
-You:    *approve*  →  /curdx-flow:requirements
-flow:   *product-manager agent — requirements.md*
-You:    *approve*  →  /curdx-flow:design
-flow:   *architect-reviewer — design.md*
-You:    *approve*  →  /curdx-flow:tasks
-flow:   *task-planner — 12 tasks across 4 phases*
-You:    *approve*  →  /curdx-flow:implement
-flow:   *executes task 1 → verify → commit → task 2 → … until done*
-You:    *come back. read the diff. ship.*
+flow:   ✓ Interview: 3 clarifying questions answered (60s)
+flow:   ✓ Parallel research team dispatched (3 specialist agents)
+        → research.md  (148 lines, 9 references, 4 risks identified)
+You:    review · approve  →  /curdx-flow:requirements
+flow:   ✓ product-manager agent
+        → requirements.md  (US-1..US-9, FR-1..FR-23, NFR-1..NFR-12)
+You:    review · approve  →  /curdx-flow:design
+flow:   ✓ architect-reviewer
+        → design.md  (9 decisions, 7 risks, component diagram)
+You:    review · approve  →  /curdx-flow:tasks
+flow:   ✓ task-planner
+        → tasks.md  (12 tasks across 4 phases, with VERIFY gates)
+You:    review · approve  →  /curdx-flow:implement
+flow:   ⟳ task 1.1 → verify → commit ✓
+        ⟳ task 1.2 → verify → commit ✓
+        …
+        ✓ ALL_TASKS_COMPLETE  (12/12 tasks, 47 commits, all green)
+You:    review the diff. open the PR. ship.
 ```
+
+---
+
+## 🎯 Who it is for
+
+`@curdx/flow` is built for developers who use Claude Code on real projects — not throwaway prototypes. It pays off most when:
+
+- **You ship code others will read.** Specs become a paper trail your reviewers and future self can audit.
+- **Your codebase has conventions and constraints.** The research and design phases force these to be surfaced before code is written, not discovered after.
+- **You context-switch.** Every task starts with a clean context window, so you do not have to manually re-explain the project after a long pause or a rate-limit reset.
+- **You delegate, then come back.** The autonomous loop runs unattended; you review the diff when it finishes.
+
+It is less useful when you only want a one-off script or a five-line tweak. For those, plain Claude Code is faster.
 
 ---
 
@@ -53,64 +97,175 @@ You:    *come back. read the diff. ship.*
   <img src="docs/img/workflow.svg" alt="curdx-flow workflow: research → requirements → design → tasks → implement, with autonomous loop on the final phase" width="100%">
 </div>
 
-Five phases. Each phase delegates to a specialist subagent, writes one Markdown artifact, and **stops for your approval**. The final phase (`implement`) runs an autonomous loop — task → verify → commit → next task — until every task in `tasks.md` is checked off.
+The workflow has **five phases**. Each phase is owned by a specialist subagent, produces exactly one Markdown artifact, and **pauses for human approval** before the next phase begins. The final phase, `implement`, runs an autonomous loop — execute task, verify, commit, advance — until every task in `tasks.md` is checked off.
+
+| Phase | Command | Subagent | Output |
+| --- | --- | --- | --- |
+| Research | `/curdx-flow:research` | research-analyst (parallel team) | `research.md` |
+| Requirements | `/curdx-flow:requirements` | product-manager | `requirements.md` |
+| Design | `/curdx-flow:design` | architect-reviewer | `design.md` |
+| Tasks | `/curdx-flow:tasks` | task-planner | `tasks.md` |
+| Implement | `/curdx-flow:implement` | spec-executor (autonomous loop) | code, tests, commits |
+
+All artifacts live under `specs/<spec-name>/` in your repository. They are plain Markdown, version-controlled, and survive across sessions.
 
 <div align="center">
   <img src="docs/img/architecture.svg" alt="curdx-flow architecture: one npm package, two products — bundled plugin and plugin/MCP marketplace installer" width="100%">
 </div>
 
+The same npm package delivers both products. The installer reads its descriptor catalog, executes `claude plugin install` / `claude mcp add` on your behalf, and writes a managed block to `~/.claude/CLAUDE.md` so Claude Code knows what is installed. Everything is idempotent — run the installer again any time to reconcile drift.
+
 ---
 
-## ⚡ Quick start
+## 📥 Installation
 
-### 1. Install Claude Code
+### Prerequisites
 
-If you don't have it yet: <https://docs.anthropic.com/en/docs/claude-code>.
+- **Node.js** ≥ 20.12 ([download](https://nodejs.org))
+- **Claude Code CLI** installed and on `PATH` ([install instructions](https://docs.anthropic.com/en/docs/claude-code))
+- *(Optional)* **Bun** ≥ 1.0 — auto-detected; the installer offers to install it if you choose `claude-mem`
 
-### 2. Run the installer
+### Install
 
 ```bash
 npx @curdx/flow
 ```
 
-On first run you'll pick a language (中文 / English), then choose what to install. The bundled `curdx-flow` plugin is always installed — that's the spec workflow itself. Everything else is optional.
+On first run, you pick a language (中文 / English), then select what to install. The bundled `curdx-flow` plugin (the spec workflow itself) is always installed. Everything else is opt-in.
+
+### Common workflows
 
 ```bash
-npx @curdx/flow              # interactive menu
-npx @curdx/flow install --all --yes   # install everything, no prompts
-npx @curdx/flow status       # what's installed, what's stale
-npx @curdx/flow update       # bump everything to latest
-npx @curdx/flow uninstall    # clean removal
+# Interactive menu — install / update / uninstall / status
+npx @curdx/flow
+
+# Non-interactive: install everything available
+npx @curdx/flow install --all --yes
+
+# Check what is installed and whether anything is stale
+npx @curdx/flow status
+npx @curdx/flow status --json   # machine-readable
+
+# Update everything to the latest version
+npx @curdx/flow update
+
+# Uninstall everything cleanly (also removes the managed CLAUDE.md block)
+npx @curdx/flow uninstall
+
+# Override the language for a single invocation
+npx @curdx/flow --lang en
 ```
 
-### 3. Start a spec
+### Verifying the install
 
-Inside a project, in Claude Code:
+```bash
+claude plugin list                    # should show curdx-flow@curdx
+claude mcp list                       # any MCP servers you opted in to
+npx @curdx/flow status                # green checkmarks for installed items
+```
+
+In Claude Code, type `/curdx-flow:` and you should see autocomplete for all commands.
+
+---
+
+## ⚡ Quick start
+
+After install, in any project:
+
+```bash
+cd ~/projects/my-app
+claude                                # start Claude Code
+```
+
+Then in the Claude Code prompt:
 
 ```text
 /curdx-flow:start
 > I want to add a rate-limited /api/upload endpoint with S3 multipart support.
 ```
 
-That's it. flow runs the interview, dispatches research, writes `specs/upload-api/research.md`, and pauses for your approval.
+flow runs a brief interview, dispatches the research team, writes `specs/upload-api/research.md`, and pauses for your approval. From there, advance through the phases (`requirements` → `design` → `tasks` → `implement`) by approving each artifact.
 
 ---
 
-## 📦 What gets installed
+## 🎬 Walkthrough — your first spec
 
-The marketplace ships with carefully picked tools. You opt in per item.
+A concrete end-to-end example, with what flow does at each step.
 
-| ID | Type | What it does |
-| --- | --- | --- |
-| **`curdx-flow`** | plugin (bundled) | This repo. Spec-driven dev with `/curdx-flow:*` commands. **Always installed.** |
-| `claude-mem` | plugin | Cross-session memory — claude-mem stores observations and recalls them next session. |
-| `pua` | plugin | "Anti-failure" pressure mode. Auto-fires on 2+ failures or user frustration. |
-| `chrome-devtools-mcp` | plugin | Drive a real Chrome via MCP — performance, network, console, screenshots. |
-| `frontend-design` | plugin | Distinctive frontend output. Avoids generic AI aesthetics. |
-| `sequential-thinking` | mcp | Step-by-step reasoning MCP server (`@modelcontextprotocol/server-sequential-thinking`). |
-| `context7` | mcp | Live library docs over MCP. Beats stale training-data answers. |
+#### 1. `/curdx-flow:start`
 
-Run `npx @curdx/flow status` any time to see what's on your machine.
+```text
+> I want to add a rate-limited /api/upload endpoint with S3 multipart support.
+```
+
+flow:
+
+- creates `specs/upload-api/` and a `.curdx-state.json` execution-state file
+- runs a 60-second interview (≈3 clarifying questions tuned to the goal)
+- detects relevant skills from your installed plugins and pre-loads them
+- dispatches a parallel research team — one agent investigates S3 multipart, one investigates rate-limiting strategies, one surveys your codebase for existing upload patterns
+- merges results into `specs/upload-api/research.md`
+- pauses for approval
+
+#### 2. `/curdx-flow:requirements`
+
+The product-manager subagent translates the goal + research into structured requirements: user stories (`US-1`, `US-2`, …), functional requirements (`FR-*`), non-functional requirements (`NFR-*`, e.g. latency, durability, security), and acceptance criteria (`AC-*`). Saved to `requirements.md`.
+
+#### 3. `/curdx-flow:design`
+
+The architect-reviewer turns requirements into a technical design: components, data flow, API contracts, key decisions (`D-1`..`D-N`), known risks (`R-1`..`R-N`), and a file-level change manifest. Saved to `design.md`.
+
+#### 4. `/curdx-flow:tasks`
+
+The task-planner breaks the design into a checked task list — typically grouped into phases, with `[VERIFY]` gates that run real verification commands (typecheck, tests, smoke tests). Saved to `tasks.md`.
+
+#### 5. `/curdx-flow:implement`
+
+The spec-executor begins the autonomous loop:
+
+```
+loop:
+  pick next unchecked task from tasks.md
+  open fresh context with task description, design.md excerpt, relevant files
+  implement → run verification command → commit on success
+  mark task [x] in tasks.md
+  if verification fails → retry up to N times → if still failing, halt and surface
+  repeat until ALL_TASKS_COMPLETE
+```
+
+You can step away. When you come back, `tasks.md` is fully checked off and the diff is in your branch.
+
+---
+
+## 🧱 Core concepts
+
+#### Spec
+
+A directory under `specs/` containing the four canonical artifacts (`research.md`, `requirements.md`, `design.md`, `tasks.md`) plus an execution-state file. Specs are first-class citizens — they version with your repo and act as the contract for what is being built and why.
+
+#### Phase
+
+One of the five steps in the workflow (research, requirements, design, tasks, implement). Each phase has exactly one owner subagent and exactly one output artifact. Phases are sequential by design — skipping or reordering them is not supported.
+
+#### Subagent
+
+A specialist agent invoked by the coordinator for a specific phase. Each subagent runs in its own context window and is given only the inputs it needs (goal, prior artifacts, relevant skills). This keeps every phase reasoning fresh and prevents prompt bloat.
+
+#### Skill
+
+A reusable capability scanned at the start of each spec. flow looks at all installed Claude Code skills, semantically matches them to the goal, and loads the relevant ones into the active context. You can install your own skills under `.claude/skills/` or `.agents/skills/`.
+
+#### Hook
+
+A script that runs at lifecycle events (`SessionStart`, `Stop`, `PreToolUse`, `UserPromptSubmit`). flow ships with four hooks that maintain the spec index, enforce quick-mode guardrails, and watch for stop-loop completion. Hooks are TypeScript sources bundled to `.mjs` at build time.
+
+#### Autonomous loop
+
+The behaviour of `/curdx-flow:implement`. After a human approves `tasks.md`, the executor takes over and runs through every task without further human input — provided each verification gate passes. If verification fails repeatedly, the loop halts and surfaces the failure so a human can intervene.
+
+#### Epic
+
+A collection of related specs with declared dependencies. Created with `/curdx-flow:triage`. Useful when a single feature decomposes into multiple specs that must be built in a specific order.
 
 ---
 
@@ -118,68 +273,190 @@ Run `npx @curdx/flow status` any time to see what's on your machine.
 
 The bundled plugin exposes these slash commands inside Claude Code:
 
-| Command | What it does |
+| Command | Description |
 | --- | --- |
-| `/curdx-flow:start` | Smart entry point — new spec or resume existing. Runs the interview. |
-| `/curdx-flow:new` | Force-create a new spec (skip resume detection). |
-| `/curdx-flow:research` | Parallel research team investigates the goal. |
-| `/curdx-flow:requirements` | Generate `requirements.md` from goal + research. |
-| `/curdx-flow:design` | Architect agent generates `design.md`. |
-| `/curdx-flow:tasks` | Break design into a checked task list. |
-| `/curdx-flow:implement` | **Autonomous execution loop** — task by task until done. |
-| `/curdx-flow:triage` | Decompose a large feature into multiple dependency-aware specs (epic). |
-| `/curdx-flow:status` | Show all specs and progress. |
-| `/curdx-flow:switch` | Switch active spec. |
-| `/curdx-flow:refactor` | Update spec files methodically after execution. |
-| `/curdx-flow:cancel` | Cancel active execution loop, cleanup state. |
-| `/curdx-flow:index` | Index codebase + external resources into searchable specs. |
-| `/curdx-flow:help` | Show plugin help and workflow overview. |
+| `/curdx-flow:start` | Smart entry point. Detects whether to create a new spec or resume an existing one. Runs the interview, sets up state, dispatches the research phase. |
+| `/curdx-flow:new` | Force-create a new spec, skipping resume detection. Useful when the smart entry point would otherwise resume something you no longer want. |
+| `/curdx-flow:research` | Run or re-run the research phase for the active spec. Dispatches the parallel research team. |
+| `/curdx-flow:requirements` | Generate `requirements.md` from goal + research, via the product-manager subagent. |
+| `/curdx-flow:design` | Generate `design.md` from requirements, via the architect-reviewer subagent. |
+| `/curdx-flow:tasks` | Break the design into a checked task list (`tasks.md`), via the task-planner subagent. |
+| `/curdx-flow:implement` | Begin the autonomous execution loop. Runs every unchecked task in `tasks.md` until completion or unrecoverable failure. |
+| `/curdx-flow:triage` | Decompose a large feature into multiple dependency-aware specs (an epic). Produces `specs/_epics/<name>/epic.md` and a per-spec graph. |
+| `/curdx-flow:status` | Show all specs, their phase, and progress. |
+| `/curdx-flow:switch` | Switch the active spec for resume / continuation. |
+| `/curdx-flow:refactor` | Methodically update spec files (requirements → design → tasks) after execution has revealed they need revision. |
+| `/curdx-flow:cancel` | Cancel the active execution loop, clean up state, and (optionally) remove the spec. |
+| `/curdx-flow:index` | Index the codebase and external resources into searchable spec metadata. |
+| `/curdx-flow:help` | Show plugin help and a workflow overview. |
 | `/curdx-flow:feedback` | Submit feedback or report a plugin issue. |
-
-Everything writes to `specs/<spec-name>/` — the artifacts are plain Markdown, version-controlled, and survive across sessions.
 
 ---
 
-## 🤔 Why it exists
+## 🤖 Subagents
 
-Claude Code is fast. But on real projects it skips tests, loses context between sessions, and produces inconsistent results — especially when the codebase has real conventions and real regressions to catch.
+flow ships with nine specialist subagents, each with a narrow responsibility. They are invoked automatically by the coordinator commands above; you do not call them directly.
 
-I tried the alternatives. Most add complexity — dozens of agents, thousands of lines of instructions — but the output doesn't actually get better. You burn more tokens and wait longer.
+| Subagent | Role |
+| --- | --- |
+| `research-analyst` | Investigates the goal via web search, documentation, and codebase exploration. Multiple instances run in parallel during the research phase. |
+| `product-manager` | Translates research into structured requirements (user stories, functional and non-functional requirements, acceptance criteria). |
+| `architect-reviewer` | Designs scalable, maintainable systems. Produces `design.md` with components, decisions, risks, and file-change manifest. |
+| `task-planner` | Breaks a design into a sequenced, checkable task list with verification gates. Supports `fine` and `coarse` granularity modes. |
+| `spec-executor` | The autonomous executor. Implements one task end-to-end per invocation, verifies, commits, and signals completion to the loop. |
+| `spec-reviewer` | Read-only reviewer that validates artifacts against type-specific rubrics. Outputs `REVIEW_PASS` or `REVIEW_FAIL`. |
+| `qa-engineer` | Runs verification commands at quality gates. Outputs `VERIFICATION_PASS` or `VERIFICATION_FAIL`. |
+| `refactor-specialist` | Updates spec files section-by-section after execution surfaces design drift. |
+| `triage-analyst` | Decomposes a large feature into multiple dependency-aware specs (epic graph). |
 
-`@curdx/flow` takes a different bet:
+---
 
-- **Specs are the contract**, not vibes. Every change has `research.md` → `requirements.md` → `design.md` → `tasks.md` before any code runs. They live in your repo. You can read them. Reviewers can read them.
-- **Subagents are specialized, not stacked**. One agent per phase. Each gets a fresh context window. No 50-agent orchestration salad.
-- **The loop runs itself**. `/curdx-flow:implement` keeps going — execute task, verify, commit, next task — until every checkbox flips. You walk away. You come back. You read the diff.
-- **Installer + plugin in one package**. You don't pick a marketplace, edit a config, scaffold a project. You run `npx @curdx/flow` once.
+## 📦 The marketplace
+
+The installer ships with a curated set of plugins and MCP servers. You opt in per item.
+
+| ID | Type | Source | Purpose |
+| --- | --- | --- | --- |
+| **`curdx-flow`** | plugin | bundled in this repo | Spec-driven dev workflow. **Always installed.** |
+| `claude-mem` | plugin | `thedotmack/claude-mem` | Cross-session memory. Stores observations and recalls them at the start of subsequent sessions. |
+| `pua` | plugin | `tanweai/pua` | "Anti-failure" pressure mode. Auto-fires on 2+ consecutive failures or detected user frustration; pushes the agent to switch approaches. |
+| `chrome-devtools-mcp` | plugin | `ChromeDevTools/chrome-devtools-mcp` | Drive a real Chrome via MCP — performance traces, network inspection, console, screenshots, accessibility audits. |
+| `frontend-design` | plugin | `claude-plugins-official` | Distinctive, production-grade frontend output. Avoids generic AI aesthetics. |
+| `sequential-thinking` | mcp | `@modelcontextprotocol/server-sequential-thinking` | Step-by-step reasoning MCP server. |
+| `context7` | mcp | `https://mcp.context7.com/mcp` | Live library documentation over MCP. Beats stale training-data answers for recent SDK changes. |
+
+Run `npx @curdx/flow status` to see what is installed on your machine.
+
+---
+
+## ⚙️ Configuration
+
+### Flags
+
+| Flag | Effect |
+| --- | --- |
+| `--all` | Apply to every available item (with `install` or `update`). |
+| `--yes` | Skip all confirmations (non-interactive). |
+| `--lang en` / `--lang zh` | Override the language for the current invocation. |
+| `--no-claude-md` | Do not write the managed block to `~/.claude/CLAUDE.md`. |
+| `--json` | Output machine-readable JSON (with `status`). |
+| `--quick` | (Plugin) Run all phases of a spec sequentially without pausing for approval. Use with caution. |
+| `--commit-spec` / `--no-commit-spec` | (Plugin) Commit spec artifacts after each phase. Default: `true`. |
+| `--specs-dir <path>` | (Plugin) Write specs to a non-default directory (e.g. `packages/api/specs/`). |
+| `--tasks-size fine` / `--tasks-size coarse` | (Plugin) Granularity of `tasks.md` decomposition. |
+
+### Environment variables
+
+| Variable | Effect |
+| --- | --- |
+| `CURDX_FLOW_NO_CLAUDE_MD=1` | Equivalent to `--no-claude-md`. |
+| `CURDX_FLOW_LANG=en` / `=zh` | Default language for the installer. |
+| `CONTEXT7_API_KEY` | Optional API key for the context7 MCP server. |
+
+### Per-project overrides
+
+Project-specific settings live in `.claude/settings.json` (Claude Code's own config). flow does not write to this file by default; it only manages its block in `~/.claude/CLAUDE.md`.
+
+---
+
+## 📁 Project layout
+
+After install, here is what is on your machine:
+
+```
+~/.claude/
+├── plugins/cache/curdx/curdx-flow/<version>/   # the bundled plugin
+│   ├── commands/         # /curdx-flow:* slash commands
+│   ├── agents/           # subagent definitions
+│   ├── skills/           # bundled skills
+│   ├── hooks/scripts/    # built hook bundles (.mjs)
+│   └── schemas/          # JSON schemas
+├── plugins/cache/<other-plugins>/              # plugins you opted into
+└── CLAUDE.md                                   # global; contains <!-- BEGIN @curdx/flow v1 --> block
+```
+
+Inside any project that uses flow:
+
+```
+<your-project>/
+└── specs/
+    ├── .current-spec               # active spec name (or path)
+    ├── .current-epic               # active epic, if any
+    ├── .index/                     # spec index for search/triage
+    └── <spec-name>/
+        ├── research.md
+        ├── requirements.md
+        ├── design.md
+        ├── tasks.md
+        ├── .curdx-state.json       # execution state (gitignored)
+        └── .progress.md            # phase notes (gitignored)
+```
+
+The four canonical artifacts (`research.md` … `tasks.md`) are committed with your code. State and progress files are gitignored.
+
+The `<!-- BEGIN @curdx/flow v1 -->` block in `~/.claude/CLAUDE.md` tells Claude what is installed and how to invoke it. flow only ever rewrites this block — content outside the markers is preserved verbatim. Pass `--no-claude-md` (or set `CURDX_FLOW_NO_CLAUDE_MD=1`) to opt out of the managed block.
+
+---
+
+## 💡 Why it exists
+
+Claude Code is fast, but on real projects it has predictable failure modes:
+
+- **It skips tests** unless you keep telling it to write them.
+- **It loses context** between sessions, between rate-limit resets, and inside very long sessions.
+- **It produces inconsistent output** across runs of the same task.
+- **It does not push back** on under-specified requirements — it just guesses, and you discover the mismatch in code review.
+
+Most workflow frameworks address this by adding more agents, more orchestration, more prompt files. The result is more tokens spent, longer wait times, and a harder-to-audit pipeline. The output rarely improves.
+
+`@curdx/flow` makes a different bet:
+
+1. **Specs are the contract, not the prompt.** Every change has `research.md` → `requirements.md` → `design.md` → `tasks.md` written before any implementation begins. They live in your repo. Reviewers can read them. Future-you can read them.
+2. **Subagents are specialized, not stacked.** One agent per phase. Each gets a fresh context window. No multi-agent orchestration salad.
+3. **The loop runs itself.** Once `tasks.md` is approved, `/curdx-flow:implement` executes the entire task list autonomously, with verification gates between every task. You walk away. You come back. You read the diff.
+4. **Installer and plugin in one package.** No separate marketplace registration, no scaffolding, no per-project config. `npx @curdx/flow` once.
 
 > Claude Code is the engine. `curdx-flow` is the chassis.
 
 ---
 
-## 🗂️ Where things live
+## ❓ FAQ
 
-After install, here's what's on your machine:
+#### Does this replace Claude Code?
 
-```
-~/.claude/
-  plugins/cache/curdx/curdx-flow/<version>/   ← the plugin
-  CLAUDE.md                                   ← managed `<!-- BEGIN @curdx/flow -->` block
+No. flow runs **inside** Claude Code as a plugin. You still use the Claude Code CLI / IDE extension to chat; flow adds the `/curdx-flow:*` commands, subagents, hooks, and the bundled marketplace.
 
-<your-project>/
-  specs/
-    .current-spec
-    .current-epic
-    <spec-name>/
-      research.md
-      requirements.md
-      design.md
-      tasks.md
-      .curdx-state.json   ← execution state, gitignored
-      .progress.md        ← phase notes, gitignored
-```
+#### Can I use flow without installing the marketplace plugins?
 
-The `<!-- BEGIN @curdx/flow v1 -->` block in your global `~/.claude/CLAUDE.md` tells Claude what's installed. flow only ever rewrites that block — anything outside is preserved verbatim. Pass `--no-claude-md` (or `CURDX_FLOW_NO_CLAUDE_MD=1`) to opt out.
+Yes. The bundled `curdx-flow` plugin is the spec workflow itself; everything else (claude-mem, chrome-devtools-mcp, …) is opt-in. `npx @curdx/flow install` lets you pick.
+
+#### Do I need to commit the spec files?
+
+You should commit the four canonical artifacts (`research.md`, `requirements.md`, `design.md`, `tasks.md`). The state and progress files (`.curdx-state.json`, `.progress.md`) should be gitignored — flow's default `.gitignore` entries handle this.
+
+#### What happens if a task fails verification mid-loop?
+
+The executor retries up to a configurable number of times (default 5). If it still fails, the loop halts, the task remains unchecked, and the failure is surfaced for human intervention. Resume with `/curdx-flow:implement` after the underlying issue is fixed.
+
+#### Can I run multiple specs in parallel?
+
+Specs are scoped per-project, but only one is active at a time. Use `/curdx-flow:switch` to change the active spec. For genuinely parallel work, use separate git worktrees or branches.
+
+#### Is there a "quick mode" that skips approvals?
+
+Yes — pass `--quick` to `/curdx-flow:start` (or set it in your spec config). This runs all phases sequentially without pausing. Recommended only for low-risk specs you have confidence in.
+
+#### Does flow modify my code outside of `/curdx-flow:implement`?
+
+No. The first four phases (`research` → `tasks`) only write to `specs/<spec>/`. Code changes happen exclusively in the `implement` phase, and every change is committed.
+
+#### How does flow compare to GitHub's Spec Kit?
+
+Spec Kit and flow share the spec-driven philosophy but differ in scope. Spec Kit is multi-agent-host (Claude Code, Copilot, Cursor, Codex, …) and CLI-driven (`specify init`). flow is Claude-Code-only, slash-command-driven, ships an autonomous execution loop, and bundles a marketplace. Pick flow if you live in Claude Code; pick Spec Kit if you need agent-host portability.
+
+#### Where do I report bugs?
+
+Run `/curdx-flow:feedback` inside Claude Code, or open an issue at <https://github.com/curdx/curdx-flow/issues>.
 
 ---
 
@@ -187,7 +464,9 @@ The `<!-- BEGIN @curdx/flow v1 -->` block in your global `~/.claude/CLAUDE.md` t
 
 - **Node.js** ≥ 20.12
 - **Claude Code** CLI on `PATH` (the installer shells out to `claude plugin` and `claude mcp`)
-- Optional: **Bun** ≥ 1.0 — auto-detected and offered if you install `claude-mem`
+- *(Optional)* **Bun** ≥ 1.0 — auto-detected and offered if you install `claude-mem`
+
+Tested on macOS, Linux, and Windows (WSL2 recommended on Windows).
 
 ---
 
