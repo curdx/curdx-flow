@@ -66,18 +66,49 @@ async function parseHookFailures(filePath: string): Promise<Map<string, HookFail
   return counts;
 }
 
+function escapeCell(s: string): string {
+  // Markdown table cells: escape `|` and collapse newlines so the row stays on
+  // one line. (We already truncate stderr to 200 chars upstream.)
+  return s.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+}
+
+function renderMarkdown(failures: HookFailureEntry[], limit: number): string {
+  const lines: string[] = [];
+  lines.push(`## Hook Failures Top-${limit}`);
+  lines.push('');
+  if (failures.length === 0) {
+    lines.push('_No hook failures recorded._');
+    lines.push('');
+    return lines.join('\n');
+  }
+  lines.push('| Hook | Count | Last stderr |');
+  lines.push('| --- | --- | --- |');
+  for (const f of failures) {
+    lines.push(`| ${escapeCell(f.hook)} | ${f.count} | ${escapeCell(f.lastStderr)} |`);
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
 export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
   const fixturePath = path.resolve(process.cwd(), POC_FIXTURE_REL);
   const counts = await parseHookFailures(fixturePath);
 
-  const hookFailures: HookFailureEntry[] = Array.from(counts.entries())
+  // Single source of truth for sort + Top-N truncation (avoids N copies elsewhere).
+  const limit = Number(opts.limit) || 10;
+  const allFailures: HookFailureEntry[] = Array.from(counts.entries())
     .map(([hook, v]) => ({ hook, count: v.count, lastStderr: v.lastStderr }))
     .sort((a, b) => b.count - a.count);
+  const hookFailures = allFailures.slice(0, limit);
 
   const report: AnalyzeReport = { hookFailures };
 
-  // POC Phase 1: Task 1.3 wires markdown rendering + --out. For now, JSON only.
+  // POC Phase 1: --out wiring deferred to Task 2.x; for now stdout only.
   void opts.out;
-  void opts.limit;
-  process.stdout.write(`${JSON.stringify(report)}\n`);
+
+  if (opts.json) {
+    process.stdout.write(`${JSON.stringify(report)}\n`);
+    return;
+  }
+  process.stdout.write(renderMarkdown(hookFailures, limit));
 }

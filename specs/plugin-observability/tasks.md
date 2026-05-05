@@ -51,7 +51,7 @@ created: 2026-05-05
   - _Requirements: FR-1, FR-2, FR-7（部分）, AC-1.1_
   - _Design: parser.ts 雏形 + index.ts 编排_
 
-- [ ] **Task 1.3: POC 收尾——markdown 渲染 + Top-N 截断**
+- [x] **Task 1.3: POC 收尾——markdown 渲染 + Top-N 截断**
   - **Do**:
     1. `src/analyze/index.ts` 内 inline 渲染 markdown：`## Hook Failures Top-N` + 表格 (hook | count | last stderr)
     2. `--json` flag 切回 JSON 输出，缺省 markdown
