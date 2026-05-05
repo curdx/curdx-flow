@@ -182,7 +182,9 @@ A frozen demo goal for byte-equal regression testing.
   "awaitingApproval": false,
   "recoveryMode": false,
   "nativeSyncEnabled": false,
-  "granularity": "fine"
+  "granularity": "fine",
+  "completed":true,
+  "completedAt":"2026-01-01T00:00:00.000Z"
 }
 `,
   );

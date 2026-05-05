@@ -76,9 +76,10 @@ If `nativeSyncEnabled` is `false`: skip all sync operations silently.
 
 If taskIndex >= totalTasks:
 1. Verify all tasks marked [x] in tasks.md
-2. Delete state file explicitly:
+2. Mark state as completed (preserve audit fields):
    ```bash
-   rm -f "$SPEC_PATH/.curdx-state.json"
+   COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
    ```
 3. Output: ALL_TASKS_COMPLETE
 4. STOP - do not delegate any task
@@ -539,7 +540,12 @@ Before outputting ALL_TASKS_COMPLETE:
 
 Before outputting:
 1. Verify all tasks marked [x] in tasks.md
-2. Delete .curdx-state.json (cleanup execution state)
+2. Write completion marker to `.curdx-state.json` (preserve execution state for audit):
+   ```bash
+   COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
+   ```
+   > Note: This write is idempotent with the Check Completion write — coordinator may invoke either path; both produce the same final state.
 3. Keep .progress.md (preserve learnings and history)
 4. **Cleanup orphaned temp progress files** (from interrupted parallel batches):
    ```bash
@@ -759,7 +765,11 @@ All must be true:
 
 When all Step 4 criteria met:
 1. Update .progress.md with final state
-2. Delete .curdx-state.json
+2. Mark spec completed in `.curdx-state.json`:
+   ```bash
+   COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
+   ```
 3. Get PR URL: `gh pr view --json url -q .url`
 4. Output: ALL_TASKS_COMPLETE
 5. Output: PR link

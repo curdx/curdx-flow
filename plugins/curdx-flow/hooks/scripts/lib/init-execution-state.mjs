@@ -33,7 +33,8 @@ var EMBEDDED_TEMPLATE = {
   modificationMap: {},
   nativeTaskMap: {},
   nativeSyncEnabled: true,
-  nativeSyncFailureCount: 0
+  nativeSyncFailureCount: 0,
+  completed: false
 };
 function loadTemplate() {
   const cwdPath = join(

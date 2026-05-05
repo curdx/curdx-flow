@@ -22,7 +22,9 @@ describe("init-execution-state", () => {
         taskIteration: 1,
         globalIteration: 1,
         recoveryMode: false,
+        completed: false,
       });
+      expect(parsed.completed).toBe(false);
       // stdout prints absolute target path
       expect(r.stdout.trim()).toBe(target);
     } finally {
@@ -59,6 +61,7 @@ describe("init-execution-state", () => {
         unknown
       >;
       expect(after.phase).toBe("execution");
+      expect(after.completed).toBe(false);
     } finally {
       rmSync(specDir, { recursive: true, force: true });
     }

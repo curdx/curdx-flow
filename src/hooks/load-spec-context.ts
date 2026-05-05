@@ -23,13 +23,7 @@ import process from "node:process";
 import { runHook } from "./_shared/run-hook.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
 import type { ContextBlockOutput } from "./_shared/types.js";
-
-interface CurdxState {
-  phase?: string;
-  taskIndex?: number;
-  totalTasks?: number;
-  awaitingApproval?: boolean;
-}
+import type { CurdxState } from "./_shared/types.js";
 
 type ContextBlock = ContextBlockOutput;
 
@@ -145,6 +139,16 @@ runHook(async (input) => {
   }
 
   if (state) {
+    if (state.completed === true) {
+      const at =
+        typeof state.completedAt === "string" ? state.completedAt : "unknown";
+      process.stderr.write(
+        `[curdx-flow] Spec completed: ${specName} (${at}). Run /curdx-flow:refactor to reopen or /curdx-flow:new for a new spec.\n`,
+      );
+      block.phase = "completed";
+      block.awaitingApproval = false;
+      return block;
+    }
     const phase = state.phase ?? "unknown";
     const taskIndex = typeof state.taskIndex === "number" ? state.taskIndex : 0;
     const totalTasks =

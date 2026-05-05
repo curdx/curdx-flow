@@ -2,6 +2,27 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.0 — 2026-05-04
+
+### Added
+
+- **`completed: boolean` and `completedAt: string` fields in `.curdx-state.json` schema.** New optional fields on the spec state file (`schemas/spec.schema.json`). `completed === true` flips the spec into "done, retained for audit" mode; `completedAt` carries an ISO 8601 timestamp (`new Date().toISOString()`, includes milliseconds, e.g. `2026-05-04T20:17:00.123Z`). Legacy v7.0.x state files with `completed === undefined` continue to be treated as in-progress (backwards-compat — see Migration).
+- **`merge-state` `$unset` operator.** `plugins/curdx-flow/hooks/scripts/lib/merge-state.mjs` now accepts a JSON patch with `"$unset": ["key1", "key2"]` to remove specific fields atomically. Used by `/curdx-flow:refactor` to clear `completedAt` when a spec is intentionally re-opened. Patches without `$unset` behave exactly as before (zero-behavior-change for existing callers).
+- **`ensure-gitignore` wire-in to `/curdx-flow:start`.** The `ensure-gitignore` lib utility (already shipped in v7.0.0 but not invoked) is now called from `commands/start.md` so first-spec creation guarantees `**/.progress.md` is gitignored. Closes the "working tree permanently dirty" footgun that motivated this spec.
+- **Shared `CurdxState` interface in `src/hooks/_shared/types.ts`.** Single source of truth for the `.curdx-state.json` shape across all 4 reader hooks (`load-spec-context`, `quick-mode-guard`, `stop-watcher`, `update-spec-index`). Type-only export — esbuild erases at bundle time, zero runtime cost.
+
+### Changed
+
+- **`.curdx-state.json` is no longer deleted on `ALL_TASKS_COMPLETE`.** Coordinator and `commands/implement.md` Step 5 now write `{"completed":true,"completedAt":"<ISO>","awaitingApproval":false}` via `merge-state` instead of `rm -f .curdx-state.json`. The state file is **retained** as the structured source of truth for completed specs (audit trail: `discoveredSkills`, `granularity`, `commitSpec`, `quickMode` interview decisions all survive). Eliminates the test008-class regression where state-deletion left a permanently-dirty working tree, and lets `update-spec-index` short-circuit to `phase=completed` without falling back to fragile markdown reverse-parsing.
+- **5 reader hooks now use strict `state.completed === true` equality.** `stop-watcher.ts:601`, `load-spec-context.ts:147`, `update-spec-index.ts:278` (plus `quick-mode-guard.ts` type-import sync) check `state.completed === true` (never `if (state.completed)`). This is the backwards-compat contract: legacy v7.0.x state files with `completed === undefined` falsy-evaluate and behave identically to pre-7.1.0. Lint-enforced via grep gate (≥3 strict-equality occurrences, 0 truthy-checks).
+- **`update-spec-index` short-circuits to `phase=completed`** when `state.completed === true`, without invoking `inferPhaseFromFiles()`. The fallback path (markdown reverse-parse) remains as a second-tier safety net for human-deleted state files / third-party forks / pre-v7 residue.
+- **`/curdx-flow:refactor` resets via `merge-state $unset` instead of state file deletion.** When a completed spec is re-opened for refactor, `commands/refactor.md` now runs `merge-state .curdx-state.json '{"$unset":["completedAt"],"completed":false}'` rather than `rm -f`. Preserves audit history; matches the v7.1.0 retention model end-to-end.
+
+### Migration
+
+- Backwards-compatible by design — `completed === undefined` (legacy v7.0.x state files) is treated as in-progress, no manual migration required.
+- See [docs/MIGRATION-V7.md → v7.1.0](./docs/MIGRATION-V7.md#v710-state-retention--completion-marker) for the full upgrade note + a `jq`-style snippet to backfill `completed:true` on specs whose `.curdx-state.json` was deleted under v7.0.x (AC-8.3).
+
 ## 7.0.2 — 2026-05-04
 
 ### Fixed

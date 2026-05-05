@@ -67,7 +67,7 @@ git diff --cached --quiet || git commit -m "chore(spec): update progress for tas
 
 ## What NOT to Include
 
-- `.curdx-state.json` - never committed, managed by coordinator
+- `.curdx-state.json` - never committed (retained on completion with completed:true marker)
 - Lock files (`.tasks.lock`, `.git-commit.lock`) - temporary, cleaned up after batch
 - Temp progress files (`.progress-task-*.md`) - merged into main .progress.md by coordinator
 

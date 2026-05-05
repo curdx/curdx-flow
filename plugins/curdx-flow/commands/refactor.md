@@ -109,7 +109,7 @@ If "Regenerate" selected, delegate to the original agent (architect-reviewer for
 
 ### Update State
 
-1. Update `.curdx-state.json`: keep existing phase, reset `taskIndex` to 0 if tasks modified, set `awaitingApproval: true`
+1. Update `.curdx-state.json` via merge-state with `'{"completed":false,"awaitingApproval":true,"$unset":["completedAt"]}'` (per design §11) -- keep existing phase, reset `taskIndex` to 0 if tasks modified
 2. Append refactoring summary to `.progress.md`
 
 ### Commit (if enabled)

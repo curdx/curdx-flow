@@ -94,7 +94,8 @@ Based on detection logic from Step 2:
 
 1. Read `$specPath/.curdx-state.json`
 2. If no state file -- check which files exist, determine last phase, ask "Continue or restart?"
-3. If state file exists -- read phase/taskIndex, show brief status, continue from current phase
+3. If state file exists and state.completed === true -- Output "This spec is completed (<completedAt>). Use /curdx-flow:refactor to reopen or /curdx-flow:new for a new spec." STOP. Do not resume.
+4. If state file exists -- read phase/taskIndex, show brief status, continue from current phase
 
 **Status Display:**
 ```text
@@ -127,7 +128,12 @@ Continuing...
    ```
 4. Create spec directory: `mkdir -p "$basePath"`
 5. Update .current-spec (bare name for default dir, full path for non-default)
-6. Ensure gitignore entries for specs/.current-spec, specs/.current-epic, and **/.progress.md
+6. Ensure gitignore entries for specs/.current-spec, specs/.current-epic, and **/.progress.md:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/ensure-gitignore.mjs" specs/.current-spec
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/ensure-gitignore.mjs" specs/.current-epic
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/ensure-gitignore.mjs" '**/.progress.md'
+   ```
 7. Initialize `.curdx-state.json`:
    ```json
    {
@@ -136,7 +142,8 @@ Continuing...
      "taskIteration": 1, "maxTaskIterations": 5,
      "globalIteration": 1, "maxGlobalIterations": 100,
      "commitSpec": true, "quickMode": false,
-     "discoveredSkills": []
+     "discoveredSkills": [],
+     "completed": false
    }
    ```
    If this spec was suggested by an active epic, also include:

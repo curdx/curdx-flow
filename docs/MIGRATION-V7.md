@@ -107,3 +107,83 @@ After upgrading, run through this checklist to confirm v7 is working end-to-end:
 - [ ] No `jq: command not found` errors in any hook firing or slash command output.
 
 If every box is checked, you're fully migrated. If any box fails, see [Downgrade path](#downgrade-path) and [file an issue](https://github.com/curdx/curdx-flow/issues).
+
+## v7.1.0 — state retention + completion marker
+
+> **TL;DR**: `.curdx-state.json` is **no longer deleted** when a spec finishes. Instead, the coordinator writes `{"completed":true,"completedAt":"<ISO>","awaitingApproval":false}` and the file is retained as a structured audit trail. Backwards-compatible — legacy v7.0.x state files with `completed === undefined` are treated as in-progress and continue to work without manual intervention.
+
+### What changed (behavior)
+
+| Aspect | v7.0.x | v7.1.0 |
+| --- | --- | --- |
+| End-of-spec | `rm -f .curdx-state.json` | `merge-state` writes `completed:true` + `completedAt` |
+| Working tree after completion | Often dirty (state file was committed earlier; deletion = unstaged delete) | Clean — file retained, mutated in place |
+| `update-spec-index` truth source | Fall back to `inferPhaseFromFiles()` (parses `tasks.md` / `.progress.md`) | Short-circuit to `phase=completed` from `state.completed === true` |
+| `/curdx-flow:refactor` reset | `rm -f .curdx-state.json` | `merge-state $unset:["completedAt"]` + `completed:false` |
+| Audit data (`discoveredSkills`, `granularity`, `commitSpec`, `quickMode`) | Lost on deletion | Preserved indefinitely |
+
+### Compatibility guarantee
+
+- **`completed === undefined` is treated as in-progress.** All 5 reader hooks (`stop-watcher`, `update-spec-index`, `load-spec-context`, `quick-mode-guard`) check `state.completed === true` with strict equality. Legacy v7.0.x state files (which have no `completed` field) falsy-evaluate and run the in-progress code path — identical behavior to pre-7.1.0.
+- **No schema break.** `schemas/spec.schema.json`'s `phase` enum is unchanged (`[research, requirements, design, tasks, execution]`). The completion signal lives on the parallel `completed: boolean` field, not as a new phase value.
+- **No manual migration required for normal users.** Just `npm i -g @curdx/flow@7.1` + `claude plugin update curdx-flow`. Specs in flight on v7.0.x finish normally; on next completion they will write the new marker instead of deleting.
+
+### Edge case — backfill `completed:true` for specs whose state was deleted under v7.0.x (AC-8.3)
+
+If you have specs that **already finished under v7.0.x** (state file was deleted, `.progress.md` says "all tasks done") and you want them to show as `phase=completed` in `/curdx-flow:status` without re-running anything, you can retrofit a minimal state file. The reader hooks (`update-spec-index.mjs`, `load-spec-context.mjs`, etc. — all bundled from `src/hooks/*.ts` via `merge-state.mjs` and friends) will pick it up on next firing.
+
+```bash
+# Backfill completed marker for specs whose state was deleted under v7.0.x.
+# Replace <name> with the spec's directory name (e.g. helloworld), and <ISO> with
+# any ISO 8601 timestamp (use the spec's last commit time if you want fidelity:
+#   ISO=$(git log -1 --format=%cI -- ./specs/<name>/)
+# ).
+SPEC=helloworld
+ISO=$(git log -1 --format=%cI -- "./specs/${SPEC}/" 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)
+cat > "./specs/${SPEC}/.curdx-state.json" <<EOF
+{
+  "source": "spec",
+  "name": "${SPEC}",
+  "basePath": "./specs/${SPEC}",
+  "phase": "execution",
+  "completed": true,
+  "completedAt": "${ISO}",
+  "awaitingApproval": false
+}
+EOF
+
+# Verify update-spec-index now reports phase=completed (no markdown reverse-parse):
+printf '{"cwd":"%s"}' "$(pwd)" | node "$(claude plugin info curdx-flow --path)/hooks/scripts/update-spec-index.mjs"
+cat ./specs/.index/index-state.json | grep -F '"phase":"completed"'
+```
+
+Alternatively, if you have `merge-state.mjs` resolved on PATH (or invoke it via the bundled plugin path), you can use the same atomic write the coordinator now uses:
+
+```bash
+# Same effect, using the plugin's merge-state lib directly (deepMerge + atomic-write).
+# Useful if .curdx-state.json already exists with partial data and you only want
+# to add the completion marker without clobbering other fields.
+PLUGIN=$(claude plugin info curdx-flow --path)
+node "${PLUGIN}/hooks/scripts/lib/merge-state.mjs" \
+  "./specs/${SPEC}/.curdx-state.json" \
+  "{\"completed\":true,\"completedAt\":\"${ISO}\",\"awaitingApproval\":false}"
+```
+
+This is **strictly optional**. If you don't backfill, those specs continue to display via the `inferPhaseFromFiles()` second-tier fallback (which still works in v7.1.0 — it's just no longer the primary path). The fallback is what v7.0.2 hardened with the strict tracker regex; it remains correct.
+
+### Downgrade
+
+Same as the main v6→v7 downgrade path: `npm i -g @curdx/flow@7.0.2` rolls back to the deletion model. State files written by v7.1.0 with `completed:true` will be **ignored** by v7.0.x readers (the `completed` field is unknown to v7.0.2) and the working tree will read as "spec in progress, taskIndex/totalTasks at the last-saved values." No data loss; the file just stops driving phase inference. To fully revert, `rm -f .curdx-state.json` per spec after downgrading.
+
+### Verification (v7.1.0 specific)
+
+After upgrading, run through this short list to confirm v7.1.0 retention is working:
+
+- [ ] `npm view @curdx/flow version` reports `7.1.0` (or later).
+- [ ] In a project with at least one in-flight spec, run `/curdx-flow:implement` to completion. After the final task: `cat ./specs/<spec>/.curdx-state.json | grep -F '"completed":true'` exits 0.
+- [ ] `git status ./specs/<spec>/` does **not** show `.curdx-state.json` as deleted (test008 regression).
+- [ ] `cat ./specs/.index/index-state.json | grep -F '"phase":"completed"'` exits 0 for the just-completed spec.
+- [ ] Re-running `/curdx-flow:implement` on the completed spec exits cleanly without restarting the loop (stop-watcher's `state.completed === true` guard).
+- [ ] If you opt into refactor: `/curdx-flow:refactor <spec>` clears `completedAt` and sets `completed:false` via `merge-state.mjs $unset`, leaving the rest of the state intact.
+
+If any check fails, see the [Downgrade](#downgrade) note above and [file an issue](https://github.com/curdx/curdx-flow/issues).

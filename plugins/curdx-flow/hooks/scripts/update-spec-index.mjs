@@ -283,6 +283,16 @@ function buildSpecRecord(entry, cwd, specsDirs) {
     phase: "unknown"
   };
   if (state) {
+    if (state.completed === true) {
+      record.phase = "completed";
+      const totalTasks2 = typeof state.totalTasks === "number" ? state.totalTasks : 0;
+      if (totalTasks2 > 0) {
+        const taskIndex2 = typeof state.taskIndex === "number" ? state.taskIndex : 0;
+        record.taskIndex = taskIndex2;
+        record.totalTasks = totalTasks2;
+      }
+      return record;
+    }
     const phase = state.phase ?? "unknown";
     const taskIndex = typeof state.taskIndex === "number" ? state.taskIndex : 0;
     const totalTasks = typeof state.totalTasks === "number" ? state.totalTasks : 0;

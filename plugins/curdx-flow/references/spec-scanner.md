@@ -210,11 +210,14 @@ Determine spec phase from directory contents:
 ### Resume Flow
 
 1. Read `$specPath/.curdx-state.json`
-2. If no state file (completed or never started):
+2. If no state file (never started):
    - Check what files exist (research.md, requirements.md, design.md, tasks.md)
    - Determine last completed phase from file presence
    - Ask: "Continue to next phase or restart?"
-3. If state file exists:
+3. If state file exists and `state.completed === true`:
+   - Output "Spec completed (<completedAt>). Use /curdx-flow:refactor to reopen or /curdx-flow:new for a new spec."
+   - STOP. Do not resume.
+4. If state file exists:
    - Read current phase and task index
    - Show brief status and continue from current phase
 

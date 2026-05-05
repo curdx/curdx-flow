@@ -153,13 +153,17 @@ Then Read and follow these references in order. They contain the complete coordi
 
 When all tasks complete (taskIndex >= totalTasks):
 1. Verify all tasks marked [x] in tasks.md
-2. Delete .curdx-state.json
+2. Mark state as completed (preserve audit fields):
+   ```bash
+   COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
+   ```
 3. Keep .progress.md (preserve learnings and history)
 4. Cleanup orphaned temp progress files: `find "$SPEC_PATH" -name ".progress-task-*.md" -mmin +60 -delete 2>/dev/null || true`
 5. Update spec index: `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet`
 6. Commit remaining spec changes:
    ```bash
-   git add "$SPEC_PATH/tasks.md" "$SPEC_PATH/.progress.md" ./specs/.index/
+   git add "$SPEC_PATH/tasks.md" "$SPEC_PATH/.progress.md" "$SPEC_PATH/.curdx-state.json" ./specs/.index/
    git diff --cached --quiet || git commit -m "chore(spec): final progress update for $spec"
    ```
 7. Check for PR link: `gh pr view --json url -q .url 2>/dev/null`
