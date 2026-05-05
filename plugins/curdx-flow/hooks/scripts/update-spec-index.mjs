@@ -6,17 +6,17 @@ const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
 // src/hooks/update-spec-index.ts
-import { existsSync as existsSync2, mkdirSync, readFileSync as readFileSync2, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync3, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
 import { join as join2, posix as posix2 } from "node:path";
-import process4 from "node:process";
+import process5 from "node:process";
 
 // src/hooks/_shared/atomic-write.ts
 import { writeFileSync, renameSync } from "node:fs";
 import { randomBytes } from "node:crypto";
-function writeFileAtomic(path, data) {
-  const tmp = `${path}.tmp.${process.pid}.${randomBytes(6).toString("hex")}`;
+function writeFileAtomic(path3, data) {
+  const tmp = `${path3}.tmp.${process.pid}.${randomBytes(6).toString("hex")}`;
   writeFileSync(tmp, data);
-  renameSync(tmp, path);
+  renameSync(tmp, path3);
 }
 
 // src/hooks/_shared/path-resolver.ts
@@ -139,13 +139,88 @@ function listSpecs(opts) {
 }
 
 // src/hooks/_shared/run-hook.ts
-import process3 from "node:process";
+import path2 from "node:path";
+import process4 from "node:process";
+
+// src/hooks/_shared/error-logger.ts
+import { appendFileSync, mkdirSync, readFileSync as readFileSync2 } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
+import process2 from "node:process";
+var SETTINGS_PATH = path.join(homedir(), ".claude", "settings.json");
+var ERRORS_DIR = path.join(homedir(), ".claude", "curdx-flow");
+var ERRORS_LOG = path.join(ERRORS_DIR, "errors.jsonl");
+var MAX_LINE_BYTES = 4096;
+var MSG_MAX = 500;
+var STACK_MAX = 2e3;
+var STR_MAX = 500;
+var cachedEnabled = null;
+function readEnabled() {
+  if (cachedEnabled !== null) return cachedEnabled;
+  try {
+    const raw = readFileSync2(SETTINGS_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.errorLogEnabled === "boolean") {
+      cachedEnabled = parsed.errorLogEnabled;
+      return cachedEnabled;
+    }
+    cachedEnabled = true;
+    return cachedEnabled;
+  } catch {
+    process2.stderr.write("[error-logger] settings.json missing/corrupt, defaulting errorLogEnabled=true\n");
+    cachedEnabled = true;
+    return cachedEnabled;
+  }
+}
+function trunc(s, max) {
+  if (typeof s !== "string") return void 0;
+  return s.length <= max ? s : s.slice(0, max);
+}
+function logHookError(ctx, err) {
+  try {
+    if (!readEnabled()) return;
+    const stack = ctx.stack ?? err?.stack;
+    const msg = ctx.msg ?? err?.message;
+    const record = {
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      level: "error",
+      hook: trunc(ctx.hook, STR_MAX) ?? "",
+      event: trunc(ctx.event, STR_MAX) ?? ""
+    };
+    const optionalEntries = [
+      ["msg", trunc(msg, MSG_MAX)],
+      ["cwd", trunc(ctx.cwd, STR_MAX)],
+      ["transcript_path", trunc(ctx.transcript_path, STR_MAX)],
+      ["spec", trunc(ctx.spec, STR_MAX)],
+      ["path", trunc(ctx.path, STR_MAX)],
+      ["stack", trunc(stack, STACK_MAX)]
+    ];
+    for (const [k, v] of optionalEntries) {
+      if (v !== void 0) record[k] = v;
+    }
+    let line = JSON.stringify(record);
+    if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
+      delete record.stack;
+      line = JSON.stringify(record);
+    }
+    if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
+      delete record.msg;
+      line = JSON.stringify(record);
+    }
+    try {
+      mkdirSync(ERRORS_DIR, { recursive: true });
+    } catch {
+    }
+    appendFileSync(ERRORS_LOG, line + "\n");
+  } catch {
+  }
+}
 
 // src/hooks/_shared/stdin.ts
-import process2 from "node:process";
+import process3 from "node:process";
 async function readStdinJson() {
   const chunks = [];
-  for await (const chunk of process2.stdin) {
+  for await (const chunk of process3.stdin) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
   const raw = Buffer.concat(chunks).toString("utf-8").trim();
@@ -154,27 +229,60 @@ async function readStdinJson() {
     return JSON.parse(raw);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    process2.stderr.write(`[hook] invalid stdin JSON: ${msg}
+    process3.stderr.write(`[hook] invalid stdin JSON: ${msg}
 `);
-    process2.exit(0);
+    process3.exit(0);
   }
 }
 
 // src/hooks/_shared/run-hook.ts
+function deriveHookName() {
+  const entry = process4.argv[1];
+  if (!entry) return "unknown-hook";
+  return path2.basename(entry).replace(/\.(mjs|js|ts)$/, "");
+}
 async function runHook(handler, options = {}) {
   const { readStdin = true } = options;
+  const hookName = deriveHookName();
+  let stdinForCtx = {};
   try {
-    const stdin = readStdin ? await readStdinJson() : {};
-    const output = await handler(stdin);
-    if (output !== void 0 && output !== null) {
-      process3.stdout.write(JSON.stringify(output) + "\n");
+    try {
+      stdinForCtx = readStdin ? await readStdinJson() : {};
+    } catch (parseErr) {
+      const e = parseErr instanceof Error ? parseErr : new Error(String(parseErr));
+      logHookError(
+        {
+          hook: hookName,
+          event: "stdin_parse",
+          msg: e.message,
+          stack: e.stack ?? ""
+        },
+        e
+      );
+      throw e;
     }
-    process3.exit(0);
+    const output = await handler(stdinForCtx);
+    if (output !== void 0 && output !== null) {
+      process4.stdout.write(JSON.stringify(output) + "\n");
+    }
+    process4.exit(0);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    process3.stderr.write(`[hook] ${msg}
+    const stack = err instanceof Error ? err.stack ?? "" : "";
+    logHookError(
+      {
+        hook: hookName,
+        event: "uncaught",
+        msg,
+        stack,
+        ...typeof stdinForCtx.cwd === "string" ? { cwd: stdinForCtx.cwd } : {},
+        ...typeof stdinForCtx.transcript_path === "string" ? { transcript_path: stdinForCtx.transcript_path } : {}
+      },
+      err instanceof Error ? err : void 0
+    );
+    process4.stderr.write(`[hook] ${msg}
 `);
-    process3.exit(0);
+    process4.exit(0);
   }
 }
 
@@ -227,7 +335,7 @@ function readState(specFs) {
   const stateFile = join2(specFs, ".curdx-state.json");
   if (!existsSync2(stateFile)) return null;
   try {
-    return JSON.parse(readFileSync2(stateFile, "utf8"));
+    return JSON.parse(readFileSync3(stateFile, "utf8"));
   } catch {
     return null;
   }
@@ -247,7 +355,7 @@ function inferPhaseFromFiles(specFs) {
   if (existsSync2(tasksFile)) {
     let raw = "";
     try {
-      raw = readFileSync2(tasksFile, "utf8");
+      raw = readFileSync3(tasksFile, "utf8");
     } catch {
       raw = "";
     }
@@ -410,24 +518,24 @@ function formatIndexJson(state) {
 }
 function log(opts, msg) {
   if (!opts.quiet) {
-    process4.stderr.write(`${msg}
+    process5.stderr.write(`${msg}
 `);
   }
 }
 runHook(
   async () => {
-    const opts = parseArgs(process4.argv.slice(2));
+    const opts = parseArgs(process5.argv.slice(2));
     const cwd = findRepoRoot();
     const state = buildIndexState(cwd);
     const markdown = buildIndexMarkdown(state, cwd);
     const jsonText = formatIndexJson(state);
     if (opts.dryRun) {
-      process4.stdout.write(jsonText);
+      process5.stdout.write(jsonText);
       return;
     }
     const defaultDir = getDefaultDir({ cwd });
     const indexDirFs = join2(cwd, defaultDir, ".index");
-    mkdirSync(indexDirFs, { recursive: true });
+    mkdirSync2(indexDirFs, { recursive: true });
     const jsonOut = join2(indexDirFs, "index-state.json");
     const mdOut = join2(indexDirFs, "index.md");
     writeFileAtomic(jsonOut, jsonText);

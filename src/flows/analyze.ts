@@ -5,6 +5,7 @@ export type AnalyzeOptions = {
   out?: string;
   json?: boolean;
   limit?: number;
+  includePrompts?: boolean;
 };
 
 const analyzeCmd = defineCommand({
@@ -25,6 +26,10 @@ const analyzeCmd = defineCommand({
       type: 'string' as const,
       description: 'Top-N truncation for tabular sections (default: 10)',
     },
+    'include-prompts': {
+      type: 'boolean' as const,
+      description: 'Skip prompt redaction (D-9 white-list passthrough disabled — local debugging only)',
+    },
   },
   async run({ args }) {
     const limitRaw = args.limit;
@@ -33,6 +38,7 @@ const analyzeCmd = defineCommand({
       out: typeof args.out === 'string' ? args.out : undefined,
       json: Boolean(args.json),
       limit: Number.isFinite(limit) ? (limit as number) : undefined,
+      includePrompts: Boolean((args as Record<string, unknown>)['include-prompts']),
     });
   },
 });

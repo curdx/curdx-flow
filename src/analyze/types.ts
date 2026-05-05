@@ -84,6 +84,8 @@ export interface StateFile {
   >;
   lastReportJson?: string;
   lastReportMarkdown?: string;
+  /** Discriminator for the cached report so toggling --include-prompts busts it. */
+  lastIncludePrompts?: boolean;
 }
 
 /**

@@ -11,6 +11,7 @@ import path from 'node:path';
 
 import { filterEvents } from './filter.ts';
 import { getStateForPath, loadSchemaMap, parseTranscript, shouldRotate } from './parser.ts';
+import { redactEvent, redactReportFields } from './redact.ts';
 import { renderReport } from './report.ts';
 import type { ErrorLogEntry, ReportJson, SpecStateInfo } from './report.ts';
 import type { Counters, Event, Options, StateFile } from './types.ts';
@@ -119,10 +120,15 @@ export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
 
   // Incremental tail with no new bytes → replay the last persisted report so
   // `analyze` is idempotent across runs (verifies via `diff /tmp/a.json /tmp/b.json`).
+  // Cache is keyed implicitly by includePrompts — toggling the flag MUST bust
+  // the cache because the redacted vs. unredacted reports diverge.
+  const includePrompts = Boolean(opts.includePrompts);
+  const cacheCompatible = (state.lastIncludePrompts ?? false) === includePrompts;
   if (
     !rotate &&
     prevForPath &&
     startOffset >= stat.size &&
+    cacheCompatible &&
     (state.lastReportJson || state.lastReportMarkdown)
   ) {
     if (opts.json && state.lastReportJson) {
@@ -145,7 +151,15 @@ export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
       collected.push(ev);
     }
 
-    const filtered = filterEvents(collected, { ...opts, limit });
+    // D-9 redact-by-default: drop file-history-snapshot, scrub user prompts,
+    // hash paths. `--include-prompts` short-circuits inside redactEvent.
+    const redacted: Event[] = [];
+    for (const ev of collected) {
+      const r = redactEvent(ev, { includePrompts });
+      if (r) redacted.push(r);
+    }
+
+    const filtered = filterEvents(redacted, { ...opts, limit });
     const errorEntries = loadErrorEntries();
     const specStates = loadSpecStates();
 
@@ -158,20 +172,27 @@ export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
       },
     });
 
+    // Belt-and-suspenders pass on the rendered JSON (no-op when redactEvent
+    // already nuked the field, but guards against future renderer additions
+    // that might surface a new path-shaped value).
+    const safeJson = redactReportFields(json, { includePrompts });
+
     void opts.out;
 
-    const jsonStr = `${JSON.stringify(json)}\n`;
+    const jsonStr = `${JSON.stringify(safeJson)}\n`;
     const markdownStr = markdown;
 
     // Cache last report so the next idempotent run replays this exact bytes.
     state.lastReportJson = jsonStr;
     state.lastReportMarkdown = markdownStr;
+    state.lastIncludePrompts = includePrompts;
 
     if (opts.json) {
       process.stdout.write(jsonStr);
     } else {
       process.stdout.write(markdownStr);
     }
+    void safeJson;
 
     if (counters.parse_error || counters.unknown_type) {
       process.stderr.write(

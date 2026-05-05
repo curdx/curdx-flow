@@ -101,7 +101,7 @@ created: 2026-05-05
   - _Requirements: FR-5, FR-7, FR-19, NFR-6, AC-1.2, AC-2.1, AC-3.1, AC-4.1, AC-5.1, AC-6.1_
   - _Design: schema map / D-4 / 报告渲染 / R-2 join_
 
-- [ ] **Task 2.3: redact + error-logger lib + 4 hook 接入**
+- [x] **Task 2.3: redact + error-logger lib + 4 hook 接入**
   - **Do**:
     1. 创建 `src/analyze/redact.ts`（~60 行）：白名单透出模式（D-9）—— prompt 全裁只留长度 + 命令分布、路径仅 basename + project hash（sha256 前 8 字符）、`file-history-snapshot` 字段直接 drop；`--include-prompts` opt-in 解锁
     2. 创建 `src/hooks/_shared/error-logger.ts`（~80 行）：`logHookError(ctx, err)` lazy 读 `~/.claude/settings.json` 缓存 `errorLogEnabled`（D-7，默认 true，settings 缺失/损坏默认 true + stderr warning）；`appendFileSync` 写 `~/.claude/curdx-flow/errors.jsonl`，单行 < 4KB（超长字段截断）；写失败 try/catch 静默

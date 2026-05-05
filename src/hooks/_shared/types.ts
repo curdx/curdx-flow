@@ -47,6 +47,16 @@ export interface HookStdin {
   cwd?: string;
   transcript_path?: string;
   stop_hook_active?: boolean;
+  /**
+   * Phase 2 Task 2.3 (FR-10): Claude Code 2.x exposes these on PreToolUse /
+   * Stop / SessionStart payloads. Hooks can plumb them into error-logger
+   * context for richer R-9 fuzzy-join keys when both jsonl and errors.jsonl
+   * carry the same incident.
+   */
+  session_id?: string;
+  hook_event_name?: string;
+  tool_name?: string;
+  tool_use_id?: string;
 }
 
 /**
