@@ -189,7 +189,7 @@ created: 2026-05-05
   - _Requirements: NFR-5, NFR-6_
   - _Design: 文件清单 i18n + README + tsup_
 
-- [ ] **Task 4.2: bundle gate（NFR-3 < 84KB）+ 0 新依赖（NFR-4）+ D-5 lazy 兜底**
+- [x] **Task 4.2: bundle gate（NFR-3 < 84KB）+ 0 新依赖（NFR-4）+ D-5 lazy 兜底**
   - **Do**:
     1. 加 `scripts/check-bundle-size.mjs`：`wc -c dist/index.mjs`，超 84KB exit 1（NFR-3 当前 64KB + 20KB）
     2. `package.json` 加 `"check:bundle": "node scripts/check-bundle-size.mjs"` + 勾入 `verify` 链
