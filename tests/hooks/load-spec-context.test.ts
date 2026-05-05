@@ -55,6 +55,32 @@ describe("load-spec-context (SessionStart hook)", () => {
     });
   });
 
+  it("completed=true → stderr 'Spec completed' hint, no resume prompt (NFR-5d)", () => {
+    const completedSpec = createFixtureSpec({
+      specName: "completed-spec",
+      state: {
+        phase: "execution",
+        taskIndex: 3,
+        totalTasks: 3,
+        completed: true,
+        completedAt: "2026-05-04T13:00:00.000Z",
+      },
+    });
+    try {
+      const r = runHook(
+        "load-spec-context",
+        "tests/hooks/fixtures/load-spec-context/with-spec.json",
+        { cwd: completedSpec.cwd },
+      );
+      expect(r.exitCode).toBe(0);
+      expect(r.stderr).toContain("Spec completed:");
+      expect(r.stderr).toContain("2026-05-04T13:00:00.000Z");
+      expect(r.stderr).not.toMatch(/Phase: execution/);
+    } finally {
+      completedSpec.cleanup();
+    }
+  });
+
   it("error: malformed stdin JSON → exit 0 (FR-8 never block) + stderr error message", () => {
     const r = runHook(
       "load-spec-context",

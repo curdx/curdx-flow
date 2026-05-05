@@ -402,7 +402,7 @@ Focus: lock the new contract with regression tests. NFR-5 4 cases + design suppl
   - _Requirements: NFR-5c, AC-3.1, AC-3.5_
   - _Design: §Test Strategy_
 
-- [ ] 3.3 [P] Add load-spec-context test case (NFR-5 d)
+- [x] 3.3 [P] Add load-spec-context test case (NFR-5 d)
   - **Do**:
     1. Open `tests/hooks/load-spec-context.test.ts`
     2. Add `it("completed=true → stderr 'Spec completed' hint, no resume prompt")` per design §Test Strategy
