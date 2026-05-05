@@ -648,7 +648,7 @@ Focus: full local CI + 5-field version sync + CHANGELOG/MIGRATION + E2E sandbox 
   - **Commit**: None (verification only)
   - _Requirements: ALL AC-* across US-1..US-10_
 
-- [ ] V8 [VERIFY] PR push + create + CI green
+- [x] V8 [VERIFY] PR push + create + CI green
   - **Do**:
     1. Confirm current branch is `feat/state-completion-marker`
     2. Push: `git push -u origin feat/state-completion-marker`

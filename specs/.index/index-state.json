@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-05-04T14:58:36Z",
+  "updated": "2026-05-05T00:24:58Z",
   "directories": [
     {
       "path": "./specs",
@@ -19,10 +19,9 @@
     {
       "name": "state-completion-marker",
       "path": "./specs/state-completion-marker",
-      "phase": "tasks",
-      "taskIndex": 0,
-      "totalTasks": 51,
-      "awaitingApproval": true
+      "phase": "execution",
+      "taskIndex": 48,
+      "totalTasks": 51
     },
     {
       "name": "superpowers-inline-review",
