@@ -64,7 +64,7 @@ created: 2026-05-05
   - _Requirements: FR-7（hook 失败段）, FR-15, FR-17, FR-19, AC-1.1_
   - _Design: report.ts 雏形_
 
-- [ ] **V1 [VERIFY] Phase 1 quality checkpoint**
+- [x] **V1 [VERIFY] Phase 1 quality checkpoint**
   - **Do**: 跑 typecheck + build + smoke
   - **Verify**: `npm run typecheck && npm run build && node dist/index.mjs analyze --help`
   - **Done when**: 三命令均退出 0
@@ -74,7 +74,7 @@ created: 2026-05-05
 
 ## Phase 2 — Refactor（拆 5 件套 + schema map + 错误埋点 lib）
 
-- [ ] **Task 2.1: 拆 parser + filter + types + state.json 增量 offset**
+- [x] **Task 2.1: 拆 parser + filter + types + state.json 增量 offset**
   - **Do**:
     1. 创建 `src/analyze/types.ts`：导出 `Event`、`Counters`（`{unknown_type, parse_error}`）、`Options`、`StateFile`
     2. 创建 `src/analyze/parser.ts`（~200 行）：`parseTranscript(path, startOffset, schemaMap)` 返回 `AsyncIterable<Event>` + 终态 offset + counters；处理 corrupt 行 `parse_error_count++`，未知 type `unknown_type_count++`，state size 倒退/mtime 倒退视为 rotate 全量重读（D-1）
