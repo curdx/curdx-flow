@@ -1,20 +1,11 @@
 import { defineCommand } from 'citty';
+import { runAnalyze } from '../analyze/index.ts';
 
 export type AnalyzeOptions = {
   out?: string;
   json?: boolean;
   limit?: number;
 };
-
-// Stub — runAnalyze() is implemented in Task 1.2 (src/analyze/index.ts).
-// For Task 1.1 we only register the CLI surface so `analyze --help` resolves.
-async function runAnalyze(opts: AnalyzeOptions): Promise<void> {
-  const _opts = opts;
-  void _opts;
-  process.stdout.write(
-    'analyze: stub (implementation arrives in Task 1.2)\n',
-  );
-}
 
 const analyzeCmd = defineCommand({
   meta: {

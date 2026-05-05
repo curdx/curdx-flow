@@ -39,7 +39,7 @@ created: 2026-05-05
   - _Requirements: FR-1, US-1_
   - _Design: 文件清单 src/flows/analyze.ts + src/index.ts 修改_
 
-- [ ] **Task 1.2: 最小流式 parser + index 编排（hook_success only）**
+- [x] **Task 1.2: 最小流式 parser + index 编排（hook_success only）**
   - **Do**:
     1. 创建 `src/analyze/index.ts`：导出 `runAnalyze(opts)`；inline 临时 parser 用 `node:readline` 读 fixture，仅识别 `attachment.type==='hook_success'` 提取 `hookName/exitCode/durationMs/stderr`
     2. 临时硬编码 fixture 路径（POC 阶段允许 shortcut）
