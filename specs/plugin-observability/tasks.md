@@ -155,7 +155,7 @@ created: 2026-05-05
   - _Requirements: NFR-9, NFR-10, FR-7, FR-8, FR-9, FR-11, FR-12, AC-1.2, AC-7.1, AC-9.1, AT-1, AT-6a, AT-6b_
   - _Design: 测试策略-单元 + 集成_
 
-- [ ] **Task 3.3: 集成测试 —— 增量 offset 第二次 ≤ 1/5（NFR-1 timing）**
+- [x] **Task 3.3: 集成测试 —— 增量 offset 第二次 ≤ 1/5（NFR-1 timing）**
   - **Do**:
     1. 创建 `tests/analyze/integration.test.ts`：跑 `runAnalyze` 两次，第一次记 `t1`，第二次记 `t2`；assert `t2 ≤ t1 / 5` —— 对应 AT-2
     2. 同文件加：`runAnalyze` 跑 100MB+ 模拟（用 fixture 重复拼接 → ≥ 100MB 内存中流过）不 OOM —— 对应 FR-2
