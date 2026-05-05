@@ -2,7 +2,13 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
-## 7.1.0 — 2026-05-04
+## 7.1.1 — 2026-05-04
+
+### Fixed
+
+- **Windows Chrome detection in the installer's `chrome-devtools-mcp` pre-req check.** `src/registry/plugins/chrome-devtools-mcp.ts`'s `checkChrome()` previously ran `test -x /Applications/...` plus `which google-chrome` / `which chromium` on every platform — none of which work on Windows (`test` is a Unix builtin, `which` isn't on `cmd`/PowerShell PATH by default, and the macOS app-bundle path doesn't exist). Result: the installer rejected Windows machines with Chrome installed, reporting "需要本机已安装 Chrome / Requires Chrome installed locally". Detection is now per-platform, mirroring `GoogleChrome/chrome-launcher`'s `chrome-finder` strategy: on `win32`, scan `LOCALAPPDATA` / `PROGRAMFILES` / `PROGRAMFILES(X86)` for `Google\Chrome\Application\chrome.exe` and `Google\Chrome SxS\Application\chrome.exe` (Canary) via `fs.existsSync`; on `darwin`, check the canonical app-bundle path; on Linux, the existing `which` lookup. A `CHROME_PATH` env var now overrides on all platforms (matches chrome-launcher / Lighthouse convention).
+
+
 
 ### Added
 

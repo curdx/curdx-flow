@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import type { Pkg, PrereqResult } from '../types.ts';
 import { isPluginInstalled } from '../../runner/state.ts';
 import {
@@ -15,15 +17,39 @@ const PLUGIN_ID = 'chrome-devtools-mcp@chrome-devtools-plugins';
 const MARKETPLACE_NAME = 'chrome-devtools-plugins';
 const MARKETPLACE_SOURCE = 'ChromeDevTools/chrome-devtools-mcp';
 
+// Per-platform detection mirrors GoogleChrome/chrome-launcher's chrome-finder:
+// env-prefix × known suffix on Windows, canonical app-bundle path on macOS,
+// PATH lookup on Linux. CHROME_PATH override applies on all platforms.
 async function checkChrome(): Promise<boolean> {
-  // macOS canonical install path; fall back to checking PATH for `google-chrome` or `chromium`.
-  const macPath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-  const [stat, viaPath, viaPathChromium] = await Promise.all([
-    run('test', ['-x', macPath]),
+  if (process.env.CHROME_PATH && existsSync(process.env.CHROME_PATH)) return true;
+
+  if (process.platform === 'win32') {
+    const suffixes = [
+      path.join('Google', 'Chrome SxS', 'Application', 'chrome.exe'),
+      path.join('Google', 'Chrome', 'Application', 'chrome.exe'),
+    ];
+    const prefixes = [
+      process.env.LOCALAPPDATA,
+      process.env.PROGRAMFILES,
+      process.env['PROGRAMFILES(X86)'],
+    ].filter((p): p is string => Boolean(p));
+    for (const prefix of prefixes) {
+      for (const suffix of suffixes) {
+        if (existsSync(path.join(prefix, suffix))) return true;
+      }
+    }
+    return false;
+  }
+
+  if (process.platform === 'darwin') {
+    return existsSync('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
+  }
+
+  const [viaPath, viaPathChromium] = await Promise.all([
     run('which', ['google-chrome']),
     run('which', ['chromium']),
   ]);
-  return stat.exitCode === 0 || viaPath.exitCode === 0 || viaPathChromium.exitCode === 0;
+  return viaPath.exitCode === 0 || viaPathChromium.exitCode === 0;
 }
 
 const chromeDevtoolsMcp: Pkg = {
