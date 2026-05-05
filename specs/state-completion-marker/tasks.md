@@ -547,7 +547,7 @@ Focus: full local CI + 5-field version sync + CHANGELOG/MIGRATION + E2E sandbox 
   - _Requirements: NFR-8, NFR-9, AC-8.3, AC-8.4_
   - _Design: §17_
 
-- [ ] VE1 [VERIFY] E2E startup — sandbox spec lifecycle replay (build + state preconditions)
+- [x] VE1 [VERIFY] E2E startup — sandbox spec lifecycle replay (build + state preconditions)
   - **Do**:
     1. Create temp sandbox: `SBX=$(mktemp -d); echo "$SBX"`
     2. Build hooks: `npm run build:hooks`
@@ -560,7 +560,7 @@ Focus: full local CI + 5-field version sync + CHANGELOG/MIGRATION + E2E sandbox 
   - _Requirements: Success Criteria 1, FR-2_
   - _Design: §11 Step 11_
 
-- [ ] VE2 [VERIFY] E2E check — simulate ALL_TASKS_COMPLETE + assert all 5 reader assertions
+- [x] VE2 [VERIFY] E2E check — simulate ALL_TASKS_COMPLETE + assert all 5 reader assertions
   - **Do**:
     1. Read sandbox path: `SBX=$(cat /tmp/state-marker-ve-sbx.txt); cd "$SBX/specs/e2e-test-spec"`
     2. Simulate coordinator completion write: `node "${OLDPWD:-/Users/wdx/opc/curdx-flow}/plugins/curdx-flow/hooks/scripts/lib/merge-state.mjs" .curdx-state.json '{"completed":true,"completedAt":"2026-05-04T15:00:00.000Z","awaitingApproval":false}'`
@@ -577,7 +577,7 @@ Focus: full local CI + 5-field version sync + CHANGELOG/MIGRATION + E2E sandbox 
   - _Requirements: Success Criteria 1, 2, 3, 4; FR-2, FR-5, FR-6, FR-8; AC-1.1, AC-1.2, AC-2.1, AC-3.1, AC-4.1_
   - _Design: §Sequence Diagram (v7.1.0 path)_
 
-- [ ] VE3 [VERIFY] E2E cleanup — remove sandbox
+- [x] VE3 [VERIFY] E2E cleanup — remove sandbox
   - **Do**:
     1. Read sandbox path: `SBX=$(cat /tmp/state-marker-ve-sbx.txt)`
     2. Remove: `rm -rf "$SBX"`
