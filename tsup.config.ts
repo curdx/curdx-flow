@@ -7,7 +7,7 @@ export default defineConfig({
   target: 'node20',
   clean: true,
   shims: false,
-  splitting: false,
+  splitting: true,
   sourcemap: false,
   minify: false,
   dts: false,

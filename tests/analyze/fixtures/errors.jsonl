@@ -1,0 +1,5 @@
+{"ts":"2026-05-05T01:54:00.000Z","level":"error","hook":"quick-mode-guard","event":"stdin-parse-failed","msg":"unexpected token at position 0"}
+{"ts":"2026-05-05T01:54:01.000Z","level":"warn","hook":"stop-watcher","event":"epic-state-write-failed","msg":"ENOSPC: no space left","cwd":"/Users/wdx/opc/curdx-flow","path":"./specs/_epics/foo/.epic-state.json"}
+{"ts":"2026-05-05T01:54:02.000Z","level":"info","hook":"stop-watcher","event":"corrupt-state-block","msg":"BlockDecision triggered","spec":"plugin-observability"}
+{"ts":"2026-05-05T01:54:03.000Z","level":"error","hook":"update-spec-index","event":"index-write-failed","msg":"EACCES: permission denied","path":"./specs/.index/index.md","stack":"Error: EACCES\n  at ..."}
+{"ts":"2026-05-05T01:54:04.000Z","level":"error","hook":"load-spec-context","event":"uncaught","msg":"Cannot read state file","cwd":"/Users/wdx/opc/curdx-flow"}

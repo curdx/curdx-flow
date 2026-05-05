@@ -3,8 +3,10 @@
  *
  * Contract (per design.md "Stdin/Stdout Contract"):
  *  - Empty stdin → return `{}` (graceful default).
- *  - Invalid JSON → log to stderr + `process.exit(0)` (graceful skip;
- *    NEVER exit 1 — that would block the Claude Code session per FR-8).
+ *  - Invalid JSON → log to stderr + throw (run-hook.ts central catch handles
+ *    graceful exit per FR-8 — it calls logHookError to record the failure in
+ *    ~/.claude/curdx-flow/errors.jsonl and then exits 0 so the Claude Code
+ *    session is never blocked).
  *
  * Usage:
  *   const input = await readStdinJson<{ cwd?: string }>();
@@ -23,6 +25,6 @@ export async function readStdinJson<T = unknown>(): Promise<T> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     process.stderr.write(`[hook] invalid stdin JSON: ${msg}\n`);
-    process.exit(0);
+    throw e;
   }
 }

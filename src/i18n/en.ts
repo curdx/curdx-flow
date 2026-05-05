@@ -92,6 +92,17 @@ const messages: Record<MessageKey, string> = {
   'claudeMd.removed': 'Removed @curdx/flow block from CLAUDE.md',
   'claudeMd.skipped': 'Skipped CLAUDE.md sync (--no-claude-md)',
   'claudeMd.failed': 'CLAUDE.md sync failed: {error}',
+
+  'analyze.description': 'Analyze Claude Code session jsonl + curdx-flow errors.jsonl, output markdown report',
+  'analyze.helpSummary': 'analyze — local observability: merge ~/.claude/projects/<cwd-encoded>/<sessionId>.jsonl with ~/.claude/curdx-flow/errors.jsonl into 7 markdown sections (hook failures / slash command frequency / subagent dispatch / spec funnel / hook duration P50/P95/P99 / schema drift / parentUuid chain integrity)',
+  'analyze.flags.json': 'Emit JSON instead of markdown (CI-friendly; --out is ignored when --json is set)',
+  'analyze.flags.out': 'Write the markdown report to the given file path (defaults to stdout)',
+  'analyze.flags.limit': 'Top-N truncation for tabular sections (default 10; 0 falls back to 10)',
+  'analyze.flags.since': 'Only count events within a relative window such as `7d` / `24h` / `30m` (default: full history; --since coexists with the incremental offset cache, replays the last report when cache hits)',
+  'analyze.flags.project': 'Pin to a specific encoded-cwd directory under ~/.claude/projects/; defaults to inferring from the current git repository root (non-git directories degrade to an empty report with a warning)',
+  'analyze.flags.includePrompts': 'Skip default redaction and pass raw prompt text through (local debugging only; D-9 white-list redacts every non-whitelisted field by default)',
+  'analyze.warning.noProject': 'Could not infer a ~/.claude/projects/ subdirectory from cwd (not a git repo or no matching session); emitting an empty report — pass --project to override',
+  'analyze.warning.schemaFallback': 'plugins/curdx-flow/schemas/transcript-events.json not found, falling back to the builtin minimal whitelist — schema drift diagnostics may underreport',
 };
 
 export default messages;

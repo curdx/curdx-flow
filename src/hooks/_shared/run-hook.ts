@@ -35,9 +35,21 @@
  *     the wrapper at any point. The wrapper's try/catch only fires for
  *     uncaught errors, never for happy-path explicit exits.
  */
+import path from "node:path";
 import process from "node:process";
+import { logHookError } from "./error-logger.js";
 import { readStdinJson } from "./stdin.js";
 import type { HookOutput, HookStdin } from "./types.js";
+
+/**
+ * Derive a logger-friendly hook name from `process.argv[1]`. Falls back to
+ * `'unknown-hook'` if argv is empty (vitest harness, REPL, etc.).
+ */
+function deriveHookName(): string {
+  const entry = process.argv[1];
+  if (!entry) return "unknown-hook";
+  return path.basename(entry).replace(/\.(mjs|js|ts)$/, "");
+}
 
 /**
  * Handler signature passed to `runHook`.
@@ -62,17 +74,49 @@ export async function runHook(
   options: RunHookOptions = {},
 ): Promise<void> {
   const { readStdin = true } = options;
+  const hookName = deriveHookName();
+  let stdinForCtx: HookStdin = {} as HookStdin;
   try {
-    const stdin = readStdin
-      ? await readStdinJson<HookStdin>()
-      : ({} as HookStdin);
-    const output = await handler(stdin);
+    try {
+      stdinForCtx = readStdin
+        ? await readStdinJson<HookStdin>()
+        : ({} as HookStdin);
+    } catch (parseErr) {
+      // stdin.ts already exits on parse failure, but if a future change
+      // surfaces the throw instead, fan it out to the error log first.
+      const e = parseErr instanceof Error ? parseErr : new Error(String(parseErr));
+      logHookError(
+        {
+          hook: hookName,
+          event: "stdin_parse",
+          msg: e.message,
+          stack: e.stack ?? "",
+        },
+        e,
+      );
+      throw e;
+    }
+    const output = await handler(stdinForCtx);
     if (output !== undefined && output !== null) {
       process.stdout.write(JSON.stringify(output) + "\n");
     }
     process.exit(0);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack ?? "" : "";
+    logHookError(
+      {
+        hook: hookName,
+        event: "uncaught",
+        msg,
+        stack,
+        ...(typeof stdinForCtx.cwd === "string" ? { cwd: stdinForCtx.cwd } : {}),
+        ...(typeof stdinForCtx.transcript_path === "string"
+          ? { transcript_path: stdinForCtx.transcript_path }
+          : {}),
+      },
+      err instanceof Error ? err : undefined,
+    );
     process.stderr.write(`[hook] ${msg}\n`);
     // FR-8: NEVER block the Claude session — exit 0 even on uncaught errors.
     process.exit(0);

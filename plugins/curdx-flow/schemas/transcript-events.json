@@ -1,0 +1,49 @@
+{
+  "_comment": [
+    "Declarative schema map for the `analyze` pipeline.",
+    "",
+    "Edit this JSON to recognise new transcript event types WITHOUT touching",
+    "src/analyze/parser.ts. Unknown top-level `type` values (or unknown",
+    "attachment.type when the wrapper is `attachment`) are silently counted",
+    "into `counters.unknown_type` and dropped — not thrown — so a Claude Code",
+    "schema bump degrades gracefully (FR-19, AC-6.1 schema drift report).",
+    "",
+    "Map shape:",
+    "  events.<type-key>.action            stable Event['kind'] consumers see",
+    "  events.<type-key>.fields            advisory list of payload fields the",
+    "                                      report layer relies on (documents",
+    "                                      coupling; not enforced at runtime)",
+    "  events.<type-key>.filter            optional gate; e.g. tool_use only",
+    "                                      surfaces when name ∈ filter.name",
+    "  events.<type-key>.extractCommandName when true, report.ts may parse",
+    "                                      <command-name>...</command-name>",
+    "                                      out of message content (D-4)",
+    "  events.<type-key>.stderrMaxBytes    cap for stderr salvage (R-2 / NFR-6)",
+    "",
+    "Type keys are matched against the EFFECTIVE type — for `attachment` rows",
+    "we unwrap `attachment.type` first, so `hook_success` here matches the",
+    "inner attachment, not a hypothetical top-level `hook_success` row."
+  ],
+  "version": 1,
+  "events": {
+    "hook_success": {
+      "action": "hook_invocation",
+      "fields": ["hookName", "hookEvent", "exitCode", "durationMs", "stderr"],
+      "stderrMaxBytes": 500
+    },
+    "tool_use": {
+      "action": "tool_call",
+      "fields": ["name", "input.subagent_type"],
+      "filter": { "name": ["Agent", "Task"] }
+    },
+    "assistant": {
+      "action": "assistant_turn",
+      "fields": ["attributionPlugin", "attributionSkill"]
+    },
+    "user": {
+      "action": "user_turn",
+      "fields": ["content"],
+      "extractCommandName": true
+    }
+  }
+}

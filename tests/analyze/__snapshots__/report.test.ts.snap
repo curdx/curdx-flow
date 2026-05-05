@@ -1,0 +1,57 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderReport > case 1: snapshot the markdown — all 7 section headers must appear 1`] = `
+"## Hook Failures Top-10
+
+| Hook | Count | Last stderr | Source |
+| --- | --- | --- | --- |
+| quick-mode-guard | 1 | invalid stdin JSON | jsonl |
+| update-spec-index | 1 | EACCES: permission denied | jsonl |
+| stop-watcher | 1 | BlockDecision triggered | errors.jsonl |
+
+## Slash Commands Top-10
+
+| Command | Count |
+| --- | --- |
+| spec-workflow | 1 |
+| /curdx-flow:research | 1 |
+
+## Subagents Top-10
+
+| Subagent | Count |
+| --- | --- |
+| Explore | 1 |
+
+## Spec Funnel
+
+| Phase | Count |
+| --- | --- |
+| research | 0 |
+| requirements | 0 |
+| design | 0 |
+| tasks | 0 |
+| execution | 2 |
+| done | 1 |
+
+## Hook Duration
+
+| Hook | Samples | P50 (ms) | P95 (ms) | P99 (ms) |
+| --- | --- | --- | --- | --- |
+| quick-mode-guard | 1 | (样本不足: 1) | (样本不足: 1) | (样本不足: 1) |
+| update-spec-index | 1 | (样本不足: 1) | (样本不足: 1) | (样本不足: 1) |
+| load-spec-context | 1 | (样本不足: 1) | (样本不足: 1) | (样本不足: 1) |
+
+## Schema Drift
+
+| Metric | Value |
+| --- | --- |
+| unknown_type_count | 2 |
+| parse_error_count | 1 |
+
+_Hint: 如长期 > 0 表明 Claude Code 升级了 schema，请检查 plugins/curdx-flow/schemas/transcript-events.json_
+
+## Parent Chain
+
+_(no parent chain data)_
+"
+`;

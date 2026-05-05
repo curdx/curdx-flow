@@ -3,19 +3,20 @@
 Auto-generated summary of all specs across configured directories.
 See [index-state.json](./index-state.json) for machine-readable data.
 
-**Last updated:** 2026-05-05T01:46:06Z
+**Last updated:** 2026-05-05T11:36:00Z
 
 ## Directories (1)
 
 | Directory | Specs | Default |
 |-----------|-------|---------|
-| ./specs | 3 | Yes |
+| ./specs | 4 | Yes |
 
-## All Specs (3)
+## All Specs (4)
 
 | Spec | Directory | Phase | Status |
 |------|-----------|-------|--------|
 | cross-platform-support | ./specs | completed | done |
+| plugin-observability | ./specs | execution | 20/21 tasks |
 | state-completion-marker | ./specs | execution | 51/51 tasks |
 | superpowers-inline-review | ./specs | new |  |
 
