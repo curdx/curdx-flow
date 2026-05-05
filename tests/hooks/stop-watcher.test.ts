@@ -62,4 +62,61 @@ describe("stop-watcher (Stop hook)", () => {
     expect(r.exitCode).toBe(0);
     expect(r.stderr).toContain("invalid stdin JSON");
   });
+
+  // NFR-5a: v7.1.0 completion marker — completed=true silent return
+  it("completed=true → silent return (no continuation block)", () => {
+    const completedSpec = createFixtureSpec({
+      state: {
+        phase: "execution",
+        taskIndex: 3,
+        totalTasks: 3,
+        completed: true,
+        completedAt: "2026-05-04T13:00:00.000Z",
+      },
+    });
+    try {
+      const r = runHook(
+        "stop-watcher",
+        "tests/hooks/fixtures/stop-watcher/execution-block.json",
+        { cwd: completedSpec.cwd },
+      );
+      expect(r.exitCode).toBe(0);
+      // Silent return: no stdout JSON decision block emitted.
+      expect(r.stdout).toBe("");
+      expect(r.json).toBeUndefined();
+    } finally {
+      completedSpec.cleanup();
+    }
+  });
+
+  // NFR-5b / NFR-2: v7.0.x legacy state without `completed` field must fall
+  // through to the existing in-progress continuation logic (backwards-compat).
+  it("completed=undefined → fall through to in-progress logic (backwards-compat)", () => {
+    const legacySpec = createFixtureSpec({
+      // Legacy v7.0.x state shape: simulate pre-v7.1.0 state file by setting
+      // `completed: undefined` — JSON.stringify drops undefined keys, so the
+      // serialized state file has no `completed` key at all, exercising the
+      // strict-equality guard (state.completed === true) against `undefined`.
+      state: {
+        phase: "execution",
+        taskIndex: 1,
+        totalTasks: 3,
+        completed: undefined,
+      },
+    });
+    try {
+      const r = runHook(
+        "stop-watcher",
+        "tests/hooks/fixtures/stop-watcher/execution-block.json",
+        { cwd: legacySpec.cwd },
+      );
+      expect(r.exitCode).toBe(0);
+      // Continuation block IS emitted (same as the happy path above).
+      expect(r.json).toBeDefined();
+      expect((r.json as any).decision).toBe("block");
+      expect((r.json as any).reason).toMatch(/Continue spec.*demo-spec/);
+    } finally {
+      legacySpec.cleanup();
+    }
+  });
 });

@@ -378,7 +378,7 @@ Focus: ship the actual contract change. Order is **strictly** sequential by depe
 
 Focus: lock the new contract with regression tests. NFR-5 4 cases + design supplements ($unset 4-case, types-erase, gitignore idempotent) + migration backwards-compat fixture + byte-equal "Completed spec" baseline regen.
 
-- [ ] 3.1 [P] Add stop-watcher test cases (NFR-5 a + b)
+- [x] 3.1 [P] Add stop-watcher test cases (NFR-5 a + b)
   - **Do**:
     1. Open `tests/hooks/stop-watcher.test.ts`
     2. Add `it("completed=true → silent return (no continuation block)")` per design §Test Strategy
