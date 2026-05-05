@@ -115,7 +115,7 @@ created: 2026-05-05
   - _Requirements: FR-8..14, NFR-2, NFR-5, NFR-8, NFR-9, NFR-11, AC-7.1, AC-8.1, AC-8.2, AC-9.1_
   - _Design: D-7 lazy cache / D-9 白名单 / R-8 grep 守护_
 
-- [ ] **V2 [VERIFY] Phase 2 quality checkpoint**
+- [x] **V2 [VERIFY] Phase 2 quality checkpoint**
   - **Do**: typecheck + build + 5 件套文件存在性检查
   - **Verify**: `npm run typecheck && npm run build && for f in src/analyze/parser.ts src/analyze/filter.ts src/analyze/report.ts src/analyze/redact.ts src/analyze/index.ts src/analyze/types.ts src/flows/analyze.ts src/hooks/_shared/error-logger.ts plugins/curdx-flow/schemas/transcript-events.json; do test -f "$f" || { echo MISS:$f; exit 1; }; done && echo PASS_FILES`
   - **Done when**: 9 文件全在 + typecheck/build 通过
@@ -125,7 +125,7 @@ created: 2026-05-05
 
 ## Phase 3 — Testing（单测 ≥ 80% + snapshot + redact grep）
 
-- [ ] **Task 3.1: parser + filter + redact 单测（含 fixture 错误注入）**
+- [x] **Task 3.1: parser + filter + redact 单测（含 fixture 错误注入）**
   - **Do**:
     1. 创建 `tests/analyze/fixtures/errors.jsonl`（5 行，覆盖 `quick-mode-guard` + `stop-watcher` + 5 必填字段全在）
     2. 创建 `tests/analyze/parser.test.ts`：snapshot Event 列表 + offset 终态 + counters（半行 → `parse_error_count≥1`，未知 type → `unknown_type_count≥1`，rotate → 全量重读）—— 对应 AT-3 / AT-7
