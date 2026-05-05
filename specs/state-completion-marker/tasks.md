@@ -589,7 +589,7 @@ Focus: full local CI + 5-field version sync + CHANGELOG/MIGRATION + E2E sandbox 
   - **Commit**: None
   - _Requirements: NFR-10_
 
-- [ ] V5 [VERIFY] 5-field version sync to v7.1.0
+- [x] V5 [VERIFY] 5-field version sync to v7.1.0
   - **Do**:
     1. Run `npm run bump-version 7.1.0` (atomic 5-field write per CLAUDE.md SOP)
     2. Run `npm run check-versions` to confirm sync
