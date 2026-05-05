@@ -475,3 +475,29 @@ Tested on macOS, Linux, and Windows (WSL2 recommended on Windows).
 MIT. Fork it. Ship it. Make it yours.
 
 > Want to contribute? See [`CLAUDE.md`](./CLAUDE.md) for local dev setup and release SOP.
+
+---
+
+## 🔭 Plugin Observability (`analyze` CLI)
+
+`npx @curdx/flow analyze` parses Claude Code session jsonl (`~/.claude/projects/<encoded-cwd>/<sessionId>.jsonl`) merged with curdx-flow `~/.claude/curdx-flow/errors.jsonl` and outputs a 7-section markdown report:
+
+- **Hook Failures** — Top-N hook entries by `exitCode ≠ 0` count
+- **Slash Commands** — `/curdx-flow:*` invocation frequency (attribution + `<command-name>` XML fallback)
+- **Subagents** — `Task` / `Agent` dispatch heat
+- **Spec Funnel** — research → requirements → design → tasks → execution completion ratios
+- **Hook Duration** — P50 / P95 / P99 latency per hook
+- **Schema Drift** — unknown event types + parse errors
+- **Parent UUID Chain** — `parentUuid` chain integrity rate (`withParent / total`)
+
+### Privacy (redact-by-default)
+
+By default the report does **NOT** contain prompt full text, full file paths, or `file-history-snapshot` contents. Use `--include-prompts` to opt in (local debugging only).
+
+### Platform support
+
+Verified on **macOS** and **Linux**. Windows is **declared supported but not tested** — `~/.claude/curdx-flow/errors.jsonl` write atomicity on NTFS is not guaranteed (POSIX `PIPE_BUF` 4 KB only applies to POSIX). Please report issues.
+
+### Configuration
+
+Set `errorLogEnabled: false` in `~/.claude/settings.json` to disable hook error logging. The schema map at `plugins/curdx-flow/schemas/transcript-events.json` is auto-resolved post-bundle; if missing, the parser falls back to a builtin minimal whitelist with a stderr warning.

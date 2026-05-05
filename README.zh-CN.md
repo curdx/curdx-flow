@@ -475,3 +475,29 @@ Spec 以项目为作用域，但同一时刻只能有一个 spec 活跃。使用
 MIT。Fork 之，发布之，使其归己。
 
 > 想为项目贡献代码？请参阅 [`CLAUDE.md`](./CLAUDE.md)，本地开发环境与发版 SOP 均在该文件中。
+
+---
+
+## 🔭 插件观测能力（`analyze` CLI）
+
+`npx @curdx/flow analyze` 解析 Claude Code session jsonl（`~/.claude/projects/<encoded-cwd>/<sessionId>.jsonl`）合并 curdx-flow `~/.claude/curdx-flow/errors.jsonl`，输出 7 段 markdown 报告：
+
+- **Hook Failures** — 按 `exitCode ≠ 0` 计数排序的 Top-N hook
+- **Slash Commands** — `/curdx-flow:*` 调用频次（attribution + `<command-name>` XML fallback）
+- **Subagents** — `Task` / `Agent` 调度热度
+- **Spec Funnel** — research → requirements → design → tasks → execution 完成漏斗
+- **Hook Duration** — 每个 hook 的 P50 / P95 / P99 时延
+- **Schema Drift** — 未知事件类型 + 解析失败计数
+- **Parent UUID Chain** — `parentUuid` 链完整性比率（`withParent / total`）
+
+### 隐私（默认 redact）
+
+默认输出**不包含** prompt 原文、完整文件路径、`file-history-snapshot` 内容。需要时显式传 `--include-prompts` 透出（仅本地调试用）。
+
+### 平台支持
+
+已实证：**macOS** 与 **Linux**。Windows **声明支持但未实测** —— `~/.claude/curdx-flow/errors.jsonl` 在 NTFS 上的原子写入不做保证（POSIX `PIPE_BUF` 4 KB 仅适用于 POSIX 文件系统）。欢迎报 issue。
+
+### 配置
+
+把 `~/.claude/settings.json` 里的 `errorLogEnabled` 设为 `false` 即可关闭 hook 错误日志。schema map 文件 `plugins/curdx-flow/schemas/transcript-events.json` 会随 bundle 自动解析；如缺失，parser 回落到内置最小白名单并在 stderr 打印 warning。

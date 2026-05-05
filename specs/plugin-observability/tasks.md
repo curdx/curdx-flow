@@ -167,7 +167,7 @@ created: 2026-05-05
   - _Requirements: NFR-1, FR-2, FR-3, AT-2_
   - _Design: 测试策略-集成_
 
-- [ ] **V3 [VERIFY] Phase 3 quality checkpoint + 覆盖率**
+- [x] **V3 [VERIFY] Phase 3 quality checkpoint + 覆盖率**
   - **Do**: typecheck + 全测 + 覆盖率（NFR-10 ≥ 80%）
   - **Verify**: `npm run typecheck && npx vitest run --coverage tests/analyze tests/hooks 2>&1 | tee /tmp/cov.log && node -e "const log=require('fs').readFileSync('/tmp/cov.log','utf8');const m=log.match(/All files[^|]*\\|\\s*([0-9.]+)/);process.exit(m && parseFloat(m[1])>=80?0:1)" || echo COVERAGE_BELOW_80_OR_PARSE_FAIL`
   - **Done when**: 覆盖率 ≥ 80% 或在覆盖率配置不可解析时手动 grep `vitest run` PASS 输出
@@ -177,7 +177,7 @@ created: 2026-05-05
 
 ## Phase 4 — Quality（i18n + bundle gate + README + reality 冒烟）
 
-- [ ] **Task 4.1: i18n + README + Windows 标注 + tsup bundle 验证**
+- [x] **Task 4.1: i18n + README + Windows 标注 + tsup bundle 验证**
   - **Do**:
     1. 修改 `src/i18n/en.ts` + `src/i18n/zh.ts` 加 analyze 文案（描述 / `--help` 摘要 / 各 flag 解释，~10 条）
     2. 修改 `README.md`（+20 行）：analyze 子命令文档 + 7 报告样例 + redact 清单 + Windows NTFS 并发非保证标注 + macOS/Linux 实证范围声明
