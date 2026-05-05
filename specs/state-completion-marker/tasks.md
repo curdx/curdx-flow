@@ -601,7 +601,7 @@ Focus: full local CI + 5-field version sync + CHANGELOG/MIGRATION + E2E sandbox 
   - _Requirements: NFR-1_
   - _Design: §11 Step 13_
 
-- [ ] V6 [VERIFY] Full local CI: `npm run verify`
+- [x] V6 [VERIFY] Full local CI: `npm run verify`
   - **Do**: Run the full pipeline (typecheck + check-versions + check:hooks-fresh + test:hooks)
   - **Files**: (verification only)
   - **Done when**: Single command exits 0
@@ -609,7 +609,7 @@ Focus: full local CI + 5-field version sync + CHANGELOG/MIGRATION + E2E sandbox 
   - **Commit**: `fix(state-marker): resolve verify pipeline issues` (only if fixes needed)
   - _Requirements: NFR-4, NFR-10, Success Criteria 5_
 
-- [ ] V7 [VERIFY] AC programmatic checklist (AC-1.1 through AC-10.5)
+- [x] V7 [VERIFY] AC programmatic checklist (AC-1.1 through AC-10.5)
   - **Do**:
     1. Read `requirements.md` AC list
     2. Programmatically verify each AC via existing automated commands or grep checks. Plain bullets below (NOT checkbox bullets — task tracker excludes AC-* prefixes).
