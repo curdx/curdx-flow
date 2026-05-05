@@ -102,7 +102,7 @@ async function readStdinJson() {
     const msg = e instanceof Error ? e.message : String(e);
     process3.stderr.write(`[hook] invalid stdin JSON: ${msg}
 `);
-    process3.exit(0);
+    throw e;
   }
 }
 
