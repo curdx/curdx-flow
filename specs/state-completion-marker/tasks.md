@@ -390,7 +390,7 @@ Focus: lock the new contract with regression tests. NFR-5 4 cases + design suppl
   - _Requirements: NFR-5a, NFR-5b, NFR-2, AC-2.1, AC-2.2, AC-8.1_
   - _Design: §Test Strategy_
 
-- [ ] 3.2 [P] Add update-spec-index test case (NFR-5 c)
+- [x] 3.2 [P] Add update-spec-index test case (NFR-5 c)
   - **Do**:
     1. Open `tests/hooks/update-spec-index.test.ts`
     2. Add `it("completed=true → record.phase='completed' without inferPhaseFromFiles")` per design §Test Strategy

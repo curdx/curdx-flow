@@ -138,6 +138,66 @@ describe("update-spec-index (CLI hook for spec index regeneration)", () => {
   });
 
   /**
+   * NFR-5 case (c): completed=true short-circuits inferPhaseFromFiles.
+   *
+   * The v7.1.0 contract: when `.curdx-state.json` carries `completed === true`,
+   * `update-spec-index` records `phase: "completed"` directly without consulting
+   * the markdown fallback (`inferPhaseFromFiles`). To prove the short-circuit
+   * we delete `tasks.md` AND `.progress.md` from the fixture spec dir — under
+   * v7.0.x semantics that wipes every signal `inferPhaseFromFiles` could use,
+   * so any phase resolution to "completed" must come from the state file's
+   * `completed === true` marker (design.md §Test Strategy NFR-5 case c).
+   */
+  it("completed=true → record.phase='completed' without inferPhaseFromFiles", () => {
+    cleanIndex(withSpec.cwd);
+    const specDir = path.join(withSpec.cwd, "specs", withSpec.specName);
+    // Overwrite state to mark completed=true with completedAt (v7.1.0 shape).
+    writeFileSync(
+      path.join(specDir, ".curdx-state.json"),
+      JSON.stringify(
+        {
+          source: "spec",
+          name: withSpec.specName,
+          basePath: `./specs/${withSpec.specName}`,
+          phase: "execution",
+          taskIndex: 3,
+          totalTasks: 3,
+          taskIteration: 1,
+          maxTaskIterations: 5,
+          globalIteration: 5,
+          maxGlobalIterations: 100,
+          commitSpec: true,
+          quickMode: false,
+          awaitingApproval: false,
+          recoveryMode: false,
+          nativeSyncEnabled: false,
+          granularity: "fine",
+          completed: true,
+          completedAt: "2026-05-04T13:00:00.000Z",
+        },
+        null,
+        2,
+      ),
+    );
+    // Strip every signal `inferPhaseFromFiles` could read; if phase still
+    // resolves to "completed" the short-circuit must have fired.
+    rmSync(path.join(specDir, "tasks.md"), { force: true });
+    rmSync(path.join(specDir, ".progress.md"), { force: true });
+
+    const r = runHook(
+      "update-spec-index",
+      "tests/hooks/fixtures/update-spec-index/with-spec.json",
+      { cwd: withSpec.cwd },
+    );
+    expect(r.exitCode).toBe(0);
+
+    const stateJson = JSON.parse(
+      readFileSync(path.join(withSpec.cwd, "specs/.index/index-state.json"), "utf8"),
+    );
+    expect(stateJson.specs[0].phase).toBe("completed");
+  });
+
+  /**
    * Regression: test003/specs/helloworld reality (May 2026).
    *
    * Real-world fail mode: an LLM emitted tasks.md using `### Task X.Y …`
