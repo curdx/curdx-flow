@@ -4,16 +4,16 @@
 
 # `@curdx/flow`
 
-### *给 Claude Code 用的规格驱动开发流，自动化执行任务。*
+### *Claude Code 的需求驱动工作流，任务自己跑完。*
 
-**说一句你想做什么。从研究、需求、设计、任务到带测试的代码，一个任务一个 fresh context，全自动跑完。**
+**丢一句需求过去。研究、需求文档、设计、任务拆分、带测试的代码——它一条龙给你出。每个任务独立 context，不串味。**
 
 [![npm version](https://img.shields.io/npm/v/@curdx/flow?color=FF6B35&label=npm)](https://www.npmjs.com/package/@curdx/flow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Built for Claude Code](https://img.shields.io/badge/Built%20for-Claude%20Code-5B6CFF)](https://claude.ai/code)
 [![Node](https://img.shields.io/badge/Node-%E2%89%A520.12-3C873A)](https://nodejs.org)
 
-[快速开始](#-快速开始) · [工作原理](#-工作原理) · [命令清单](#%EF%B8%8F-命令清单) · [为什么造它](#-为什么造它)
+[上手](#-上手) · [怎么跑](#-怎么跑) · [命令一览](#%EF%B8%8F-命令一览) · [图什么](#-图什么)
 
 ```bash
 npx @curdx/flow
@@ -23,49 +23,49 @@ npx @curdx/flow
 
 ---
 
-## 🚀 这是什么？
+## 🚀 这玩意是啥
 
-`@curdx/flow` 是**一个 npm 包，提供两样东西**：
+一个 npm 包，给你两样东西：
 
-1. **一个 Claude Code 插件** — `/curdx-flow:*` 系列斜杠命令，规格驱动（spec-driven）开发。一句模糊需求进，结构化规格 + 可运行代码出。
-2. **一键安装器** — 挑选你真正想用的 Claude Code 插件和 MCP 服务器（claude-mem、pua、chrome-devtools-mcp、context7、sequential-thinking…），更新干净，卸载干净。
+1. **一个 Claude Code 插件**——`/curdx-flow:*` 系列斜杠命令，按 spec（规格）来开发。从一句"我想搞个 X"，到结构化文档 + 跑得起来的代码，全自动。
+2. **一键安装器**——你想用的 Claude Code 插件和 MCP 服务（claude-mem 跨会话记忆、pua 抗失败模式、chrome-devtools-mcp、context7、sequential-thinking 这些），装、更新、卸载，一条命令搞定。
 
 ```text
-你：    /curdx-flow:start "加个带 token 刷新的 OAuth 登录"
-flow：  *访谈你 60 秒，问关键问题*
-flow：  *并行研究小组开始调研 — 输出 research.md*
-你：    *确认通过*  →  /curdx-flow:requirements
-flow：  *product-manager 子 agent — 输出 requirements.md*
-你：    *确认通过*  →  /curdx-flow:design
-flow：  *architect-reviewer — 输出 design.md*
-你：    *确认通过*  →  /curdx-flow:tasks
-flow：  *task-planner — 4 个阶段、12 个任务*
-你：    *确认通过*  →  /curdx-flow:implement
-flow：  *任务 1 → 验证 → 提交 → 任务 2 → … 全部跑完*
-你：    *回来。看 diff。发版。*
+你：    /curdx-flow:start "搞个带 token 刷新的 OAuth 登录"
+flow：  *60 秒小访谈，把模糊地方问清楚*
+flow：  *并行研究小队上场 → research.md 写完*
+你：    *点头通过*  →  /curdx-flow:requirements
+flow：  *product-manager agent 出 → requirements.md*
+你：    *点头通过*  →  /curdx-flow:design
+flow：  *architect-reviewer 出 → design.md*
+你：    *点头通过*  →  /curdx-flow:tasks
+flow：  *task-planner 出 → 4 个阶段、12 个任务*
+你：    *点头通过*  →  /curdx-flow:implement
+flow：  *任务 1 → 验证 → 提交 → 任务 2 → … 跑到全部打勾*
+你：    *回来翻翻 diff，没毛病就 ship。*
 ```
 
 ---
 
-## 🧭 工作原理
+## 🧭 怎么跑
 
 <div align="center">
-  <img src="docs/img/workflow.svg" alt="curdx-flow 工作流：research → requirements → design → tasks → implement，最后一阶段带自主循环" width="100%">
+  <img src="docs/img/workflow.svg" alt="curdx-flow 工作流：research → requirements → design → tasks → implement，最后一步是自动 loop" width="100%">
 </div>
 
-5 个阶段，每个阶段委派给一个专家子 agent，写一份 Markdown 文档，然后**停下等你确认**。最后一阶段（`implement`）跑自主循环——任务 → 验证 → 提交 → 下一个任务，直到 `tasks.md` 里每个 checkbox 都打勾。
+5 个阶段。每个阶段对应一个专门的子 agent，输出一份 Markdown，**写完停下来等你点头**。最后那个 `implement` 阶段最香——任务、验证、提交、下一个，自己一直跑，跑到 `tasks.md` 里每个 checkbox 都翻绿才停。你倒杯咖啡，回来看 diff 就行。
 
 <div align="center">
-  <img src="docs/img/architecture.svg" alt="curdx-flow 架构：一个 npm 包，两个产物——内置插件和插件/MCP 安装器" width="100%">
+  <img src="docs/img/architecture.svg" alt="curdx-flow 架构：一个 npm 包两个产物——内置插件 + 插件/MCP 安装器" width="100%">
 </div>
 
 ---
 
-## ⚡ 快速开始
+## ⚡ 上手
 
-### 1. 安装 Claude Code
+### 1. 先装好 Claude Code
 
-还没装的话：<https://docs.anthropic.com/en/docs/claude-code>。
+还没装？戳这儿：<https://docs.anthropic.com/en/docs/claude-code>。
 
 ### 2. 跑安装器
 
@@ -73,126 +73,126 @@ flow：  *任务 1 → 验证 → 提交 → 任务 2 → … 全部跑完*
 npx @curdx/flow
 ```
 
-第一次运行会让你选语言（中文 / English），然后挑要装哪些工具。内置的 `curdx-flow` 插件总是会装上——这就是规格工作流本身。其他都是可选项。
+第一次跑会让你挑语言（中文 / English），然后选要装啥。`curdx-flow` 这个插件本身是必装的——这是工作流的本体。其他的随便勾。
 
 ```bash
-npx @curdx/flow              # 交互式菜单
-npx @curdx/flow install --all --yes   # 全量安装，无交互
-npx @curdx/flow status       # 查看已装/过期项
-npx @curdx/flow update       # 全部更新到最新
-npx @curdx/flow uninstall    # 干净卸载
+npx @curdx/flow              # 进交互菜单
+npx @curdx/flow install --all --yes   # 全装上，零交互
+npx @curdx/flow status       # 看现在装了啥、哪些过时了
+npx @curdx/flow update       # 全部升到最新
+npx @curdx/flow uninstall    # 卸得干净
 ```
 
-### 3. 启动一个规格
+### 3. 开搞一个 spec
 
-在项目里，打开 Claude Code：
+在你项目目录下打开 Claude Code，输入：
 
 ```text
 /curdx-flow:start
-> 我想加一个带限流的 /api/upload 接口，要支持 S3 分片上传
+> 我想加个限流的 /api/upload 接口，要支持 S3 分片上传
 ```
 
-完事。flow 会跑访谈、分发研究、写 `specs/upload-api/research.md`，然后停下等你确认。
+齐活。flow 会带你跑访谈、派研究小队、把 `specs/upload-api/research.md` 写出来，然后停下来等你点头。
 
 ---
 
-## 📦 安装器里有什么
+## 📦 安装器里有啥
 
-精心挑选过，按需勾选。
+精挑过的几样工具，你按需勾选。
 
-| ID | 类型 | 干啥的 |
+| ID | 类型 | 干嘛用的 |
 | --- | --- | --- |
-| **`curdx-flow`** | 插件（内置） | 本仓库。规格驱动开发，提供 `/curdx-flow:*` 命令。**总是会装。** |
-| `claude-mem` | 插件 | 跨会话记忆——把观察记下来，下次会话自动召回。 |
-| `pua` | 插件 | "抗失败"压力模式。连续失败 2+ 次或检测到用户不爽时自动触发。 |
-| `chrome-devtools-mcp` | 插件 | 通过 MCP 操控真实的 Chrome——性能、网络、控制台、截图。 |
-| `frontend-design` | 插件 | 前端产出有辨识度，避免那种"一看就 AI 生成"的味道。 |
-| `sequential-thinking` | mcp | 逐步推理 MCP 服务器（`@modelcontextprotocol/server-sequential-thinking`）。 |
-| `context7` | mcp | 实时拉库文档的 MCP，比训练数据里的过时内容靠谱。 |
+| **`curdx-flow`** | 插件（内置） | 就这仓库本身。`/curdx-flow:*` 命令的来源。**永远会装上。** |
+| `claude-mem` | 插件 | 跨会话记忆——上次记下的东西，这次自动召回，免得你天天复述背景。 |
+| `pua` | 插件 | "抗失败"模式。连错 2 次或者察觉你不爽时自动上压力，逼 agent 换路子。 |
+| `chrome-devtools-mcp` | 插件 | 通过 MCP 操真 Chrome——性能、网络、控制台、截图都能干。 |
+| `frontend-design` | 插件 | 前端产出有辨识度，避开那种"一眼 AI 生成"的塑料感。 |
+| `sequential-thinking` | mcp | 逐步推理 MCP（`@modelcontextprotocol/server-sequential-thinking`）。 |
+| `context7` | mcp | 实时拉库文档，比训练数据里的过期答案靠谱。 |
 
-随时跑 `npx @curdx/flow status` 查当前状态。
+随时 `npx @curdx/flow status` 看下当前状态。
 
 ---
 
-## 🛠️ 命令清单
+## 🛠️ 命令一览
 
-内置插件在 Claude Code 里暴露这些斜杠命令：
+内置插件在 Claude Code 里给你这些斜杠命令：
 
-| 命令 | 干啥 |
+| 命令 | 干嘛 |
 | --- | --- |
-| `/curdx-flow:start` | 智能入口——开新规格或继续旧的，自动跑访谈。 |
-| `/curdx-flow:new` | 强制开新规格（跳过 resume 检测）。 |
-| `/curdx-flow:research` | 启动并行研究小组调研目标。 |
-| `/curdx-flow:requirements` | 用目标 + 研究生成 `requirements.md`。 |
-| `/curdx-flow:design` | 架构师 agent 生成 `design.md`。 |
-| `/curdx-flow:tasks` | 把设计拆成带 checkbox 的任务列表。 |
-| `/curdx-flow:implement` | **自主执行 loop** — 一个任务接一个，跑完为止。 |
-| `/curdx-flow:triage` | 把大特性拆成多个有依赖关系的规格（epic）。 |
-| `/curdx-flow:status` | 列出所有规格和进度。 |
-| `/curdx-flow:switch` | 切换当前活跃规格。 |
-| `/curdx-flow:refactor` | 执行后系统化更新规格文件。 |
-| `/curdx-flow:cancel` | 取消正在跑的执行 loop，清理状态。 |
-| `/curdx-flow:index` | 把代码库 + 外部资源索引成可搜索的规格。 |
-| `/curdx-flow:help` | 查看插件帮助和流程概览。 |
-| `/curdx-flow:feedback` | 提交反馈或报告插件问题。 |
+| `/curdx-flow:start` | 智能入口——新开 spec 或者接着上次的来，自动跑访谈。 |
+| `/curdx-flow:new` | 强制新开一个 spec，跳过 resume 检测。 |
+| `/curdx-flow:research` | 派并行研究小队去摸目标。 |
+| `/curdx-flow:requirements` | 从需求 + 研究合成 `requirements.md`。 |
+| `/curdx-flow:design` | 架构师 agent 出 `design.md`。 |
+| `/curdx-flow:tasks` | 把设计拆成带勾选框的任务列表。 |
+| `/curdx-flow:implement` | **自动执行 loop**——一个任务接一个，跑完才停。 |
+| `/curdx-flow:triage` | 把大需求拆成几个有依赖关系的 spec（epic）。 |
+| `/curdx-flow:status` | 看所有 spec 和进度。 |
+| `/curdx-flow:switch` | 切到别的 spec。 |
+| `/curdx-flow:refactor` | 跑完之后系统化更新 spec 文件。 |
+| `/curdx-flow:cancel` | 停掉正在跑的 loop，把状态清干净。 |
+| `/curdx-flow:index` | 把代码库 + 外部资源做成可搜的索引。 |
+| `/curdx-flow:help` | 看插件帮助和工作流概览。 |
+| `/curdx-flow:feedback` | 提反馈或报 bug。 |
 
-所有产物都写到 `specs/<规格名>/` 里——纯 Markdown，纳入版本控制，跨会话存活。
-
----
-
-## 🤔 为什么造它
-
-Claude Code 写代码很快。但真实项目里它会跳过测试、跨会话丢上下文、产出不稳定——特别是当代码库有真实的约定要遵守、有真实的回归要避免。
-
-我试过同类方案。大部分都在堆复杂度——几十个 agent、几千行指令文件——但产出并没变好。只是烧更多 token、等更久。
-
-`@curdx/flow` 押的是另一个方向：
-
-- **规格就是合约，不是感觉**。代码动手前必须有 `research.md` → `requirements.md` → `design.md` → `tasks.md` 这 4 份文档。它们存在你的仓库里，你能读，reviewer 也能读。
-- **子 agent 各司其职，不堆叠**。每个阶段一个专家 agent，独立 context 窗口。没有 50 个 agent 的乱炖编排。
-- **Loop 自己跑**。`/curdx-flow:implement` 一直推进——执行任务、验证、提交、下一个，直到每个 checkbox 都翻面。你走开，你回来，你看 diff。
-- **安装器 + 插件一体打包**。不用挑 marketplace、不用改配置、不用 scaffold 项目。一条 `npx @curdx/flow` 搞定。
-
-> Claude Code 是引擎。`curdx-flow` 是底盘。
+所有产物都写在 `specs/<spec 名>/` 里，纯 Markdown，跟你代码一起进 git，跨会话也不会丢。
 
 ---
 
-## 🗂️ 文件都在哪
+## 🤔 图什么
+
+Claude Code 写代码是真快。但放到真实项目里——它会漏测试、跨会话丢上下文、产出看心情，尤其当代码库本身有很多约定和坑要避。
+
+我也试过别家方案。基本都在加复杂度——几十个 agent 互相调、几千行 prompt 文件——但产出该糙还糙，token 烧得更多、等得更久。
+
+`@curdx/flow` 走另一条路：
+
+- **靠 spec 立 flag，不靠感觉**。动手前必须先有 `research.md` → `requirements.md` → `design.md` → `tasks.md`。这些文件都进你的 git，你能 review，同事能 review。
+- **子 agent 各管一段，别堆叠**。一个阶段一个专家，独立 context。不搞 50 个 agent 互相 @ 来 @ 去的大杂烩。
+- **Loop 自己闭环**。`/curdx-flow:implement` 一直跑——执行、验证、提交、下一个——直到所有 checkbox 都翻绿。你走开，回来看 diff。
+- **安装器和插件一个包**。不挑 marketplace、不动配置、不搭脚手架，`npx @curdx/flow` 一条命令完事。
+
+> Claude Code 是发动机。`curdx-flow` 是整车装配。
+
+---
+
+## 🗂️ 文件都落在哪
 
 装完之后，你机器上长这样：
 
 ```
 ~/.claude/
   plugins/cache/curdx/curdx-flow/<version>/   ← 插件本体
-  CLAUDE.md                                   ← 管理过的 `<!-- BEGIN @curdx/flow -->` 块
+  CLAUDE.md                                   ← 我们管理的那个 <!-- BEGIN @curdx/flow --> 块
 
 <你的项目>/
   specs/
     .current-spec
     .current-epic
-    <规格名>/
+    <spec 名>/
       research.md
       requirements.md
       design.md
       tasks.md
-      .curdx-state.json   ← 执行状态，已 gitignore
-      .progress.md        ← 阶段笔记，已 gitignore
+      .curdx-state.json   ← 执行状态（已 gitignore）
+      .progress.md        ← 阶段笔记（已 gitignore）
 ```
 
-全局 `~/.claude/CLAUDE.md` 里那个 `<!-- BEGIN @curdx/flow v1 -->` 块告诉 Claude 你装了啥。flow 只重写这个块，块外面的东西**原样保留**。如果不想要这个管理块，传 `--no-claude-md`（或设环境变量 `CURDX_FLOW_NO_CLAUDE_MD=1`）。
+全局 `~/.claude/CLAUDE.md` 里那个 `<!-- BEGIN @curdx/flow v1 -->` 块告诉 Claude 你装了哪些工具。flow 只重写这个块，**外面的内容原样不动**。不想要这个块？传 `--no-claude-md`，或者设环境变量 `CURDX_FLOW_NO_CLAUDE_MD=1`。
 
 ---
 
 ## 🧱 环境要求
 
 - **Node.js** ≥ 20.12
-- **Claude Code** CLI 已装并在 `PATH` 上（安装器会调用 `claude plugin` 和 `claude mcp`）
-- 可选：**Bun** ≥ 1.0 — 装 `claude-mem` 时会自动检测并询问
+- **Claude Code** CLI 装好且在 `PATH` 上（安装器要调 `claude plugin` 和 `claude mcp`）
+- 可选：**Bun** ≥ 1.0——装 `claude-mem` 时会自动检测，没装就提醒你装
 
 ---
 
 ## 📜 许可证
 
-MIT。Fork 它。Ship 它。让它变成你的。
+MIT。Fork 走，自己玩。
 
-> 想给项目贡献代码？看 [`CLAUDE.md`](./CLAUDE.md) — 本地开发环境和发版 SOP 都在那儿。
+> 想贡献代码？翻 [`CLAUDE.md`](./CLAUDE.md)，本地开发环境和发版流程都在那儿。
