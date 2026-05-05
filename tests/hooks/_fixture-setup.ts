@@ -81,6 +81,49 @@ const DEFAULT_STATE = {
   completed: false,
 };
 
+/**
+ * Build a legacy v7.0.x-shaped state object with NO `completed` key at all.
+ *
+ * Pre-v7.1.0 state files predate the completion marker — the `completed` field
+ * did not exist on the wire. NFR-2 backwards-compat requires that all v7.1.0
+ * readers treat such states as "in progress" (strict-equality `=== true` guard
+ * against the absent key, which surfaces as `undefined`).
+ *
+ * Unlike spreading `DEFAULT_STATE` (which now carries `completed: false` from
+ * task 1.7), this helper builds the v7.0.x shape from scratch so the absence
+ * of the key is explicit on disk — `JSON.stringify` cannot drop a key that
+ * was never set, making the legacy shape unambiguous.
+ *
+ * Override semantics: `overrides` is shallow-merged AFTER the base, so callers
+ * can pin a different `phase`, `taskIndex`, etc. for their scenario. Passing
+ * `completed` here defeats the purpose; use `createFixtureSpec({state:...})`
+ * if you want a v7.1.0-shaped state.
+ */
+export function createLegacyState(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    source: "spec" as const,
+    name: "demo-spec",
+    basePath: "./specs/demo-spec",
+    phase: "execution",
+    taskIndex: 1,
+    totalTasks: 3,
+    taskIteration: 1,
+    maxTaskIterations: 5,
+    globalIteration: 5,
+    maxGlobalIterations: 100,
+    commitSpec: true,
+    quickMode: false,
+    awaitingApproval: false,
+    recoveryMode: false,
+    nativeSyncEnabled: false,
+    granularity: "fine",
+    // NOTE: no `completed` key — this is the legacy v7.0.x shape.
+    ...overrides,
+  };
+}
+
 const DEFAULT_TASKS_MD =
   "# Demo Tasks\n" +
   "\n" +

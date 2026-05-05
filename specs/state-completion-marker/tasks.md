@@ -414,7 +414,7 @@ Focus: lock the new contract with regression tests. NFR-5 4 cases + design suppl
   - _Requirements: NFR-5d, AC-4.1, AC-4.4_
   - _Design: §Test Strategy_
 
-- [ ] 3.4 [P] Add Migration backwards-compat fixture (legacy v7.0.x state without `completed`)
+- [x] 3.4 [P] Add Migration backwards-compat fixture (legacy v7.0.x state without `completed`)
   - **Do**:
     1. In `tests/hooks/stop-watcher.test.ts` (or `_fixture-setup.ts`) add a helper `createLegacyState` that omits `completed` field entirely
     2. Add at least 1 cross-hook assertion: legacy state → stop-watcher fall-through emits continuation block (NFR-2)
