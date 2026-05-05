@@ -2,6 +2,28 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.3 — 2026-05-05
+
+### Added
+
+- **`npx @curdx/flow analyze` CLI — local-only plugin self-observation.** New subcommand that parses Claude Code session transcripts (`~/.claude/projects/<encoded-cwd>/<sessionId>.jsonl`) merged with curdx-flow's own `~/.claude/curdx-flow/errors.jsonl`, and emits a 7-section markdown report: **Hook Failures Top-N** · **Slash Commands** · **Subagents** · **Spec Funnel** · **Hook Duration P50/P95/P99** · **Schema Drift** · **Parent UUID Chain integrity**. Streaming `node:readline` parser handles 100MB+ transcripts (102 MB tested → 139 MB RSS bounded). Incremental byte-offset state at `~/.claude/curdx-flow/observability-state.json` makes second-run analysis ~31× faster than a cold full scan. Flags: `--json` · `--limit <N>` · `--since <7d|30d|YYYY-MM-DD>` · `--project <name>` · `--include-prompts`. Zero new npm dependencies — uses Node 20+ built-ins only (commit `ae4d7cc..0f87161`).
+  - New 5-piece module: `src/analyze/{parser,filter,report,redact,error-logger}.ts` + `index.ts` orchestrator + `types.ts`.
+  - New CLI flow: `src/flows/analyze.ts` (lazy `await import('../analyze/index.ts')` so the analyze pipeline only loads when invoked).
+  - 4 micro-edits to `src/index.ts` (citty registration: import + `defineCommand` ref + `subCommands` extension + `SUBCOMMANDS.add('analyze')`).
+- **Declarative schema map at `plugins/curdx-flow/schemas/transcript-events.json`.** Pattern borrowed from `claude-mem`'s `transcript-watch.json`: `type → action + fields` mapping is JSON config, not hardcoded TypeScript. Ships with the 4 core event types (`hook_success`, `tool_use`, `assistant`, `user`) and is auto-resolved post-bundle via two-probe strategy (`__dirname`-relative + `process.cwd()`-relative); on missing/corrupt, parser falls back to a builtin minimal whitelist with a stderr warning. Unknown event types are silently skipped and counted into `unknown_type_count` so Claude Code schema drift is observable rather than fatal (`R-1` mitigation).
+- **Hook error logger at `src/hooks/_shared/error-logger.ts`.** Synchronous `appendFileSync` writer for `~/.claude/curdx-flow/errors.jsonl` — 5 required fields (`ts`/`level`/`hook`/`event`/`msg`) + 5 optional (`session_id`/`cwd`/`spec`/`path`/`stack`), single line `< 4 KB` (POSIX `PIPE_BUF` atomic). Lazy reads `~/.claude/settings.json` once per process (`errorLogEnabled` defaults to `true`; corrupt/missing settings.json defaults `true` + stderr warning). Wired into `_shared/run-hook.ts`'s central catch so all 4 hooks (`load-spec-context` / `quick-mode-guard` / `stop-watcher` / `update-spec-index`) now write structured error trails instead of silently swallowing exceptions. Write failures are themselves swallowed (NFR-9 — never crash a hook trying to log a hook crash). Disable with `errorLogEnabled: false` in `~/.claude/settings.json`.
+- **Bundle-size CI gate at `scripts/check-bundle-size.mjs`.** New `npm run check:bundle` script enforces `dist/index.mjs ≤ 84 KB` (NFR-3); wired into the `verify` chain. Pairs with `tsup.config.ts` `splitting: true` so the analyze pipeline emits as a separate content-hashed chunk (`dist/analyze-*.mjs`, ~26 KB) and only loads when the user runs `analyze` — main bundle stayed at **68.46 KB** even after adding ~1500 LoC of analyze code.
+- **i18n strings for `analyze`** in `src/i18n/{en,zh}.ts` — 10 + 10 keys (`analyze.description`, `analyze.flags.*`, `analyze.warning.*`).
+- **Bilingual README sections** at the end of `README.md` and `README.zh-CN.md` documenting the analyze CLI, the redact-by-default privacy model, the macOS/Linux verification scope (Windows declared supported but not tested — NTFS append atomicity not guaranteed), and the `errorLogEnabled` config.
+
+### Fixed
+
+- **Hook stdin parse failures now reach `errors.jsonl`.** `src/hooks/_shared/stdin.ts` previously called `process.exit(0)` directly on `JSON.parse` failure, short-circuiting `_shared/run-hook.ts`'s outer try/catch — meaning the `logHookError({ event: 'stdin_parse', ... })` call in the wrapper was effectively dead code. Replaced `process.exit(0)` with `throw e;` so the central catch fires the logger and *then* exits 0 (FR-8 graceful-skip semantics preserved end-to-end). Caught by VE2 round-4 reality verification on the real `quick-mode-guard.mjs` bundle (commit `edf417a`).
+
+### Changed
+
+- **`tsup.config.ts`: `splitting: false → true`.** Required to make the new `await import('../analyze/index.ts')` in `src/flows/analyze.ts` actually emit a separate chunk (single-entry tsup with `splitting: false` was inlining the dynamic import, growing main bundle to 94.47 KB). Output now includes `dist/analyze-<hash>.mjs` alongside `dist/index.mjs`. `package.json` `files: ["dist", ...]` already covers the new chunk for `npm publish`.
+
 ## 7.1.2 — 2026-05-04
 
 ### Added
