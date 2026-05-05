@@ -217,7 +217,7 @@ created: 2026-05-05
   - _Requirements: AC-7.1, AT-6a, FR-2, FR-7_
   - _Design: 测试策略-真实 session 冒烟_
 
-- [ ] **V4 [VERIFY] Phase 4 quality checkpoint**
+- [x] **V4 [VERIFY] Phase 4 quality checkpoint**
   - **Do**: 全 verify 链 + bundle gate
   - **Verify**: `npm run typecheck && npm run check:bundle && npm run check:hooks-fresh && npm run test:hooks && npx vitest run tests/analyze`
   - **Done when**: 全部命令退出 0
@@ -227,7 +227,7 @@ created: 2026-05-05
 
 ## Phase 5 — E2E Verification（VE1/VE2/VE3）
 
-- [ ] **VE1 [VERIFY] E2E startup —— 构建 dist + 准备 fixture jsonl + 备份 state**
+- [x] **VE1 [VERIFY] E2E startup —— 构建 dist + 准备 fixture jsonl + 备份 state**
   - **Do**:
     1. `npm run build && npm run build:hooks`
     2. 备份现有 `~/.claude/curdx-flow/observability-state.json` 到 `/tmp/observability-state.bak`（若不存在则 touch 占位）
@@ -238,7 +238,7 @@ created: 2026-05-05
   - **Done when**: dist + hooks 构建好；备份就位；fixture 就位
   - **Commit**: None
 
-- [ ] **VE2 [VERIFY] E2E check —— 三轮 analyze + 7 段 + errors.jsonl 真写**
+- [x] **VE2 [VERIFY] E2E check —— 三轮 analyze + 7 段 + errors.jsonl 真写**
   - **Do**:
     1. 第一轮（fixture）：`node dist/index.mjs analyze --project -tmp-ve-curdx-fixture --json > /tmp/ve-r1.json`，assert 7 段 key 全在
     2. 第二轮（增量 offset）：再跑一次，记录 t2 应远短于 t1（NFR-1 时间断言）
@@ -248,7 +248,7 @@ created: 2026-05-05
   - **Done when**: 7 段全 + redact 默认生效 + errors.jsonl 真写
   - **Commit**: None
 
-- [ ] **VE3 [VERIFY] E2E cleanup —— 还原 state + 删 fixture 痕迹**
+- [x] **VE3 [VERIFY] E2E cleanup —— 还原 state + 删 fixture 痕迹**
   - **Do**:
     1. 还原 `~/.claude/curdx-flow/observability-state.json` ←  `/tmp/observability-state.bak`（若 bak 是空 touch 则 rm 当前 state.json）
     2. 还原 `~/.claude/curdx-flow/errors.jsonl` ← `/tmp/errors.jsonl.bak`（同上）
@@ -263,13 +263,13 @@ created: 2026-05-05
 
 ## Final Verification Sequence
 
-- [ ] **V5 [VERIFY] 全 phase 总闸门**
+- [x] **V5 [VERIFY] 全 phase 总闸门**
   - **Do**: 跑全套验证链
   - **Verify**: `npm run typecheck && npm run check:hooks-fresh && npm run check:bundle && npm run test:hooks && npx vitest run tests/analyze && npm run build && node dist/index.mjs analyze --help`
   - **Done when**: 全部命令退出 0；CI 等价本地复现成功
   - **Commit**: `chore(analyze): pass full local CI gate`（如有修复）
 
-- [ ] **V6 [VERIFY] FR/NFR/AC × 任务 + 文件清单 23 条 矩阵核对**
+- [x] **V6 [VERIFY] FR/NFR/AC × 任务 + 文件清单 23 条 矩阵核对**
   - **Do**:
     1. 自动核对 FR-1..20 / NFR-1..11 / AC-1.1..9.1 / AT-1..10 每条至少被 1 个任务覆盖（grep `_Requirements:` 所有任务的引用集合）
     2. 自动核对 design.md 文件清单 23 条（12 创建 + 11 修改）每条都有任务实际操作（grep 任务的 Files: 段）
