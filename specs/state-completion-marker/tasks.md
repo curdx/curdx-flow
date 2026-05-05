@@ -425,7 +425,7 @@ Focus: lock the new contract with regression tests. NFR-5 4 cases + design suppl
   - _Requirements: NFR-2, AC-8.1_
   - _Design: §Test Strategy, K-3_
 
-- [ ] 3.5 Regenerate byte-equal "Completed spec" fixture + baseline
+- [x] 3.5 Regenerate byte-equal "Completed spec" fixture + baseline
   - **Do**:
     1. Open `tests/hooks/byte-equal.test.ts` (~L155-180); change Completed spec fixture state to `{phase:"execution",taskIndex:2,totalTasks:2,completed:true,completedAt:"2026-01-01T00:00:00.000Z"}`
     2. Run `npm run test:hooks -- --update` (vitest snapshot update, or whichever flag the byte-equal harness exposes; check `tests/hooks/baselines/v6.0.6/` after run)
