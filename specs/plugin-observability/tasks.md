@@ -202,7 +202,7 @@ created: 2026-05-05
   - _Requirements: NFR-3, NFR-4, AT-9_
   - _Design: D-5 lazy 兜底_
 
-- [ ] **Task 4.3: Reality verification —— 真实 jsonl 冒烟 + VF（fix-type goal 等价）**
+- [x] **Task 4.3: Reality verification —— 真实 jsonl 冒烟 + VF（fix-type goal 等价）**
   - **Do**:
     1. 用本机 `~/.claude/projects/-Users-wdx-opc-curdx-flow/` 真实 jsonl 跑 `node dist/index.mjs analyze --since 7d --limit 5 --out /tmp/observability-real.md`
     2. assert `/tmp/observability-real.md` 含 7 段 + 不抛错
