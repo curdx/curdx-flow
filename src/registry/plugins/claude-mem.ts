@@ -1,5 +1,6 @@
 import type { Pkg } from '../types.ts';
 import { findPlugin, getMarketplacePluginVersion, isPluginInstalled } from '../../runner/state.ts';
+import { ensureBun } from '../../runner/ensureBun.ts';
 import {
   ensureMarketplace,
   installPluginById,
@@ -21,6 +22,7 @@ const claudeMem: Pkg = {
   whenToUse:
     'for cross-session memory search ("did we solve this before?"), phased planning (`make-plan`), or phased execution (`do`).',
   marketplaces: () => [MARKETPLACE_NAME],
+  prereqCheck: (t) => ensureBun(t),
   isInstalled: () => isPluginInstalled(PLUGIN_ID),
   installedVersion: async () => {
     const p = await findPlugin(PLUGIN_ID);

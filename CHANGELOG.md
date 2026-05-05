@@ -2,6 +2,15 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.2 — 2026-05-04
+
+### Added
+
+- **Auto-detect-and-install Bun when installing `claude-mem`.** The `claude-mem` plugin's runtime hooks shell out to `node scripts/bun-runner.js` which requires Bun on `PATH` or `~/.bun/bin/bun(.exe)` — Windows users without Bun previously hit `Error: Bun not found` at every Claude Code session start. The installer now runs `ensureBun()` as a `prereqCheck` before installing `claude-mem`: detects Bun via `which`/`where` plus the standard fallback paths (mirrors `bun-runner.js`'s discovery order), and if missing prompts `Auto-install Bun now? (default: No)`. On accept, runs the official installer (`curl -fsSL https://bun.sh/install | bash` on macOS/Linux, `powershell -c "irm bun.sh/install.ps1 | iex"` on Windows). On decline, the installer surfaces a `skip` row for `claude-mem` and continues with the rest of the bundle — other packages are unaffected. Existing users with Bun already installed (e.g. all macOS users who manually ran the installer earlier) see zero behavior change.
+  - New module: `src/runner/ensureBun.ts` (~75 LoC) — exports `findBun()` and `ensureBun(t)`.
+  - `src/registry/plugins/claude-mem.ts` declares `prereqCheck: (t) => ensureBun(t)` (one-line wire-in via the existing `Pkg.prereqCheck` contract that `chrome-devtools-mcp` already uses).
+  - i18n: 9 new `bun.*` keys in `src/i18n/{zh,en}.ts`.
+
 ## 7.1.1 — 2026-05-04
 
 ### Fixed

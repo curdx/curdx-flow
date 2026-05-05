@@ -68,6 +68,16 @@ const messages = {
   'chrome.prereqNode': '需要 Node.js >= 20.19，当前版本 {current}',
   'chrome.prereqChrome': '需要本机已安装 Chrome（chrome-devtools-mcp 会调用本地浏览器）',
 
+  'bun.missing': '未检测到 Bun，claude-mem 的后台 worker 依赖 Bun 运行。',
+  'bun.installerSource': 'Bun 安装脚本来源：https://bun.sh（macOS/Linux 用 curl，Windows 用 powershell irm）。',
+  'bun.confirmInstall': '是否现在自动安装 Bun？（默认否——选否将跳过 claude-mem，其他插件继续安装）',
+  'bun.declined': '已跳过 Bun 安装；claude-mem 需要 Bun，本次不安装。手动装好 Bun 后可重跑 install。',
+  'bun.installing': '正在下载并安装 Bun（首次约 60MB）…',
+  'bun.installed': 'Bun 安装完成。',
+  'bun.installFailedTitle': 'Bun 安装失败',
+  'bun.installFailedReason': 'Bun 安装失败：{error}',
+  'bun.installedButNotFound': 'Bun 安装脚本声明成功，但未在已知路径找到 bun 可执行文件——请手动确认后重跑。',
+
   'reinstall.uninstalling': '先卸载旧版本…',
   'reinstall.installing': '安装新版本…',
 

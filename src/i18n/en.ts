@@ -70,6 +70,16 @@ const messages: Record<MessageKey, string> = {
   'chrome.prereqNode': 'Requires Node.js >= 20.19 (current: {current})',
   'chrome.prereqChrome': 'Requires Chrome installed locally (chrome-devtools-mcp drives the local browser)',
 
+  'bun.missing': 'Bun runtime not found — claude-mem\'s background worker requires Bun.',
+  'bun.installerSource': 'Bun installer source: https://bun.sh (curl on macOS/Linux, PowerShell irm on Windows).',
+  'bun.confirmInstall': 'Auto-install Bun now? (default: No — declining will skip claude-mem; other packages continue)',
+  'bun.declined': 'Bun install declined; claude-mem requires Bun and will be skipped this run. Install Bun manually and re-run install.',
+  'bun.installing': 'Downloading and installing Bun (~60 MB on first run)…',
+  'bun.installed': 'Bun installed.',
+  'bun.installFailedTitle': 'Bun install failed',
+  'bun.installFailedReason': 'Bun install failed: {error}',
+  'bun.installedButNotFound': 'Bun installer reported success but bun was not found at any known path — verify manually and re-run.',
+
   'reinstall.uninstalling': 'Uninstalling old version…',
   'reinstall.installing': 'Installing new version…',
 
