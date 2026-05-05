@@ -512,7 +512,7 @@ Focus: lock the new contract with regression tests. NFR-5 4 cases + design suppl
 
 Focus: full local CI + 5-field version sync + CHANGELOG/MIGRATION + E2E sandbox replay (VE1-VE3) + AC programmatic checklist + PR push.
 
-- [ ] V1 [VERIFY] `npm run typecheck` exit 0
+- [x] V1 [VERIFY] `npm run typecheck` exit 0
   - **Do**: Run TypeScript compiler in noEmit mode
   - **Files**: (verification only)
   - **Done when**: 0 type errors across `src/**/*.ts` and `tests/**/*.ts`
@@ -520,7 +520,7 @@ Focus: full local CI + 5-field version sync + CHANGELOG/MIGRATION + E2E sandbox 
   - **Commit**: `fix(state-marker): resolve type errors` (only if fixes needed)
   - _Requirements: NFR-10_
 
-- [ ] V2 [VERIFY] `npm run test:hooks` full suite + new NFR-5 cases pass
+- [x] V2 [VERIFY] `npm run test:hooks` full suite + new NFR-5 cases pass
   - **Do**: Run full vitest hook suite
   - **Files**: (verification only)
   - **Done when**: 0 failing tests; 0 skips; ≥ 4 newly added cases pass
@@ -528,7 +528,7 @@ Focus: full local CI + 5-field version sync + CHANGELOG/MIGRATION + E2E sandbox 
   - **Commit**: `fix(state-marker): resolve test failures` (only if fixes needed)
   - _Requirements: NFR-4, NFR-5_
 
-- [ ] V3 [VERIFY] `npm run check:hooks-fresh` confirms bundle parity
+- [x] V3 [VERIFY] `npm run check:hooks-fresh` confirms bundle parity
   - **Do**: Run desync gate
   - **Files**: (verification only)
   - **Done when**: Exit 0
@@ -536,7 +536,7 @@ Focus: full local CI + 5-field version sync + CHANGELOG/MIGRATION + E2E sandbox 
   - **Commit**: `chore(state-marker): rebundle hooks for fresh check` (only if rebuild needed)
   - _Requirements: NFR-10_
 
-- [ ] V4 [VERIFY] CHANGELOG + MIGRATION-V7 v7.1.0 sections present
+- [x] V4 [VERIFY] CHANGELOG + MIGRATION-V7 v7.1.0 sections present
   - **Do**:
     1. Open `CHANGELOG.md`; prepend `## 7.1.0 — 2026-05-04` with Added / Changed / Migration subsections per design §17
     2. Open `docs/MIGRATION-V7.md`; append v7.1.0 upgrade section including jq snippet for AC-8.3 backfill
