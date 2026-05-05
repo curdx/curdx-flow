@@ -437,7 +437,7 @@ Focus: lock the new contract with regression tests. NFR-5 4 cases + design suppl
   - _Requirements: NFR-6_
   - _Design: §Test Strategy fixture clean-up_
 
-- [ ] 3.6 [VERIFY] types-only erase verification — bundle has no runtime CurdxState
+- [x] 3.6 [VERIFY] types-only erase verification — bundle has no runtime CurdxState
   - **Do**:
     1. Run `npm run build:hooks`
     2. Grep all bundled `plugins/curdx-flow/hooks/scripts/*.mjs` for `interface CurdxState` (must be 0 — interfaces are TS-only and erased at compile time)
@@ -449,7 +449,7 @@ Focus: lock the new contract with regression tests. NFR-5 4 cases + design suppl
   - _Requirements: FR-12_
   - _Design: K-2_
 
-- [ ] 3.7 [VERIFY] ensure-gitignore idempotent test passes after wire-in
+- [x] 3.7 [VERIFY] ensure-gitignore idempotent test passes after wire-in
   - **Do**:
     1. Run `npm run test:hooks -- ensure-gitignore`
     2. Confirm existing `tests/hooks/lib/ensure-gitignore.test.ts` still passes (we did not modify the lib; only wired it in start.md)
@@ -460,7 +460,7 @@ Focus: lock the new contract with regression tests. NFR-5 4 cases + design suppl
   - **Commit**: `chore(state-marker): verify ensure-gitignore idempotent` (only if fixes needed)
   - _Requirements: FR-14, AC-10.4, AC-10.5_
 
-- [ ] 3.8 [VERIFY] merge-state $unset 4-case completeness
+- [x] 3.8 [VERIFY] merge-state $unset 4-case completeness
   - **Do**:
     1. Re-run `npm run test:hooks -- merge-state`
     2. Confirm ≥ 4 distinct $unset cases (basic, with normal patch, missing key no-op, invalid shape exit-1) — covered by 1.4 U-1..U-4
@@ -472,7 +472,7 @@ Focus: lock the new contract with regression tests. NFR-5 4 cases + design suppl
   - _Requirements: FR-10, AC-6.1_
   - _Design: §Test Strategy U-1..U-6_
 
-- [ ] 3.9 [VERIFY] Strict equality grep — final lint
+- [x] 3.9 [VERIFY] Strict equality grep — final lint
   - **Do**:
     1. Across all 4 reader hooks (`stop-watcher.ts`, `load-spec-context.ts`, `update-spec-index.ts`, `quick-mode-guard.ts`) grep for `state.completed === true` ≥ 3 occurrences (quick-mode-guard intentionally has 0 because behavior unchanged)
     2. Grep for the forbidden truthy form `if (state.completed)` (no `===`) — must be 0 across all 4 files
@@ -483,7 +483,7 @@ Focus: lock the new contract with regression tests. NFR-5 4 cases + design suppl
   - _Requirements: FR-12, NFR-2, AC-8.1_
   - _Design: K-3_
 
-- [ ] 3.10 [VERIFY] Quality checkpoint after testing layer
+- [x] 3.10 [VERIFY] Quality checkpoint after testing layer
   - **Do**:
     1. Run `npm run typecheck`
     2. Run `npm run build:hooks`
@@ -495,7 +495,7 @@ Focus: lock the new contract with regression tests. NFR-5 4 cases + design suppl
   - **Commit**: `chore(state-marker): pass testing-layer quality checkpoint` (only if fixes needed)
   - _Requirements: NFR-4, NFR-5, NFR-10_
 
-- [ ] 3.11 [VERIFY] check:hooks-fresh — bundle vs source desync gate
+- [x] 3.11 [VERIFY] check:hooks-fresh — bundle vs source desync gate
   - **Do**:
     1. Run `npm run check:hooks-fresh`
     2. If desynced, re-run `npm run build:hooks` and re-verify
