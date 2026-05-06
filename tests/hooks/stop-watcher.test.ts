@@ -351,8 +351,11 @@ describe("stop-watcher (Stop hook)", () => {
       expect(r.json).toBeDefined();
       expect((r.json as any).decision).toBe("block");
       // Canonical stale format passed through verbatim from verify-blocks.ts.
-      expect((r.json as any).reason).toMatch(/^Stale evidence: /);
+      // Task 4.2 (NFR-3): message embeds phase id + fix command + spec name.
+      expect((r.json as any).reason).toMatch(/^Stale evidence for phase '/);
+      expect((r.json as any).reason).toContain("phase 'execution'");
       expect((r.json as any).reason).toContain("Re-run: npm run typecheck");
+      expect((r.json as any).reason).toMatch(/Spec: \S+/);
       expect((r.json as any).systemMessage).toMatch(
         /verification stale/,
       );

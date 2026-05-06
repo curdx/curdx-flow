@@ -14,7 +14,7 @@ import {
   unlinkSync
 } from "node:fs";
 import { spawn } from "node:child_process";
-import { basename as basename2, dirname, join as join3 } from "node:path";
+import { basename as basename3, dirname, join as join3 } from "node:path";
 import { fileURLToPath } from "node:url";
 import process5 from "node:process";
 
@@ -329,7 +329,7 @@ function extractTaskBlock(markdown, taskIndex) {
 
 // src/hooks/lib/verify-blocks.ts
 import { promises as fs } from "node:fs";
-import { join as join2 } from "node:path";
+import { basename as basename2, join as join2 } from "node:path";
 var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
   ".git",
   "node_modules",
@@ -367,9 +367,10 @@ async function verifyPhaseBlock(state, phase, specDir) {
   void await walkSrcTree(specDir);
   if (block.srcMtime > Date.parse(block.timestamp)) {
     const srcIso = new Date(block.srcMtime).toISOString();
+    const specName = basename2(specDir);
     return {
       ok: false,
-      reason: `Stale evidence: src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}.`,
+      reason: `Stale evidence for phase '${phase}': src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}. Spec: ${specName}.`,
       command: block.command
     };
   }
@@ -598,20 +599,20 @@ function extractParallelGroupBlock(markdown, taskIndex, maxGroup = 5) {
   }
   return block.replace(/\n+$/, "");
 }
-function buildVerificationBlockFailDecision(phase, result) {
+function buildVerificationBlockFailDecision(phase, result, specName) {
   const cmd = typeof result.command === "string" && result.command.length > 0 ? result.command : `/curdx-flow:${phase} (re-run phase to record verification)`;
   let reason;
   let systemMessage;
   if (result.reason === "missing") {
-    reason = `Phase '${phase}' has no verification block. Run: ${cmd}. Then try again.`;
-    systemMessage = `curdx-flow: phase '${phase}' missing verification block`;
+    reason = `Phase '${phase}' has no verification block. Run: ${cmd}. Spec: ${specName}. Then try again.`;
+    systemMessage = `curdx-flow: phase '${phase}' missing verification block (spec: ${specName})`;
   } else if (typeof result.reason === "string" && result.reason.startsWith("Stale evidence")) {
     reason = result.reason;
-    systemMessage = `curdx-flow: phase '${phase}' verification stale`;
+    systemMessage = `curdx-flow: phase '${phase}' verification stale (spec: ${specName})`;
   } else {
     const detail = result.reason ?? "verification failed";
-    reason = `Verification failed: ${detail}. Fix and re-run: ${cmd}.`;
-    systemMessage = `curdx-flow: phase '${phase}' verification failed`;
+    reason = `Verification failed for phase '${phase}': ${detail}. Fix and re-run: ${cmd}. Spec: ${specName}.`;
+    systemMessage = `curdx-flow: phase '${phase}' verification failed (spec: ${specName})`;
   }
   return {
     decision: "block",
@@ -619,12 +620,12 @@ function buildVerificationBlockFailDecision(phase, result) {
     systemMessage
   };
 }
-function buildMalformedVerificationBlock() {
-  const reason = "verificationBlocks malformed in .curdx-state.json. See references/iron-law-verification.md.";
+function buildMalformedVerificationBlock(specName) {
+  const reason = `Phase 'unknown' verificationBlocks malformed in .curdx-state.json. Fix: edit ${specName}/.curdx-state.json (or run /curdx-flow:cancel). Spec: ${specName}. See references/iron-law-verification.md.`;
   return {
     decision: "block",
     reason,
-    systemMessage: "curdx-flow: verificationBlocks malformed"
+    systemMessage: `curdx-flow: verificationBlocks malformed (spec: ${specName})`
   };
 }
 function buildCorruptStateBlock(specPath) {
@@ -710,7 +711,7 @@ runHook(async (input) => {
   const rawSpecPath = resolveCurrent({ cwd });
   if (!rawSpecPath) return;
   const specPath = preserveDotPrefix(rawSpecPath, getSpecsDirs({ cwd }));
-  const specName = basename2(specPath);
+  const specName = basename3(specPath);
   const stateFile = join3(cwd, specPath, ".curdx-state.json");
   if (!existsSync2(stateFile)) return;
   await maybeWaitForRecentStateFile(stateFile);
@@ -728,7 +729,7 @@ runHook(async (input) => {
         stateMalformed = true;
       }
       if (stateMalformed) {
-        return buildMalformedVerificationBlock();
+        return buildMalformedVerificationBlock(specName);
       }
       const epicName = parsedState && typeof parsedState.epicName === "string" && parsedState.epicName.length > 0 ? parsedState.epicName : void 0;
       if (parsedState) {
@@ -742,10 +743,14 @@ runHook(async (input) => {
               join3(cwd, specPath)
             );
           } catch {
-            return buildMalformedVerificationBlock();
+            return buildMalformedVerificationBlock(specName);
           }
           if (!result.ok) {
-            return buildVerificationBlockFailDecision(knownPhase, result);
+            return buildVerificationBlockFailDecision(
+              knownPhase,
+              result,
+              specName
+            );
           }
         }
       }

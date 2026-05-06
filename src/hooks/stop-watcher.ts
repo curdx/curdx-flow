@@ -422,20 +422,29 @@ function extractParallelGroupBlock(
  * result. Emitted when a phase is about to exit but the recorded
  * `verificationBlocks[phase]` is missing, failed, or stale.
  *
- * Message formats — canonical per design.md §Error Handling table (L352-356):
- *   - "missing": `Phase '<phase>' has no verification block. Run: <cmd>. Then try again.`
- *   - stale (reason starts with "Stale evidence"): pass-through verbatim
- *     from verify-blocks.ts (already produces
- *     `Stale evidence: src changed at <iso>, last verified at <iso>. Re-run: <cmd>.`)
- *   - any other reason → failed: `Verification failed: <reason>. Fix and re-run: <cmd>.`
+ * Message formats — canonical per design.md §Error Handling table (L352-356)
+ * + NFR-3 actionability (Task 4.2): every fail message embeds **phase id,
+ * fix command, and spec context** so the user can act without further
+ * lookup.
+ *
+ *   - "missing": `Phase '<phase>' has no verification block. Run: <cmd>. Spec: <specName>. Then try again.`
+ *   - stale (reason from verify-blocks already starts with `Phase '<phase>' stale evidence: ...`)
+ *     pass-through verbatim — verify-blocks.ts owns the canonical stale
+ *     wording and embeds all 3 NFR-3 fields itself.
+ *   - any other reason → failed: `Phase '<phase>' verification failed: <reason>. Fix and re-run: <cmd>. Spec: <specName>.`
  *
  * The `<cmd>` placeholder for the missing case falls back to a phase-aware
  * `/curdx-flow:<phase>` hint when verify-blocks couldn't recover the original
  * command (it returns `command: ""` for the missing branch).
+ *
+ * `specName` is the human-recognizable identifier for the active spec (the
+ * basename of `specDir`). Callers in this file already compute `specName`
+ * via `basename(specPath)` so the threading is zero-cost.
  */
 function buildVerificationBlockFailDecision(
   phase: string,
   result: { reason?: string; command?: string },
+  specName: string,
 ): BlockDecision {
   const cmd =
     typeof result.command === "string" && result.command.length > 0
@@ -444,21 +453,23 @@ function buildVerificationBlockFailDecision(
   let reason: string;
   let systemMessage: string;
   if (result.reason === "missing") {
-    reason = `Phase '${phase}' has no verification block. Run: ${cmd}. Then try again.`;
-    systemMessage = `curdx-flow: phase '${phase}' missing verification block`;
+    reason = `Phase '${phase}' has no verification block. Run: ${cmd}. Spec: ${specName}. Then try again.`;
+    systemMessage = `curdx-flow: phase '${phase}' missing verification block (spec: ${specName})`;
   } else if (
     typeof result.reason === "string" &&
     result.reason.startsWith("Stale evidence")
   ) {
     // verify-blocks.ts already produces the canonical stale message
-    // (`Stale evidence: src changed at <iso>, last verified at <iso>. Re-run: <cmd>.`).
-    // Pass through verbatim — re-formatting here would diverge from design L355.
+    // (`Stale evidence for phase '<phase>': src changed at <iso>, last
+    // verified at <iso>. Re-run: <cmd>. Spec: <specName>.`) — all 3
+    // NFR-3 fields are embedded at the source. Pass through verbatim;
+    // re-formatting here would diverge from design L355.
     reason = result.reason;
-    systemMessage = `curdx-flow: phase '${phase}' verification stale`;
+    systemMessage = `curdx-flow: phase '${phase}' verification stale (spec: ${specName})`;
   } else {
     const detail = result.reason ?? "verification failed";
-    reason = `Verification failed: ${detail}. Fix and re-run: ${cmd}.`;
-    systemMessage = `curdx-flow: phase '${phase}' verification failed`;
+    reason = `Verification failed for phase '${phase}': ${detail}. Fix and re-run: ${cmd}. Spec: ${specName}.`;
+    systemMessage = `curdx-flow: phase '${phase}' verification failed (spec: ${specName})`;
   }
   return {
     decision: "block",
@@ -477,15 +488,23 @@ function buildVerificationBlockFailDecision(
  * `ALL_TASKS_COMPLETE` marker has been seen and we are about to allow the
  * loop to stop, malformed state must surface a verificationBlocks-specific
  * message that points the user at the iron-law reference doc.
+ *
+ * NFR-3 (Task 4.2): the malformed branch lacks a meaningful phase id (the
+ * state itself is unparseable, so we cannot read `state.phase`), so the
+ * `<phase>` slot collapses to a literal `'unknown'` placeholder. Fix
+ * command and spec context still appear so the user can locate the file
+ * and follow the recovery cookbook.
  */
-function buildMalformedVerificationBlock(): BlockDecision {
+function buildMalformedVerificationBlock(specName: string): BlockDecision {
   const reason =
-    "verificationBlocks malformed in .curdx-state.json. " +
-    "See references/iron-law-verification.md.";
+    `Phase 'unknown' verificationBlocks malformed in .curdx-state.json. ` +
+    `Fix: edit ${specName}/.curdx-state.json (or run /curdx-flow:cancel). ` +
+    `Spec: ${specName}. ` +
+    `See references/iron-law-verification.md.`;
   return {
     decision: "block",
     reason,
-    systemMessage: "curdx-flow: verificationBlocks malformed",
+    systemMessage: `curdx-flow: verificationBlocks malformed (spec: ${specName})`,
   };
 }
 
@@ -655,7 +674,7 @@ runHook(async (input) => {
         stateMalformed = true;
       }
       if (stateMalformed) {
-        return buildMalformedVerificationBlock();
+        return buildMalformedVerificationBlock(specName);
       }
       const epicName =
         parsedState && typeof parsedState.epicName === "string" &&
@@ -685,10 +704,14 @@ runHook(async (input) => {
           } catch {
             // Unexpected throw inside verify-blocks (e.g. malformed shape on
             // verificationBlocks access). Surface the malformed message.
-            return buildMalformedVerificationBlock();
+            return buildMalformedVerificationBlock(specName);
           }
           if (!result.ok) {
-            return buildVerificationBlockFailDecision(knownPhase, result);
+            return buildVerificationBlockFailDecision(
+              knownPhase,
+              result,
+              specName,
+            );
           }
         }
       }

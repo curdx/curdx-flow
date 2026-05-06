@@ -24,7 +24,7 @@
 // "verify-blocks shared lib".
 
 import { promises as fs } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import type { CurdxState, VerificationPhase } from "../_shared/types.ts";
 
@@ -116,7 +116,7 @@ export interface VerifyPhaseBlockResult {
  *   1. No block recorded            → `{ok: false, reason: "missing", command: ""}`
  *   2. Block exists, `exitCode !== 0` → `{ok: false, reason: failedReason ?? "verification failed", command: block.command}`
  *   3. Block exists, `block.srcMtime > Date.parse(block.timestamp)` → stale
- *      `{ok: false, reason: "Stale evidence: src changed at <iso>, last verified at <ts>. Re-run: <cmd>.", command: block.command}`
+ *      `{ok: false, reason: "Phase '<phase>' stale evidence: src changed at <iso>, last verified at <ts>. Re-run: <cmd>. Spec: <specName>.", command: block.command}`
  *   4. Block exists, otherwise      → `{ok: true}`
  *
  * The comparison uses ms-vs-ms (AC-7.3): `block.srcMtime` is already epoch
@@ -130,6 +130,16 @@ export interface VerifyPhaseBlockResult {
  * `block.srcMtime > Date.parse(block.timestamp)` form (design L179, L355,
  * tasks.md Task 2.2 step-2). Future tasks may refine the comparison to
  * fold in the live `maxSrcMtime`; see design.md L329.
+ *
+ * NFR-3 (Task 4.2): the stale message embeds all 3 mandated fields —
+ * phase id (`Phase '<phase>'`), fix command (`Re-run: <cmd>`), and spec
+ * context (`Spec: <specName>`). The basename of `specDir` is used so
+ * that downstream callers (Stop hook, TaskCompleted hook, CLI) get the
+ * same human-recognizable identifier without further plumbing. The
+ * `missing` and `failed` reasons remain short tokens — stop-watcher's
+ * `buildVerificationBlockFailDecision` is the single point that wraps
+ * them with phase + spec context for user display, since the malformed
+ * branch lives in stop-watcher.ts only.
  */
 export async function verifyPhaseBlock(
   state: CurdxState,
@@ -156,9 +166,15 @@ export async function verifyPhaseBlock(
   void (await walkSrcTree(specDir));
   if (block.srcMtime > Date.parse(block.timestamp)) {
     const srcIso = new Date(block.srcMtime).toISOString();
+    // NFR-3: phase id + fix command + spec context all embedded in one
+    // line so passthrough to stop-watcher / task-completed-verifier
+    // surfaces a fully actionable message without further wrapping.
+    // Wording keeps the leading literal "Stale evidence" so the canonical
+    // matcher `^Stale evidence` (in stop-watcher / e2e tests) still fires.
+    const specName = basename(specDir);
     return {
       ok: false,
-      reason: `Stale evidence: src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}.`,
+      reason: `Stale evidence for phase '${phase}': src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}. Spec: ${specName}.`,
       command: block.command,
     };
   }

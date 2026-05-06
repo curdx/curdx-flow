@@ -7,7 +7,7 @@ const __dirname = __ccd(__filename);
 
 // src/hooks/lib/verify-blocks.ts
 import { promises as fs } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
   ".git",
   "node_modules",
@@ -45,9 +45,10 @@ async function verifyPhaseBlock(state, phase, specDir) {
   void await walkSrcTree(specDir);
   if (block.srcMtime > Date.parse(block.timestamp)) {
     const srcIso = new Date(block.srcMtime).toISOString();
+    const specName = basename(specDir);
     return {
       ok: false,
-      reason: `Stale evidence: src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}.`,
+      reason: `Stale evidence for phase '${phase}': src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}. Spec: ${specName}.`,
       command: block.command
     };
   }

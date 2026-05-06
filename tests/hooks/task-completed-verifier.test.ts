@@ -190,8 +190,11 @@ describe("task-completed-verifier (TaskCompleted hook)", () => {
     expect(r.exitCode).toBe(2);
     expect(r.json).toBeDefined();
     expect((r.json as any).decision).toBe("block");
-    expect((r.json as any).reason).toMatch(/^Stale evidence: /);
+    // Task 4.2 (NFR-3): stale message embeds phase id + fix command + spec.
+    expect((r.json as any).reason).toMatch(/^Stale evidence for phase '/);
+    expect((r.json as any).reason).toContain("phase 'execution'");
     expect((r.json as any).reason).toContain("Re-run: npm run typecheck");
+    expect((r.json as any).reason).toMatch(/Spec: \S+/);
   });
 
   it("(d): malformed stdin (missing task_id) → exit 0 pass-through {continue:true}", () => {
