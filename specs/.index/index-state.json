@@ -1,14 +1,19 @@
 {
   "version": "1.0",
-  "updated": "2026-05-06T12:26:27Z",
+  "updated": "2026-05-06T23:47:35Z",
   "directories": [
     {
       "path": "./specs",
-      "specsCount": 4,
+      "specsCount": 9,
       "isDefault": true
     }
   ],
   "specs": [
+    {
+      "name": "_epics",
+      "path": "./specs/_epics",
+      "phase": "new"
+    },
     {
       "name": "cross-platform-support",
       "path": "./specs/cross-platform-support",
@@ -22,16 +27,38 @@
       "phase": "completed"
     },
     {
+      "name": "spec-bounded-parallel-dispatch",
+      "path": "./specs/spec-bounded-parallel-dispatch",
+      "phase": "new"
+    },
+    {
+      "name": "spec-cost-runaway-guards",
+      "path": "./specs/spec-cost-runaway-guards",
+      "phase": "new"
+    },
+    {
+      "name": "spec-subagent-context-reinjection",
+      "path": "./specs/spec-subagent-context-reinjection",
+      "phase": "new"
+    },
+    {
+      "name": "spec-two-stage-review",
+      "path": "./specs/spec-two-stage-review",
+      "phase": "new"
+    },
+    {
+      "name": "spec-verification-iron-law",
+      "path": "./specs/spec-verification-iron-law",
+      "phase": "completed",
+      "taskIndex": 53,
+      "totalTasks": 53
+    },
+    {
       "name": "state-completion-marker",
       "path": "./specs/state-completion-marker",
       "phase": "completed",
       "taskIndex": 51,
       "totalTasks": 51
-    },
-    {
-      "name": "superpowers-inline-review",
-      "path": "./specs/superpowers-inline-review",
-      "phase": "new"
     }
   ]
 }
