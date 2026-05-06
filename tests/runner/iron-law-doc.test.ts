@@ -47,7 +47,7 @@ const NPM_RUN_PATTERN = /`npm run ([A-Za-z0-9:_\-.]+)`/g;
 function extractNpmRunScripts(doc: string): string[] {
   const found = new Set<string>();
   for (const m of doc.matchAll(NPM_RUN_PATTERN)) {
-    found.add(m[1]);
+    if (m[1] !== undefined) found.add(m[1]);
   }
   return [...found].sort();
 }
