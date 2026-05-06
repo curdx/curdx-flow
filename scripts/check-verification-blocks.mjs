@@ -90,10 +90,33 @@ try {
   process.exit(2);
 }
 
+// Env opt-out: bootstrapping the iron-law mechanism itself (or any case where
+// the developer needs to force-skip this gate locally). CI and release flows
+// MUST NOT set this — the env var is for human escape hatches only.
+if (process.env.CURDX_VERIFY_SKIP_BLOCKS === '1') {
+  console.log('[check-verification-blocks] CURDX_VERIFY_SKIP_BLOCKS=1 — skipping gate.');
+  process.exit(0);
+}
+
 const blocks = state.verificationBlocks;
 const presentPhases = blocks
   ? Object.keys(blocks).filter((p) => blocks[p] !== undefined && blocks[p] !== null)
   : [];
+
+// Initial-state permissive branch: if the `verificationBlocks` field is
+// entirely ABSENT from state (i.e. no phase has ever recorded a block — the
+// spec predates the iron-law mechanism, or we are still building it), exit 0.
+// This is distinct from "field present but empty {}" which still trips the
+// gate (someone wiped the blocks but kept the field — that is a regression).
+// See task 2.21 pre-flight: adding this script to `npm run verify` would
+// otherwise trip on the very spec that is implementing the gate.
+if (state.verificationBlocks === undefined) {
+  console.log(
+    '[check-verification-blocks] No verificationBlocks defined — skipping (treat as initial state)',
+  );
+  console.log(`  Active spec: ${path.relative(repoRoot, specDir)}`);
+  process.exit(0);
+}
 
 if (!blocks || presentPhases.length === 0) {
   console.error('✗ No verificationBlocks found. Run the appropriate phase verification command.');
