@@ -2,6 +2,18 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.4 — 2026-05-06
+
+### Changed
+
+- **`~/.claude/CLAUDE.md` managed block is now language-aware.** `src/runner/claudeMd.ts` no longer emits a single Chinese-only block regardless of installer language. The managed `<!-- BEGIN @curdx/flow v1 -->` block now renders in English when the installer runs with `--lang en` (or `CURDX_FLOW_LANG=en`) and in Chinese when it runs with `zh`. This keeps the generated guidance aligned with the installer's selected language instead of mixing an English install flow with Chinese managed instructions.
+- **Chinese installs inject an explicit language policy into the managed block.** When the current installer language is `zh`, flow now prepends a `Language Policy` section that instructs Claude to keep tool/model interaction in English while replying to the user in Simplified Chinese. English installs do not inject this section. This behavior is covered by new tests in `tests/runner/claudeMd.test.ts`.
+- **Managed-block guidance now uses clearer Claude Code terminology.** The block now distinguishes slash commands from MCP capabilities and plugin skills instead of mixing them together. `claude-mem` calls are rendered as `/claude-mem:...`, Context7 / sequential-thinking / Chrome DevTools are described as MCP capabilities, and the overly-strong `frontend-design` "auto fire" wording was softened to "prioritize, then invoke explicitly if needed". The global decision tree also stopped leaking `TaskCreate` as a user-facing universal rule, matching current Claude Code best-practice guidance more closely.
+
+### Added
+
+- **README alignment for managed `CLAUDE.md` behavior.** `README.md` and `README.zh-CN.md` now document that language selection affects not only the installer UI, but also the rendering of the managed `CLAUDE.md` block, including the extra Chinese-mode language policy injection.
+
 ## 7.1.3 — 2026-05-05
 
 ### Added

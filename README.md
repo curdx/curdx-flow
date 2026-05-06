@@ -133,6 +133,8 @@ npx @curdx/flow
 
 On first run, you pick a language (中文 / English), then select what to install. The bundled `curdx-flow` plugin (the spec workflow itself) is always installed. Everything else is opt-in.
 
+That language choice also controls the managed `~/.claude/CLAUDE.md` block that flow writes. The block is rendered in the selected language, and when you choose `zh` it additionally injects a language policy telling Claude to keep tool/model interaction in English while replying to the user in Simplified Chinese.
+
 ### Common workflows
 
 ```bash
@@ -337,7 +339,7 @@ Run `npx @curdx/flow status` to see what is installed on your machine.
 | --- | --- |
 | `--all` | Apply to every available item (with `install` or `update`). |
 | `--yes` | Skip all confirmations (non-interactive). |
-| `--lang en` / `--lang zh` | Override the language for the current invocation. |
+| `--lang en` / `--lang zh` | Override the language for the current invocation, including the language used when rendering the managed `CLAUDE.md` block. |
 | `--no-claude-md` | Do not write the managed block to `~/.claude/CLAUDE.md`. |
 | `--json` | Output machine-readable JSON (with `status`). |
 | `--quick` | (Plugin) Run all phases of a spec sequentially without pausing for approval. Use with caution. |
@@ -350,7 +352,7 @@ Run `npx @curdx/flow status` to see what is installed on your machine.
 | Variable | Effect |
 | --- | --- |
 | `CURDX_FLOW_NO_CLAUDE_MD=1` | Equivalent to `--no-claude-md`. |
-| `CURDX_FLOW_LANG=en` / `=zh` | Default language for the installer. |
+| `CURDX_FLOW_LANG=en` / `=zh` | Default language for the installer and for managed `CLAUDE.md` block rendering. |
 | `CONTEXT7_API_KEY` | Optional API key for the context7 MCP server. |
 
 ### Per-project overrides
@@ -394,7 +396,7 @@ Inside any project that uses flow:
 
 The four canonical artifacts (`research.md` … `tasks.md`) are committed with your code. State and progress files are gitignored.
 
-The `<!-- BEGIN @curdx/flow v1 -->` block in `~/.claude/CLAUDE.md` tells Claude what is installed and how to invoke it. flow only ever rewrites this block — content outside the markers is preserved verbatim. Pass `--no-claude-md` (or set `CURDX_FLOW_NO_CLAUDE_MD=1`) to opt out of the managed block.
+The `<!-- BEGIN @curdx/flow v1 -->` block in `~/.claude/CLAUDE.md` tells Claude what is installed and how to invoke it. flow only ever rewrites this block — content outside the markers is preserved verbatim. The block is language-aware: `--lang en` renders the guidance in English, `--lang zh` renders it in Chinese, and the `zh` variant also injects a language policy requiring English for tool/model interaction and Simplified Chinese for user-facing replies. Pass `--no-claude-md` (or set `CURDX_FLOW_NO_CLAUDE_MD=1`) to opt out of the managed block.
 
 ---
 

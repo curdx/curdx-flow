@@ -133,6 +133,8 @@ npx @curdx/flow
 
 首次运行会让你选择语言（中文 / English），随后选择安装项。内置的 `curdx-flow` 插件（即工作流本身）始终安装；其余工具均可按需选择。
 
+这个语言选择同时决定 flow 写入 `~/.claude/CLAUDE.md` 的受管理块内容。受管理块会按所选语言渲染；若选择 `zh`，还会额外注入语言策略，要求 Claude 在工具 / 模型交互时使用英文、面向用户输出时使用简体中文。
+
 ### 常用操作
 
 ```bash
@@ -337,7 +339,7 @@ flow 内置九个专项子 agent，各自承担明确的单一职责。它们由
 | --- | --- |
 | `--all` | 应用于全部可用项（与 `install` 或 `update` 配合）。 |
 | `--yes` | 跳过所有确认提示（非交互模式）。 |
-| `--lang en` / `--lang zh` | 单次调用覆盖语言设置。 |
+| `--lang en` / `--lang zh` | 单次调用覆盖语言设置，同时影响受管理 `CLAUDE.md` 区块的渲染语言。 |
 | `--no-claude-md` | 不向 `~/.claude/CLAUDE.md` 写入受管理块。 |
 | `--json` | 机器可读 JSON 输出（与 `status` 配合）。 |
 | `--quick` | （插件）连续运行 spec 的全部阶段，不在阶段间暂停等待确认。请谨慎使用。 |
@@ -350,7 +352,7 @@ flow 内置九个专项子 agent，各自承担明确的单一职责。它们由
 | 变量 | 作用 |
 | --- | --- |
 | `CURDX_FLOW_NO_CLAUDE_MD=1` | 等价于 `--no-claude-md`。 |
-| `CURDX_FLOW_LANG=en` / `=zh` | 安装器默认语言。 |
+| `CURDX_FLOW_LANG=en` / `=zh` | 安装器默认语言，同时作为受管理 `CLAUDE.md` 区块的默认渲染语言。 |
 | `CONTEXT7_API_KEY` | context7 MCP 服务器的可选 API 密钥。 |
 
 ### 项目级覆盖
@@ -394,7 +396,7 @@ flow 内置九个专项子 agent，各自承担明确的单一职责。它们由
 
 四份标准产出物（`research.md` … `tasks.md`）随代码一同提交至仓库。状态与进度文件已加入 gitignore。
 
-`~/.claude/CLAUDE.md` 中的 `<!-- BEGIN @curdx/flow v1 -->` 块告知 Claude 当前已安装的内容及调用方式。flow 仅会重写该块，标记之外的内容**原样保留**。如需关闭受管理块，传入 `--no-claude-md`，或设置环境变量 `CURDX_FLOW_NO_CLAUDE_MD=1`。
+`~/.claude/CLAUDE.md` 中的 `<!-- BEGIN @curdx/flow v1 -->` 块告知 Claude 当前已安装的内容及调用方式。flow 仅会重写该块，标记之外的内容**原样保留**。该区块会根据语言设置渲染：`--lang en` 输出英文提示，`--lang zh` 输出中文提示；其中 `zh` 版本还会额外注入语言策略，要求工具 / 模型交互使用英文、面向用户回复使用简体中文。如需关闭受管理块，传入 `--no-claude-md`，或设置环境变量 `CURDX_FLOW_NO_CLAUDE_MD=1`。
 
 ---
 
