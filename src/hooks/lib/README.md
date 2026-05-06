@@ -39,7 +39,7 @@ to recreate later.
 | Lib | LOC | Callers | Purpose |
 | --- | --- | --- | --- |
 | `cleanup-files` | 185 | 0 (designed for `commands/implement.md` cleanup phase) | glob + delete with safety guards (refuses to delete outside repo, refuses dotfiles unless explicit) |
-| `count-mocks` | 107 | 0 (designed for `templates/tasks.md` reality-verification VE2) | walks tests/, counts `vi.mock` / `jest.mock` / `mock.fn` occurrences, prints mock-vs-real ratio JSON |
+| `count-mocks` | 107 | 0 (designed for `templates/tasks.md` verification-before-completion VE2) | walks tests/, counts `vi.mock` / `jest.mock` / `mock.fn` occurrences, prints mock-vs-real ratio JSON |
 | `count-tasks` | 54 | 0 (designed for `templates/tasks.md`, `commands/status.md`) | parse `tasks.md` → `{total, completed, pending}` JSON via `_shared/markdown-task-parser` |
 | `ensure-gitignore` | 64 | 0 (designed for `commands/implement.md`, `templates/tasks.md`) | idempotent: append `<entry>` to `.gitignore` only if missing |
 | `get-default-branch` | 105 | 0 (designed for native sync + `commands/start.md`) | cross-platform git default branch detection (origin/HEAD → main → master fallback chain) |

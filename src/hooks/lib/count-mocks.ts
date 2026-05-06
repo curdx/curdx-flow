@@ -2,7 +2,7 @@
 //
 // CLI utility: count mock-framework usages across test files in a tree.
 //
-// Supports the reality-verification skill, which flags mock-heavy test
+// Supports the verification-before-completion skill, which flags mock-heavy test
 // anti-patterns. Recursively walks <root>, identifies test files
 // (*.test.* / *.spec.*), and counts occurrences of:
 //   vi.mock(   jest.mock(   mock.fn(   vi.fn(   jest.fn(
