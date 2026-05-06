@@ -327,6 +327,22 @@ function extractTaskBlock(markdown, taskIndex) {
   return trimTrailingBlankLines(out).join("\n");
 }
 
+// src/hooks/lib/verify-blocks.ts
+function verifyPhaseBlock(state, phase, specDir) {
+  const block = state.verificationBlocks?.[phase];
+  if (block === void 0) {
+    return { ok: false, reason: "missing", command: "" };
+  }
+  if (block.exitCode !== 0) {
+    return {
+      ok: false,
+      reason: block.failedReason ?? "verification failed",
+      command: block.command
+    };
+  }
+  return { ok: true };
+}
+
 // src/hooks/stop-watcher.ts
 var SETTINGS_REL_PATH2 = ".claude/curdx-flow.local.md";
 var ALL_TASKS_COMPLETE_RE = /(^|\W)ALL_TASKS_COMPLETE(\W|$)/;
@@ -522,6 +538,21 @@ function extractParallelGroupBlock(markdown, taskIndex, maxGroup = 5) {
   }
   return block.replace(/\n+$/, "");
 }
+function buildMissingVerificationBlock(phase, result) {
+  const cmd = typeof result.command === "string" && result.command.length > 0 ? result.command : `/curdx-flow:${phase} (re-run phase to record verification)`;
+  let reason;
+  if (result.reason === "missing") {
+    reason = `Phase '${phase}' has no verification block. Run: ${cmd}. Then try again.`;
+  } else {
+    const detail = result.reason ?? "verification failed";
+    reason = `Phase '${phase}' verification failed: ${detail}. Run: ${cmd}. Then try again.`;
+  }
+  return {
+    decision: "block",
+    reason,
+    systemMessage: `curdx-flow: phase '${phase}' missing verification block`
+  };
+}
 function buildCorruptStateBlock(specPath) {
   const reason = `ERROR: Corrupt state file at ${specPath}/.curdx-state.json
 
@@ -614,25 +645,48 @@ runHook(async (input) => {
     const handleCompletion = (variant) => {
       const label = variant === "primary" ? "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript" : "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript (tail-end)";
       process5.stderr.write(label + "\n");
-      let epicName;
+      let parsedState;
       try {
-        const st = JSON.parse(readFileSync3(stateFile, "utf8"));
-        epicName = typeof st.epicName === "string" && st.epicName.length > 0 ? st.epicName : void 0;
+        parsedState = JSON.parse(readFileSync3(stateFile, "utf8"));
       } catch {
-        epicName = void 0;
+        parsedState = void 0;
+      }
+      const epicName = parsedState && typeof parsedState.epicName === "string" && parsedState.epicName.length > 0 ? parsedState.epicName : void 0;
+      if (parsedState) {
+        const rawPhase = typeof parsedState.phase === "string" ? parsedState.phase : "";
+        const known = [
+          "research",
+          "requirements",
+          "design",
+          "tasks",
+          "execution"
+        ];
+        if (known.includes(rawPhase)) {
+          const result = verifyPhaseBlock(
+            parsedState,
+            rawPhase,
+            join2(cwd, specPath)
+          );
+          if (!result.ok) {
+            return buildMissingVerificationBlock(rawPhase, result);
+          }
+        }
       }
       const currentEpicFile = join2(cwd, "specs", ".current-epic");
       if (epicName && existsSync2(currentEpicFile)) {
         markSpecCompletedInEpic(cwd, epicName, specName);
       }
       fireUpdateSpecIndex();
+      return void 0;
     };
     if (tailContainsCompletionMarker(transcriptPath, 500)) {
-      handleCompletion("primary");
+      const blocked = handleCompletion("primary");
+      if (blocked) return blocked;
       return;
     }
     if (tailContainsCompletionMarker(transcriptPath, 20)) {
-      handleCompletion("fallback");
+      const blocked = handleCompletion("fallback");
+      if (blocked) return blocked;
       return;
     }
   }

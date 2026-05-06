@@ -65,8 +65,9 @@ import { runHook } from "./_shared/run-hook.js";
 import { getSpecsDirs, resolveCurrent } from "./_shared/path-resolver.js";
 import { writeFileAtomic } from "./_shared/atomic-write.js";
 import { extractTaskBlock } from "./_shared/markdown-task-parser.js";
+import { verifyPhaseBlock } from "./lib/verify-blocks.js";
 import type { BlockDecisionOutput } from "./_shared/types.js";
-import type { CurdxState } from "./_shared/types.js";
+import type { CurdxState, VerificationPhase } from "./_shared/types.js";
 
 interface EpicState {
   specs?: Array<{ name: string; status?: string; [k: string]: unknown }>;
@@ -416,6 +417,41 @@ function extractParallelGroupBlock(
   return block.replace(/\n+$/, "");
 }
 
+/**
+ * Build the missing-verification-block decision (Layer-1 iron-law gate).
+ *
+ * Emitted when a phase is about to exit but no `verificationBlocks[phase]`
+ * record exists in state (or, in Phase 2, exists but is stale/failed). The
+ * `reason` carries the exact fix command so the user can re-run the phase's
+ * Verify step to populate the block, after which the loop is allowed to stop.
+ *
+ * Three flavors per `result.reason`:
+ *   - "missing"            → phase has no recorded verification at all
+ *   - block.failedReason   → phase verification failed (non-zero exitCode)
+ *   - any other string     → reserved for Phase 2 stale-mtime detection
+ */
+function buildMissingVerificationBlock(
+  phase: string,
+  result: { reason?: string; command?: string },
+): BlockDecision {
+  const cmd =
+    typeof result.command === "string" && result.command.length > 0
+      ? result.command
+      : `/curdx-flow:${phase} (re-run phase to record verification)`;
+  let reason: string;
+  if (result.reason === "missing") {
+    reason = `Phase '${phase}' has no verification block. Run: ${cmd}. Then try again.`;
+  } else {
+    const detail = result.reason ?? "verification failed";
+    reason = `Phase '${phase}' verification failed: ${detail}. Run: ${cmd}. Then try again.`;
+  }
+  return {
+    decision: "block",
+    reason,
+    systemMessage: `curdx-flow: phase '${phase}' missing verification block`,
+  };
+}
+
 /** Build the corrupt-state recovery block decision (L121-138). */
 function buildCorruptStateBlock(specPath: string): BlockDecision {
   const reason =
@@ -560,35 +596,75 @@ runHook(async (input) => {
   // ALL_TASKS_COMPLETE detection (primary 500 lines + fallback 20 lines).
   const transcriptPath = input.transcript_path;
   if (transcriptPath && existsSync(transcriptPath)) {
-    const handleCompletion = (variant: "primary" | "fallback") => {
+    const handleCompletion = (
+      variant: "primary" | "fallback",
+    ): BlockDecision | undefined => {
       const label =
         variant === "primary"
           ? "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript"
           : "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript (tail-end)";
       process.stderr.write(label + "\n");
-      // Read state for epicName (best-effort; if state is corrupt we still exit).
-      let epicName: string | undefined;
+      // Read state for epicName + Layer-1 iron-law gate. If state is corrupt
+      // here we still exit silently (the buildCorruptStateBlock path will
+      // catch the next invocation via the JSON.parse below).
+      let parsedState: CurdxState | undefined;
       try {
-        const st = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
-        epicName = typeof st.epicName === "string" && st.epicName.length > 0
-          ? st.epicName
-          : undefined;
+        parsedState = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
       } catch {
-        epicName = undefined;
+        parsedState = undefined;
       }
+      const epicName =
+        parsedState && typeof parsedState.epicName === "string" &&
+          parsedState.epicName.length > 0
+          ? parsedState.epicName
+          : undefined;
+
+      // Layer-1 iron-law gate (spec-verification-iron-law Task 1.6): before
+      // allowing the loop to terminate on ALL_TASKS_COMPLETE, require the
+      // active phase to have a recorded verification block. Phase 1 POC scope
+      // = "missing block" branch only; stale-mtime detection lands in Phase 2.
+      // Skipped when state is unparseable (corrupt-state branch handles it
+      // below) or when phase isn't a known VerificationPhase (e.g. legacy
+      // states with phase="unknown" — fail-open per FR-8).
+      if (parsedState) {
+        const rawPhase = typeof parsedState.phase === "string"
+          ? parsedState.phase
+          : "";
+        const known: VerificationPhase[] = [
+          "research",
+          "requirements",
+          "design",
+          "tasks",
+          "execution",
+        ];
+        if ((known as string[]).includes(rawPhase)) {
+          const result = verifyPhaseBlock(
+            parsedState,
+            rawPhase as VerificationPhase,
+            join(cwd, specPath),
+          );
+          if (!result.ok) {
+            return buildMissingVerificationBlock(rawPhase, result);
+          }
+        }
+      }
+
       const currentEpicFile = join(cwd, "specs", ".current-epic");
       if (epicName && existsSync(currentEpicFile)) {
         markSpecCompletedInEpic(cwd, epicName, specName);
       }
       fireUpdateSpecIndex();
+      return undefined;
     };
 
     if (tailContainsCompletionMarker(transcriptPath, 500)) {
-      handleCompletion("primary");
+      const blocked = handleCompletion("primary");
+      if (blocked) return blocked;
       return;
     }
     if (tailContainsCompletionMarker(transcriptPath, 20)) {
-      handleCompletion("fallback");
+      const blocked = handleCompletion("fallback");
+      if (blocked) return blocked;
       return;
     }
   }
