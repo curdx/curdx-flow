@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-05-05T11:36:00Z",
+  "updated": "2026-05-06T12:26:27Z",
   "directories": [
     {
       "path": "./specs",
@@ -19,14 +19,12 @@
     {
       "name": "plugin-observability",
       "path": "./specs/plugin-observability",
-      "phase": "execution",
-      "taskIndex": 20,
-      "totalTasks": 21
+      "phase": "completed"
     },
     {
       "name": "state-completion-marker",
       "path": "./specs/state-completion-marker",
-      "phase": "execution",
+      "phase": "completed",
       "taskIndex": 51,
       "totalTasks": 51
     },
