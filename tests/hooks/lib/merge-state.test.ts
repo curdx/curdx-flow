@@ -181,4 +181,118 @@ describe("merge-state", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // VB-1: atomic write of full verificationBlocks object reads back correctly
+  it("verificationBlocks: atomic write of full object reads back correctly (VB-1)", () => {
+    const dir = makeTmpDir("merge-vb-write");
+    const stateFile = path.join(dir, "state.json");
+    writeFileSync(stateFile, JSON.stringify({ specName: "demo" }));
+    try {
+      const patch = {
+        verificationBlocks: {
+          research: {
+            command: "npm run research:verify",
+            exitCode: 0,
+            timestamp: "2026-05-06T12:00:00.000Z",
+            srcMtime: 1714994400000,
+          },
+          design: {
+            command: "npm run design:verify",
+            exitCode: 0,
+            timestamp: "2026-05-06T12:05:00.000Z",
+            srcMtime: 1714994700000,
+          },
+        },
+      };
+      const r = runLib("merge-state", [stateFile, JSON.stringify(patch)]);
+      expect(r.exitCode).toBe(0);
+      const after = JSON.parse(readFileSync(stateFile, "utf8")) as Record<
+        string,
+        unknown
+      >;
+      expect(after).toEqual({
+        specName: "demo",
+        verificationBlocks: patch.verificationBlocks,
+      });
+      // stdout echoes merged JSON
+      expect(JSON.parse(r.stdout)).toEqual(after);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // VB-2: $unset of a single phase removes only that phase, siblings preserved
+  it("verificationBlocks: $unset removes single phase, siblings preserved (VB-2)", () => {
+    const dir = makeTmpDir("merge-vb-unset-phase");
+    const stateFile = path.join(dir, "state.json");
+    const initial = {
+      verificationBlocks: {
+        research: {
+          command: "npm run research:verify",
+          exitCode: 0,
+          timestamp: "2026-05-06T12:00:00.000Z",
+          srcMtime: 1714994400000,
+        },
+        design: {
+          command: "npm run design:verify",
+          exitCode: 0,
+          timestamp: "2026-05-06T12:05:00.000Z",
+          srcMtime: 1714994700000,
+        },
+        tasks: {
+          command: "npm run tasks:verify",
+          exitCode: 0,
+          timestamp: "2026-05-06T12:10:00.000Z",
+          srcMtime: 1714995000000,
+        },
+      },
+    };
+    writeFileSync(stateFile, JSON.stringify(initial));
+    try {
+      const r = runLib("merge-state", [
+        stateFile,
+        '{"$unset":["verificationBlocks.research"]}',
+      ]);
+      expect(r.exitCode).toBe(0);
+      const after = JSON.parse(readFileSync(stateFile, "utf8")) as {
+        verificationBlocks: Record<string, unknown>;
+      };
+      expect("research" in after.verificationBlocks).toBe(false);
+      expect(after.verificationBlocks).toEqual({
+        design: initial.verificationBlocks.design,
+        tasks: initial.verificationBlocks.tasks,
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // VB-3: writing a block missing required field `command` errors with readable message
+  it("verificationBlocks: missing required field command errors with readable message (VB-3)", () => {
+    const dir = makeTmpDir("merge-vb-invalid");
+    const stateFile = path.join(dir, "state.json");
+    writeFileSync(stateFile, JSON.stringify({ specName: "demo" }));
+    try {
+      // research block is missing the required `command` field
+      const patch = {
+        verificationBlocks: {
+          research: {
+            exitCode: 0,
+            timestamp: "2026-05-06T12:00:00.000Z",
+            srcMtime: 1714994400000,
+          },
+        },
+      };
+      const r = runLib("merge-state", [stateFile, JSON.stringify(patch)]);
+      expect(r.exitCode).toBe(1);
+      expect(r.stderr).toContain("verificationBlocks.research");
+      expect(r.stderr).toContain("command");
+      // base file untouched on validation failure
+      expect(JSON.parse(readFileSync(stateFile, "utf8"))).toEqual({
+        specName: "demo",
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
