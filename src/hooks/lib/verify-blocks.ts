@@ -5,9 +5,10 @@
 // (Stop hook, TaskCompleted hook, npm verify gate, `curdx-flow check` CLI),
 // per design.md §Components 3 / D3.
 //
-// Phase 1 (POC) skeleton — only the "missing block" branch is load-bearing
-// for the Stop-hook gate (Task 1.6). Stale-mtime detection and the full
-// `walkSrcTree` implementation are deferred to Phase 2 (Task 2.1).
+// Phase 2: `walkSrcTree` is now a real recursive walker (Task 2.1) — used
+// downstream by the stale-mtime gate (Task 2.2 / 2.3). `verifyPhaseBlock`
+// itself still only consults the "missing" / "failed" branches; the
+// stale-mtime branch is wired into it in Task 2.3.
 //
 // Departure from `lib/README.md` "CLI surface only" invariant: this lib is
 // imported as a TypeScript module rather than invoked as a child `node`
@@ -18,7 +19,31 @@
 // Spec: specs/spec-verification-iron-law/design.md § Components 3
 // "verify-blocks shared lib".
 
+import { promises as fs } from "node:fs";
+import { join } from "node:path";
+
 import type { CurdxState, VerificationPhase } from "../_shared/types.ts";
+
+/**
+ * Directory names skipped during `walkSrcTree`. These are either VCS / package
+ * artifacts (`.git`, `node_modules`, `dist`) or curdx-flow's own runtime trees
+ * (`.curdx`, `.claude`) which would otherwise dominate the mtime calculation
+ * and make stale-detection meaningless.
+ */
+const WALK_SKIP_DIRS = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  ".curdx",
+  ".claude",
+]);
+
+/**
+ * Recursion depth cap for `walkSrcTree`. Spec dirs and `src/**` are flat in
+ * practice; 6 levels is enough headroom while bounding worst-case I/O on
+ * accidental traversal into a deep tree.
+ */
+const WALK_MAX_DEPTH = 6;
 
 /**
  * Outcome of evaluating a phase's verification block.
@@ -77,16 +102,60 @@ export function verifyPhaseBlock(
 }
 
 /**
- * Phase-1 stub. Phase 2 (Task 2.1) will replace the body with a real
- * recursive walk of `dir` that returns the maximum mtime (epoch ms) of
- * any source artifact under it, used to detect drift between the recorded
- * `srcMtime` and the current tree state.
+ * Recursively walk `dir` and return the maximum file `mtimeMs` (epoch ms)
+ * across every regular file reachable within `WALK_MAX_DEPTH` levels.
  *
- * Returning `Date.now()` is intentional: it makes any current call site
- * conservatively treat the tree as "just touched", which is acceptable
- * for the POC since `verifyPhaseBlock` does not yet consult this value.
+ * Used by the stale-mtime branch of the iron-law gate (Task 2.2 / 2.3) —
+ * compare against `verificationBlocks[phase].srcMtime` to detect that the
+ * source tree has been edited since the recorded verification, in which
+ * case the gate must demand a fresh `Verify` run.
+ *
+ * Behavior:
+ *  - Directories whose basename is in `WALK_SKIP_DIRS` are pruned
+ *    (`.git`, `node_modules`, `dist`, `.curdx`, `.claude`).
+ *  - Depth is measured from `dir` (depth 0). At `WALK_MAX_DEPTH` we still
+ *    stat the entries at that level but do not descend further.
+ *  - Path joins go through `path.join` for cross-platform safety (AC-7.2).
+ *  - Per-entry `readdir` / `stat` failures are swallowed and treated as
+ *    contributing 0 to the running max — the walker never throws; FR-8
+ *    "never block the session" applies to all 4 callers.
+ *  - Empty trees (no files reachable, or every subdir filtered) → return 0.
+ *    This makes the downstream stale check fall back to "block exists ⇒ ok"
+ *    semantics rather than spuriously failing on a brand-new spec dir.
+ *  - Symlinks: `readdir`'s `Dirent` flags from a symlink only mark it as
+ *    a symlink (not a directory), so they are treated as files; their
+ *    target's `mtimeMs` is read via `stat` (follows the link). This is
+ *    intentional — drift in linked sources should still trigger staleness.
  */
 export async function walkSrcTree(dir: string): Promise<number> {
-  void dir;
-  return Date.now();
+  let maxMtime = 0;
+
+  async function walk(current: string, depth: number): Promise<void> {
+    let entries;
+    try {
+      entries = await fs.readdir(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const abs = join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (WALK_SKIP_DIRS.has(entry.name)) continue;
+        if (depth >= WALK_MAX_DEPTH) continue;
+        await walk(abs, depth + 1);
+        continue;
+      }
+      // Treat anything non-directory (regular file, symlink, etc.) as a
+      // file for mtime purposes. `stat` follows symlinks.
+      try {
+        const st = await fs.stat(abs);
+        if (st.mtimeMs > maxMtime) maxMtime = st.mtimeMs;
+      } catch {
+        // ignore unreadable entry, contribute 0
+      }
+    }
+  }
+
+  await walk(dir, 0);
+  return maxMtime;
 }
