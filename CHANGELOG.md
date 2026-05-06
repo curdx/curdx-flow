@@ -2,6 +2,20 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.6 — 2026-05-06
+
+### Changed
+
+- **Managed-block body is now English-only; bilingual rendering removed.** `src/runner/claudeMd.ts` previously emitted a Simplified-Chinese body when the installer ran with `--lang zh` (or `CURDX_FLOW_LANG=zh`). The block is injected into `~/.claude/CLAUDE.md` and consumed by Claude as system-prompt context, not by humans, so a Chinese body actually contradicts the very `Language Policy` rule the block itself injects ("Tool and model interaction must be in English"). The body, including section headings, is now always English. The `Language Policy` section is still gated to `zh` mode — that section is what tells Claude to reply to the *user* in Simplified Chinese. Result: one source of truth for the body text, lower per-session token footprint, and one less language-drift risk between zh/en branches. The added test in `tests/runner/claudeMd.test.ts` asserts the rendered block contains no CJK characters even in `zh` mode.
+- **Section headings stripped of bilingual suffixes.** Headings such as `## Tool Combination Patterns（组合工作流）` are now plain `## Tool Combination Patterns`. The parenthetical Chinese suffix added no signal for Claude and cost tokens on every session injection.
+
+### Fixed
+
+- **Removed redundant `npx @curdx/flow` install/update/uninstall hint from the injected block.** The line `Run \`npx @curdx/flow\` to install / update / uninstall.` was marketing copy aimed at human readers, not guidance for Claude. It has been stripped from `renderBlock` so it no longer ends up in the system prompt.
+- **`/claude-mem:mem-search` is referenced once instead of three times.** It previously appeared as the first step of *Starting a new feature*, the first step of *Debugging and repeated failures*, and the fourth item of the *Decision Tree*. It is now only referenced in the *Decision Tree*, where it belongs as a general "have we seen this before?" question. Removes ~30 tokens of duplicated guidance per session.
+- **Aligned the "skip" rule for pua with the "stuck" rule.** `Skip Rules` told Claude not to reach for `/pua:pua` first, while `Tool Combination Patterns` recommended `/pua:pua-loop` only after multiple stuck attempts. The two rules are about the same tool but disagreed on its name, which read as a self-contradiction inside one block. `Skip Rules` now references `/pua:pua-loop` explicitly.
+- **Fixed a Chinese-only grammar bug in the "still stuck" line.** When both `pua` and `sequential-thinking` were installed, the joined sentence rendered as `两轮以上仍卡住，再 使用 sequential-thinking MCP 拆假设，或 再进入 \`/pua:pua-loop\` 迭代。` — duplicate "再" and a stray space. The bug is fully eliminated as a side effect of moving to an English-only body; the contributing pattern (verb prefix in the template plus verb prefix in joined items) was also removed in `buildCombinationPatterns`.
+
 ## 7.1.5 — 2026-05-06
 
 ### Fixed

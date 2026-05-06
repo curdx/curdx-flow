@@ -8,29 +8,32 @@ const items: ManagedItem[] = [
   { id: 'context7', name: 'context7', type: 'mcp' },
 ];
 
-describe('renderBlock language policy', () => {
-  test('injects the language policy for zh', () => {
+describe('renderBlock', () => {
+  test('block is always English; injects Language Policy for zh', () => {
     setLang('zh');
     const block = renderBlock(items);
 
-    expect(block).toContain('## Language Policy（语言规则）');
+    expect(block).toContain('## Language Policy');
     expect(block).toContain('Tool and model interaction must be in English.');
     expect(block).toContain('All user-facing responses must be in Simplified Chinese.');
+    expect(block).toContain('## Tool Combination Patterns');
+    expect(block).toContain('use the Context7 MCP');
     expect(block).toContain('/claude-mem:mem-search');
     expect(block).toContain('/claude-mem:make-plan');
-    expect(block).toContain('使用 Context7 MCP');
+    // Body must be English even in zh mode (block is for the model, not the user).
+    expect(block).not.toMatch(/[一-鿿]/);
   });
 
-  test('renders an english block without the zh-only language policy', () => {
+  test('en mode omits Language Policy section; body identical to zh body', () => {
     setLang('en');
     const block = renderBlock(items);
 
-    expect(block).not.toContain('## Language Policy（语言规则）');
+    expect(block).not.toContain('## Language Policy');
     expect(block).not.toContain('Tool and model interaction must be in English.');
     expect(block).not.toContain('All user-facing responses must be in Simplified Chinese.');
     expect(block).toContain('## Tool Combination Patterns');
     expect(block).toContain('Start with `/claude-mem:mem-search`');
     expect(block).toContain('use the Context7 MCP');
-    expect(block).toContain('Run `npx @curdx/flow` to install / update / uninstall.');
+    expect(block).not.toContain('Run `npx @curdx/flow` to install / update / uninstall.');
   });
 });
