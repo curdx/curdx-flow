@@ -112,6 +112,42 @@ export type HookOutput =
   | BlockDecisionOutput;
 
 /**
+ * Spec phase identifier used as the key for verification block records.
+ * Five canonical phases that produce verifiable artifacts (per design D2).
+ */
+export type VerificationPhase =
+  | "research"
+  | "requirements"
+  | "design"
+  | "tasks"
+  | "execution";
+
+/**
+ * Verification record persisted on `CurdxState.verificationBlocks[phase]`.
+ *
+ * Captures the outcome of running a phase's `Verify` command (per design
+ * §Components 3). Required fields establish the iron-law evidence:
+ *  - `command`     : exact command line that was executed
+ *  - `exitCode`    : process exit status (0 = pass, non-zero = fail)
+ *  - `timestamp`   : ISO-8601 instant the verification was recorded
+ *  - `srcMtime`    : mtime (epoch ms) of the verified source artifact, used
+ *                    by downstream gates to detect drift between recorded
+ *                    verification and post-edit content.
+ *
+ * Optional fields enrich the record without being load-bearing for gating:
+ *  - `description`  : human-readable summary of what was checked
+ *  - `failedReason` : populated only when `exitCode !== 0`
+ */
+export interface VerificationBlock {
+  command: string;
+  exitCode: number;
+  timestamp: string;
+  srcMtime: number;
+  description?: string;
+  failedReason?: string;
+}
+
+/**
  * Per-spec runtime state, persisted at `<basePath>/.curdx-state.json`.
  *
  * Single source of truth for the 4 readers (load-spec-context,
@@ -151,6 +187,8 @@ export interface CurdxState {
   quickMode?: boolean;
   granularity?: "fine" | "coarse";
   epicName?: string;
+  // verification iron-law (design D2): per-phase Verify command outcomes
+  verificationBlocks?: Partial<Record<VerificationPhase, VerificationBlock>>;
   // completion marker (v7.1.0)
   completed?: boolean;
   completedAt?: string;
