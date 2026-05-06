@@ -42,8 +42,8 @@ import { join } from "node:path";
 import process from "node:process";
 import { readStdinJson } from "./_shared/stdin.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
-import { verifyPhaseBlock } from "./lib/verify-blocks.js";
-import type { CurdxState, VerificationPhase } from "./_shared/types.js";
+import { getVerificationPhase, verifyPhaseBlock } from "./lib/verify-blocks.js";
+import type { CurdxState } from "./_shared/types.js";
 
 interface TaskCompletedStdin {
   cwd?: string;
@@ -51,14 +51,6 @@ interface TaskCompletedStdin {
   task_id?: string;
   [k: string]: unknown;
 }
-
-const KNOWN_PHASES: VerificationPhase[] = [
-  "research",
-  "requirements",
-  "design",
-  "tasks",
-  "execution",
-];
 
 /** Emit `{continue:true}` and exit 0 — the canonical pass-through. */
 function passThrough(): never {
@@ -117,12 +109,12 @@ async function main(): Promise<void> {
     passThrough();
   }
 
-  // Path 5: phase ∉ KNOWN_PHASES → pass-through (legacy state, fail-open).
-  const rawPhase = typeof state.phase === "string" ? state.phase : "";
-  if (!(KNOWN_PHASES as string[]).includes(rawPhase)) {
+  // Path 5: phase ∉ VERIFICATION_PHASES → pass-through (legacy state, fail-open).
+  // Shared phase-detection lives in lib/verify-blocks.ts (Task 4.1 DRY).
+  const phase = getVerificationPhase(state);
+  if (phase === null) {
     passThrough();
   }
-  const phase = rawPhase as VerificationPhase;
 
   // Path 6: run the shared gate. Same lib as Stop hook (D3 single source of
   // truth across 4 callers).

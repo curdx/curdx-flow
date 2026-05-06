@@ -65,9 +65,9 @@ import { runHook } from "./_shared/run-hook.js";
 import { getSpecsDirs, resolveCurrent } from "./_shared/path-resolver.js";
 import { writeFileAtomic } from "./_shared/atomic-write.js";
 import { extractTaskBlock } from "./_shared/markdown-task-parser.js";
-import { verifyPhaseBlock } from "./lib/verify-blocks.js";
+import { getVerificationPhase, verifyPhaseBlock } from "./lib/verify-blocks.js";
 import type { BlockDecisionOutput } from "./_shared/types.js";
-import type { CurdxState, VerificationPhase } from "./_shared/types.js";
+import type { CurdxState } from "./_shared/types.js";
 
 interface EpicState {
   specs?: Array<{ name: string; status?: string; [k: string]: unknown }>;
@@ -671,23 +671,15 @@ runHook(async (input) => {
       // §Error Handling (L352-356); a fourth class (malformed JSON) is
       // handled above. Skipped when phase isn't a known VerificationPhase
       // (e.g. legacy states with phase="unknown" — fail-open per FR-8).
+      // Shared phase-detection lives in lib/verify-blocks.ts (Task 4.1 DRY).
       if (parsedState) {
-        const rawPhase = typeof parsedState.phase === "string"
-          ? parsedState.phase
-          : "";
-        const known: VerificationPhase[] = [
-          "research",
-          "requirements",
-          "design",
-          "tasks",
-          "execution",
-        ];
-        if ((known as string[]).includes(rawPhase)) {
+        const knownPhase = getVerificationPhase(parsedState);
+        if (knownPhase !== null) {
           let result;
           try {
             result = await verifyPhaseBlock(
               parsedState,
-              rawPhase as VerificationPhase,
+              knownPhase,
               join(cwd, specPath),
             );
           } catch {
@@ -696,7 +688,7 @@ runHook(async (input) => {
             return buildMalformedVerificationBlock();
           }
           if (!result.ok) {
-            return buildVerificationBlockFailDecision(rawPhase, result);
+            return buildVerificationBlockFailDecision(knownPhase, result);
           }
         }
       }

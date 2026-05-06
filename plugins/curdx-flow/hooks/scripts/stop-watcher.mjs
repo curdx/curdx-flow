@@ -338,6 +338,20 @@ var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
   ".claude"
 ]);
 var WALK_MAX_DEPTH = 6;
+var VERIFICATION_PHASES = [
+  "research",
+  "requirements",
+  "design",
+  "tasks",
+  "execution"
+];
+function getVerificationPhase(state) {
+  const raw = typeof state.phase === "string" ? state.phase : "";
+  if (!VERIFICATION_PHASES.includes(raw)) {
+    return null;
+  }
+  return raw;
+}
 async function verifyPhaseBlock(state, phase, specDir) {
   const block = state.verificationBlocks?.[phase];
   if (block === void 0) {
@@ -718,27 +732,20 @@ runHook(async (input) => {
       }
       const epicName = parsedState && typeof parsedState.epicName === "string" && parsedState.epicName.length > 0 ? parsedState.epicName : void 0;
       if (parsedState) {
-        const rawPhase = typeof parsedState.phase === "string" ? parsedState.phase : "";
-        const known = [
-          "research",
-          "requirements",
-          "design",
-          "tasks",
-          "execution"
-        ];
-        if (known.includes(rawPhase)) {
+        const knownPhase = getVerificationPhase(parsedState);
+        if (knownPhase !== null) {
           let result;
           try {
             result = await verifyPhaseBlock(
               parsedState,
-              rawPhase,
+              knownPhase,
               join3(cwd, specPath)
             );
           } catch {
             return buildMalformedVerificationBlock();
           }
           if (!result.ok) {
-            return buildVerificationBlockFailDecision(rawPhase, result);
+            return buildVerificationBlockFailDecision(knownPhase, result);
           }
         }
       }

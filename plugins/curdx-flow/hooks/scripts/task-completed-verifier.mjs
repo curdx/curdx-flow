@@ -144,6 +144,20 @@ var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
   ".claude"
 ]);
 var WALK_MAX_DEPTH = 6;
+var VERIFICATION_PHASES = [
+  "research",
+  "requirements",
+  "design",
+  "tasks",
+  "execution"
+];
+function getVerificationPhase(state) {
+  const raw = typeof state.phase === "string" ? state.phase : "";
+  if (!VERIFICATION_PHASES.includes(raw)) {
+    return null;
+  }
+  return raw;
+}
 async function verifyPhaseBlock(state, phase, specDir) {
   const block = state.verificationBlocks?.[phase];
   if (block === void 0) {
@@ -196,13 +210,6 @@ async function walkSrcTree(dir) {
 }
 
 // src/hooks/task-completed-verifier.ts
-var KNOWN_PHASES = [
-  "research",
-  "requirements",
-  "design",
-  "tasks",
-  "execution"
-];
 function passThrough() {
   process3.stdout.write(JSON.stringify({ continue: true }));
   process3.exit(0);
@@ -240,11 +247,10 @@ async function main() {
   } catch {
     passThrough();
   }
-  const rawPhase = typeof state.phase === "string" ? state.phase : "";
-  if (!KNOWN_PHASES.includes(rawPhase)) {
+  const phase = getVerificationPhase(state);
+  if (phase === null) {
     passThrough();
   }
-  const phase = rawPhase;
   const result = await verifyPhaseBlock(state, phase, specDir);
   if (!result.ok) {
     emitBlock(result.reason ?? "verification failed");

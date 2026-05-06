@@ -50,6 +50,47 @@ const WALK_SKIP_DIRS = new Set([
 const WALK_MAX_DEPTH = 6;
 
 /**
+ * Canonical list of phases the iron-law gate evaluates. Single source of truth
+ * for callers (Stop hook, TaskCompleted hook) that need to decide whether a
+ * raw `state.phase` string is a known verification phase before invoking
+ * `verifyPhaseBlock`.
+ *
+ * `check-verification-blocks.ts` keeps its own copy because that file is
+ * imported by both the npm verify gate and the `curdx-flow check` CLI and we
+ * want minimal coupling across the two iron-law subsystems; a future cleanup
+ * can fold them together once the CLI surface stabilizes.
+ */
+export const VERIFICATION_PHASES: ReadonlyArray<VerificationPhase> = [
+  "research",
+  "requirements",
+  "design",
+  "tasks",
+  "execution",
+];
+
+/**
+ * Coerce a state's `phase` field to a typed `VerificationPhase`, or return
+ * `null` when the phase is missing / non-string / not a known phase.
+ *
+ * Both hook callers (Stop, TaskCompleted) need this exact shape: read
+ * `state.phase`, defend against `phase: "unknown"` legacy states (FR-8 fail-
+ * open), and only proceed to `verifyPhaseBlock` when the phase is one of the
+ * five canonical values. Callers diverge on what to DO when the phase isn't
+ * known (Stop: silently fall through; TaskCompleted: pass-through with
+ * `{continue: true}`), so this helper just returns the typed phase or null
+ * and lets each caller pick its own branch.
+ */
+export function getVerificationPhase(
+  state: CurdxState,
+): VerificationPhase | null {
+  const raw = typeof state.phase === "string" ? state.phase : "";
+  if (!(VERIFICATION_PHASES as ReadonlyArray<string>).includes(raw)) {
+    return null;
+  }
+  return raw as VerificationPhase;
+}
+
+/**
  * Outcome of evaluating a phase's verification block.
  *
  *  - `ok: true`            → block exists and `exitCode === 0` (gate passes).

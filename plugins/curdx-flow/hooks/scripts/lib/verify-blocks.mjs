@@ -16,6 +16,20 @@ var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
   ".claude"
 ]);
 var WALK_MAX_DEPTH = 6;
+var VERIFICATION_PHASES = [
+  "research",
+  "requirements",
+  "design",
+  "tasks",
+  "execution"
+];
+function getVerificationPhase(state) {
+  const raw = typeof state.phase === "string" ? state.phase : "";
+  if (!VERIFICATION_PHASES.includes(raw)) {
+    return null;
+  }
+  return raw;
+}
 async function verifyPhaseBlock(state, phase, specDir) {
   const block = state.verificationBlocks?.[phase];
   if (block === void 0) {
@@ -67,6 +81,8 @@ async function walkSrcTree(dir) {
   return maxMtime;
 }
 export {
+  VERIFICATION_PHASES,
+  getVerificationPhase,
   verifyPhaseBlock,
   walkSrcTree
 };
