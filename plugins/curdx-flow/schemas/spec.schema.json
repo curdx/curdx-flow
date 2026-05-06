@@ -4,6 +4,59 @@
   "title": "curdx-flow Specification Schema",
   "description": "Schema for curdx-flow state files and spec document frontmatter",
 
+  "properties": {
+    "verificationBlocks": {
+      "type": "object",
+      "description": "Per-phase verification blocks proving a verify command was executed against current source. Iron-law gate (Stop/TaskCompleted hooks read this). One block per workflow phase; missing block for current phase blocks the hook with exit 2.",
+      "additionalProperties": false,
+      "properties": {
+        "research": { "$ref": "#/$defs/verificationBlock" },
+        "requirements": { "$ref": "#/$defs/verificationBlock" },
+        "design": { "$ref": "#/$defs/verificationBlock" },
+        "tasks": { "$ref": "#/$defs/verificationBlock" },
+        "execution": { "$ref": "#/$defs/verificationBlock" }
+      }
+    }
+  },
+
+  "$defs": {
+    "verificationBlock": {
+      "type": "object",
+      "description": "Machine-readable proof that a verify command ran against the current source state",
+      "required": ["command", "exitCode", "timestamp", "srcMtime"],
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact verify command that was executed (e.g., 'npm run verify')"
+        },
+        "exitCode": {
+          "type": "integer",
+          "description": "Process exit code from the verify command (0 = pass, non-zero = fail)"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 UTC timestamp when verify command completed"
+        },
+        "srcMtime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Max mtime (epoch ms) of relevant source tree at verify time; used for stale-detection"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional human-readable summary of what was verified"
+        },
+        "failedReason": {
+          "type": "string",
+          "description": "Optional failure detail when exitCode is non-zero"
+        }
+      }
+    }
+  },
+
   "definitions": {
     "state": {
       "type": "object",
