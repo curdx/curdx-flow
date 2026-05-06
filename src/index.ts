@@ -8,6 +8,7 @@ import { updateFlow } from './flows/update.ts';
 import { statusFlow } from './flows/status.ts';
 import analyzeCmd from './flows/analyze.ts';
 import { t, type Lang } from './i18n/index.ts';
+import { assertFreshLocalBuild } from './runner/buildFreshness.ts';
 
 function parseLang(v: unknown): Lang | undefined {
   return v === 'zh' || v === 'en' ? v : undefined;
@@ -157,6 +158,7 @@ async function runInteractive(argv: string[]): Promise<void> {
 
 const argv = process.argv.slice(2);
 const first = firstNonFlag(argv);
+assertFreshLocalBuild();
 if (first === undefined || (first !== undefined && !SUBCOMMANDS.has(first) && first !== '--help' && first !== '-h')) {
   // No subcommand → interactive menu.
   // (--help / -h are flags, handled by citty if user typed them; we won't reach here.)

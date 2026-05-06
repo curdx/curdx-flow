@@ -2,6 +2,12 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.5 — 2026-05-06
+
+### Fixed
+
+- **Prevent local source checkouts from silently running a stale CLI bundle.** A repo-local execution path could still write the old `~/.claude/CLAUDE.md` block even after `7.1.4` was published correctly, because `.gitignore` excludes `dist/` and `npx @curdx/flow` run from the source checkout may execute the checkout's local `bin` (`dist/index.mjs`) instead of the freshly published npm tarball. If `src/` had newer changes but `dist/` had not been rebuilt, the user would unknowingly run old installer logic and keep re-injecting the pre-7.1.4 managed block. Added `src/runner/buildFreshness.ts` and wired it into `src/index.ts` startup so source checkouts now fail fast with a clear error when `src/**/*.ts` is newer than `dist/index.mjs`, instructing the user to run `npm run build` or execute the published package explicitly. New tests in `tests/runner/buildFreshness.test.ts` cover both stale and fresh build states.
+
 ## 7.1.4 — 2026-05-06
 
 ### Changed
