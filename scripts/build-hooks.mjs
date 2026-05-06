@@ -23,6 +23,7 @@ const HOOK_ENTRIES = [
   'src/hooks/load-spec-context.ts',
   'src/hooks/quick-mode-guard.ts',
   'src/hooks/stop-watcher.ts',
+  'src/hooks/task-completed-verifier.ts',
   'src/hooks/update-spec-index.ts',
 ];
 
