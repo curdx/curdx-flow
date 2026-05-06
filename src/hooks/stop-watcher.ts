@@ -526,6 +526,15 @@ function buildContinuationBlock(args: {
 }
 
 runHook(async (input) => {
+  // D5: canonical early-exit guard — owned by spec A
+  // (spec-verification-iron-law). Any stop-hook re-invocation must short-circuit
+  // here BEFORE any other logic (settings read, state parse, transcript scan,
+  // verificationBlocks read by future spec E). Behavior preserved: silent
+  // return = allow stop (runHook serializes void as no-decision).
+  if (input?.stop_hook_active === true) {
+    return;
+  }
+
   const cwd = input?.cwd;
   if (!cwd) return;
 
@@ -635,13 +644,9 @@ runHook(async (input) => {
   }
 
   // Quick-mode guard: block stop during ANY phase except execution.
+  // (D5: stop_hook_active re-invocation already short-circuited at the top of
+  // runHook; no inner guard needed here.)
   if (quickMode && phase !== "execution") {
-    if (input.stop_hook_active === true) {
-      process.stderr.write(
-        `[curdx-flow] stop_hook_active=true in quick mode, allowing stop to prevent loop\n`,
-      );
-      return;
-    }
     return buildQuickModeBlock(phase, specName);
   }
 
@@ -694,13 +699,8 @@ runHook(async (input) => {
         ? state.maxTaskIterations
         : 5;
 
-    // Re-invocation safety guard.
-    if (input.stop_hook_active === true) {
-      process.stderr.write(
-        `[curdx-flow] stop_hook_active=true, skipping continuation to prevent re-invocation loop\n`,
-      );
-      return;
-    }
+    // Re-invocation safety guard already enforced at the top of runHook
+    // (D5: canonical early-exit). No inner guard needed here.
 
     // Extract current task block via shared parser (replaces v6 awk + sed).
     const tasksFile = join(cwd, specPath, "tasks.md");

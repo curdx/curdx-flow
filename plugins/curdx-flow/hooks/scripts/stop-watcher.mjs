@@ -592,6 +592,9 @@ ${parallelInstructions}
   return { decision: "block", reason, systemMessage };
 }
 runHook(async (input) => {
+  if (input?.stop_hook_active === true) {
+    return;
+  }
   const cwd = input?.cwd;
   if (!cwd) return;
   const settingsPath = join2(cwd, SETTINGS_REL_PATH2);
@@ -662,13 +665,6 @@ runHook(async (input) => {
     return;
   }
   if (quickMode && phase !== "execution") {
-    if (input.stop_hook_active === true) {
-      process5.stderr.write(
-        `[curdx-flow] stop_hook_active=true in quick mode, allowing stop to prevent loop
-`
-      );
-      return;
-    }
     return buildQuickModeBlock(phase, specName);
   }
   if (phase === "execution") {
@@ -710,13 +706,6 @@ runHook(async (input) => {
     }
     const recoveryMode = state.recoveryMode === true;
     const maxTaskIter = typeof state.maxTaskIterations === "number" ? state.maxTaskIterations : 5;
-    if (input.stop_hook_active === true) {
-      process5.stderr.write(
-        `[curdx-flow] stop_hook_active=true, skipping continuation to prevent re-invocation loop
-`
-      );
-      return;
-    }
     const tasksFile = join2(cwd, specPath, "tasks.md");
     let taskBlock = "";
     if (existsSync2(tasksFile)) {
