@@ -47,15 +47,26 @@ const STOP_WATCHER_BUNDLE = path.join(
   "hooks/scripts/stop-watcher.mjs",
 );
 
+/**
+ * Normalize CRLF -> LF for cross-platform stderr/stdout assertions (AC-7.5).
+ * Windows GH Actions runners surface CRLF newlines in spawnSync output, which
+ * breaks naive `.toContain("...newline...")` style matching. Wrapping with
+ * this helper keeps assertions stable across macOS / Linux / Windows.
+ */
+function norm(s: string | null | undefined): string {
+  return (s ?? "").replace(/\r\n/g, "\n");
+}
+
 describe("e2e verification flow (VE1 + VE2) — fixture-based stop-watcher", () => {
   let fixtureDir: string;
   let transcriptPath: string;
   let stateFile: string;
 
   beforeEach(() => {
-    // Fresh tmpdir per test — never hardcode `/tmp`, use `os.tmpdir()` for
-    // cross-platform CI (Windows GitHub runner uses `C:\Users\...\AppData\
-    // Local\Temp\`, see _fixture-setup.ts header for context).
+    // Fresh tmpdir per test — never hardcode the platform-specific temp
+    // directory literal, use `os.tmpdir()` for cross-platform CI (Windows
+    // GitHub runner uses `C:\Users\...\AppData\Local\Temp\`, see
+    // _fixture-setup.ts header for context).
     fixtureDir = mkdtempSync(path.join(tmpdir(), "curdx-e2e-"));
     const specName = "e2e-test";
     const specsDir = path.join(fixtureDir, "specs");
@@ -196,7 +207,7 @@ describe("e2e verification flow (VE1 + VE2) — fixture-based stop-watcher", () 
     // Stderr carries the ALL_TASKS_COMPLETE detection marker (proves the
     // gate's host code path was actually exercised — not short-circuited by
     // an earlier branch).
-    expect(result.stderr ?? "").toContain(
+    expect(norm(result.stderr)).toContain(
       "ALL_TASKS_COMPLETE detected in transcript",
     );
   });
@@ -223,7 +234,7 @@ describe("e2e verification flow (VE1 + VE2) — fixture-based stop-watcher", () 
 
     // Stderr still carries the ALL_TASKS_COMPLETE marker (preserved from
     // pre-gate behavior — proves the host code path was exercised).
-    expect(result.stderr ?? "").toContain(
+    expect(norm(result.stderr)).toContain(
       "ALL_TASKS_COMPLETE detected in transcript",
     );
   });
@@ -262,7 +273,7 @@ describe("e2e verification flow (VE1 + VE2) — fixture-based stop-watcher", () 
     expect(json.reason).toContain("Re-run: npm run verify");
     expect(json.systemMessage).toMatch(/verification stale/);
 
-    expect(result.stderr ?? "").toContain(
+    expect(norm(result.stderr)).toContain(
       "ALL_TASKS_COMPLETE detected in transcript",
     );
   });

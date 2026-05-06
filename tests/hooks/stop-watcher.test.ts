@@ -45,6 +45,16 @@ const STOP_WATCHER_BUNDLE = path.join(
   "plugins/curdx-flow/hooks/scripts/stop-watcher.mjs",
 );
 
+/**
+ * Normalize CRLF -> LF for cross-platform stderr/stdout assertions (AC-7.5).
+ * Windows GH Actions runners surface CRLF newlines in spawnSync output, which
+ * would break naive `.toContain("...")` style matching across line boundaries.
+ * Wrapping with `norm()` keeps assertions stable across macOS / Linux / Windows.
+ */
+function norm(s: string | null | undefined): string {
+  return (s ?? "").replace(/\r\n/g, "\n");
+}
+
 describe("stop-watcher (Stop hook)", () => {
   let demoSpec: FixtureSpec;
   let corruptSpec: FixtureSpec;
@@ -89,7 +99,7 @@ describe("stop-watcher (Stop hook)", () => {
     expect((r.json as any).reason).toMatch(/Continue spec.*demo-spec/);
     expect((r.json as any).systemMessage).toMatch(/curdx-flow/);
     // Stderr banner echoes spec status for human visibility
-    expect(r.stderr).toContain("demo-spec");
+    expect(norm(r.stderr)).toContain("demo-spec");
   });
 
   it("edge: corrupt state file → exit 0, JSON decision=block with recovery instructions", () => {
@@ -111,7 +121,7 @@ describe("stop-watcher (Stop hook)", () => {
       "tests/hooks/fixtures/stop-watcher/error-malformed.json",
     );
     expect(r.exitCode).toBe(0);
-    expect(r.stderr).toContain("invalid stdin JSON");
+    expect(norm(r.stderr)).toContain("invalid stdin JSON");
   });
 
   // NFR-5a: v7.1.0 completion marker — completed=true silent return
@@ -220,7 +230,7 @@ describe("stop-watcher (Stop hook)", () => {
       expect(r.json).toBeUndefined();
       // Stderr still carries the "ALL_TASKS_COMPLETE detected" marker line
       // (preserved from pre-gate behavior).
-      expect(r.stderr).toContain("ALL_TASKS_COMPLETE detected in transcript");
+      expect(norm(r.stderr)).toContain("ALL_TASKS_COMPLETE detected in transcript");
     } finally {
       validBlockSpec.cleanup();
     }
@@ -378,7 +388,7 @@ describe("stop-watcher (Stop hook)", () => {
       expect(r.stdout).toBe("");
       expect(r.json).toBeUndefined();
       // Marker line still printed by handleCompletion's stderr label.
-      expect(r.stderr).toContain("ALL_TASKS_COMPLETE detected in transcript");
+      expect(norm(r.stderr)).toContain("ALL_TASKS_COMPLETE detected in transcript");
     } finally {
       completedSpec.cleanup();
     }
@@ -424,10 +434,10 @@ describe("stop-watcher (Stop hook)", () => {
       // stderr (hook returned before the ALL_TASKS_COMPLETE detection
       // path could log its marker).
       expect(result.stdout ?? "").toBe("");
-      expect(result.stderr ?? "").not.toContain(
+      expect(norm(result.stderr)).not.toContain(
         "ALL_TASKS_COMPLETE detected in transcript",
       );
-      expect(result.stderr ?? "").not.toContain("no verification block");
+      expect(norm(result.stderr)).not.toContain("no verification block");
     } finally {
       reentrantSpec.cleanup();
     }
