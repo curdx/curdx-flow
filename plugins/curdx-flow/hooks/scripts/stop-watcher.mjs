@@ -584,19 +584,33 @@ function extractParallelGroupBlock(markdown, taskIndex, maxGroup = 5) {
   }
   return block.replace(/\n+$/, "");
 }
-function buildMissingVerificationBlock(phase, result) {
+function buildVerificationBlockFailDecision(phase, result) {
   const cmd = typeof result.command === "string" && result.command.length > 0 ? result.command : `/curdx-flow:${phase} (re-run phase to record verification)`;
   let reason;
+  let systemMessage;
   if (result.reason === "missing") {
     reason = `Phase '${phase}' has no verification block. Run: ${cmd}. Then try again.`;
+    systemMessage = `curdx-flow: phase '${phase}' missing verification block`;
+  } else if (typeof result.reason === "string" && result.reason.startsWith("Stale evidence")) {
+    reason = result.reason;
+    systemMessage = `curdx-flow: phase '${phase}' verification stale`;
   } else {
     const detail = result.reason ?? "verification failed";
-    reason = `Phase '${phase}' verification failed: ${detail}. Run: ${cmd}. Then try again.`;
+    reason = `Verification failed: ${detail}. Fix and re-run: ${cmd}.`;
+    systemMessage = `curdx-flow: phase '${phase}' verification failed`;
   }
   return {
     decision: "block",
     reason,
-    systemMessage: `curdx-flow: phase '${phase}' missing verification block`
+    systemMessage
+  };
+}
+function buildMalformedVerificationBlock() {
+  const reason = "verificationBlocks malformed in .curdx-state.json. See references/iron-law-verification.md.";
+  return {
+    decision: "block",
+    reason,
+    systemMessage: "curdx-flow: verificationBlocks malformed"
   };
 }
 function buildCorruptStateBlock(specPath) {
@@ -692,10 +706,15 @@ runHook(async (input) => {
       const label = variant === "primary" ? "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript" : "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript (tail-end)";
       process5.stderr.write(label + "\n");
       let parsedState;
+      let stateMalformed = false;
       try {
         parsedState = JSON.parse(readFileSync3(stateFile, "utf8"));
       } catch {
         parsedState = void 0;
+        stateMalformed = true;
+      }
+      if (stateMalformed) {
+        return buildMalformedVerificationBlock();
       }
       const epicName = parsedState && typeof parsedState.epicName === "string" && parsedState.epicName.length > 0 ? parsedState.epicName : void 0;
       if (parsedState) {
@@ -708,13 +727,18 @@ runHook(async (input) => {
           "execution"
         ];
         if (known.includes(rawPhase)) {
-          const result = await verifyPhaseBlock(
-            parsedState,
-            rawPhase,
-            join3(cwd, specPath)
-          );
+          let result;
+          try {
+            result = await verifyPhaseBlock(
+              parsedState,
+              rawPhase,
+              join3(cwd, specPath)
+            );
+          } catch {
+            return buildMalformedVerificationBlock();
+          }
           if (!result.ok) {
-            return buildMissingVerificationBlock(rawPhase, result);
+            return buildVerificationBlockFailDecision(rawPhase, result);
           }
         }
       }

@@ -418,19 +418,22 @@ function extractParallelGroupBlock(
 }
 
 /**
- * Build the missing-verification-block decision (Layer-1 iron-law gate).
+ * Build a Layer-1 iron-law gate block decision from a `verifyPhaseBlock`
+ * result. Emitted when a phase is about to exit but the recorded
+ * `verificationBlocks[phase]` is missing, failed, or stale.
  *
- * Emitted when a phase is about to exit but no `verificationBlocks[phase]`
- * record exists in state (or, in Phase 2, exists but is stale/failed). The
- * `reason` carries the exact fix command so the user can re-run the phase's
- * Verify step to populate the block, after which the loop is allowed to stop.
+ * Message formats — canonical per design.md §Error Handling table (L352-356):
+ *   - "missing": `Phase '<phase>' has no verification block. Run: <cmd>. Then try again.`
+ *   - stale (reason starts with "Stale evidence"): pass-through verbatim
+ *     from verify-blocks.ts (already produces
+ *     `Stale evidence: src changed at <iso>, last verified at <iso>. Re-run: <cmd>.`)
+ *   - any other reason → failed: `Verification failed: <reason>. Fix and re-run: <cmd>.`
  *
- * Three flavors per `result.reason`:
- *   - "missing"            → phase has no recorded verification at all
- *   - block.failedReason   → phase verification failed (non-zero exitCode)
- *   - any other string     → reserved for Phase 2 stale-mtime detection
+ * The `<cmd>` placeholder for the missing case falls back to a phase-aware
+ * `/curdx-flow:<phase>` hint when verify-blocks couldn't recover the original
+ * command (it returns `command: ""` for the missing branch).
  */
-function buildMissingVerificationBlock(
+function buildVerificationBlockFailDecision(
   phase: string,
   result: { reason?: string; command?: string },
 ): BlockDecision {
@@ -439,16 +442,50 @@ function buildMissingVerificationBlock(
       ? result.command
       : `/curdx-flow:${phase} (re-run phase to record verification)`;
   let reason: string;
+  let systemMessage: string;
   if (result.reason === "missing") {
     reason = `Phase '${phase}' has no verification block. Run: ${cmd}. Then try again.`;
+    systemMessage = `curdx-flow: phase '${phase}' missing verification block`;
+  } else if (
+    typeof result.reason === "string" &&
+    result.reason.startsWith("Stale evidence")
+  ) {
+    // verify-blocks.ts already produces the canonical stale message
+    // (`Stale evidence: src changed at <iso>, last verified at <iso>. Re-run: <cmd>.`).
+    // Pass through verbatim — re-formatting here would diverge from design L355.
+    reason = result.reason;
+    systemMessage = `curdx-flow: phase '${phase}' verification stale`;
   } else {
     const detail = result.reason ?? "verification failed";
-    reason = `Phase '${phase}' verification failed: ${detail}. Run: ${cmd}. Then try again.`;
+    reason = `Verification failed: ${detail}. Fix and re-run: ${cmd}.`;
+    systemMessage = `curdx-flow: phase '${phase}' verification failed`;
   }
   return {
     decision: "block",
     reason,
-    systemMessage: `curdx-flow: phase '${phase}' missing verification block`,
+    systemMessage,
+  };
+}
+
+/**
+ * Build the malformed-verificationBlocks block decision per design L357.
+ *
+ * Emitted when reading or parsing `.curdx-state.json` for the iron-law gate
+ * fails (JSON.parse error, or any thrown access on a malformed shape).
+ * Distinct from `buildCorruptStateBlock` because this path is reached BEFORE
+ * the general state validation in the non-completion code path — when an
+ * `ALL_TASKS_COMPLETE` marker has been seen and we are about to allow the
+ * loop to stop, malformed state must surface a verificationBlocks-specific
+ * message that points the user at the iron-law reference doc.
+ */
+function buildMalformedVerificationBlock(): BlockDecision {
+  const reason =
+    "verificationBlocks malformed in .curdx-state.json. " +
+    "See references/iron-law-verification.md.";
+  return {
+    decision: "block",
+    reason,
+    systemMessage: "curdx-flow: verificationBlocks malformed",
   };
 }
 
@@ -604,14 +641,21 @@ runHook(async (input) => {
           ? "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript"
           : "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript (tail-end)";
       process.stderr.write(label + "\n");
-      // Read state for epicName + Layer-1 iron-law gate. If state is corrupt
-      // here we still exit silently (the buildCorruptStateBlock path will
-      // catch the next invocation via the JSON.parse below).
+      // Read state for epicName + Layer-1 iron-law gate. JSON.parse failure
+      // here is treated as malformed verificationBlocks per design L357 —
+      // emit the canonical malformed message rather than silently allowing
+      // stop. Note: a separate `buildCorruptStateBlock` path still catches
+      // generic state corruption on the non-completion code path below.
       let parsedState: CurdxState | undefined;
+      let stateMalformed = false;
       try {
         parsedState = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
       } catch {
         parsedState = undefined;
+        stateMalformed = true;
+      }
+      if (stateMalformed) {
+        return buildMalformedVerificationBlock();
       }
       const epicName =
         parsedState && typeof parsedState.epicName === "string" &&
@@ -619,13 +663,14 @@ runHook(async (input) => {
           ? parsedState.epicName
           : undefined;
 
-      // Layer-1 iron-law gate (spec-verification-iron-law Task 1.6): before
-      // allowing the loop to terminate on ALL_TASKS_COMPLETE, require the
-      // active phase to have a recorded verification block. Phase 1 POC scope
-      // = "missing block" branch only; stale-mtime detection lands in Phase 2.
-      // Skipped when state is unparseable (corrupt-state branch handles it
-      // below) or when phase isn't a known VerificationPhase (e.g. legacy
-      // states with phase="unknown" — fail-open per FR-8).
+      // Layer-1 iron-law gate (spec-verification-iron-law Tasks 1.6 / 2.2 / 2.3):
+      // before allowing the loop to terminate on ALL_TASKS_COMPLETE, require
+      // the active phase to have a recorded verification block that is
+      // present, exitCode==0, and not stale. The three failure classes
+      // (missing / failed / stale) map to canonical messages per design.md
+      // §Error Handling (L352-356); a fourth class (malformed JSON) is
+      // handled above. Skipped when phase isn't a known VerificationPhase
+      // (e.g. legacy states with phase="unknown" — fail-open per FR-8).
       if (parsedState) {
         const rawPhase = typeof parsedState.phase === "string"
           ? parsedState.phase
@@ -638,13 +683,20 @@ runHook(async (input) => {
           "execution",
         ];
         if ((known as string[]).includes(rawPhase)) {
-          const result = await verifyPhaseBlock(
-            parsedState,
-            rawPhase as VerificationPhase,
-            join(cwd, specPath),
-          );
+          let result;
+          try {
+            result = await verifyPhaseBlock(
+              parsedState,
+              rawPhase as VerificationPhase,
+              join(cwd, specPath),
+            );
+          } catch {
+            // Unexpected throw inside verify-blocks (e.g. malformed shape on
+            // verificationBlocks access). Surface the malformed message.
+            return buildMalformedVerificationBlock();
+          }
           if (!result.ok) {
-            return buildMissingVerificationBlock(rawPhase, result);
+            return buildVerificationBlockFailDecision(rawPhase, result);
           }
         }
       }
