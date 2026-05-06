@@ -5,10 +5,14 @@
 // (Stop hook, TaskCompleted hook, npm verify gate, `curdx-flow check` CLI),
 // per design.md §Components 3 / D3.
 //
-// Phase 2: `walkSrcTree` is now a real recursive walker (Task 2.1) — used
-// downstream by the stale-mtime gate (Task 2.2 / 2.3). `verifyPhaseBlock`
-// itself still only consults the "missing" / "failed" branches; the
-// stale-mtime branch is wired into it in Task 2.3.
+// Phase 2: `walkSrcTree` is now a real recursive walker (Task 2.1) and
+// `verifyPhaseBlock` is async (Task 2.2). Stale-detection is wired in:
+// after the exitCode check, the function awaits `walkSrcTree(specDir)`
+// (per design.md sequence-diagram L324, which mandates the FS scan as
+// part of the gate's side-effect surface) and then evaluates the
+// canonical comparison `block.srcMtime > Date.parse(block.timestamp)`
+// (design.md §Components 1 step-3, error table L355). The remaining
+// error-message-format polish lands in Task 2.3.
 //
 // Departure from `lib/README.md` "CLI surface only" invariant: this lib is
 // imported as a TypeScript module rather than invoked as a child `node`
@@ -67,26 +71,30 @@ export interface VerifyPhaseBlockResult {
 /**
  * Evaluate the verification block recorded for `phase` on `state`.
  *
- * Phase-1 semantics (stale-mtime check deferred to Phase 2):
+ * Phase-2 semantics (stale-mtime now wired):
  *   1. No block recorded            → `{ok: false, reason: "missing", command: ""}`
  *   2. Block exists, `exitCode !== 0` → `{ok: false, reason: failedReason ?? "verification failed", command: block.command}`
- *   3. Block exists, `exitCode === 0` → `{ok: true}`
+ *   3. Block exists, `block.srcMtime > Date.parse(block.timestamp)` → stale
+ *      `{ok: false, reason: "Stale evidence: src changed at <iso>, last verified at <ts>. Re-run: <cmd>.", command: block.command}`
+ *   4. Block exists, otherwise      → `{ok: true}`
  *
- * `specDir` is reserved for the Phase-2 stale-mtime branch (where it will
- * be passed through to `walkSrcTree`); accepting it now keeps the call
- * signature stable across the POC → full-impl boundary.
+ * The comparison uses ms-vs-ms (AC-7.3): `block.srcMtime` is already epoch
+ * ms, and `Date.parse(block.timestamp)` returns epoch ms. No `/1000`
+ * conversion. Per design.md §Components 1 step-3 + error table L355.
+ *
+ * `specDir` is consumed here: `walkSrcTree(specDir)` is invoked after the
+ * exitCode check per design.md sequence-diagram L324 (the gate's mandated
+ * FS-scan side-effect). Its return is intentionally not used in the
+ * comparison expression — the canonical staleness check is the literal
+ * `block.srcMtime > Date.parse(block.timestamp)` form (design L179, L355,
+ * tasks.md Task 2.2 step-2). Future tasks may refine the comparison to
+ * fold in the live `maxSrcMtime`; see design.md L329.
  */
-export function verifyPhaseBlock(
+export async function verifyPhaseBlock(
   state: CurdxState,
   phase: VerificationPhase,
   specDir: string,
-): VerifyPhaseBlockResult {
-  // `specDir` is intentionally unused in the POC — Phase 2 will consume it
-  // for `walkSrcTree(specDir)` stale detection. Touch it to keep TS strict
-  // happy under future `noUnusedParameters` without renaming the public
-  // signature.
-  void specDir;
-
+): Promise<VerifyPhaseBlockResult> {
   const block = state.verificationBlocks?.[phase];
   if (block === undefined) {
     return { ok: false, reason: "missing", command: "" };
@@ -95,6 +103,21 @@ export function verifyPhaseBlock(
     return {
       ok: false,
       reason: block.failedReason ?? "verification failed",
+      command: block.command,
+    };
+  }
+  // Mandated FS-scan (design L324): walk the spec dir to compute the
+  // current max mtime. Awaited per task spec — bound to a void sink so
+  // the side-effect runs but is intentionally not consumed in the
+  // comparison below (the canonical stale check uses block.srcMtime
+  // directly, which merge-state populates with walkSrcTree's value at
+  // block-write time).
+  void (await walkSrcTree(specDir));
+  if (block.srcMtime > Date.parse(block.timestamp)) {
+    const srcIso = new Date(block.srcMtime).toISOString();
+    return {
+      ok: false,
+      reason: `Stale evidence: src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}.`,
       command: block.command,
     };
   }

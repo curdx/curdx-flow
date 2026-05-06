@@ -14,7 +14,7 @@ import {
   unlinkSync
 } from "node:fs";
 import { spawn } from "node:child_process";
-import { basename as basename2, dirname, join as join2 } from "node:path";
+import { basename as basename2, dirname, join as join3 } from "node:path";
 import { fileURLToPath } from "node:url";
 import process5 from "node:process";
 
@@ -328,7 +328,17 @@ function extractTaskBlock(markdown, taskIndex) {
 }
 
 // src/hooks/lib/verify-blocks.ts
-function verifyPhaseBlock(state, phase, specDir) {
+import { promises as fs } from "node:fs";
+import { join as join2 } from "node:path";
+var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  ".curdx",
+  ".claude"
+]);
+var WALK_MAX_DEPTH = 6;
+async function verifyPhaseBlock(state, phase, specDir) {
   const block = state.verificationBlocks?.[phase];
   if (block === void 0) {
     return { ok: false, reason: "missing", command: "" };
@@ -340,7 +350,43 @@ function verifyPhaseBlock(state, phase, specDir) {
       command: block.command
     };
   }
+  void await walkSrcTree(specDir);
+  if (block.srcMtime > Date.parse(block.timestamp)) {
+    const srcIso = new Date(block.srcMtime).toISOString();
+    return {
+      ok: false,
+      reason: `Stale evidence: src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}.`,
+      command: block.command
+    };
+  }
   return { ok: true };
+}
+async function walkSrcTree(dir) {
+  let maxMtime = 0;
+  async function walk(current, depth) {
+    let entries;
+    try {
+      entries = await fs.readdir(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const abs = join2(current, entry.name);
+      if (entry.isDirectory()) {
+        if (WALK_SKIP_DIRS.has(entry.name)) continue;
+        if (depth >= WALK_MAX_DEPTH) continue;
+        await walk(abs, depth + 1);
+        continue;
+      }
+      try {
+        const st = await fs.stat(abs);
+        if (st.mtimeMs > maxMtime) maxMtime = st.mtimeMs;
+      } catch {
+      }
+    }
+  }
+  await walk(dir, 0);
+  return maxMtime;
 }
 
 // src/hooks/stop-watcher.ts
@@ -410,7 +456,7 @@ function tailContainsCompletionMarker(transcriptPath, lineCount) {
   return false;
 }
 function markSpecCompletedInEpic(cwd, epicName, specName) {
-  const epicStateFile = join2(
+  const epicStateFile = join3(
     cwd,
     "specs",
     "_epics",
@@ -450,7 +496,7 @@ function fireUpdateSpecIndex() {
     here = fileURLToPath(import.meta.url);
   }
   const scriptDir = dirname(here);
-  const target = join2(scriptDir, "update-spec-index.mjs");
+  const target = join3(scriptDir, "update-spec-index.mjs");
   if (!existsSync2(target)) return;
   try {
     const child = spawn(process5.execPath, [target, "--quiet"], {
@@ -472,7 +518,7 @@ function cleanupStaleProgressFiles(specDirFs) {
   const sixtyMinMs = 60 * 60 * 1e3;
   for (const name of entries) {
     if (!name.startsWith(".progress-task-") || !name.endsWith(".md")) continue;
-    const fp = join2(specDirFs, name);
+    const fp = join3(specDirFs, name);
     let mtimeMs;
     try {
       mtimeMs = statSync2(fp).mtimeMs;
@@ -628,7 +674,7 @@ runHook(async (input) => {
   }
   const cwd = input?.cwd;
   if (!cwd) return;
-  const settingsPath = join2(cwd, SETTINGS_REL_PATH2);
+  const settingsPath = join3(cwd, SETTINGS_REL_PATH2);
   if (existsSync2(settingsPath)) {
     const enabled = readEnabledSetting(settingsPath);
     if (enabled === "false") return;
@@ -637,12 +683,12 @@ runHook(async (input) => {
   if (!rawSpecPath) return;
   const specPath = preserveDotPrefix(rawSpecPath, getSpecsDirs({ cwd }));
   const specName = basename2(specPath);
-  const stateFile = join2(cwd, specPath, ".curdx-state.json");
+  const stateFile = join3(cwd, specPath, ".curdx-state.json");
   if (!existsSync2(stateFile)) return;
   await maybeWaitForRecentStateFile(stateFile);
   const transcriptPath = input.transcript_path;
   if (transcriptPath && existsSync2(transcriptPath)) {
-    const handleCompletion = (variant) => {
+    const handleCompletion = async (variant) => {
       const label = variant === "primary" ? "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript" : "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript (tail-end)";
       process5.stderr.write(label + "\n");
       let parsedState;
@@ -662,17 +708,17 @@ runHook(async (input) => {
           "execution"
         ];
         if (known.includes(rawPhase)) {
-          const result = verifyPhaseBlock(
+          const result = await verifyPhaseBlock(
             parsedState,
             rawPhase,
-            join2(cwd, specPath)
+            join3(cwd, specPath)
           );
           if (!result.ok) {
             return buildMissingVerificationBlock(rawPhase, result);
           }
         }
       }
-      const currentEpicFile = join2(cwd, "specs", ".current-epic");
+      const currentEpicFile = join3(cwd, "specs", ".current-epic");
       if (epicName && existsSync2(currentEpicFile)) {
         markSpecCompletedInEpic(cwd, epicName, specName);
       }
@@ -680,12 +726,12 @@ runHook(async (input) => {
       return void 0;
     };
     if (tailContainsCompletionMarker(transcriptPath, 500)) {
-      const blocked = handleCompletion("primary");
+      const blocked = await handleCompletion("primary");
       if (blocked) return blocked;
       return;
     }
     if (tailContainsCompletionMarker(transcriptPath, 20)) {
-      const blocked = handleCompletion("fallback");
+      const blocked = await handleCompletion("fallback");
       if (blocked) return blocked;
       return;
     }
@@ -728,7 +774,7 @@ runHook(async (input) => {
     );
   }
   if (phase === "execution" && taskIndex >= totalTasks && totalTasks > 0) {
-    const tasksFile = join2(cwd, specPath, "tasks.md");
+    const tasksFile = join3(cwd, specPath, "tasks.md");
     if (existsSync2(tasksFile)) {
       const unchecked = countUncheckedTasks(tasksFile);
       if (unchecked > 0) {
@@ -760,7 +806,7 @@ runHook(async (input) => {
     }
     const recoveryMode = state.recoveryMode === true;
     const maxTaskIter = typeof state.maxTaskIterations === "number" ? state.maxTaskIterations : 5;
-    const tasksFile = join2(cwd, specPath, "tasks.md");
+    const tasksFile = join3(cwd, specPath, "tasks.md");
     let taskBlock = "";
     if (existsSync2(tasksFile)) {
       let tasksMd = "";
@@ -787,7 +833,7 @@ runHook(async (input) => {
         isParallel = false;
       }
     }
-    cleanupStaleProgressFiles(join2(cwd, specPath));
+    cleanupStaleProgressFiles(join3(cwd, specPath));
     return buildContinuationBlock({
       specName,
       specPath,
@@ -802,6 +848,6 @@ runHook(async (input) => {
       isParallel
     });
   }
-  cleanupStaleProgressFiles(join2(cwd, specPath));
+  cleanupStaleProgressFiles(join3(cwd, specPath));
 });
 //# sourceMappingURL=stop-watcher.mjs.map

@@ -596,9 +596,9 @@ runHook(async (input) => {
   // ALL_TASKS_COMPLETE detection (primary 500 lines + fallback 20 lines).
   const transcriptPath = input.transcript_path;
   if (transcriptPath && existsSync(transcriptPath)) {
-    const handleCompletion = (
+    const handleCompletion = async (
       variant: "primary" | "fallback",
-    ): BlockDecision | undefined => {
+    ): Promise<BlockDecision | undefined> => {
       const label =
         variant === "primary"
           ? "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript"
@@ -638,7 +638,7 @@ runHook(async (input) => {
           "execution",
         ];
         if ((known as string[]).includes(rawPhase)) {
-          const result = verifyPhaseBlock(
+          const result = await verifyPhaseBlock(
             parsedState,
             rawPhase as VerificationPhase,
             join(cwd, specPath),
@@ -658,12 +658,12 @@ runHook(async (input) => {
     };
 
     if (tailContainsCompletionMarker(transcriptPath, 500)) {
-      const blocked = handleCompletion("primary");
+      const blocked = await handleCompletion("primary");
       if (blocked) return blocked;
       return;
     }
     if (tailContainsCompletionMarker(transcriptPath, 20)) {
-      const blocked = handleCompletion("fallback");
+      const blocked = await handleCompletion("fallback");
       if (blocked) return blocked;
       return;
     }

@@ -16,7 +16,7 @@ var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
   ".claude"
 ]);
 var WALK_MAX_DEPTH = 6;
-function verifyPhaseBlock(state, phase, specDir) {
+async function verifyPhaseBlock(state, phase, specDir) {
   const block = state.verificationBlocks?.[phase];
   if (block === void 0) {
     return { ok: false, reason: "missing", command: "" };
@@ -25,6 +25,15 @@ function verifyPhaseBlock(state, phase, specDir) {
     return {
       ok: false,
       reason: block.failedReason ?? "verification failed",
+      command: block.command
+    };
+  }
+  void await walkSrcTree(specDir);
+  if (block.srcMtime > Date.parse(block.timestamp)) {
+    const srcIso = new Date(block.srcMtime).toISOString();
+    return {
+      ok: false,
+      reason: `Stale evidence: src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}.`,
       command: block.command
     };
   }
