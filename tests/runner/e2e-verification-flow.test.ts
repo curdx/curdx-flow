@@ -1,27 +1,27 @@
 /**
- * E2E verification flow (VE1) — fixture-based smoke test.
+ * E2E verification flow (VE1 + VE2) — fixture-based smoke test.
  *
- * Spec: spec-verification-iron-law (Task 3.5).
+ * Spec: spec-verification-iron-law (Tasks 3.5, 3.6).
  *
  * Unlike `tests/hooks/stop-watcher.test.ts` POC (b) — which uses the
  * `createFixtureSpec` helper and the canonical `runHook` runner — this test
  * exercises the bundled `stop-watcher.mjs` end-to-end against a hand-built
  * fixture directory created via `os.tmpdir()` + `mkdtempSync`. The goal is a
  * dependency-free smoke test that proves the iron-law gate fires when
- * `verificationBlocks` is missing, with no shared test infrastructure between
- * the fixture and the hook under test.
+ * `verificationBlocks` is missing (VE1), passes when a valid block is
+ * written (VE2.b), and re-fires when the recorded block is stale (VE2.c).
  *
- * Note on "exit code" vs "block decision": the task description (3.5) calls
- * for "exit code 2", but `stop-watcher.mjs` is a Stop hook governed by FR-8
- * (`runHook` in `src/hooks/_shared/run-hook.ts` always `process.exit(0)` —
- * even on the block path) and signals "block" to Claude Code via JSON
- * `{decision:"block", reason}` on stdout. We assert that semantics here:
- * exit 0 + JSON `decision:"block"` + `reason` contains "no verification
- * block". This matches the existing POC (b) test in stop-watcher.test.ts
- * (lines 229-259) which is the source-of-truth for the gate's behavior.
+ * Note on "exit code" vs "block decision": the task description (3.5/3.6)
+ * calls for "exit code 2", but `stop-watcher.mjs` is a Stop hook governed by
+ * FR-8 (`runHook` in `src/hooks/_shared/run-hook.ts` always
+ * `process.exit(0)` — even on the block path) and signals "block" to Claude
+ * Code via JSON `{decision:"block", reason}` on stdout. We assert that
+ * semantics here: exit 0 + JSON `decision:"block"` + `reason` contains the
+ * canonical phrase. This matches the existing POC tests in
+ * `tests/hooks/stop-watcher.test.ts` (lines 199-258, 317-350) which are the
+ * source-of-truth for the gate's behavior.
  *
- * Tasks 3.6 (VE2) and 3.7 (VE3) extend this file with the
- * write-block-then-pass + stale + performance cases.
+ * Task 3.7 (VE3) extends this file further with the performance case.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
@@ -39,9 +39,10 @@ const STOP_WATCHER_BUNDLE = path.join(
   "hooks/scripts/stop-watcher.mjs",
 );
 
-describe("e2e verification flow (VE1) — fixture-based stop-watcher", () => {
+describe("e2e verification flow (VE1 + VE2) — fixture-based stop-watcher", () => {
   let fixtureDir: string;
   let transcriptPath: string;
+  let stateFile: string;
 
   beforeEach(() => {
     // Fresh tmpdir per test — never hardcode `/tmp`, use `os.tmpdir()` for
@@ -80,10 +81,8 @@ describe("e2e verification flow (VE1) — fixture-based stop-watcher", () => {
       granularity: "fine" as const,
       completed: false,
     };
-    writeFileSync(
-      path.join(specDir, ".curdx-state.json"),
-      JSON.stringify(state, null, 2),
-    );
+    stateFile = path.join(specDir, ".curdx-state.json");
+    writeFileSync(stateFile, JSON.stringify(state, null, 2));
 
     // Transcript with ALL_TASKS_COMPLETE marker (lives under fixtureDir so
     // cleanup wipes it alongside the spec).
@@ -102,7 +101,12 @@ describe("e2e verification flow (VE1) — fixture-based stop-watcher", () => {
     }
   });
 
-  it("(a) claim done without verificationBlocks → block decision with 'no verification block' reason", () => {
+  /**
+   * Spawn the bundled stop-watcher.mjs against the per-test fixtureDir +
+   * transcriptPath. Inlined in test (a) for VE1; tests (b) and (c) reuse it
+   * via this helper to keep the write-block-then-spawn flow readable.
+   */
+  function spawnStopWatcher() {
     const stdin = JSON.stringify({
       hook_event_name: "Stop",
       hookEvent: "Stop",
@@ -110,8 +114,7 @@ describe("e2e verification flow (VE1) — fixture-based stop-watcher", () => {
       cwd: fixtureDir,
       transcript_path: transcriptPath,
     });
-
-    const result = spawnSync("node", [STOP_WATCHER_BUNDLE], {
+    return spawnSync("node", [STOP_WATCHER_BUNDLE], {
       input: stdin,
       cwd: fixtureDir,
       env: {
@@ -121,6 +124,49 @@ describe("e2e verification flow (VE1) — fixture-based stop-watcher", () => {
       encoding: "utf8",
       timeout: 5000,
     });
+  }
+
+  /**
+   * Splice a `verificationBlocks.execution` block into the per-test state
+   * file. Used by (b) — valid block path — and (c) — stale block path. Done
+   * at the raw JSON level (no merge-state CLI) per Task 3.6 guidance: the
+   * fixture setup is intentionally dependency-free so the assertion couples
+   * only to stop-watcher.mjs's runtime behavior, not to the merge-state
+   * writer. Re-renders the full state object (not a shallow merge) so the
+   * fixture stays in lock-step with beforeEach.
+   */
+  function writeExecutionBlock(block: {
+    command: string;
+    exitCode: number;
+    timestamp: string;
+    srcMtime: number;
+    description?: string;
+  }) {
+    const state = {
+      source: "spec",
+      name: "e2e-test",
+      basePath: "./specs/e2e-test",
+      phase: "execution",
+      taskIndex: 1,
+      totalTasks: 1,
+      taskIteration: 1,
+      maxTaskIterations: 5,
+      globalIteration: 1,
+      maxGlobalIterations: 100,
+      commitSpec: true,
+      quickMode: false,
+      awaitingApproval: false,
+      recoveryMode: false,
+      nativeSyncEnabled: false,
+      granularity: "fine",
+      completed: false,
+      verificationBlocks: { execution: block },
+    };
+    writeFileSync(stateFile, JSON.stringify(state, null, 2));
+  }
+
+  it("(a) claim done without verificationBlocks → block decision with 'no verification block' reason", () => {
+    const result = spawnStopWatcher();
 
     // FR-8: stop-watcher.mjs ALWAYS exits 0 (the runHook contract in
     // _shared/run-hook.ts hard-wires process.exit(0) on every code path).
@@ -142,6 +188,72 @@ describe("e2e verification flow (VE1) — fixture-based stop-watcher", () => {
     // Stderr carries the ALL_TASKS_COMPLETE detection marker (proves the
     // gate's host code path was actually exercised — not short-circuited by
     // an earlier branch).
+    expect(result.stderr ?? "").toContain(
+      "ALL_TASKS_COMPLETE detected in transcript",
+    );
+  });
+
+  it("(b) write valid verificationBlocks.execution → hook passes (silent return, no block decision)", () => {
+    // Valid block: srcMtime predates timestamp → not stale; exitCode 0 → not
+    // failed. verifyPhaseBlock returns ok=true; handleCompletion exits silently.
+    const now = Date.now();
+    writeExecutionBlock({
+      command: "npm run verify",
+      exitCode: 0,
+      timestamp: new Date(now).toISOString(),
+      srcMtime: now - 5000,
+      description: "VE2 happy-path fixture",
+    });
+
+    const result = spawnStopWatcher();
+
+    // Iron-law gate passed → handleCompletion returned undefined → outer
+    // return is silent (no JSON decision block on stdout). FR-8 still holds:
+    // exit code is 0. This mirrors stop-watcher.test.ts POC (a) (line 199).
+    expect(result.status).toBe(0);
+    expect((result.stdout ?? "").trim()).toBe("");
+
+    // Stderr still carries the ALL_TASKS_COMPLETE marker (preserved from
+    // pre-gate behavior — proves the host code path was exercised).
+    expect(result.stderr ?? "").toContain(
+      "ALL_TASKS_COMPLETE detected in transcript",
+    );
+  });
+
+  it("(c) write stale verificationBlocks.execution (srcMtime > timestamp) → block decision with 'Stale evidence' reason", () => {
+    // Stale block: srcMtime is 10s in the FUTURE relative to timestamp,
+    // simulating a src file that changed AFTER verification was recorded.
+    // verifyPhaseBlock's canonical check `block.srcMtime > Date.parse(
+    // block.timestamp)` fires the stale branch (verify-blocks.ts L116-122).
+    const now = Date.now();
+    writeExecutionBlock({
+      command: "npm run verify",
+      exitCode: 0,
+      timestamp: new Date(now).toISOString(),
+      srcMtime: now + 10000,
+      description: "VE2 stale-evidence fixture",
+    });
+
+    const result = spawnStopWatcher();
+
+    // FR-8: exit code 0 even on the block path; signal is on stdout JSON.
+    expect(result.status).toBe(0);
+
+    const stdout = (result.stdout ?? "").trim();
+    expect(stdout.length).toBeGreaterThan(0);
+    const json = JSON.parse(stdout) as {
+      decision?: string;
+      reason?: string;
+      systemMessage?: string;
+    };
+    expect(json.decision).toBe("block");
+    // Canonical stale message passed through verbatim from verify-blocks.ts
+    // (stop-watcher.ts L449-457): "Stale evidence: src changed at <iso>,
+    // last verified at <iso>. Re-run: <cmd>."
+    expect(json.reason).toContain("Stale evidence");
+    expect(json.reason).toContain("Re-run: npm run verify");
+    expect(json.systemMessage).toMatch(/verification stale/);
+
     expect(result.stderr ?? "").toContain(
       "ALL_TASKS_COMPLETE detected in transcript",
     );
