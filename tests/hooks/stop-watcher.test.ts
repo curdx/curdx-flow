@@ -258,6 +258,132 @@ describe("stop-watcher (Stop hook)", () => {
     }
   });
 
+  // -----------------------------------------------------------------------
+  // Phase-2 gate cases (Task 2.5) — exercise the failed / stale / preserved
+  // branches of `verifyPhaseBlock` (src/hooks/lib/verify-blocks.ts) that
+  // POC (a)+(b) intentionally did not cover.
+  //
+  // The user-visible block-fail messages are emitted as JSON on STDOUT
+  // (`json.reason`), built by `buildVerificationBlockFailDecision` in
+  // stop-watcher.ts (~L436). The task description's "stderr contains" wording
+  // refers to the user-visible reason text — which the canonical path in
+  // this hook surfaces via the JSON `reason` field, mirroring POC (b).
+  // -----------------------------------------------------------------------
+
+  it("(d): block exitCode !== 0 with failedReason → block decision, reason includes failedReason text", () => {
+    const now = Date.now();
+    const failedSpec = createFixtureSpec({
+      state: {
+        phase: "execution",
+        taskIndex: 1,
+        totalTasks: 3,
+        verificationBlocks: {
+          execution: {
+            command: "npm run lint",
+            exitCode: 1,
+            timestamp: new Date(now).toISOString(),
+            srcMtime: now - 1000,
+            description: "lint check",
+            failedReason: "lint failed: 3 errors in src/foo.ts",
+          },
+        },
+      },
+    });
+    try {
+      const r = runHook(
+        "stop-watcher",
+        "tests/hooks/fixtures/stop-watcher/all-complete.json",
+        { cwd: failedSpec.cwd },
+      );
+      expect(r.exitCode).toBe(0);
+      expect(r.json).toBeDefined();
+      expect((r.json as any).decision).toBe("block");
+      // Canonical failed format: "Verification failed: <reason>. Fix and re-run: <cmd>."
+      expect((r.json as any).reason).toContain(
+        "lint failed: 3 errors in src/foo.ts",
+      );
+      expect((r.json as any).reason).toMatch(/Verification failed/);
+      expect((r.json as any).reason).toContain("npm run lint");
+      expect((r.json as any).systemMessage).toMatch(
+        /verification failed/,
+      );
+    } finally {
+      failedSpec.cleanup();
+    }
+  });
+
+  it("(e): block.srcMtime > Date.parse(timestamp) → block decision, reason starts with 'Stale evidence'", () => {
+    const now = Date.now();
+    const staleSpec = createFixtureSpec({
+      state: {
+        phase: "execution",
+        taskIndex: 1,
+        totalTasks: 3,
+        verificationBlocks: {
+          execution: {
+            command: "npm run typecheck",
+            exitCode: 0,
+            // timestamp = 1 hour ago, srcMtime = now → strictly stale.
+            timestamp: new Date(now - 3600_000).toISOString(),
+            srcMtime: now,
+            description: "typecheck (now stale)",
+          },
+        },
+      },
+    });
+    try {
+      const r = runHook(
+        "stop-watcher",
+        "tests/hooks/fixtures/stop-watcher/all-complete.json",
+        { cwd: staleSpec.cwd },
+      );
+      expect(r.exitCode).toBe(0);
+      expect(r.json).toBeDefined();
+      expect((r.json as any).decision).toBe("block");
+      // Canonical stale format passed through verbatim from verify-blocks.ts.
+      expect((r.json as any).reason).toMatch(/^Stale evidence: /);
+      expect((r.json as any).reason).toContain("Re-run: npm run typecheck");
+      expect((r.json as any).systemMessage).toMatch(
+        /verification stale/,
+      );
+    } finally {
+      staleSpec.cleanup();
+    }
+  });
+
+  it("(f): ALL_TASKS_COMPLETE behavior preserved — taskIndex===totalTasks + valid block → silent return", () => {
+    // Regression guard: when every task is checked AND a valid execution
+    // block is recorded, the gate must allow the loop to terminate (no
+    // continuation block on stdout). Distinct from POC (a) which had
+    // taskIndex < totalTasks; this case asserts the post-completion path
+    // still passes through cleanly when the spec is genuinely finished.
+    const completedSpec = createFixtureSpec({
+      state: {
+        phase: "execution",
+        taskIndex: 3,
+        totalTasks: 3,
+        verificationBlocks: {
+          execution: buildValidExecutionBlock(),
+        },
+      },
+    });
+    try {
+      const r = runHook(
+        "stop-watcher",
+        "tests/hooks/fixtures/stop-watcher/all-complete.json",
+        { cwd: completedSpec.cwd },
+      );
+      expect(r.exitCode).toBe(0);
+      // Silent: gate passed, ALL_TASKS_COMPLETE allowed to fall through.
+      expect(r.stdout).toBe("");
+      expect(r.json).toBeUndefined();
+      // Marker line still printed by handleCompletion's stderr label.
+      expect(r.stderr).toContain("ALL_TASKS_COMPLETE detected in transcript");
+    } finally {
+      completedSpec.cleanup();
+    }
+  });
+
   it("POC (c): stop_hook_active=true with missing block → silent early-exit (D5 anti-loop guard)", () => {
     // D5 canonical guard at the top of runHook handler short-circuits BEFORE
     // any state read — so even with no verificationBlocks the hook must exit
