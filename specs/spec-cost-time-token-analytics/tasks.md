@@ -342,7 +342,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: None
 
-- [ ] 2.13 [VERIFY] Phase 2 gate
+- [x] 2.13 [VERIFY] Phase 2 gate
   **Do**: 确认 2.1-2.12 全 commit；trailer regex / aggregateBy / 5 flag / specPhaseMap / costBreakdown JSON 全接好；进入 Phase 3 测试覆盖。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && git log --oneline -13 | grep -cE "trailer|aggregateBy|by-spec|costBreakdown|specPhaseMap|cache discriminator|schema-map" | xargs -I{} test {} -ge 6 && echo PHASE2_GATE_PASS`
