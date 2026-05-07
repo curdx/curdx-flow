@@ -29,7 +29,7 @@ Goal: create the renamed doc with full content and replace the old path with a s
   - **Commit**: `feat(references): create bounded-parallel-dispatch.md with review and debug domain rules`
   - _Design: New Doc Structure §1-§9, §2 shape, §3 shape, §4 shape, §5 shape, D2, D3_
 
-- [ ] 1.2 Replace `parallel-research.md` with 1-line stub redirect
+- [x] 1.2 Replace `parallel-research.md` with 1-line stub redirect
   - **Do**: Overwrite `plugins/curdx-flow/references/parallel-research.md` with exactly: `> Moved to [bounded-parallel-dispatch.md](./bounded-parallel-dispatch.md). Documentation expanded to cover review and debug domains, not only research.`
   - **Files**: `plugins/curdx-flow/references/parallel-research.md`
   - **Done when**: File is ≤3 lines; contains "Moved to" and "bounded-parallel-dispatch.md"
