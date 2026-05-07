@@ -699,7 +699,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `docs(changelog): add OB-3 cost-summary entry`
 
-- [ ] 4.11 [VE2] E2E smoke — totalCost.usd + recommendations non-null
+- [x] 4.11 [VE2] E2E smoke — totalCost.usd + recommendations non-null
   **Do**: Run 真实本地 transcript 跑 `--cost-summary --by-spec --by-phase --by-task --json` 验证：(1) `.totalCost.usd` 非 null；(2) `.costBreakdown.R3_perTask` 数组；(3) `.recommendations` 数组；(4) markdown 输出含 `## Cost Breakdown` + `## Recommendations`。
 
   **Files**: (no edit — VE smoke)
@@ -713,7 +713,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: None
 
-- [ ] 4.12 [VE3] E2E cleanup — remove temp test artifacts
+- [x] 4.12 [VE3] E2E cleanup — remove temp test artifacts
   **Do**: 删除 VE2 临时输出 + 任何测试残留 state cache。
 
   **Files**: (no edit — cleanup)
