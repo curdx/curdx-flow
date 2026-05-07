@@ -475,7 +475,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `test(recommend): add findOutliers 11 edge cases for MAD`
 
-- [ ] 3.9 [VERIFY] Quality checkpoint: typecheck + test:analyze
+- [x] 3.9 [VERIFY] Quality checkpoint: typecheck + test:analyze
   **Do**: Run 验证 recommend skeleton + MAD 测试全过。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run typecheck && npm run test:analyze`
@@ -484,7 +484,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `chore(recommend): pass quality checkpoint after MAD skeleton+tests`
 
-- [ ] 3.10 Extend integration.test.ts with sample-with-usage.jsonl
+- [x] 3.10 Extend integration.test.ts with sample-with-usage.jsonl
   **Do**: 在 integration.test.ts 加测试组 "OB-3 cost pipeline"：用 Task 0.1 fixture 跑 `runAnalyze({costSummary: true, json: true})` → assert 输出含 `costBreakdown.R1_perSpec/R2_perPhase/R3_perTask/R7_topN` (array) + `totalCost.usd` (number > 0) + 7 现有 flat section 仍存在 (NFR-6)。**老 schema 行（缺嵌套）必须不导致 throw**（FR-PARSER-3 / US-11）。
 
   **Files**:

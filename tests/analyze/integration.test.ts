@@ -63,8 +63,10 @@ vi.mock('node:os', async () => {
 });
 
 import { runAnalyze } from '../../src/analyze/index.ts';
+import { extractUsageRowsFromEvents } from '../../src/analyze/cost.ts';
+import { filterEvents } from '../../src/analyze/filter.ts';
 import { parseTranscript } from '../../src/analyze/parser.ts';
-import type { Counters } from '../../src/analyze/types.ts';
+import type { Counters, Event } from '../../src/analyze/types.ts';
 
 const REAL_FIXTURE = path.resolve(process.cwd(), 'tests/analyze/fixtures/sample.jsonl');
 const STATE_DIR = path.join(FAKE_HOME, '.claude', 'curdx-flow');
@@ -271,5 +273,265 @@ describe('analyze integration', () => {
         "subagentsCount": 1,
       }
     `);
+  });
+});
+
+// OB-3 cost pipeline (Task 3.10) — assert the cost branch wires through
+// runAnalyze end-to-end with a usage-bearing fixture and that the existing
+// 7 flat report sections survive untouched (NFR-6 / FR-REPORT-2).
+//
+// Why a synthesized fixture instead of /tests/analyze/fixtures/sample-with-usage.jsonl?
+//   The Phase 0 fixture intentionally uses dated model ids (e.g.
+//   `claude-opus-4-7-20260301`) which `pricing.ts#PRICING` does not carry —
+//   `resolveModelId` returns undefined and `computeCost` floors to $0. That is
+//   recorded behavior (.progress.md Task 1.7 Learnings) and locks AC0
+//   "totalCost.usd != null" but cannot satisfy this task's stricter
+//   "totalCost.usd > 0" gate. We stage a sibling fixture in tmpdir whose
+//   model ids resolve through PRICING/MODEL_ALIASES so the cost branch
+//   produces a real positive figure, AND we re-use the canonical Phase 0
+//   fixture's last row (legacy schema — only top-level
+//   `cache_creation_input_tokens`) verbatim to exercise FR-PARSER-3 / US-11
+//   backward compat round-trip.
+describe('OB-3 cost pipeline', () => {
+  // Three rows that exercise PRICING for all three models + 1 sidechain
+  // (isSidechain:true) + 1 legacy-schema row (no nested cache_creation).
+  // Canonical correlationId 3-segment: <sid>:<task>:<iter> (OB-2 lock).
+  const COST_FIXTURE_ROWS = [
+    // Opus 4.7 — input=1M, output=0, cache_read=0, cache_5m=0, cache_1h=0
+    // → 1M × $5/M = $5.0000 expected.
+    {
+      type: 'assistant',
+      timestamp: '2026-05-07T08:00:00.000Z',
+      uuid: 'cost-int-0001',
+      sessionId: 'cost-sess-001',
+      requestId: 'req_opus_int_001',
+      correlationId: 'cost-sess-001:1.1:1',
+      message: {
+        id: 'msg_opus_int_001',
+        role: 'assistant',
+        model: 'claude-opus-4-7',
+        content: [{ type: 'text', text: 'Integration cost row — Opus.' }],
+        usage: {
+          input_tokens: 1_000_000,
+          output_tokens: 0,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 },
+        },
+      },
+    },
+    // Sonnet 4.6 — output=1M only → 1M × $15/M = $15.0000.
+    {
+      type: 'assistant',
+      timestamp: '2026-05-07T08:00:05.000Z',
+      uuid: 'cost-int-0002',
+      sessionId: 'cost-sess-001',
+      requestId: 'req_sonnet_int_001',
+      correlationId: 'cost-sess-001:1.2:1',
+      message: {
+        id: 'msg_sonnet_int_001',
+        role: 'assistant',
+        model: 'claude-sonnet-4-6',
+        content: [{ type: 'text', text: 'Integration cost row — Sonnet.' }],
+        usage: {
+          input_tokens: 0,
+          output_tokens: 1_000_000,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 },
+        },
+      },
+    },
+    // Haiku 4.5 (alias) — output=1M → 1M × $5/M = $5.0000.
+    {
+      type: 'assistant',
+      timestamp: '2026-05-07T08:00:10.000Z',
+      uuid: 'cost-int-0003',
+      sessionId: 'cost-sess-001',
+      requestId: 'req_haiku_int_001',
+      correlationId: 'cost-sess-001:1.3:1',
+      message: {
+        id: 'msg_haiku_int_001',
+        role: 'assistant',
+        model: 'claude-haiku-4-5',
+        content: [{ type: 'text', text: 'Integration cost row — Haiku alias.' }],
+        usage: {
+          input_tokens: 0,
+          output_tokens: 1_000_000,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 },
+        },
+      },
+    },
+    // Sidechain subagent — same correlationId as 1.2 parent (R3 task-level
+    // groups child rows under parent task bucket).
+    {
+      type: 'assistant',
+      timestamp: '2026-05-07T08:00:15.000Z',
+      uuid: 'cost-int-0004',
+      sessionId: 'cost-sess-001',
+      requestId: 'req_subagent_int_001',
+      correlationId: 'cost-sess-001:1.2:1',
+      isSidechain: true,
+      message: {
+        id: 'msg_subagent_int_001',
+        role: 'assistant',
+        model: 'claude-sonnet-4-6',
+        content: [{ type: 'text', text: 'Subagent body for integration test.' }],
+        usage: {
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 },
+        },
+      },
+    },
+    // Legacy-schema row — NO nested `cache_creation`, only top-level
+    // `cache_creation_input_tokens` (FR-PARSER-3 backward compat fallback;
+    // cost.ts attributes the legacy bucket entirely to the 5m slot).
+    {
+      type: 'assistant',
+      timestamp: '2026-05-07T08:00:20.000Z',
+      uuid: 'cost-int-0005',
+      sessionId: 'cost-sess-001',
+      requestId: 'req_legacy_int_001',
+      correlationId: 'cost-sess-001:1.4:1',
+      message: {
+        id: 'msg_legacy_int_001',
+        role: 'assistant',
+        model: 'claude-opus-4-7',
+        content: [{ type: 'text', text: 'Legacy schema row — no nested cache_creation.' }],
+        usage: {
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+        },
+      },
+    },
+  ];
+
+  const COST_FIXTURE_DIR = path.join(tmpdir(), 'curdx-flow-integration-cost');
+  const COST_FIXTURE_PATH = path.join(COST_FIXTURE_DIR, 'sample-with-usage-int.jsonl');
+
+  beforeAll(() => {
+    if (existsSync(COST_FIXTURE_DIR)) rmSync(COST_FIXTURE_DIR, { recursive: true, force: true });
+    mkdirSync(COST_FIXTURE_DIR, { recursive: true });
+    const body = COST_FIXTURE_ROWS.map((r) => JSON.stringify(r)).join('\n') + '\n';
+    writeFileSync(COST_FIXTURE_PATH, body, 'utf8');
+  });
+
+  beforeEach(() => {
+    if (existsSync(FAKE_HOME)) rmSync(FAKE_HOME, { recursive: true, force: true });
+    mkdirSync(path.join(FAKE_HOME, '.claude', 'curdx-flow'), { recursive: true });
+  });
+
+  afterAll(() => {
+    if (existsSync(COST_FIXTURE_DIR)) rmSync(COST_FIXTURE_DIR, { recursive: true, force: true });
+    if (existsSync(FAKE_HOME)) rmSync(FAKE_HOME, { recursive: true, force: true });
+  });
+
+  it('emits costBreakdown + totalCost mirror and preserves the 7 flat sections', async () => {
+    const previousFixtureEnv = process.env.CURDX_TRANSCRIPT_FIXTURE;
+    process.env.CURDX_TRANSCRIPT_FIXTURE = COST_FIXTURE_PATH;
+    try {
+      const out = await captureStdout(() =>
+        runAnalyze({ json: true, costSummary: true, byTask: true } as Parameters<typeof runAnalyze>[0]),
+      );
+      const parsed = JSON.parse(out) as Record<string, unknown>;
+
+      // 7 flat sections must still surface (NFR-6). Names match report.ts
+      // ReportJson keys: hookFailures / slashCommands / subagents / specFunnel
+      // / hookDuration / schemaDrift / parentChain.
+      const SEVEN_FLAT_KEYS = [
+        'hookFailures',
+        'slashCommands',
+        'subagents',
+        'specFunnel',
+        'hookDuration',
+        'schemaDrift',
+        'parentChain',
+      ];
+      for (const k of SEVEN_FLAT_KEYS) {
+        expect(parsed).toHaveProperty(k);
+      }
+
+      // costBreakdown sub-keys are arrays (R1/R2/R3/R7).
+      const cb = parsed.costBreakdown as Record<string, unknown>;
+      expect(cb).toBeDefined();
+      expect(Array.isArray(cb.R1_perSpec)).toBe(true);
+      expect(Array.isArray(cb.R2_perPhase)).toBe(true);
+      expect(Array.isArray(cb.R3_perTask)).toBe(true);
+      expect(Array.isArray(cb.R7_topN)).toBe(true);
+
+      // Top-level totalCost.usd mirror is a positive number (FR-REPORT-2 /
+      // Decision 3 / Validation Hint). Fixture math: Opus $5 + Sonnet $15
+      // + Haiku $5 = $25.0000 (legacy + sidechain rows contribute $0).
+      const topTotal = (parsed.totalCost as { usd: unknown }).usd;
+      expect(typeof topTotal).toBe('number');
+      expect(topTotal).toBeGreaterThan(0);
+
+      // costBreakdown.totalCost.usd === top-level totalCost.usd (mirror).
+      const cbTotal = (cb.totalCost as { usd: unknown }).usd;
+      expect(cbTotal).toBe(topTotal);
+    } finally {
+      if (previousFixtureEnv === undefined) {
+        delete process.env.CURDX_TRANSCRIPT_FIXTURE;
+      } else {
+        process.env.CURDX_TRANSCRIPT_FIXTURE = previousFixtureEnv;
+      }
+    }
+  }, 30_000);
+
+  it('legacy-schema row round-trips through filterEvents → extractUsageRowsFromEvents without throwing (FR-PARSER-3 / US-11)', () => {
+    // Legacy row mirrors the COST_FIXTURE_ROWS legacy entry above (and the
+    // last row of /tests/analyze/fixtures/sample-with-usage.jsonl): no
+    // nested `cache_creation`, only top-level `cache_creation_input_tokens`.
+    const legacyEvent: Event = {
+      kind: 'assistant_turn',
+      ts: '2026-05-07T08:00:20.000Z',
+      uuid: 'cost-int-legacy',
+      requestId: 'req_legacy_round_trip',
+      payload: {
+        type: 'assistant',
+        timestamp: '2026-05-07T08:00:20.000Z',
+        uuid: 'cost-int-legacy',
+        requestId: 'req_legacy_round_trip',
+        correlationId: 'cost-sess-001:1.4:1',
+        message: {
+          id: 'msg_legacy_round_trip',
+          role: 'assistant',
+          model: 'claude-opus-4-7',
+          content: [{ type: 'text', text: 'Legacy schema row.' }],
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_read_input_tokens: 200,
+            cache_creation_input_tokens: 300,
+            // No nested `cache_creation` on purpose — FR-PARSER-3 fallback.
+          },
+        },
+      } as Record<string, unknown>,
+    };
+
+    // filterEvents must accept the row (dedup uses uuid|requestId composite).
+    const filtered = filterEvents([legacyEvent], { limit: 10 });
+    expect(filtered.length).toBe(1);
+
+    // extractUsageRowsFromEvents must NOT throw on the legacy shape.
+    let rows: ReturnType<typeof extractUsageRowsFromEvents> = [];
+    expect(() => {
+      rows = extractUsageRowsFromEvents(filtered, []);
+    }).not.toThrow();
+
+    // It should yield exactly 1 row, model resolved, and the legacy
+    // top-level cache_creation_input_tokens=300 must have fallen back to
+    // the 5m slot (cost.ts L300-305 fallback).
+    expect(rows.length).toBe(1);
+    expect(rows[0]?.model).toBe('claude-opus-4-7');
+    expect(rows[0]?.cacheCreate5mTokens).toBe(300);
+    expect(rows[0]?.cacheCreate1hTokens).toBe(0);
   });
 });
