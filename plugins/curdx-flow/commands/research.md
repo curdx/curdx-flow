@@ -75,7 +75,7 @@ Pass combined context to subagent delegation as "Interview Context".
 <mandatory>
 **PARALLEL EXECUTION IS MANDATORY - NO EXCEPTIONS.**
 
-Read `${CLAUDE_PLUGIN_ROOT}/references/parallel-research.md` and follow the full dispatch pattern described there.
+Read `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md` and follow the full dispatch pattern described there.
 
 Key rules:
 - Minimum 2 agents (1 research-analyst + 1 Explore). There are ZERO exceptions.
@@ -100,7 +100,7 @@ Follow the full team lifecycle: Clean up stale team (MANDATORY TeamDelete first)
 
 After ALL parallel tasks complete, merge into unified `./specs/$spec/research.md`.
 
-Read `${CLAUDE_PLUGIN_ROOT}/references/parallel-research.md` "Merging Results" section for the exact merge structure and process.
+Read `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md` "Merging Results" section for the exact merge structure and process.
 
 After merge, delete partial files: `rm ./specs/$spec/.research-*.md`
 

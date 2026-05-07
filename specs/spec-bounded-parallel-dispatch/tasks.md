@@ -49,7 +49,7 @@ Goal: create the renamed doc with full content and replace the old path with a s
 
 Goal: update the 3 confirmed hard path references from `parallel-research.md` → `bounded-parallel-dispatch.md`; grep-verify soft consumers and edit only those with literal old-path strings.
 
-- [ ] 2.1 Update hard-path refs in `commands/research.md`, `commands/start.md`, `references/triage-flow.md`; grep-verify soft consumers
+- [x] 2.1 Update hard-path refs in `commands/research.md`, `commands/start.md`, `references/triage-flow.md`; grep-verify soft consumers
   - **Do**:
     1. In `plugins/curdx-flow/commands/research.md`: replace all occurrences of `references/parallel-research.md` with `references/bounded-parallel-dispatch.md` (2 confirmed occurrences at lines 78, 103)
     2. In `plugins/curdx-flow/commands/start.md`: replace `references/parallel-research.md` with `references/bounded-parallel-dispatch.md` (1 confirmed occurrence at line 193)
