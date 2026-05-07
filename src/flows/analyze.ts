@@ -5,6 +5,7 @@ export type AnalyzeOptions = {
   json?: boolean;
   limit?: number;
   includePrompts?: boolean;
+  session?: string;
 };
 
 const analyzeCmd = defineCommand({
@@ -29,6 +30,10 @@ const analyzeCmd = defineCommand({
       type: 'boolean' as const,
       description: 'Skip prompt redaction (D-9 white-list passthrough disabled — local debugging only)',
     },
+    session: {
+      type: 'string' as const,
+      description: 'Filter to single session UUID (matches <uuid>.jsonl in encoded project dir)',
+    },
   },
   async run({ args }) {
     const limitRaw = args.limit;
@@ -39,6 +44,7 @@ const analyzeCmd = defineCommand({
       json: Boolean(args.json),
       limit: Number.isFinite(limit) ? (limit as number) : undefined,
       includePrompts: Boolean((args as Record<string, unknown>)['include-prompts']),
+      session: typeof args.session === 'string' && args.session.length > 0 ? args.session : undefined,
     });
   },
 });

@@ -14,13 +14,13 @@ import { getStateForPath, loadSchemaMap, parseTranscript, shouldRotate } from '.
 import { redactEvent, redactReportFields } from './redact.ts';
 import { renderReport } from './report.ts';
 import type { ErrorLogEntry, ReportJson, SpecStateInfo } from './report.ts';
+import { resolveTranscriptSource, TranscriptNotFoundError } from './transcript-path.ts';
 import type { Counters, Event, Options, StateFile } from './types.ts';
 
 export type RunAnalyzeOptions = Options;
 
 export type AnalyzeReport = ReportJson;
 
-const POC_FIXTURE_REL = 'tests/analyze/fixtures/sample.jsonl';
 const STATE_DIR = path.join(homedir(), '.claude', 'curdx-flow');
 const STATE_PATH = path.join(STATE_DIR, 'observability-state.json');
 const ERRORS_LOG_PATH = path.join(STATE_DIR, 'errors.jsonl');
@@ -108,26 +108,50 @@ function loadErrorEntries(): ErrorLogEntry[] {
   return out;
 }
 
-export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
-  const fixturePath = path.resolve(process.cwd(), POC_FIXTURE_REL);
+async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
+  // Resolve transcript source: real Claude Code project dir (default) or
+  // CURDX_TRANSCRIPT_FIXTURE override (legacy / test path). Throws
+  // TranscriptNotFoundError if neither yields any `.jsonl` — caught at the
+  // top-level wrapper for friendly 2-line stderr + exit 1 (D1 / AC3).
+  const source = resolveTranscriptSource({
+    fixtureOverride: process.env.CURDX_TRANSCRIPT_FIXTURE,
+    sessionFilter: opts.session,
+  });
   const limit = Number(opts.limit) || 10;
 
   const state = readState();
-  const stat = statSync(fixturePath);
-  const prevForPath = state.files[fixturePath];
-  const rotate = shouldRotate(prevForPath, { sizeBytes: stat.size, lastModifiedMs: stat.mtimeMs });
-  const startOffset = rotate || !prevForPath ? 0 : prevForPath.byteOffset;
 
-  // Incremental tail with no new bytes → replay the last persisted report so
-  // `analyze` is idempotent across runs (verifies via `diff /tmp/a.json /tmp/b.json`).
-  // Cache is keyed implicitly by includePrompts — toggling the flag MUST bust
-  // the cache because the redacted vs. unredacted reports diverge.
+  // Per-path stat + rotation: rotation is checked per session file because
+  // each `.jsonl` has independent size/mtime. We aggregate stats so the
+  // idempotent-replay short-circuit only triggers when EVERY path is
+  // unchanged at its last byteOffset (any new bytes anywhere → re-render).
+  type PathStat = {
+    p: string;
+    sizeBytes: number;
+    lastModifiedMs: number;
+    rotate: boolean;
+    startOffset: number;
+  };
+  const pathStats: PathStat[] = [];
+  let allCachedReady = true;
+  for (const p of source.paths) {
+    const stat = statSync(p);
+    const prev = state.files[p];
+    const rotate = shouldRotate(prev, { sizeBytes: stat.size, lastModifiedMs: stat.mtimeMs });
+    const startOffset = rotate || !prev ? 0 : prev.byteOffset;
+    if (rotate || !prev || startOffset < stat.size) allCachedReady = false;
+    pathStats.push({ p, sizeBytes: stat.size, lastModifiedMs: stat.mtimeMs, rotate, startOffset });
+  }
+
+  // Incremental tail with no new bytes across ALL paths → replay the last
+  // persisted report so `analyze` is idempotent across runs. Cache is keyed
+  // implicitly by includePrompts — toggling the flag MUST bust the cache
+  // because the redacted vs. unredacted reports diverge.
   const includePrompts = Boolean(opts.includePrompts);
   const cacheCompatible = (state.lastIncludePrompts ?? false) === includePrompts;
   if (
-    !rotate &&
-    prevForPath &&
-    startOffset >= stat.size &&
+    allCachedReady &&
+    pathStats.length > 0 &&
     cacheCompatible &&
     (state.lastReportJson || state.lastReportMarkdown)
   ) {
@@ -147,8 +171,14 @@ export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
   const counters: Counters = { unknown_type: 0, parse_error: 0, processed: 0 };
   const collected: Event[] = [];
   try {
-    for await (const ev of parseTranscript(fixturePath, startOffset, schemaMap, counters)) {
-      collected.push(ev);
+    // Multi-file aggregation: parse each path's tail, collect into a single
+    // event list, then dedupe/filter downstream. Order across files is
+    // unstable here; filter.ts dedupes on `uuid|requestId` so ordering only
+    // matters for tie-break reporting (acceptable for v1).
+    for (const { p, startOffset } of pathStats) {
+      for await (const ev of parseTranscript(p, startOffset, schemaMap, counters)) {
+        collected.push(ev);
+      }
     }
 
     // D-9 redact-by-default: drop file-history-snapshot, scrub user prompts,
@@ -200,12 +230,34 @@ export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
       );
     }
   } finally {
-    state.files[fixturePath] = {
-      byteOffset: stat.size,
-      lastModifiedMs: stat.mtimeMs,
-      sizeBytes: stat.size,
-    };
+    // Per-path state entry: each session's resume offset is independent, so
+    // rotation detection (size/mtime regression) keys on its own file.
+    for (const ps of pathStats) {
+      state.files[ps.p] = {
+        byteOffset: ps.sizeBytes,
+        lastModifiedMs: ps.lastModifiedMs,
+        sizeBytes: ps.sizeBytes,
+      };
+    }
     void getStateForPath; // satisfy unused-import lint; helper is exported for tests.
     writeState(state);
+  }
+}
+
+/**
+ * Top-level wrapper: catches `TranscriptNotFoundError` and emits a friendly
+ * 2-line stderr message + exits with code 1 (D1 / AC3). Other errors
+ * propagate so unit tests still see real stack traces.
+ */
+export async function runAnalyze(opts: RunAnalyzeOptions): Promise<void> {
+  try {
+    await runAnalyzeInner(opts);
+  } catch (err) {
+    if (err instanceof TranscriptNotFoundError) {
+      process.stderr.write(`warning: no transcripts found at ${err.path}\n`);
+      process.stderr.write(`hint: ${err.hint}\n`);
+      process.exit(1);
+    }
+    throw err;
   }
 }

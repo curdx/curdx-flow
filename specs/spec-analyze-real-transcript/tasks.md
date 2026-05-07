@@ -27,7 +27,7 @@ Task 1.3 — `resolveTranscriptSource()` wired into index.ts; integration test g
   - **Commit**: `feat(analyze): add transcript-path resolver with encoding + glob + realpath cache`
   - _Requirements: AC1, AC2, AC3, AC4 | Design: Component 1, D1, D3, D4_
 
-- [ ] 1.2 Replace 5 fixture sites in `index.ts` + wire `--session` arg + top-level error catch
+- [x] 1.2 Replace 5 fixture sites in `index.ts` + wire `--session` arg + top-level error catch
   - **Do**:
     1. Delete L23 `POC_FIXTURE_REL` const
     2. L112: replace `path.resolve(cwd, POC_FIXTURE_REL)` with `const source = resolveTranscriptSource({ cwd, fixtureOverride: process.env.CURDX_TRANSCRIPT_FIXTURE, sessionFilter: args.session })`

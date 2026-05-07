@@ -57,6 +57,8 @@ export interface Options {
   since?: string;
   project?: string;
   includePrompts?: boolean;
+  /** Filter to single session UUID — wired through resolveTranscriptSource. */
+  session?: string;
 }
 
 /**
