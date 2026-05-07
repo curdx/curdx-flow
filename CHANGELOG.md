@@ -2,6 +2,22 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added (OB-3 — cost-time-token analytics)
+
+- **`npx curdx-flow analyze --cost-summary` flag suite (OB-3).** New citty flag set on the `analyze` subcommand that turns on cost / time / token aggregation across the spec funnel. Companion flags `--by-spec` (group rows by spec id), `--by-task` (per-task drill-down), `--since <duration>` (time window — `7d`, `24h`, etc.), and `--include-recommendations` (toggle the rules-engine output) compose freely. Default off — the v7.1.7 baseline `analyze` 7-section report is byte-equal preserved when the cost flags are absent.
+- **`src/analyze/pricing.ts` — hardcoded pricing table + `LAST_UPDATED` constant.** Zero npm runtime deps. Per-model rows for `input`, `output`, `cache_creation`, `cache_read` (per-1M-token USD). Quarterly self-check: `--cost-summary` emits a stderr warning when `today - LAST_UPDATED > 90 days`. Refresh workflow documented in `README.md → Pricing Refresh Workflow` (3-step: WebFetch official → diff `PRICING` → bump `LAST_UPDATED` + CHANGELOG entry).
+- **`src/analyze/recommend.ts` — 8-rule recommendation engine.** Pure-function rules engine that consumes the cost/time/token aggregates and emits ordered text recommendations (rules R1-R8 — cache hit-rate, retry-loop count, output-skew, output:input ratio, cache_creation:cache_read ratio, p99/median latency outlier, MAD-based token outlier, subagent fan-out depth). Threshold constants centralized in `REC_THRESHOLDS` for future tuning. Wired into `--include-recommendations` and the `recommendations` field of `--json` output.
+- **`tests/analyze/fixtures/sample-with-usage.jsonl` fixture.** Synthetic transcript carrying `usage` blocks with realistic cache_creation / cache_read / input / output token splits across multiple models, plus a subagent `<usage>` trailer sample (per OB-2 Decision 1 trailer-handling contract). Drives the cost-aggregation snapshot tests so any regression in `pricing.ts` × `recommend.ts` × the per-spec/per-task aggregator surfaces as a snapshot diff.
+- **Cost Breakdown report section (R1-R7 seven tables).** New markdown section emitted by `--cost-summary` covering: (R1) total cost / time / tokens, (R2) per-model cost split, (R3) per-task cost (correlationId join `<sid>:<task>:<iter>`), (R4) per-spec rollup, (R5) cache efficiency (hit-rate + creation-vs-read ratio), (R6) latency percentiles (p50/p95/p99 per phase), (R7) token-anomaly outliers (MAD-based). Each table is independently togglable via `--by-spec` / `--by-task` filters.
+- **Recommendations section in `--json` output.** Top-level `recommendations: string[]` array on the JSON shape, alongside the new top-level `costBreakdown: { totals, byModel, byTask, bySpec, cacheEfficiency, latency, outliers }` object. The pre-existing JSON keys (hookFailures, slashCommands, subagents, specFunnel, hookDuration, schemaDrift, parentUuidChain) are preserved byte-equal so existing downstream consumers that grep the v7.1.7 keys keep working.
+
+### Changed
+
+- **`analyze` CLI gained 5 cost-related flags (`--cost-summary`, `--by-spec`, `--by-task`, `--since`, `--include-recommendations`).** All five are off-by-default. With every flag absent, `analyze` output is byte-equal to v7.1.7 (the 7-section markdown plus the existing JSON shape) — the new cost code paths are gated entirely behind `--cost-summary`. i18n: 5 new `analyze.flags.*` keys in `src/i18n/{en,zh}.ts`.
+- **`--json` output gained `costBreakdown` + `recommendations` top-level keys.** Both keys are emitted only when `--cost-summary` is set; otherwise they are absent from the JSON entirely (not `null` / not empty array — physically absent, so `JSON.stringify` byte length matches v7.1.7 for non-cost runs). Schema doc and snapshot tests pin this contract.
+
 ## 7.1.7 — 2026-05-06
 
 ### Added
