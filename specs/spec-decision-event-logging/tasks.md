@@ -88,7 +88,7 @@ Focus: Wire remaining 31 sites across 3 hooks. Each hook is one atomic task.
   - **Commit**: `feat(task-completed-verifier): wire 9 logHookEvent decision sites`
   - _Design: Component 7_
 
-- [ ] 2.3 Wire subagent-context-injector.ts (8 sites)
+- [x] 2.3 Wire subagent-context-injector.ts (8 sites)
   - **Do**:
     1. Import `logHookEvent`, `buildCorrelationId` in `src/hooks/subagent-context-injector.ts`
     2. Add `logHookEvent` at 8 sites: 6 fail-open (`kind: 'context_inject_fail_open'`), 1 success (`kind: 'context_inject_success'`), 1 error (`kind: 'unknown'`)

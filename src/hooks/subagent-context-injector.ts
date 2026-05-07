@@ -35,11 +35,13 @@ import { join } from "node:path";
 import process from "node:process";
 import { runHook } from "./_shared/run-hook.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
+import { buildCorrelationId } from "./_shared/correlation.js";
+import * as eventLog from "./_shared/error-logger.js";
 import {
   IRON_LAW_SUMMARY,
   buildContextPayload,
 } from "./lib/build-context-payload.js";
-import type { CurdxState, HookOutput } from "./_shared/types.js";
+import type { CurdxState, HookOutput, HookStdin } from "./_shared/types.js";
 
 // Reference IRON_LAW_SUMMARY at module scope to keep tree-shaking honest:
 // the constant is part of the public surface contract (drift test imports
@@ -71,17 +73,38 @@ interface SubagentContinueOutput {
 const FAIL_OPEN: SubagentContinueOutput = { continue: true };
 
 runHook(async (input) => {
+  // Cast for buildCorrelationId — the runHook envelope mirrors HookStdin's
+  // permissive shape (cwd, hook_event_name, session_id all optional).
+  const stdin = (input ?? null) as HookStdin | null;
   try {
     // Only react to SubagentStart events. If the hook is wired into a
     // different event by misconfiguration, fail open silently — never
     // poison an unrelated event with subagent context.
     const eventName = input?.hook_event_name;
     if (typeof eventName === "string" && eventName !== "SubagentStart") {
+      // Site 1/8: event mismatch — wrong hook envelope, fail-open.
+      eventLog.logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        payload: { reason: "event_mismatch", got: eventName },
+        correlationId: buildCorrelationId(stdin, null),
+      });
       return FAIL_OPEN as unknown as HookOutput;
     }
 
     const cwd = input?.cwd;
     if (typeof cwd !== "string" || cwd.length === 0) {
+      // Site 2/8: cwd missing/empty — cannot resolve spec, fail-open.
+      eventLog.logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        payload: { reason: "no_cwd" },
+        correlationId: buildCorrelationId(stdin, null),
+      });
       return FAIL_OPEN as unknown as HookOutput;
     }
 
@@ -90,12 +113,34 @@ runHook(async (input) => {
     // mixed seps on Windows — see path-resolver.ts contract).
     const specPath = resolveCurrent({ cwd });
     if (!specPath) {
+      // Site 3/8: no active spec — not a curdx project, fail-open.
+      eventLog.logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        payload: { reason: "no_spec" },
+        correlationId: buildCorrelationId(stdin, null),
+        cwd,
+      });
       return FAIL_OPEN as unknown as HookOutput;
     }
 
     const specDirFs = join(cwd, specPath);
     const stateFile = join(specDirFs, ".curdx-state.json");
     if (!existsSync(stateFile)) {
+      // Site 4/8: state file missing — pre-/post-loop, fail-open.
+      eventLog.logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        payload: { reason: "no_state", specPath },
+        correlationId: buildCorrelationId(stdin, null),
+        cwd,
+        spec: specPath,
+        path: stateFile,
+      });
       return FAIL_OPEN as unknown as HookOutput;
     }
 
@@ -107,12 +152,36 @@ runHook(async (input) => {
       process.stderr.write(
         `[subagent-context-injector] state parse failed: ${msg}\n`,
       );
+      // Site 5/8: state JSON parse fail — corrupt state, fail-open per FR-FailOpen.
+      eventLog.logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        msg: `state parse failed: ${msg}`,
+        payload: { reason: "state_parse_fail", specPath },
+        correlationId: buildCorrelationId(stdin, null),
+        cwd,
+        spec: specPath,
+        path: stateFile,
+      });
       return FAIL_OPEN as unknown as HookOutput;
     }
 
     // Completed spec → no injection. Coordinator should not dispatch
     // subagents under a completed spec; if it does, this hook stays silent.
     if (state.completed === true) {
+      // Site 6/8: completed spec — no injection needed, fail-open.
+      eventLog.logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        payload: { reason: "completed_spec", specPath },
+        correlationId: buildCorrelationId(stdin, state),
+        cwd,
+        spec: specPath,
+      });
       return FAIL_OPEN as unknown as HookOutput;
     }
 
@@ -131,13 +200,40 @@ runHook(async (input) => {
       },
       continue: true,
     };
+    // Site 7/8: success — context injected. Track payload byte size for
+    // NFR-1 (≤2KB) cost-analytics roll-up.
+    eventLog.logHookEvent({
+      hook: "subagent-context-injector",
+      event: "SubagentStart",
+      level: "info",
+      kind: "subagent_context_injected",
+      payload: {
+        bytes: Buffer.byteLength(additionalContext, "utf8"),
+        specPath,
+      },
+      correlationId: buildCorrelationId(stdin, state),
+      cwd,
+      spec: specPath,
+    });
     return out as unknown as HookOutput;
   } catch (e) {
     // Any throw from the lib (PayloadOverBudgetError, unexpected) or fs
     // surface lands here. FR-FailOpen: emit {continue:true} with stderr
     // trace, never block dispatch.
     const msg = e instanceof Error ? e.message : String(e);
+    const stack = e instanceof Error ? e.stack : undefined;
     process.stderr.write(`[subagent-context-injector] ${msg}\n`);
+    // Site 8/8: error fallback — unexpected throw, fail-open with error level.
+    eventLog.logHookEvent({
+      hook: "subagent-context-injector",
+      event: "SubagentStart",
+      level: "error",
+      kind: "subagent_injection_failed",
+      msg,
+      stack,
+      correlationId: buildCorrelationId(stdin, null),
+      cwd: typeof input?.cwd === "string" ? input.cwd : undefined,
+    });
     return FAIL_OPEN as unknown as HookOutput;
   }
 });
