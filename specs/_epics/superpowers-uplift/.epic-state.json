@@ -33,12 +33,13 @@
     },
     {
       "name": "spec-subagent-context-reinjection",
-      "status": "pending",
+      "status": "completed",
+      "completedAt": "2026-05-07",
       "dependencies": [
         "spec-verification-iron-law"
       ],
       "size": "S-M",
-      "preCheck": "verify SubagentStart event GA in target Claude Code version"
+      "preCheckResolved": "SubagentStart event verified GA — no opt-in required"
     },
     {
       "name": "spec-cost-runaway-guards",
