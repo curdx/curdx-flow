@@ -65,6 +65,7 @@ import { runHook } from "./_shared/run-hook.js";
 import { getSpecsDirs, resolveCurrent } from "./_shared/path-resolver.js";
 import { writeFileAtomic } from "./_shared/atomic-write.js";
 import { extractTaskBlock } from "./_shared/markdown-task-parser.js";
+import { getVerificationPhase, verifyPhaseBlock } from "./lib/verify-blocks.js";
 import type { BlockDecisionOutput } from "./_shared/types.js";
 import type { CurdxState } from "./_shared/types.js";
 
@@ -416,6 +417,97 @@ function extractParallelGroupBlock(
   return block.replace(/\n+$/, "");
 }
 
+/**
+ * Build a Layer-1 iron-law gate block decision from a `verifyPhaseBlock`
+ * result. Emitted when a phase is about to exit but the recorded
+ * `verificationBlocks[phase]` is missing, failed, or stale.
+ *
+ * Message formats — canonical per design.md §Error Handling table (L352-356)
+ * + NFR-3 actionability (Task 4.2): every fail message embeds **phase id,
+ * fix command, and spec context** so the user can act without further
+ * lookup.
+ *
+ *   - "missing": `Phase '<phase>' has no verification block. Run: <cmd>. Spec: <specName>. Then try again.`
+ *   - stale (reason from verify-blocks already starts with `Phase '<phase>' stale evidence: ...`)
+ *     pass-through verbatim — verify-blocks.ts owns the canonical stale
+ *     wording and embeds all 3 NFR-3 fields itself.
+ *   - any other reason → failed: `Phase '<phase>' verification failed: <reason>. Fix and re-run: <cmd>. Spec: <specName>.`
+ *
+ * The `<cmd>` placeholder for the missing case falls back to a phase-aware
+ * `/curdx-flow:<phase>` hint when verify-blocks couldn't recover the original
+ * command (it returns `command: ""` for the missing branch).
+ *
+ * `specName` is the human-recognizable identifier for the active spec (the
+ * basename of `specDir`). Callers in this file already compute `specName`
+ * via `basename(specPath)` so the threading is zero-cost.
+ */
+function buildVerificationBlockFailDecision(
+  phase: string,
+  result: { reason?: string; command?: string },
+  specName: string,
+): BlockDecision {
+  const cmd =
+    typeof result.command === "string" && result.command.length > 0
+      ? result.command
+      : `/curdx-flow:${phase} (re-run phase to record verification)`;
+  let reason: string;
+  let systemMessage: string;
+  if (result.reason === "missing") {
+    reason = `Phase '${phase}' has no verification block. Run: ${cmd}. Spec: ${specName}. Then try again.`;
+    systemMessage = `curdx-flow: phase '${phase}' missing verification block (spec: ${specName})`;
+  } else if (
+    typeof result.reason === "string" &&
+    result.reason.startsWith("Stale evidence")
+  ) {
+    // verify-blocks.ts already produces the canonical stale message
+    // (`Stale evidence for phase '<phase>': src changed at <iso>, last
+    // verified at <iso>. Re-run: <cmd>. Spec: <specName>.`) — all 3
+    // NFR-3 fields are embedded at the source. Pass through verbatim;
+    // re-formatting here would diverge from design L355.
+    reason = result.reason;
+    systemMessage = `curdx-flow: phase '${phase}' verification stale (spec: ${specName})`;
+  } else {
+    const detail = result.reason ?? "verification failed";
+    reason = `Verification failed for phase '${phase}': ${detail}. Fix and re-run: ${cmd}. Spec: ${specName}.`;
+    systemMessage = `curdx-flow: phase '${phase}' verification failed (spec: ${specName})`;
+  }
+  return {
+    decision: "block",
+    reason,
+    systemMessage,
+  };
+}
+
+/**
+ * Build the malformed-verificationBlocks block decision per design L357.
+ *
+ * Emitted when reading or parsing `.curdx-state.json` for the iron-law gate
+ * fails (JSON.parse error, or any thrown access on a malformed shape).
+ * Distinct from `buildCorruptStateBlock` because this path is reached BEFORE
+ * the general state validation in the non-completion code path — when an
+ * `ALL_TASKS_COMPLETE` marker has been seen and we are about to allow the
+ * loop to stop, malformed state must surface a verificationBlocks-specific
+ * message that points the user at the iron-law reference doc.
+ *
+ * NFR-3 (Task 4.2): the malformed branch lacks a meaningful phase id (the
+ * state itself is unparseable, so we cannot read `state.phase`), so the
+ * `<phase>` slot collapses to a literal `'unknown'` placeholder. Fix
+ * command and spec context still appear so the user can locate the file
+ * and follow the recovery cookbook.
+ */
+function buildMalformedVerificationBlock(specName: string): BlockDecision {
+  const reason =
+    `Phase 'unknown' verificationBlocks malformed in .curdx-state.json. ` +
+    `Fix: edit ${specName}/.curdx-state.json (or run /curdx-flow:cancel). ` +
+    `Spec: ${specName}. ` +
+    `See references/iron-law-verification.md.`;
+  return {
+    decision: "block",
+    reason,
+    systemMessage: `curdx-flow: verificationBlocks malformed (spec: ${specName})`,
+  };
+}
+
 /** Build the corrupt-state recovery block decision (L121-138). */
 function buildCorruptStateBlock(specPath: string): BlockDecision {
   const reason =
@@ -442,6 +534,67 @@ function buildQuickModeBlock(phase: string, specName: string): BlockDecision {
     reason,
     systemMessage: `curdx-flow quick mode: continue ${phase} phase`,
   };
+}
+
+/**
+ * Build the cost-runaway hard-block decision (spec-cost-runaway-guards D4).
+ *
+ * Replaces the v6/v7.1 soft `stderr` warn that allowed the loop to continue
+ * burning tokens after caps were hit. Returns `null` when both caps are still
+ * under their limit so the caller falls through to the existing gates.
+ *
+ * Message format mirrors `buildVerificationBlockFailDecision` (NFR-3):
+ * phase + cap value + actionable 3-step remediation.
+ */
+function buildCostRunawayBlock(
+  state: CurdxState,
+  specName: string,
+  stateFilePath: string,
+): BlockDecision | null {
+  const globalIter =
+    typeof state.globalIteration === "number" ? state.globalIteration : 1;
+  const maxGlobal =
+    typeof state.maxGlobalIterations === "number"
+      ? state.maxGlobalIterations
+      : 100;
+  const taskIter =
+    typeof state.taskIteration === "number" ? state.taskIteration : 1;
+  const maxTask =
+    typeof state.maxTaskIterations === "number"
+      ? state.maxTaskIterations
+      : 5;
+
+  if (globalIter >= maxGlobal) {
+    const reason =
+      `Cost runaway guard tripped: globalIteration=${globalIter} >= maxGlobalIterations=${maxGlobal}.\n` +
+      `Loop blocked. Either:\n` +
+      `- Investigate why your loop ran ${globalIter} iterations (check .progress.md)\n` +
+      `- Override with: /curdx-flow:implement --max-global-iterations <higher-cap>\n` +
+      `- Reset by editing ${stateFilePath}: set globalIteration to a lower value\n` +
+      `\n` +
+      `Spec: ${specName}  Phase: implement`;
+    return {
+      decision: "block",
+      reason,
+      systemMessage: `curdx-flow: cost runaway — globalIteration cap reached (${specName})`,
+    };
+  }
+  if (taskIter >= maxTask) {
+    const reason =
+      `Cost runaway guard tripped: taskIteration=${taskIter} >= maxTaskIterations=${maxTask}.\n` +
+      `Loop blocked. Either:\n` +
+      `- Investigate why your loop ran ${taskIter} iterations (check .progress.md)\n` +
+      `- Override with: /curdx-flow:implement --max-task-iterations <higher-cap>\n` +
+      `- Reset by editing ${stateFilePath}: set taskIteration to a lower value\n` +
+      `\n` +
+      `Spec: ${specName}  Phase: implement`;
+    return {
+      decision: "block",
+      reason,
+      systemMessage: `curdx-flow: cost runaway — taskIteration cap reached (${specName})`,
+    };
+  }
+  return null;
 }
 
 /** Build the unchecked-tasks block decision (L198-216). */
@@ -526,6 +679,15 @@ function buildContinuationBlock(args: {
 }
 
 runHook(async (input) => {
+  // D5: canonical early-exit guard — owned by spec A
+  // (spec-verification-iron-law). Any stop-hook re-invocation must short-circuit
+  // here BEFORE any other logic (settings read, state parse, transcript scan,
+  // verificationBlocks read by future spec E). Behavior preserved: silent
+  // return = allow stop (runHook serializes void as no-decision).
+  if (input?.stop_hook_active === true) {
+    return;
+  }
+
   const cwd = input?.cwd;
   if (!cwd) return;
 
@@ -548,38 +710,104 @@ runHook(async (input) => {
   // Race-condition safeguard.
   await maybeWaitForRecentStateFile(stateFile);
 
+  // Cost-runaway hard gate (spec-cost-runaway-guards C2/D4).
+  // First hard gate after `stop_hook_active` early-exit: if either iteration
+  // cap is hit, block immediately with an actionable D4 message instead of the
+  // pre-7.2 soft stderr warn. Parse-failure here is intentionally swallowed —
+  // the existing `buildCorruptStateBlock` path below handles malformed state.
+  try {
+    const capState = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
+    if (capState.completed !== true) {
+      const runawayBlock = buildCostRunawayBlock(capState, specName, stateFile);
+      if (runawayBlock) return runawayBlock;
+    }
+  } catch {
+    // fall through to existing corrupt-state handling
+  }
+
   // ALL_TASKS_COMPLETE detection (primary 500 lines + fallback 20 lines).
   const transcriptPath = input.transcript_path;
   if (transcriptPath && existsSync(transcriptPath)) {
-    const handleCompletion = (variant: "primary" | "fallback") => {
+    const handleCompletion = async (
+      variant: "primary" | "fallback",
+    ): Promise<BlockDecision | undefined> => {
       const label =
         variant === "primary"
           ? "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript"
           : "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript (tail-end)";
       process.stderr.write(label + "\n");
-      // Read state for epicName (best-effort; if state is corrupt we still exit).
-      let epicName: string | undefined;
+      // Read state for epicName + Layer-1 iron-law gate. JSON.parse failure
+      // here is treated as malformed verificationBlocks per design L357 —
+      // emit the canonical malformed message rather than silently allowing
+      // stop. Note: a separate `buildCorruptStateBlock` path still catches
+      // generic state corruption on the non-completion code path below.
+      let parsedState: CurdxState | undefined;
+      let stateMalformed = false;
       try {
-        const st = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
-        epicName = typeof st.epicName === "string" && st.epicName.length > 0
-          ? st.epicName
-          : undefined;
+        parsedState = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
       } catch {
-        epicName = undefined;
+        parsedState = undefined;
+        stateMalformed = true;
       }
+      if (stateMalformed) {
+        return buildMalformedVerificationBlock(specName);
+      }
+      const epicName =
+        parsedState && typeof parsedState.epicName === "string" &&
+          parsedState.epicName.length > 0
+          ? parsedState.epicName
+          : undefined;
+
+      // Layer-1 iron-law gate (spec-verification-iron-law Tasks 1.6 / 2.2 / 2.3):
+      // before allowing the loop to terminate on ALL_TASKS_COMPLETE, require
+      // the active phase to have a recorded verification block that is
+      // present, exitCode==0, and not stale. The three failure classes
+      // (missing / failed / stale) map to canonical messages per design.md
+      // §Error Handling (L352-356); a fourth class (malformed JSON) is
+      // handled above. Skipped when phase isn't a known VerificationPhase
+      // (e.g. legacy states with phase="unknown" — fail-open per FR-8).
+      // Shared phase-detection lives in lib/verify-blocks.ts (Task 4.1 DRY).
+      if (parsedState) {
+        const knownPhase = getVerificationPhase(parsedState);
+        if (knownPhase !== null) {
+          let result;
+          try {
+            result = await verifyPhaseBlock(
+              parsedState,
+              knownPhase,
+              join(cwd, specPath),
+            );
+          } catch {
+            // Unexpected throw inside verify-blocks (e.g. malformed shape on
+            // verificationBlocks access). Surface the malformed message.
+            return buildMalformedVerificationBlock(specName);
+          }
+          if (!result.ok) {
+            return buildVerificationBlockFailDecision(
+              knownPhase,
+              result,
+              specName,
+            );
+          }
+        }
+      }
+
       const currentEpicFile = join(cwd, "specs", ".current-epic");
       if (epicName && existsSync(currentEpicFile)) {
         markSpecCompletedInEpic(cwd, epicName, specName);
       }
       fireUpdateSpecIndex();
+      return undefined;
     };
 
     if (tailContainsCompletionMarker(transcriptPath, 500)) {
-      handleCompletion("primary");
+      const blocked = await handleCompletion("primary");
+      if (blocked) return blocked;
       return;
     }
     if (tailContainsCompletionMarker(transcriptPath, 20)) {
-      handleCompletion("fallback");
+      const blocked = await handleCompletion("fallback");
+      if (blocked) return blocked;
       return;
     }
   }
@@ -618,30 +846,15 @@ runHook(async (input) => {
   const nativeSync = defaultTrueIfFalsyOrNull(state.nativeSyncEnabled);
   const globalIteration =
     typeof state.globalIteration === "number" ? state.globalIteration : 1;
-  const maxGlobal =
-    typeof state.maxGlobalIterations === "number"
-      ? state.maxGlobalIterations
-      : 100;
 
-  // Global iteration limit.
-  if (globalIteration >= maxGlobal) {
-    process.stderr.write(
-      `[curdx-flow] ERROR: Maximum global iterations (${maxGlobal}) reached. Review .progress.md for failure patterns.\n`,
-    );
-    process.stderr.write(
-      `[curdx-flow] Recovery: fix issues manually, then run /curdx-flow:implement or /curdx-flow:cancel\n`,
-    );
-    return;
-  }
+  // Global iteration cap is now enforced upstream as a hard block via
+  // `buildCostRunawayBlock` (spec-cost-runaway-guards C2). The soft stderr
+  // warn that previously lived here was removed in v7.2 — see CHANGELOG.
 
   // Quick-mode guard: block stop during ANY phase except execution.
+  // (D5: stop_hook_active re-invocation already short-circuited at the top of
+  // runHook; no inner guard needed here.)
   if (quickMode && phase !== "execution") {
-    if (input.stop_hook_active === true) {
-      process.stderr.write(
-        `[curdx-flow] stop_hook_active=true in quick mode, allowing stop to prevent loop\n`,
-      );
-      return;
-    }
     return buildQuickModeBlock(phase, specName);
   }
 
@@ -694,13 +907,8 @@ runHook(async (input) => {
         ? state.maxTaskIterations
         : 5;
 
-    // Re-invocation safety guard.
-    if (input.stop_hook_active === true) {
-      process.stderr.write(
-        `[curdx-flow] stop_hook_active=true, skipping continuation to prevent re-invocation loop\n`,
-      );
-      return;
-    }
+    // Re-invocation safety guard already enforced at the top of runHook
+    // (D5: canonical early-exit). No inner guard needed here.
 
     // Extract current task block via shared parser (replaces v6 awk + sed).
     const tasksFile = join(cwd, specPath, "tasks.md");

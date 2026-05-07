@@ -15,7 +15,7 @@ Create a task for each item and complete in order:
 1. **Gather context** -- resolve spec, read requirements and research
 2. **Interview** -- brainstorming dialogue (skip if `--quick`)
 3. **Execute design** -- dispatch architect-reviewer via team
-4. **Artifact review** -- spec-reviewer validation loop (only if `--quick`)
+4. **Artifact review** -- parallel two-stage review (`spec-reviewer` + `code-quality-reviewer`); QuickMode bypass per D5
 5. **Walkthrough & approval** -- display summary, get user approval
 6. **Finalize** -- update state, commit, stop
 
@@ -87,24 +87,94 @@ Follow the full team lifecycle:
 **Fallback**: If TeamCreate fails with "already leading" error, call `TeamDelete()` and retry `TeamCreate` once. If still fails, fall back to direct `Task(subagent_type: architect-reviewer)` call.
 </mandatory>
 
-## Step 4: Artifact Review (only in --quick mode)
+## Step 4: Artifact Review (Parallel Two-Stage)
 
 <mandatory>
 **Review loop must complete before walkthrough. Max 3 iterations.**
 
-If NOT `--quick`, skip to Step 5.
+This step runs the **two-stage review protocol** at the design phase boundary: `spec-reviewer` (specCompliance) and `code-quality-reviewer` (codeQuality) are dispatched **in parallel**, in ONE message, against the frozen `design.md` artifact. Both reviewers must complete before reconciliation.
 
-Invoke `spec-reviewer` via Task tool. Follow the standard review loop:
-- REVIEW_PASS: log to .progress.md, proceed
-- REVIEW_FAIL (iteration < 3): log, re-invoke architect-reviewer with feedback, loop
-- REVIEW_FAIL (iteration >= 3): graceful degradation, log warning, proceed
-- No signal: treat as REVIEW_PASS (permissive)
+**Required reading before dispatch** (read once at top of step, do not skip):
+- [`references/bounded-parallel-dispatch.md`](../references/bounded-parallel-dispatch.md) — independence criteria + the Review-domain "ALL Task calls in ONE message" rule (anti-pattern #3 + #5–#8). Both reviewers must be spawned in the SAME message.
+- [`references/two-stage-review.md`](../references/two-stage-review.md) — domain boundary table (specCompliance vs codeQuality), 3-layer drift defense, anti-rationalization rule, SLSA-shape verdict glossary, QuickMode behavior contract.
 
-**Review delegation**: Include full design.md content, iteration count, prior findings. Upstream: research.md + requirements.md.
+The two reviewers do **not** see each other's output (Layer 2 isolation). The coordinator never arbitrates findings across domains.
 
-**Revision delegation**: Re-invoke architect-reviewer with reviewer feedback and requirements.md upstream context. Focus on specific issues.
+### 4.1 Bounded parallel dispatch (per Component 3)
 
-**Error handling**: Reviewer no signal = REVIEW_PASS. Agent failure = retry once, then use original.
+```
+1. TeamDelete()                      # MANDATORY first action — releases any stale team
+2. TeamCreate(team_name: "review-design-$spec")
+3. TaskCreate(subject: "Spec-compliance review of design.md",
+              activeForm: "Reviewing design (spec-compliance)")
+   TaskCreate(subject: "Code-quality review of design.md",
+              activeForm: "Reviewing design (code-quality)")
+4. # ALL Task calls in ONE message — see bounded-parallel-dispatch.md anti-pattern #3
+   Task(subagent_type: spec-reviewer,
+        team_name: "review-design-$spec",
+        name: "compliance-1",
+        prompt: "Review ./specs/$spec/design.md for spec-compliance ONLY.
+                 Upstream: requirements.md + research.md.
+                 Your domain: traceability, phase artifact structure, requirement
+                 coverage, artifact format. Do NOT comment on code-quality concerns
+                 (smell / security / readability / test-shape) — those belong to the
+                 peer code-quality-reviewer (which you do NOT see and MUST NOT
+                 reference). Emit a markdown findings table and a final line
+                 `REVIEW_PASS` or `REVIEW_FAIL` (byte-equal).")
+   Task(subagent_type: code-quality-reviewer,
+        team_name: "review-design-$spec",
+        name: "quality-1",
+        prompt: "Review ./specs/$spec/design.md for code-quality ONLY.
+                 Your domain: code smell / security / implementation quality /
+                 readability / test quality / no-hallucinations. Do NOT comment
+                 on traceability to requirements / phase artifact structure /
+                 requirement coverage / artifact format / front-matter — those
+                 belong to spec-reviewer (which you do NOT see and MUST NOT
+                 reference). Emit a markdown findings table and a final line
+                 `REVIEW_PASS` or `REVIEW_FAIL` (byte-equal).")
+5. # Wait for both teammates to finish via TaskList; collect REVIEW_PASS/REVIEW_FAIL final lines.
+6. # Persist verdicts under verificationBlocks.design.reviews via merge-state (FR-T3 — never hand-edit state):
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" \
+     "$SPEC_PATH/.curdx-state.json" \
+     '{"verificationBlocks":{"design":{"reviews":{
+        "specCompliance":{"verdict":"<PASS|FAIL>","findings":[...],"reviewerId":"spec-compliance","timestamp":"<ISO8601>"},
+        "codeQuality":{"verdict":"<PASS|FAIL>","findings":[...],"reviewerId":"code-quality","timestamp":"<ISO8601>"}
+     }}}}'
+7. SendMessage(type: "shutdown_request", recipient: "compliance-1")
+   SendMessage(type: "shutdown_request", recipient: "quality-1")
+8. TeamDelete()
+```
+
+### 4.2 QuickMode branch (D5)
+
+Read `state.quickMode` from `.curdx-state.json`. **specCompliance is always a hard gate**; QuickMode only relaxes codeQuality.
+
+```
+if state.quickMode === true:
+  if specCompliance.verdict === "FAIL":
+    # Hard gate even in QuickMode — FR-M2 reverse contract.
+    block; show findings; do NOT advance to Step 5.
+  if codeQuality.verdict === "FAIL":
+    # Advisory downgrade — set advisory:true via merge-state, surface findings,
+    # continue. Never set advisory on specCompliance.
+    merge-state into verificationBlocks.design.reviews.codeQuality.advisory = true
+    log warning to .progress.md; proceed to Step 5.
+else:                                  # normal mode
+  if specCompliance.verdict === "FAIL" OR codeQuality.verdict === "FAIL":
+    # Either FAIL blocks. Display findings table, ask user (Step 5 "Run review" / "Request changes" loop).
+    Iteration < 3: re-invoke architect-reviewer with merged feedback, loop back to 4.1.
+    Iteration >= 3: graceful degradation, log warning, proceed (permissive ceiling matches prior behavior).
+  else:
+    proceed to Step 5.
+```
+
+**Anti-rationalization**: the coordinator MUST NOT pass spec-reviewer's findings into the code-quality-reviewer prompt (or vice versa). Both verdicts are stored verbatim under `verificationBlocks.design.reviews`. See [`references/two-stage-review.md`](../references/two-stage-review.md) §2.
+
+**Revision delegation**: Re-invoke architect-reviewer with the merged feedback (both reviewers' findings concatenated, attributed by `reviewerId`) and requirements.md upstream context. Focus on the union of issues.
+
+**Error handling**: Reviewer no signal = treat as REVIEW_PASS for that slot (permissive ceiling). Agent failure = retry once, then use the surviving reviewer's verdict alone (still hard-gate on specCompliance if it survived).
+
+**Fallback**: If TeamCreate fails with "already leading" error, call `TeamDelete()` and retry once. If still fails, fall back to direct dual `Task(...)` calls in ONE message (no team), per `bounded-parallel-dispatch.md` Step 2 fallback.
 </mandatory>
 
 ## Step 5: Walkthrough & Approval

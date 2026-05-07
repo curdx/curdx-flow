@@ -1,6 +1,6 @@
 ---
 description: Start task execution loop
-argument-hint: [--max-task-iterations 5] [--max-global-iterations 100] [--recovery-mode]
+argument-hint: [--max-task-iterations 5] [--max-global-iterations 30] [--recovery-mode]
 allowed-tools: [Read, Write, Edit, Task, Bash, Skill]
 ---
 
@@ -42,8 +42,8 @@ specs_dirs: ["./specs", "./packages/api/specs", "./packages/web/specs"]
 ## Step 2: Parse Arguments
 
 From `$ARGUMENTS`:
-- **--max-task-iterations**: Max retries per task (default: 5)
-- **--max-global-iterations**: Max total loop iterations (default: 100). Safety limit to prevent infinite execution loops.
+- **--max-task-iterations**: Max retries per task (default: 5). Cap on per-task retry loop; when hit, the current task is marked failed and the retry loop breaks (US-2 / AC-2.2). Override example: `--max-task-iterations 10`.
+- **--max-global-iterations**: Max total loop iterations (default: 30 per FR-D1; tightened from legacy 100 to bound cost runaway blast radius). Safety limit to prevent infinite execution loops; when hit, the coordinator halts entirely (US-1 / AC-1.1). Override example: `--max-global-iterations 100` to opt back into legacy cap. Mirrors `--max-task-iterations` parse pattern: flag value propagates into `state.maxGlobalIterations` at init.
 - **--recovery-mode**: Enable iterative failure recovery (default: false). When enabled, failed tasks trigger automatic fix task generation instead of stopping.
 
 ## Step 3: Initialize Execution State
@@ -75,7 +75,7 @@ Update `.curdx-state.json` by merging these fields into the existing object:
   "maxFixTasksPerOriginal": 3,
   "maxFixTaskDepth": 3,
   "globalIteration": 1,
-  "maxGlobalIterations": "<parsed from --max-global-iterations or default 100>",
+  "maxGlobalIterations": "<parsed from --max-global-iterations or default 30 (FR-D1; legacy 100 preserved on existing state files per FR-C1)>",
   "fixTaskMap": {},
   "modificationMap": {},
   "maxModificationsPerTask": 3,
@@ -98,7 +98,7 @@ Where `$MAX_TASK_ITER`, `$RECOVERY_MODE`, `$MAX_GLOBAL_ITER` come from parsed ar
 **Preserved fields** (set by earlier phases, must NOT be removed):
 - `source`, `name`, `basePath`, `commitSpec`, `relatedSpecs`
 
-**Backwards Compatibility**: State files from earlier versions may lack new fields. The system handles missing fields gracefully with defaults (globalIteration: 1, maxGlobalIterations: 100, maxFixTaskDepth: 3, modificationMap: {}, maxModificationsPerTask: 3, maxModificationDepth: 2, nativeTaskMap: {}, nativeSyncEnabled: true, nativeSyncFailureCount: 0).
+**Backwards Compatibility**: State files from earlier versions may lack new fields. The system handles missing fields gracefully with defaults (globalIteration: 1, maxGlobalIterations: 30 for new init per FR-D1; legacy state files storing 100 are preserved as-is per FR-C1, maxFixTaskDepth: 3, modificationMap: {}, maxModificationsPerTask: 3, maxModificationDepth: 2, nativeTaskMap: {}, nativeSyncEnabled: true, nativeSyncFailureCount: 0).
 
 ## Step 4: Execute Task Loop
 
@@ -129,6 +129,60 @@ Then Read and follow these references in order. They contain the complete coordi
 
 5. **Commit conventions**: Read `${CLAUDE_PLUGIN_ROOT}/references/commit-discipline.md` and follow it.
    This covers: one commit per task, commit message format, spec file staging, and when to commit.
+
+### Pre-Dispatch Cap Check (MANDATORY — runs every iteration, before any Task(...) call)
+
+CRITICAL: At the top of every iteration loop body, immediately after reading `.curdx-state.json` and BEFORE any `Task(...)` delegation call, the coordinator MUST evaluate the cost-runaway caps. This is the coordinator-side enforcement of `maxGlobalIterations` / `maxTaskIterations` (spec-cost-runaway-guards FR-E1 / US-1 / US-2 / AC-1.1 / AC-2.2). The stop-watcher hook is the last-mile safety net; this pre-check is the first-line defense and avoids burning a dispatch round-trip when the cap is already breached.
+
+**Step A: Read caps from state**
+
+After reading `.curdx-state.json`, extract:
+- `globalIter = state.globalIteration` (default `1` if missing)
+- `maxGlobal = state.maxGlobalIterations` (default `30` per FR-D1; legacy state files may store `100` — preserve as-is)
+- `taskIter = state.taskIteration` (default `1` if missing)
+- `maxTask = state.maxTaskIterations` (default `5`)
+
+**Step B: Global cap pre-check (halts loop entirely)**
+
+If `globalIteration >= maxGlobalIterations`:
+1. Do NOT delegate. Do NOT call `Task(...)`. Do NOT advance `taskIndex`.
+2. Output the D4 cost-runaway STOP message verbatim (mirrors `buildCostRunawayBlock` in `src/hooks/stop-watcher.ts` so user sees identical wording from either surface):
+
+   ```text
+   Cost runaway guard tripped: globalIteration={globalIter} >= maxGlobalIterations={maxGlobal}.
+   Loop blocked. Either:
+   - Investigate why your loop ran {globalIter} iterations (check .progress.md)
+   - Override with: /curdx-flow:implement --max-global-iterations <higher-cap>
+   - Reset by editing {state-file-path}: set globalIteration to a lower value
+
+   Spec: {specName}  Phase: implement
+   ```
+
+3. Halt the coordinator loop. Do NOT output `ALL_TASKS_COMPLETE` (tasks remain incomplete). Do NOT output `TASK_COMPLETE`.
+
+**Step C: Task-level cap pre-check (fails current task, breaks retry loop)**
+
+Else if `taskIteration >= maxTaskIterations`:
+1. Do NOT delegate the current task again. Mark the current task as failed in `.progress.md` (append a Learnings entry: `Task ${taskIndex} hit taskIteration cap (${taskIter} >= ${maxTask}) — marked failed, retry loop broken`).
+2. Output the task-level D4 message variant verbatim:
+
+   ```text
+   Cost runaway guard tripped: taskIteration={taskIter} >= maxTaskIterations={maxTask}.
+   Loop blocked. Either:
+   - Investigate why your loop ran {taskIter} iterations (check .progress.md)
+   - Override with: /curdx-flow:implement --max-task-iterations <higher-cap>
+   - Reset by editing {state-file-path}: set taskIteration to a lower value
+
+   Spec: {specName}  Phase: implement
+   ```
+
+3. Break the per-task retry loop. Do not advance `taskIndex` automatically — surface the failure so the user can decide whether to override the cap, fix the underlying problem, or accept the partial completion. Do NOT output `ALL_TASKS_COMPLETE`.
+
+**Step D: Caps OK → proceed to standard delegation**
+
+Only when both `globalIteration < maxGlobalIterations` AND `taskIteration < maxTaskIterations`, fall through to the standard task-delegation flow defined in `coordinator-pattern.md` (Parse Current Task → Parallel Group Detection → Task Delegation).
+
+> **Defense-in-depth note**: The stop-watcher hook re-evaluates the same condition via `buildCostRunawayBlock(state)` and emits the identical message string. If this coordinator pre-check is somehow skipped (e.g., manual override of state mid-iteration), the hook still blocks. Both surfaces use the same template so the user never sees split error wording.
 
 ### Key Coordinator Behaviors (quick reference — see coordinator-pattern.md for authoritative details)
 

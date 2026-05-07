@@ -1,0 +1,64 @@
+{
+  "name": "superpowers-uplift",
+  "goal": "把 superpowers 的 phase 内部纪律（强验证 / 双审查 / 受控并行）作为 hooks + references + 极少量 skills 嵌进 curdx-flow 既有 spec backbone，不替换、不扩张状态机、不破坏 npm 直拷分发。",
+  "specs": [
+    {
+      "name": "spec-verification-iron-law",
+      "status": "completed",
+      "dependencies": [],
+      "size": "L",
+      "role": "foundation",
+      "externalBlockersResolved": [
+        "state-completion-marker (completed 2026-05-05)"
+      ]
+    },
+    {
+      "name": "spec-bounded-parallel-dispatch",
+      "status": "completed",
+      "dependencies": [],
+      "size": "S",
+      "role": "doc-only-prereq-for-B"
+    },
+    {
+      "name": "spec-two-stage-review",
+      "status": "completed",
+      "dependencies": [
+        "spec-verification-iron-law",
+        "spec-bounded-parallel-dispatch"
+      ],
+      "size": "M",
+      "absorbs": [
+        "superpowers-inline-review (placeholder dropped)"
+      ]
+    },
+    {
+      "name": "spec-subagent-context-reinjection",
+      "status": "completed",
+      "completedAt": "2026-05-07",
+      "dependencies": [
+        "spec-verification-iron-law"
+      ],
+      "size": "S-M",
+      "preCheckResolved": "SubagentStart event verified GA — no opt-in required"
+    },
+    {
+      "name": "spec-cost-runaway-guards",
+      "status": "completed",
+      "completedAt": "2026-05-07",
+      "dependencies": [
+        "spec-verification-iron-law"
+      ],
+      "size": "M",
+      "externalBlockersResolved": [
+        "state-completion-marker (completed 2026-05-05)"
+      ],
+      "preCheckResolved": "StopFailure event verified GA (observability-only; 8 matchers)"
+    }
+  ],
+  "output": "spec-files",
+  "issueNumber": null,
+  "createdAt": "2026-05-06",
+  "branch": "epic/superpowers-uplift",
+  "research": "specs/_epics/superpowers-uplift/research.md",
+  "epicDoc": "specs/_epics/superpowers-uplift/epic.md"
+}

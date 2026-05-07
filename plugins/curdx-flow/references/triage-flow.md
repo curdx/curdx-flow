@@ -43,7 +43,7 @@ Output: research.md at <basePath>/research.md
 
 ### Research Team Dispatch
 
-Follow `${CLAUDE_PLUGIN_ROOT}/references/parallel-research.md` but with:
+Follow `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md` but with:
 - basePath = epic directory (e.g., `./specs/_epics/<epic-name>`)
 - Research directive = triage directive above (not standard spec research)
 

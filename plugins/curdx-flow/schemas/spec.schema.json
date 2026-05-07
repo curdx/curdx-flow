@@ -4,6 +4,97 @@
   "title": "curdx-flow Specification Schema",
   "description": "Schema for curdx-flow state files and spec document frontmatter",
 
+  "properties": {
+    "verificationBlocks": {
+      "type": "object",
+      "description": "Per-phase verification blocks proving a verify command was executed against current source. Iron-law gate (Stop/TaskCompleted hooks read this). One block per workflow phase; missing block for current phase blocks the hook with exit 2.",
+      "additionalProperties": false,
+      "properties": {
+        "research": { "$ref": "#/$defs/verificationBlock" },
+        "requirements": { "$ref": "#/$defs/verificationBlock" },
+        "design": { "$ref": "#/$defs/verificationBlock" },
+        "tasks": { "$ref": "#/$defs/verificationBlock" },
+        "execution": { "$ref": "#/$defs/verificationBlock" }
+      }
+    }
+  },
+
+  "$defs": {
+    "verificationBlock": {
+      "type": "object",
+      "description": "Machine-readable proof that a verify command ran against the current source state",
+      "required": ["command", "exitCode", "timestamp", "srcMtime"],
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact verify command that was executed (e.g., 'npm run verify')"
+        },
+        "exitCode": {
+          "type": "integer",
+          "description": "Process exit code from the verify command (0 = pass, non-zero = fail)"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 UTC timestamp when verify command completed"
+        },
+        "srcMtime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Max mtime (epoch ms) of relevant source tree at verify time; used for stale-detection"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional human-readable summary of what was verified"
+        },
+        "failedReason": {
+          "type": "string",
+          "description": "Optional failure detail when exitCode is non-zero"
+        },
+        "reviews": {
+          "type": "object",
+          "description": "Two-stage review verdicts (spec-two-stage-review D3). Keyed-object shape isomorphic to the parent verificationBlocks map. Both sub-fields optional for backwards-compat with pre-two-stage-review states.",
+          "additionalProperties": false,
+          "properties": {
+            "specCompliance": { "$ref": "#/$defs/reviewVerdict" },
+            "codeQuality": { "$ref": "#/$defs/reviewVerdict" }
+          }
+        }
+      }
+    },
+
+    "reviewVerdict": {
+      "type": "object",
+      "description": "Reviewer verdict emitted at phase boundaries by spec-compliance / code-quality reviewers. 'advisory' surfaces findings without blocking (used by code-quality in QuickMode bypass per FR-M2).",
+      "required": ["verdict", "findings", "reviewerId", "timestamp"],
+      "additionalProperties": false,
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": ["pass", "fail", "advisory"],
+          "description": "Reviewer outcome. 'pass' = no blocking issues; 'fail' = hard block; 'advisory' = surface findings, do not block"
+        },
+        "findings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Reviewer notes (one per concern). Empty array allowed on pass; fail/advisory should populate at least one entry"
+        },
+        "reviewerId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Agent identifier (e.g. 'spec-reviewer', 'code-quality-reviewer'). Used by drift tests to confirm domain ownership"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 UTC timestamp when verdict was recorded"
+        }
+      }
+    }
+  },
+
   "definitions": {
     "state": {
       "type": "object",
@@ -62,8 +153,8 @@
         "maxGlobalIterations": {
           "type": "integer",
           "minimum": 1,
-          "default": 100,
-          "description": "Safety cap on total iterations"
+          "default": 30,
+          "description": "Safety cap on total iterations. Tightened to 30 in v7.1.7 (~1hr unattended). Use --max-global-iterations 100 to opt back to legacy."
         },
         "relatedSpecs": {
           "type": "array",

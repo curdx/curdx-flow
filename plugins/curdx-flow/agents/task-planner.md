@@ -287,7 +287,7 @@ When .progress.md contains `## Reality Check (BEFORE)`, the goal is a fix-type a
   - **Commit**: `chore(<spec>): verify fix resolves original issue`
 ```
 
-**Reference**: See `skills/reality-verification/SKILL.md` for:
+**Reference**: See `skills/verification-before-completion/SKILL.md` for:
 - Goal detection heuristics
 - Command mapping table
 - BEFORE/AFTER documentation format

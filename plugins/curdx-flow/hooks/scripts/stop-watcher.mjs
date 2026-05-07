@@ -14,7 +14,7 @@ import {
   unlinkSync
 } from "node:fs";
 import { spawn } from "node:child_process";
-import { basename as basename2, dirname, join as join2 } from "node:path";
+import { basename as basename3, dirname, join as join3 } from "node:path";
 import { fileURLToPath } from "node:url";
 import process5 from "node:process";
 
@@ -327,6 +327,83 @@ function extractTaskBlock(markdown, taskIndex) {
   return trimTrailingBlankLines(out).join("\n");
 }
 
+// src/hooks/lib/verify-blocks.ts
+import { promises as fs } from "node:fs";
+import { basename as basename2, join as join2 } from "node:path";
+var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  ".curdx",
+  ".claude"
+]);
+var WALK_MAX_DEPTH = 6;
+var VERIFICATION_PHASES = [
+  "research",
+  "requirements",
+  "design",
+  "tasks",
+  "execution"
+];
+function getVerificationPhase(state) {
+  const raw = typeof state.phase === "string" ? state.phase : "";
+  if (!VERIFICATION_PHASES.includes(raw)) {
+    return null;
+  }
+  return raw;
+}
+async function verifyPhaseBlock(state, phase, specDir) {
+  const block = state.verificationBlocks?.[phase];
+  if (block === void 0) {
+    return { ok: false, reason: "missing", command: "" };
+  }
+  if (block.exitCode !== 0) {
+    return {
+      ok: false,
+      reason: block.failedReason ?? "verification failed",
+      command: block.command
+    };
+  }
+  void await walkSrcTree(specDir);
+  if (block.srcMtime > Date.parse(block.timestamp)) {
+    const srcIso = new Date(block.srcMtime).toISOString();
+    const specName = basename2(specDir);
+    return {
+      ok: false,
+      reason: `Stale evidence for phase '${phase}': src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}. Spec: ${specName}.`,
+      command: block.command
+    };
+  }
+  return { ok: true };
+}
+async function walkSrcTree(dir) {
+  let maxMtime = 0;
+  async function walk(current, depth) {
+    let entries;
+    try {
+      entries = await fs.readdir(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const abs = join2(current, entry.name);
+      if (entry.isDirectory()) {
+        if (WALK_SKIP_DIRS.has(entry.name)) continue;
+        if (depth >= WALK_MAX_DEPTH) continue;
+        await walk(abs, depth + 1);
+        continue;
+      }
+      try {
+        const st = await fs.stat(abs);
+        if (st.mtimeMs > maxMtime) maxMtime = st.mtimeMs;
+      } catch {
+      }
+    }
+  }
+  await walk(dir, 0);
+  return maxMtime;
+}
+
 // src/hooks/stop-watcher.ts
 var SETTINGS_REL_PATH2 = ".claude/curdx-flow.local.md";
 var ALL_TASKS_COMPLETE_RE = /(^|\W)ALL_TASKS_COMPLETE(\W|$)/;
@@ -394,7 +471,7 @@ function tailContainsCompletionMarker(transcriptPath, lineCount) {
   return false;
 }
 function markSpecCompletedInEpic(cwd, epicName, specName) {
-  const epicStateFile = join2(
+  const epicStateFile = join3(
     cwd,
     "specs",
     "_epics",
@@ -434,7 +511,7 @@ function fireUpdateSpecIndex() {
     here = fileURLToPath(import.meta.url);
   }
   const scriptDir = dirname(here);
-  const target = join2(scriptDir, "update-spec-index.mjs");
+  const target = join3(scriptDir, "update-spec-index.mjs");
   if (!existsSync2(target)) return;
   try {
     const child = spawn(process5.execPath, [target, "--quiet"], {
@@ -456,7 +533,7 @@ function cleanupStaleProgressFiles(specDirFs) {
   const sixtyMinMs = 60 * 60 * 1e3;
   for (const name of entries) {
     if (!name.startsWith(".progress-task-") || !name.endsWith(".md")) continue;
-    const fp = join2(specDirFs, name);
+    const fp = join3(specDirFs, name);
     let mtimeMs;
     try {
       mtimeMs = statSync2(fp).mtimeMs;
@@ -522,6 +599,35 @@ function extractParallelGroupBlock(markdown, taskIndex, maxGroup = 5) {
   }
   return block.replace(/\n+$/, "");
 }
+function buildVerificationBlockFailDecision(phase, result, specName) {
+  const cmd = typeof result.command === "string" && result.command.length > 0 ? result.command : `/curdx-flow:${phase} (re-run phase to record verification)`;
+  let reason;
+  let systemMessage;
+  if (result.reason === "missing") {
+    reason = `Phase '${phase}' has no verification block. Run: ${cmd}. Spec: ${specName}. Then try again.`;
+    systemMessage = `curdx-flow: phase '${phase}' missing verification block (spec: ${specName})`;
+  } else if (typeof result.reason === "string" && result.reason.startsWith("Stale evidence")) {
+    reason = result.reason;
+    systemMessage = `curdx-flow: phase '${phase}' verification stale (spec: ${specName})`;
+  } else {
+    const detail = result.reason ?? "verification failed";
+    reason = `Verification failed for phase '${phase}': ${detail}. Fix and re-run: ${cmd}. Spec: ${specName}.`;
+    systemMessage = `curdx-flow: phase '${phase}' verification failed (spec: ${specName})`;
+  }
+  return {
+    decision: "block",
+    reason,
+    systemMessage
+  };
+}
+function buildMalformedVerificationBlock(specName) {
+  const reason = `Phase 'unknown' verificationBlocks malformed in .curdx-state.json. Fix: edit ${specName}/.curdx-state.json (or run /curdx-flow:cancel). Spec: ${specName}. See references/iron-law-verification.md.`;
+  return {
+    decision: "block",
+    reason,
+    systemMessage: `curdx-flow: verificationBlocks malformed (spec: ${specName})`
+  };
+}
 function buildCorruptStateBlock(specPath) {
   const reason = `ERROR: Corrupt state file at ${specPath}/.curdx-state.json
 
@@ -545,6 +651,41 @@ Make strong, opinionated decisions autonomously.`;
     reason,
     systemMessage: `curdx-flow quick mode: continue ${phase} phase`
   };
+}
+function buildCostRunawayBlock(state, specName, stateFilePath) {
+  const globalIter = typeof state.globalIteration === "number" ? state.globalIteration : 1;
+  const maxGlobal = typeof state.maxGlobalIterations === "number" ? state.maxGlobalIterations : 100;
+  const taskIter = typeof state.taskIteration === "number" ? state.taskIteration : 1;
+  const maxTask = typeof state.maxTaskIterations === "number" ? state.maxTaskIterations : 5;
+  if (globalIter >= maxGlobal) {
+    const reason = `Cost runaway guard tripped: globalIteration=${globalIter} >= maxGlobalIterations=${maxGlobal}.
+Loop blocked. Either:
+- Investigate why your loop ran ${globalIter} iterations (check .progress.md)
+- Override with: /curdx-flow:implement --max-global-iterations <higher-cap>
+- Reset by editing ${stateFilePath}: set globalIteration to a lower value
+
+Spec: ${specName}  Phase: implement`;
+    return {
+      decision: "block",
+      reason,
+      systemMessage: `curdx-flow: cost runaway \u2014 globalIteration cap reached (${specName})`
+    };
+  }
+  if (taskIter >= maxTask) {
+    const reason = `Cost runaway guard tripped: taskIteration=${taskIter} >= maxTaskIterations=${maxTask}.
+Loop blocked. Either:
+- Investigate why your loop ran ${taskIter} iterations (check .progress.md)
+- Override with: /curdx-flow:implement --max-task-iterations <higher-cap>
+- Reset by editing ${stateFilePath}: set taskIteration to a lower value
+
+Spec: ${specName}  Phase: implement`;
+    return {
+      decision: "block",
+      reason,
+      systemMessage: `curdx-flow: cost runaway \u2014 taskIteration cap reached (${specName})`
+    };
+  }
+  return null;
 }
 function buildUncheckedTasksBlock(specPath, taskIndex, totalTasks, unchecked) {
   const reason = `Tasks incomplete: state index (${taskIndex}) reached total (${totalTasks}), but tasks.md has ${unchecked} unchecked items.
@@ -592,9 +733,12 @@ ${parallelInstructions}
   return { decision: "block", reason, systemMessage };
 }
 runHook(async (input) => {
+  if (input?.stop_hook_active === true) {
+    return;
+  }
   const cwd = input?.cwd;
   if (!cwd) return;
-  const settingsPath = join2(cwd, SETTINGS_REL_PATH2);
+  const settingsPath = join3(cwd, SETTINGS_REL_PATH2);
   if (existsSync2(settingsPath)) {
     const enabled = readEnabledSetting(settingsPath);
     if (enabled === "false") return;
@@ -602,34 +746,72 @@ runHook(async (input) => {
   const rawSpecPath = resolveCurrent({ cwd });
   if (!rawSpecPath) return;
   const specPath = preserveDotPrefix(rawSpecPath, getSpecsDirs({ cwd }));
-  const specName = basename2(specPath);
-  const stateFile = join2(cwd, specPath, ".curdx-state.json");
+  const specName = basename3(specPath);
+  const stateFile = join3(cwd, specPath, ".curdx-state.json");
   if (!existsSync2(stateFile)) return;
   await maybeWaitForRecentStateFile(stateFile);
+  try {
+    const capState = JSON.parse(readFileSync3(stateFile, "utf8"));
+    if (capState.completed !== true) {
+      const runawayBlock = buildCostRunawayBlock(capState, specName, stateFile);
+      if (runawayBlock) return runawayBlock;
+    }
+  } catch {
+  }
   const transcriptPath = input.transcript_path;
   if (transcriptPath && existsSync2(transcriptPath)) {
-    const handleCompletion = (variant) => {
+    const handleCompletion = async (variant) => {
       const label = variant === "primary" ? "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript" : "[curdx-flow] ALL_TASKS_COMPLETE detected in transcript (tail-end)";
       process5.stderr.write(label + "\n");
-      let epicName;
+      let parsedState;
+      let stateMalformed = false;
       try {
-        const st = JSON.parse(readFileSync3(stateFile, "utf8"));
-        epicName = typeof st.epicName === "string" && st.epicName.length > 0 ? st.epicName : void 0;
+        parsedState = JSON.parse(readFileSync3(stateFile, "utf8"));
       } catch {
-        epicName = void 0;
+        parsedState = void 0;
+        stateMalformed = true;
       }
-      const currentEpicFile = join2(cwd, "specs", ".current-epic");
+      if (stateMalformed) {
+        return buildMalformedVerificationBlock(specName);
+      }
+      const epicName = parsedState && typeof parsedState.epicName === "string" && parsedState.epicName.length > 0 ? parsedState.epicName : void 0;
+      if (parsedState) {
+        const knownPhase = getVerificationPhase(parsedState);
+        if (knownPhase !== null) {
+          let result;
+          try {
+            result = await verifyPhaseBlock(
+              parsedState,
+              knownPhase,
+              join3(cwd, specPath)
+            );
+          } catch {
+            return buildMalformedVerificationBlock(specName);
+          }
+          if (!result.ok) {
+            return buildVerificationBlockFailDecision(
+              knownPhase,
+              result,
+              specName
+            );
+          }
+        }
+      }
+      const currentEpicFile = join3(cwd, "specs", ".current-epic");
       if (epicName && existsSync2(currentEpicFile)) {
         markSpecCompletedInEpic(cwd, epicName, specName);
       }
       fireUpdateSpecIndex();
+      return void 0;
     };
     if (tailContainsCompletionMarker(transcriptPath, 500)) {
-      handleCompletion("primary");
+      const blocked = await handleCompletion("primary");
+      if (blocked) return blocked;
       return;
     }
     if (tailContainsCompletionMarker(transcriptPath, 20)) {
-      handleCompletion("fallback");
+      const blocked = await handleCompletion("fallback");
+      if (blocked) return blocked;
       return;
     }
   }
@@ -649,26 +831,7 @@ runHook(async (input) => {
   const quickMode = state.quickMode === true;
   const nativeSync = defaultTrueIfFalsyOrNull(state.nativeSyncEnabled);
   const globalIteration = typeof state.globalIteration === "number" ? state.globalIteration : 1;
-  const maxGlobal = typeof state.maxGlobalIterations === "number" ? state.maxGlobalIterations : 100;
-  if (globalIteration >= maxGlobal) {
-    process5.stderr.write(
-      `[curdx-flow] ERROR: Maximum global iterations (${maxGlobal}) reached. Review .progress.md for failure patterns.
-`
-    );
-    process5.stderr.write(
-      `[curdx-flow] Recovery: fix issues manually, then run /curdx-flow:implement or /curdx-flow:cancel
-`
-    );
-    return;
-  }
   if (quickMode && phase !== "execution") {
-    if (input.stop_hook_active === true) {
-      process5.stderr.write(
-        `[curdx-flow] stop_hook_active=true in quick mode, allowing stop to prevent loop
-`
-      );
-      return;
-    }
     return buildQuickModeBlock(phase, specName);
   }
   if (phase === "execution") {
@@ -678,7 +841,7 @@ runHook(async (input) => {
     );
   }
   if (phase === "execution" && taskIndex >= totalTasks && totalTasks > 0) {
-    const tasksFile = join2(cwd, specPath, "tasks.md");
+    const tasksFile = join3(cwd, specPath, "tasks.md");
     if (existsSync2(tasksFile)) {
       const unchecked = countUncheckedTasks(tasksFile);
       if (unchecked > 0) {
@@ -710,14 +873,7 @@ runHook(async (input) => {
     }
     const recoveryMode = state.recoveryMode === true;
     const maxTaskIter = typeof state.maxTaskIterations === "number" ? state.maxTaskIterations : 5;
-    if (input.stop_hook_active === true) {
-      process5.stderr.write(
-        `[curdx-flow] stop_hook_active=true, skipping continuation to prevent re-invocation loop
-`
-      );
-      return;
-    }
-    const tasksFile = join2(cwd, specPath, "tasks.md");
+    const tasksFile = join3(cwd, specPath, "tasks.md");
     let taskBlock = "";
     if (existsSync2(tasksFile)) {
       let tasksMd = "";
@@ -744,7 +900,7 @@ runHook(async (input) => {
         isParallel = false;
       }
     }
-    cleanupStaleProgressFiles(join2(cwd, specPath));
+    cleanupStaleProgressFiles(join3(cwd, specPath));
     return buildContinuationBlock({
       specName,
       specPath,
@@ -759,6 +915,6 @@ runHook(async (input) => {
       isParallel
     });
   }
-  cleanupStaleProgressFiles(join2(cwd, specPath));
+  cleanupStaleProgressFiles(join3(cwd, specPath));
 });
 //# sourceMappingURL=stop-watcher.mjs.map

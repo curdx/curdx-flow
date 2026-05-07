@@ -91,6 +91,22 @@ const updateCmd = defineCommand({
   },
 });
 
+// Stub citty registration for the `check` subcommand. Real dispatch happens
+// in the early-exit branch below (`process.argv[2] === 'check'`). This stub
+// exists so citty's auto-generated `--help` lists the subcommand alongside
+// the others. Its run() is a defensive fallback that should be unreachable.
+const checkCmd = defineCommand({
+  meta: {
+    name: 'check',
+    description: 'Verify active spec verificationBlocks (iron-law gate)',
+  },
+  args: {},
+  async run() {
+    const { runCheckCommand } = await import('./cli/commands/check.ts');
+    await runCheckCommand([]);
+  },
+});
+
 const statusCmd = defineCommand({
   meta: { name: 'status', description: 'Show install status' },
   args: {
@@ -105,7 +121,33 @@ const statusCmd = defineCommand({
   },
 });
 
-const SUBCOMMANDS = new Set(['install', 'uninstall', 'update', 'status', 'analyze']);
+const SUBCOMMANDS = new Set(['install', 'uninstall', 'update', 'status', 'analyze', 'check']);
+
+// Help text for the `check` subcommand. Surfaced when the user runs
+// `npx @curdx/flow check --help` or `--help` is forwarded after `check`.
+// Kept as a top-level constant so it stays in sync with the citty meta block
+// below and can be emitted directly by the early-dispatch branch (per Task
+// 2.24 step 2: `if (process.argv[2] === 'check') call runCheckCommand`).
+const CHECK_HELP = `USAGE \`@curdx/flow check\`
+
+DESCRIPTION
+  Verify the active spec's verificationBlocks (iron-law gate) — the same
+  check enforced by the Stop hook and \`npm run verify\` release gate.
+
+OPTIONS
+  --help, -h    Show this help message and exit.
+
+EXIT CODES
+   0  All verificationBlocks valid (or no spec is active — graceful no-op).
+   2  At least one phase block is missing, stale, or failed.
+
+ENV
+  CURDX_VERIFY_SKIP_BLOCKS=1   Skip the gate (human escape hatch; never set
+                               in CI / release).
+
+SEE ALSO
+  plugins/curdx-flow/references/iron-law-verification.md
+`;
 
 const root = defineCommand({
   meta: {
@@ -120,6 +162,7 @@ const root = defineCommand({
     update: updateCmd,
     status: statusCmd,
     analyze: analyzeCmd,
+    check: checkCmd,
   },
   // No root run() — citty 0.1.6 calls parent.run AFTER a matching subcommand,
   // which would render the menu after a subcommand finishes. We dispatch the
@@ -159,6 +202,26 @@ async function runInteractive(argv: string[]): Promise<void> {
 const argv = process.argv.slice(2);
 const first = firstNonFlag(argv);
 assertFreshLocalBuild();
+
+// Early dispatch for the `check` subcommand (Task 2.24).
+// Matches the task spec literal: "if process.argv[2] === 'check', call
+// runCheckCommand(process.argv.slice(3))". We bypass citty here because
+// `runCheckCommand` calls process.exit directly (per Task 2.23) and has
+// minimal arg-parsing needs — keeping it outside the citty tree avoids
+// citty's defineCommand boilerplate while still surfacing in `--help`
+// (handled below in the help-listing block).
+if (process.argv[2] === 'check') {
+  const rest = process.argv.slice(3);
+  if (rest.includes('--help') || rest.includes('-h')) {
+    process.stdout.write(CHECK_HELP);
+    process.exit(0);
+  }
+  const { runCheckCommand } = await import('./cli/commands/check.ts');
+  await runCheckCommand(rest);
+  // runCheckCommand calls process.exit; we should not reach here.
+  process.exit(0);
+}
+
 if (first === undefined || (first !== undefined && !SUBCOMMANDS.has(first) && first !== '--help' && first !== '-h')) {
   // No subcommand → interactive menu.
   // (--help / -h are flags, handled by citty if user typed them; we won't reach here.)

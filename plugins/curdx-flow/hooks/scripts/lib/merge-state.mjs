@@ -49,9 +49,73 @@ function applyUnset(target, patch) {
     process.stderr.write("merge-state: $unset must be string[]\n");
     process.exit(1);
   }
-  const out = { ...target };
-  for (const key of unsetVal) delete out[key];
+  let out = { ...target };
+  for (const rawPath of unsetVal) {
+    const segments = rawPath.split(".");
+    if (segments.length === 1) {
+      delete out[segments[0]];
+      continue;
+    }
+    out = unsetNested(out, segments);
+  }
   return out;
+}
+function unsetNested(root, segments) {
+  const head = segments[0];
+  const rest = segments.slice(1);
+  const child = root[head];
+  if (rest.length === 0) {
+    const next = { ...root };
+    delete next[head];
+    return next;
+  }
+  if (!isPlainObject(child)) {
+    return root;
+  }
+  const nextChild = unsetNested(child, rest);
+  if (nextChild === child) return root;
+  return { ...root, [head]: nextChild };
+}
+function validateVerificationBlocks(merged) {
+  if (!isPlainObject(merged)) return;
+  const blocks = merged["verificationBlocks"];
+  if (blocks === void 0 || blocks === null) return;
+  if (!isPlainObject(blocks)) {
+    throw new Error(
+      "invalid verificationBlocks: expected object map keyed by phase, got " + (Array.isArray(blocks) ? "array" : typeof blocks)
+    );
+  }
+  for (const [phase, block] of Object.entries(blocks)) {
+    if (!isPlainObject(block)) {
+      throw new Error(
+        `invalid verificationBlocks.${phase}: expected object, got ${Array.isArray(block) ? "array" : typeof block}`
+      );
+    }
+    const cmd = block["command"];
+    if (typeof cmd !== "string" || cmd.length === 0) {
+      throw new Error(
+        `invalid verificationBlocks.${phase}: missing/wrong-type field "command" (expected non-empty string)`
+      );
+    }
+    const exitCode = block["exitCode"];
+    if (typeof exitCode !== "number" || !Number.isInteger(exitCode)) {
+      throw new Error(
+        `invalid verificationBlocks.${phase}: missing/wrong-type field "exitCode" (expected integer)`
+      );
+    }
+    const ts = block["timestamp"];
+    if (typeof ts !== "string" || Number.isNaN(Date.parse(ts))) {
+      throw new Error(
+        `invalid verificationBlocks.${phase}: missing/wrong-type field "timestamp" (expected ISO date-time string)`
+      );
+    }
+    const srcMtime = block["srcMtime"];
+    if (typeof srcMtime !== "number" || !Number.isFinite(srcMtime) || srcMtime < 0) {
+      throw new Error(
+        `invalid verificationBlocks.${phase}: missing/wrong-type field "srcMtime" (expected non-negative number)`
+      );
+    }
+  }
 }
 function main() {
   const args = process.argv.slice(2);
@@ -91,6 +155,18 @@ function main() {
   const cleanPatch = stripUnset(patch);
   let merged = deepMerge(base, cleanPatch);
   merged = applyUnset(merged, patch);
+  const patchTouchesVerificationBlocks = isPlainObject(patch) && (Object.prototype.hasOwnProperty.call(patch, "verificationBlocks") || Array.isArray(patch["$unset"]) && patch["$unset"].some(
+    (p) => typeof p === "string" && p.startsWith("verificationBlocks")
+  ));
+  if (patchTouchesVerificationBlocks) {
+    try {
+      validateVerificationBlocks(merged);
+    } catch (err) {
+      process.stderr.write(`merge-state: ${err.message}
+`);
+      process.exit(1);
+    }
+  }
   const serialized = JSON.stringify(merged) + "\n";
   writeFileAtomic(stateFile, serialized);
   process.stdout.write(serialized);

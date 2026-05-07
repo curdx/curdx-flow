@@ -92,8 +92,7 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 | Consistency | Design component responsibilities map to requirements FRs; no orphan components | Components exist that don't trace to any FR; FRs have no corresponding design component |
 | Feasibility | File paths reference existing files or are clearly new creation targets; APIs and tools referenced exist | File paths reference non-existent files without noting creation; APIs or tools referenced don't exist |
 | Patterns | Design follows existing codebase conventions (frontmatter format, signal patterns, delegation patterns) | Design introduces new patterns without justification when existing patterns would work |
-| Principles | Solution follows SOLID (single responsibility per component, open-closed, dependency inversion), DRY (no duplicated responsibilities across components), and KISS (simplest approach that meets requirements) | Over-engineered solution; components with multiple unrelated responsibilities; duplicated logic across components; unnecessary abstractions or indirection |
-| Holistic Awareness | Design considers impact on the broader system beyond the immediate feature; addresses cross-cutting concerns (error handling, logging, config); notes effects on existing modules and shared patterns | Design is tunnel-visioned to feature scope; ignores impact on existing modules; no mention of cross-cutting concerns or system-wide implications |
+| Holistic Awareness | Design documents cross-cutting impact on other specs / shared modules; design decisions are traceable to specific requirements (FR-* / NFR-*) | Design is tunnel-visioned to feature scope with no documented cross-cutting impact; design decisions appear without traceability to a stated requirement |
 
 **Examples**:
 - Completeness PASS: All five sections (Architecture, Components, Data Flow, Technical Decisions, File Structure) present with substantive content.
@@ -104,10 +103,8 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 - Feasibility FAIL: "Import from `utils/validator.ts`" but file doesn't exist and isn't listed as a creation target.
 - Patterns PASS: Agent omits `model` field in frontmatter (inherits parent model automatically), matching existing agents like spec-executor.md.
 - Patterns FAIL: Agent hardcodes a specific model like `model: claude-3-opus` when all other agents omit it to inherit dynamically.
-- Principles PASS: Each component has a single, well-defined responsibility. No business logic duplicated between components. Architecture uses the simplest pattern that satisfies the requirements.
-- Principles FAIL: Component A handles both data validation and UI rendering. The same filtering logic appears in Component B and Component C. An abstract factory pattern is used where a simple function would suffice.
-- Holistic Awareness PASS: "Impact: modifying the command parser affects all 4 phase commands. Migration: existing specs will continue to work because the new field is optional."
-- Holistic Awareness FAIL: Design only discusses the new feature files with no mention of how changes affect the existing command flow or shared utilities.
+- Holistic Awareness PASS: "Impact: modifying the command parser affects all 4 phase commands (cross-cutting); decision to extend the parser rather than fork it traces to FR-3 (single source of truth)."
+- Holistic Awareness FAIL: Design only discusses the new feature files with no mention of cross-cutting impact on shared modules, and design decisions appear without any FR-*/NFR-* reference.
 
 ### Tasks Rubric
 
@@ -117,7 +114,7 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 | Traceability | Tasks reference requirements (FR-*) and/or design sections | Tasks exist without tracing to requirements or design |
 | Actionability | Do steps are concrete with specific instructions (file names, code patterns, section names) | Do steps are vague (e.g., "implement the feature", "add appropriate code") |
 | Structure | POC-first 4-phase structure followed (Phase 1: POC, Phase 2: Refactoring, Phase 3: Testing, Phase 4: Quality) | Phases are out of order, missing, or don't follow POC-first approach |
-| Quality Gates | [VERIFY] tasks present at appropriate intervals (every 2-3 tasks) | No [VERIFY] tasks, or gaps of more than 3 tasks without a checkpoint |
+| Quality Gates | [VERIFY] tasks exist where required | No [VERIFY] tasks anywhere in the plan |
 | Holistic Awareness | Tasks reference how changes interact with the broader system; impact on shared modules and existing behavior is acknowledged; not tunnel-visioned to just the feature files | Tasks only reference feature-specific files with no consideration of system-wide impact; no mention of how changes affect other modules or shared code |
 
 **Examples**:
@@ -129,31 +126,10 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 - Actionability FAIL: "Implement the review feature in the appropriate files."
 - Structure PASS: Phase 1 is POC (minimal wiring), Phase 2 is full integration, Phase 3 is testing, Phase 4 is quality gates.
 - Structure FAIL: Phase 1 jumps straight to testing; or Phase 2 is labeled "POC" but Phase 1 already exists.
-- Quality Gates PASS: [VERIFY] task after tasks 1.2 and 2.3 (every 2-3 tasks).
-- Quality Gates FAIL: 6 consecutive tasks with no [VERIFY] checkpoint.
+- Quality Gates PASS: At least one [VERIFY] task exists in the plan.
+- Quality Gates FAIL: No [VERIFY] tasks anywhere in the plan.
 - Holistic Awareness PASS: Task notes "Modifying the phase command template affects research, requirements, design, and tasks commands. Verify all four after change."
 - Holistic Awareness FAIL: Task says "Edit commands/research.md" with no mention that the same pattern exists in 3 other command files that may need the same change.
-
-### Execution Rubric
-
-Cross-reference implementation against the design.md Components section. Each task should map to a specific component (A, B, C, D, etc.) and the implementation must fulfill that component's documented responsibilities.
-
-| Dimension | PASS Criteria | FAIL Criteria |
-|-----------|--------------|---------------|
-| Alignment | Implementation matches the design.md component responsibilities for the relevant component (e.g., Component A responsibilities, Component B integration points) | Implementation deviates from design without documented reason; component responsibilities not fulfilled |
-| Correctness | Changed files match the task's Files list; no undocumented file changes | Files changed that aren't in the task's Files list, or listed files not changed |
-| Completeness | All "Done when" criteria are verifiable in the changed code | "Done when" criteria cannot be verified from the implementation |
-| No Hallucinations | Imports reference real modules; APIs called actually exist; file paths are valid | Imports reference non-existent modules; API calls to non-existent endpoints; invalid file paths |
-
-**Examples**:
-- Alignment PASS: Task references "Design: Component B" and the implementation adds a review loop to the phase command, matching Component B's documented responsibility to "invoke spec-reviewer after phase agent completes."
-- Alignment FAIL: Design says Component C adds Layer 5 to implement.md, but implementation adds it as Layer 3 replacing an existing layer.
-- Correctness PASS: Task lists `Files: commands/research.md` and only that file was changed.
-- Correctness FAIL: Task lists `Files: commands/research.md` but `commands/design.md` was also modified without documentation.
-- Completeness PASS: "Done when: research.md contains Artifact Review section" and `grep -q "Artifact Review" commands/research.md` succeeds.
-- Completeness FAIL: "Done when: all four commands have review loops" but `commands/tasks.md` has no review section.
-- No Hallucinations PASS: Code references `agents/spec-reviewer.md` which exists in the file structure.
-- No Hallucinations FAIL: Code imports from `utils/review-engine.js` which doesn't exist anywhere in the codebase.
 
 ## Iteration Awareness
 
