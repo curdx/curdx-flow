@@ -16,7 +16,7 @@ Task 1.3 — `resolveTranscriptSource()` wired into index.ts; integration test g
 
 ## Phase 1 — POC (Make It Work)
 
-- [ ] 1.1 Create `src/analyze/transcript-path.ts` with resolver, encoding, glob, realpath cache, error class
+- [x] 1.1 Create `src/analyze/transcript-path.ts` with resolver, encoding, glob, realpath cache, error class
   - **Do**:
     1. Define `TranscriptSource` union type and `ResolveOpts` interface (see design Component 1 API)
     2. Implement `resolveTranscriptSource(opts?)`: if `fixtureOverride` → return `{kind:'fixture', paths:[fixtureOverride], cwd}`; else `realpath(cwd)` (cached in module-level Map), encode `/`→`-`, `readdirSync` 1-level, filter `.isFile() && name.endsWith('.jsonl')`, apply `sessionFilter` if present, throw `TranscriptNotFoundError` if empty/dir-missing
