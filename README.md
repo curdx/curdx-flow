@@ -503,3 +503,17 @@ Verified on **macOS** and **Linux**. Windows is **declared supported but not tes
 ### Configuration
 
 Set `errorLogEnabled: false` in `~/.claude/settings.json` to disable hook error logging. The schema map at `plugins/curdx-flow/schemas/transcript-events.json` is auto-resolved post-bundle; if missing, the parser falls back to a builtin minimal whitelist with a stderr warning.
+
+---
+
+## 💰 Pricing Refresh Workflow
+
+`npx @curdx/flow analyze --cost-summary` computes USD cost using a hardcoded pricing table at `src/analyze/pricing.ts` (zero npm runtime deps — no pricing-API call, no phone-home). Anthropic publishes occasional price changes, so the table needs a **quarterly self-check** (≤ 90 days since `LAST_UPDATED`).
+
+When the self-check fires (or whenever Anthropic announces new pricing), follow the **3-step refresh** below:
+
+1. **WebFetch official pricing.** Fetch <https://www.anthropic.com/pricing> (or the model-specific docs page) via WebFetch. Capture the per-1M-token rates for every model row currently in `pricing.ts` — `input`, `output`, `cache_creation`, `cache_read`. Cross-check against `https://docs.anthropic.com/en/docs/about-claude/pricing` for any model that has a docs page.
+2. **Diff `PRICING` table.** Open `src/analyze/pricing.ts` and reconcile each row against the WebFetched figures. Add new model rows for any newly-released model the spec funnel might encounter (Opus, Sonnet, Haiku across versions). Remove rows only if Anthropic has formally retired a model — keep historical rows otherwise so retro `analyze` runs on old transcripts still produce correct cost.
+3. **Bump `LAST_UPDATED` + add CHANGELOG entry.** Update the `LAST_UPDATED` constant at the top of `pricing.ts` to today's `YYYY-MM-DD`. Add a `Changed` line to `CHANGELOG.md` referencing the diff (e.g. `pricing: refresh 2026-08-07 — Opus 4.7 input $15→$18, cache_read unchanged`). Commit as `chore(pricing): refresh table to YYYY-MM-DD`.
+
+> **Quarterly self-check:** the `--cost-summary` command emits a stderr warning when `today - LAST_UPDATED > 90 days`. Treat that warning as a blocking todo — stale pricing makes every cost figure in the report directionally wrong.

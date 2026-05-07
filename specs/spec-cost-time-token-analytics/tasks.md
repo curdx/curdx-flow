@@ -667,7 +667,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `test(integration): assert R1-R7 snapshot + Recommendations + tokenizer footer`
 
-- [ ] 4.9 README — pricing 三步刷新流程章节
+- [x] 4.9 README — pricing 三步刷新流程章节
   **Do**: 在 README.md 加 `## Pricing Refresh Workflow` 章节列三步：(1) WebFetch `https://platform.claude.com/docs/en/about-claude/pricing`；(2) diff `src/analyze/pricing.ts` 中 `PRICING`；(3) bump `LAST_UPDATED` + 加 CHANGELOG entry。强调 ≤ 90 天季度自检。
 
   **Files**:
@@ -683,7 +683,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `docs(readme): add pricing 3-step refresh workflow`
 
-- [ ] 4.10 CHANGELOG — single OB-3 entry
+- [x] 4.10 CHANGELOG — single OB-3 entry
   **Do**: 在 CHANGELOG.md 顶部加 `## [Unreleased]` 或 `## X.Y.Z — 2026-05-07` (PATCH bump) 段，含 OB-3 单 entry：Added pricing.ts / cost.ts / recommend.ts / R1-R7 reports / 5 CLI flag / 8 recommend rules。Changed schema-map JSON adds usage fields. Note backward compat preserved.
 
   **Files**:
