@@ -652,6 +652,41 @@ Make strong, opinionated decisions autonomously.`;
     systemMessage: `curdx-flow quick mode: continue ${phase} phase`
   };
 }
+function buildCostRunawayBlock(state, specName, stateFilePath) {
+  const globalIter = typeof state.globalIteration === "number" ? state.globalIteration : 1;
+  const maxGlobal = typeof state.maxGlobalIterations === "number" ? state.maxGlobalIterations : 100;
+  const taskIter = typeof state.taskIteration === "number" ? state.taskIteration : 1;
+  const maxTask = typeof state.maxTaskIterations === "number" ? state.maxTaskIterations : 5;
+  if (globalIter >= maxGlobal) {
+    const reason = `Cost runaway guard tripped: globalIteration=${globalIter} >= maxGlobalIterations=${maxGlobal}.
+Loop blocked. Either:
+- Investigate why your loop ran ${globalIter} iterations (check .progress.md)
+- Override with: /curdx-flow:implement --max-global-iterations <higher-cap>
+- Reset by editing ${stateFilePath}: set globalIteration to a lower value
+
+Spec: ${specName}  Phase: implement`;
+    return {
+      decision: "block",
+      reason,
+      systemMessage: `curdx-flow: cost runaway \u2014 globalIteration cap reached (${specName})`
+    };
+  }
+  if (taskIter >= maxTask) {
+    const reason = `Cost runaway guard tripped: taskIteration=${taskIter} >= maxTaskIterations=${maxTask}.
+Loop blocked. Either:
+- Investigate why your loop ran ${taskIter} iterations (check .progress.md)
+- Override with: /curdx-flow:implement --max-task-iterations <higher-cap>
+- Reset by editing ${stateFilePath}: set taskIteration to a lower value
+
+Spec: ${specName}  Phase: implement`;
+    return {
+      decision: "block",
+      reason,
+      systemMessage: `curdx-flow: cost runaway \u2014 taskIteration cap reached (${specName})`
+    };
+  }
+  return null;
+}
 function buildUncheckedTasksBlock(specPath, taskIndex, totalTasks, unchecked) {
   const reason = `Tasks incomplete: state index (${taskIndex}) reached total (${totalTasks}), but tasks.md has ${unchecked} unchecked items.
 
@@ -715,6 +750,14 @@ runHook(async (input) => {
   const stateFile = join3(cwd, specPath, ".curdx-state.json");
   if (!existsSync2(stateFile)) return;
   await maybeWaitForRecentStateFile(stateFile);
+  try {
+    const capState = JSON.parse(readFileSync3(stateFile, "utf8"));
+    if (capState.completed !== true) {
+      const runawayBlock = buildCostRunawayBlock(capState, specName, stateFile);
+      if (runawayBlock) return runawayBlock;
+    }
+  } catch {
+  }
   const transcriptPath = input.transcript_path;
   if (transcriptPath && existsSync2(transcriptPath)) {
     const handleCompletion = async (variant) => {
@@ -788,18 +831,6 @@ runHook(async (input) => {
   const quickMode = state.quickMode === true;
   const nativeSync = defaultTrueIfFalsyOrNull(state.nativeSyncEnabled);
   const globalIteration = typeof state.globalIteration === "number" ? state.globalIteration : 1;
-  const maxGlobal = typeof state.maxGlobalIterations === "number" ? state.maxGlobalIterations : 100;
-  if (globalIteration >= maxGlobal) {
-    process5.stderr.write(
-      `[curdx-flow] ERROR: Maximum global iterations (${maxGlobal}) reached. Review .progress.md for failure patterns.
-`
-    );
-    process5.stderr.write(
-      `[curdx-flow] Recovery: fix issues manually, then run /curdx-flow:implement or /curdx-flow:cancel
-`
-    );
-    return;
-  }
   if (quickMode && phase !== "execution") {
     return buildQuickModeBlock(phase, specName);
   }

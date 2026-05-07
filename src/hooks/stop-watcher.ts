@@ -536,6 +536,67 @@ function buildQuickModeBlock(phase: string, specName: string): BlockDecision {
   };
 }
 
+/**
+ * Build the cost-runaway hard-block decision (spec-cost-runaway-guards D4).
+ *
+ * Replaces the v6/v7.1 soft `stderr` warn that allowed the loop to continue
+ * burning tokens after caps were hit. Returns `null` when both caps are still
+ * under their limit so the caller falls through to the existing gates.
+ *
+ * Message format mirrors `buildVerificationBlockFailDecision` (NFR-3):
+ * phase + cap value + actionable 3-step remediation.
+ */
+function buildCostRunawayBlock(
+  state: CurdxState,
+  specName: string,
+  stateFilePath: string,
+): BlockDecision | null {
+  const globalIter =
+    typeof state.globalIteration === "number" ? state.globalIteration : 1;
+  const maxGlobal =
+    typeof state.maxGlobalIterations === "number"
+      ? state.maxGlobalIterations
+      : 100;
+  const taskIter =
+    typeof state.taskIteration === "number" ? state.taskIteration : 1;
+  const maxTask =
+    typeof state.maxTaskIterations === "number"
+      ? state.maxTaskIterations
+      : 5;
+
+  if (globalIter >= maxGlobal) {
+    const reason =
+      `Cost runaway guard tripped: globalIteration=${globalIter} >= maxGlobalIterations=${maxGlobal}.\n` +
+      `Loop blocked. Either:\n` +
+      `- Investigate why your loop ran ${globalIter} iterations (check .progress.md)\n` +
+      `- Override with: /curdx-flow:implement --max-global-iterations <higher-cap>\n` +
+      `- Reset by editing ${stateFilePath}: set globalIteration to a lower value\n` +
+      `\n` +
+      `Spec: ${specName}  Phase: implement`;
+    return {
+      decision: "block",
+      reason,
+      systemMessage: `curdx-flow: cost runaway — globalIteration cap reached (${specName})`,
+    };
+  }
+  if (taskIter >= maxTask) {
+    const reason =
+      `Cost runaway guard tripped: taskIteration=${taskIter} >= maxTaskIterations=${maxTask}.\n` +
+      `Loop blocked. Either:\n` +
+      `- Investigate why your loop ran ${taskIter} iterations (check .progress.md)\n` +
+      `- Override with: /curdx-flow:implement --max-task-iterations <higher-cap>\n` +
+      `- Reset by editing ${stateFilePath}: set taskIteration to a lower value\n` +
+      `\n` +
+      `Spec: ${specName}  Phase: implement`;
+    return {
+      decision: "block",
+      reason,
+      systemMessage: `curdx-flow: cost runaway — taskIteration cap reached (${specName})`,
+    };
+  }
+  return null;
+}
+
 /** Build the unchecked-tasks block decision (L198-216). */
 function buildUncheckedTasksBlock(
   specPath: string,
@@ -648,6 +709,21 @@ runHook(async (input) => {
 
   // Race-condition safeguard.
   await maybeWaitForRecentStateFile(stateFile);
+
+  // Cost-runaway hard gate (spec-cost-runaway-guards C2/D4).
+  // First hard gate after `stop_hook_active` early-exit: if either iteration
+  // cap is hit, block immediately with an actionable D4 message instead of the
+  // pre-7.2 soft stderr warn. Parse-failure here is intentionally swallowed —
+  // the existing `buildCorruptStateBlock` path below handles malformed state.
+  try {
+    const capState = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
+    if (capState.completed !== true) {
+      const runawayBlock = buildCostRunawayBlock(capState, specName, stateFile);
+      if (runawayBlock) return runawayBlock;
+    }
+  } catch {
+    // fall through to existing corrupt-state handling
+  }
 
   // ALL_TASKS_COMPLETE detection (primary 500 lines + fallback 20 lines).
   const transcriptPath = input.transcript_path;
@@ -770,21 +846,10 @@ runHook(async (input) => {
   const nativeSync = defaultTrueIfFalsyOrNull(state.nativeSyncEnabled);
   const globalIteration =
     typeof state.globalIteration === "number" ? state.globalIteration : 1;
-  const maxGlobal =
-    typeof state.maxGlobalIterations === "number"
-      ? state.maxGlobalIterations
-      : 100;
 
-  // Global iteration limit.
-  if (globalIteration >= maxGlobal) {
-    process.stderr.write(
-      `[curdx-flow] ERROR: Maximum global iterations (${maxGlobal}) reached. Review .progress.md for failure patterns.\n`,
-    );
-    process.stderr.write(
-      `[curdx-flow] Recovery: fix issues manually, then run /curdx-flow:implement or /curdx-flow:cancel\n`,
-    );
-    return;
-  }
+  // Global iteration cap is now enforced upstream as a hard block via
+  // `buildCostRunawayBlock` (spec-cost-runaway-guards C2). The soft stderr
+  // warn that previously lived here was removed in v7.2 — see CHANGELOG.
 
   // Quick-mode guard: block stop during ANY phase except execution.
   // (D5: stop_hook_active re-invocation already short-circuited at the top of

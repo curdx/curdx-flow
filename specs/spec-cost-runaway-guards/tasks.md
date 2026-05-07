@@ -71,7 +71,7 @@ Focus: skeleton + build pipeline green. Skip tests, accept stubs. Types must pas
   - **Done when**: All three commands exit 0; `stop-failure-handler.mjs` present and tracked by freshness check
   - **Commit**: `chore(hooks): POC checkpoint — typecheck + build green`
 
-- [ ] 1.6 Stop-watcher surgical edit: replace soft warn with hard block
+- [x] 1.6 Stop-watcher surgical edit: replace soft warn with hard block
   - **Do**:
     1. Open `src/hooks/stop-watcher.ts`, locate L779-787 (soft warn for cap exceeded)
     2. Replace warn block with `buildCostRunawayBlock(state)` call returning `{ decision: "block", reason: "<D4 message>" }` — insert AFTER `stop_hook_active` early-exit (L626-628), BEFORE existing `buildVerificationBlockFailDecision` calls
