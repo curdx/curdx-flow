@@ -434,7 +434,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `test(cost): add aggregateBy 3-level snapshot with trailer attribution`
 
-- [ ] 3.6 [VERIFY] Quality checkpoint: typecheck + test:analyze
+- [x] 3.6 [VERIFY] Quality checkpoint: typecheck + test:analyze
   **Do**: Run 验证 cost.test.ts 8+ 测试全过。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run typecheck && npm run test:analyze`
@@ -443,7 +443,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `chore(analyze): pass quality checkpoint after cost.test full coverage`
 
-- [ ] 3.7 [P] Create recommend.ts skeleton (8 rules, no impl yet)
+- [x] 3.7 [P] Create recommend.ts skeleton (8 rules, no impl yet)
   **Do**: 创建 recommend.ts 含 `REC_THRESHOLDS` 常量（design.md §Components #3 表全数值）+ `recommend(buckets, ctx): Recommendation[]` 空骨架（返回 []）+ `findOutliers(values)` / `modifiedZScore(values)` 用 research §MAD 22-LOC 参考代码（含 MIN_N=5 short-circuit）。Phase 4 落 8 rules 实体。
 
   **Files**:
