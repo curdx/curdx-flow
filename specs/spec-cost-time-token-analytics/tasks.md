@@ -106,7 +106,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(analyze): add cost.ts computeCost + extractUsageRowsFromEvents skeleton`
 
-- [ ] 1.4 [VERIFY] Quality checkpoint: typecheck + build
+- [x] 1.4 [VERIFY] Quality checkpoint: typecheck + build
   **Do**: Run typecheck + build 验证 Phase 1 前 3 任务无破坏。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run typecheck && npm run build`
@@ -115,7 +115,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `chore(analyze): pass quality checkpoint after types+pricing+cost skeleton` (only if fixes needed)
 
-- [ ] 1.5 Wire --cost-summary CLI flag in index.ts
+- [x] 1.5 Wire --cost-summary CLI flag in index.ts
   **Do**: 在 index.ts 加 `--cost-summary` flag 解析（citty）+ 默认 `false`（opt-in）。`runAnalyze` 在 `renderReport` 后插入 cost branch：调用 `extractUsageRowsFromEvents(filtered, errorEntries)` → 累加 `computeCost` → 把 `totalCost: { usd: <num> }` 写入 markdown 末尾 `## Cost Summary` 段 + `--json` 顶层 `totalCost.usd` mirror。Phase 1 暂不做 by-spec/phase/task。
 
   **Files**:

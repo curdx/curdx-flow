@@ -6,6 +6,7 @@ export type AnalyzeOptions = {
   limit?: number;
   includePrompts?: boolean;
   session?: string;
+  costSummary?: boolean;
 };
 
 const analyzeCmd = defineCommand({
@@ -34,6 +35,10 @@ const analyzeCmd = defineCommand({
       type: 'string' as const,
       description: 'Filter to single session UUID (matches <uuid>.jsonl in encoded project dir)',
     },
+    'cost-summary': {
+      type: 'boolean' as const,
+      description: 'Emit OB-3 cost analytics: totalCost.usd top-level + ## Cost Summary markdown (opt-in, default false)',
+    },
   },
   async run({ args }) {
     const limitRaw = args.limit;
@@ -45,6 +50,7 @@ const analyzeCmd = defineCommand({
       limit: Number.isFinite(limit) ? (limit as number) : undefined,
       includePrompts: Boolean((args as Record<string, unknown>)['include-prompts']),
       session: typeof args.session === 'string' && args.session.length > 0 ? args.session : undefined,
+      costSummary: Boolean((args as Record<string, unknown>)['cost-summary']),
     });
   },
 });

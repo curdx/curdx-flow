@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { homedir } from 'node:os';
 import path from 'node:path';
 
+import { computeCost, extractUsageRowsFromEvents } from './cost.ts';
 import { filterEvents } from './filter.ts';
 import { getStateForPath, loadSchemaMap, parseTranscript, shouldRotate } from './parser.ts';
 import { redactEvent, redactReportFields } from './redact.ts';
@@ -233,9 +234,17 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
   // Incremental tail with no new bytes across ALL paths → replay the last
   // persisted report so `analyze` is idempotent across runs. Cache is keyed
   // implicitly by includePrompts — toggling the flag MUST bust the cache
-  // because the redacted vs. unredacted reports diverge.
+  // because the redacted vs. unredacted reports diverge. OB-3 (Task 1.5)
+  // adds the same discriminator on `--cost-summary`: toggling the flag
+  // changes the rendered shape (markdown gets a new section, JSON gets a
+  // new top-level field), so cache must bust on transition. Task 2.10
+  // formalizes this with the StateFile.lastCostSummary field — Phase 1
+  // wiring already lands here so the POC smoke is correct on re-runs.
   const includePrompts = Boolean(opts.includePrompts);
-  const cacheCompatible = (state.lastIncludePrompts ?? false) === includePrompts;
+  const costSummary = opts.costSummary === true;
+  const cacheCompatible =
+    (state.lastIncludePrompts ?? false) === includePrompts &&
+    (state.lastCostSummary ?? false) === costSummary;
   if (
     allCachedReady &&
     pathStats.length > 0 &&
@@ -296,13 +305,39 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
 
     void opts.out;
 
-    const jsonStr = `${JSON.stringify(safeJson)}\n`;
-    const markdownStr = markdown;
+    // OB-3 cost branch — Task 1.5 (Phase 1 POC).
+    //
+    // Opt-in via `--cost-summary`. Walks the same `filtered` event stream
+    // through `extractUsageRowsFromEvents` (assistant_turn main path only;
+    // trailer + aggregateBy land in Phase 2 Tasks 2.2/2.3/2.5/2.7), sums
+    // per-row USD via `computeCost`, and surfaces:
+    //   • markdown: appended `## Cost Summary` section at the end
+    //   • JSON: top-level `totalCost.usd` mirror (Decision 3 / Validation
+    //     Hint — `jq '.totalCost.usd'` must resolve non-null)
+    //
+    // The existing 7 flat sections from `renderReport` are NOT touched
+    // (NFR-6 hard constraint). Phase 2 will inject a sibling `costBreakdown`
+    // object alongside this top-level mirror.
+    let markdownStr = markdown;
+    let jsonObj: Record<string, unknown> = safeJson as unknown as Record<string, unknown>;
+    if (opts.costSummary === true) {
+      const usageRows = extractUsageRowsFromEvents(filtered, errorEntries);
+      let totalUsd = 0;
+      for (const r of usageRows) totalUsd += computeCost(r);
+      // 4-decimal round at the boundary (Decision 10) — matches per-row
+      // round4 in cost.ts so re-summing across rows doesn't drift.
+      totalUsd = Math.round(totalUsd * 10000) / 10000;
+      markdownStr = `${markdown}\n## Cost Summary\n\nTotal: $${totalUsd} USD\n`;
+      jsonObj = { ...jsonObj, totalCost: { usd: totalUsd } };
+    }
+
+    const jsonStr = `${JSON.stringify(jsonObj)}\n`;
 
     // Cache last report so the next idempotent run replays this exact bytes.
     state.lastReportJson = jsonStr;
     state.lastReportMarkdown = markdownStr;
     state.lastIncludePrompts = includePrompts;
+    state.lastCostSummary = costSummary;
 
     if (opts.json) {
       process.stdout.write(jsonStr);
