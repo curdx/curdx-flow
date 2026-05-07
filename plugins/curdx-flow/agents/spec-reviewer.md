@@ -92,7 +92,7 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 | Consistency | Design component responsibilities map to requirements FRs; no orphan components | Components exist that don't trace to any FR; FRs have no corresponding design component |
 | Feasibility | File paths reference existing files or are clearly new creation targets; APIs and tools referenced exist | File paths reference non-existent files without noting creation; APIs or tools referenced don't exist |
 | Patterns | Design follows existing codebase conventions (frontmatter format, signal patterns, delegation patterns) | Design introduces new patterns without justification when existing patterns would work |
-| Holistic Awareness | Design considers impact on the broader system beyond the immediate feature; addresses cross-cutting concerns (error handling, logging, config); notes effects on existing modules and shared patterns | Design is tunnel-visioned to feature scope; ignores impact on existing modules; no mention of cross-cutting concerns or system-wide implications |
+| Holistic Awareness | Design documents cross-cutting impact on other specs / shared modules; design decisions are traceable to specific requirements (FR-* / NFR-*) | Design is tunnel-visioned to feature scope with no documented cross-cutting impact; design decisions appear without traceability to a stated requirement |
 
 **Examples**:
 - Completeness PASS: All five sections (Architecture, Components, Data Flow, Technical Decisions, File Structure) present with substantive content.
@@ -103,8 +103,8 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 - Feasibility FAIL: "Import from `utils/validator.ts`" but file doesn't exist and isn't listed as a creation target.
 - Patterns PASS: Agent omits `model` field in frontmatter (inherits parent model automatically), matching existing agents like spec-executor.md.
 - Patterns FAIL: Agent hardcodes a specific model like `model: claude-3-opus` when all other agents omit it to inherit dynamically.
-- Holistic Awareness PASS: "Impact: modifying the command parser affects all 4 phase commands. Migration: existing specs will continue to work because the new field is optional."
-- Holistic Awareness FAIL: Design only discusses the new feature files with no mention of how changes affect the existing command flow or shared utilities.
+- Holistic Awareness PASS: "Impact: modifying the command parser affects all 4 phase commands (cross-cutting); decision to extend the parser rather than fork it traces to FR-3 (single source of truth)."
+- Holistic Awareness FAIL: Design only discusses the new feature files with no mention of cross-cutting impact on shared modules, and design decisions appear without any FR-*/NFR-* reference.
 
 ### Tasks Rubric
 

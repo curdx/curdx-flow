@@ -75,7 +75,7 @@ Goal: prove schema change + 1 narrowing pass + code-quality-reviewer skeleton + 
 
 Goal: complete all 4 narrowing passes on spec-reviewer, fill code-quality-reviewer rubrics, wire parallel dispatch in both commands, write reference doc.
 
-- [ ] 2.1 Spec-reviewer narrow Pass-2: split Design/Holistic-Awareness (5 → 2 keep)
+- [x] 2.1 Spec-reviewer narrow Pass-2: split Design/Holistic-Awareness (5 → 2 keep)
   - **Do**:
     1. In `plugins/curdx-flow/agents/spec-reviewer.md` find Design / Holistic-Awareness block (5 items)
     2. Keep: `cross-cutting impact on other specs`, `design decisions traceable to requirements`
