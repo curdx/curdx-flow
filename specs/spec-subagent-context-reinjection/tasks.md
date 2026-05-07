@@ -115,7 +115,7 @@ Focus: surgical refactor of `load-spec-context.ts` to use shared lib; byte-equal
 
 Focus: 7 unit cases + drift test + byte-equal extension.
 
-- [ ] 3.1 Create `tests/hooks/subagent-context-injector.test.ts` — cases (a)-(e)
+- [x] 3.1 Create `tests/hooks/subagent-context-injector.test.ts` — cases (a)-(e)
   - **Do**:
     1. Create `tests/hooks/subagent-context-injector.test.ts` using existing `createFixtureSpec()` + `runHook()` test infra
     2. Case (a) happy path: spec active + valid state → `additionalContext` contains `phase:`, `spec:`, `iron-law:`
