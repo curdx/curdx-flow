@@ -42,7 +42,7 @@ Task 1.3 — `resolveTranscriptSource()` wired into index.ts; integration test g
   - **Commit**: `feat(analyze): replace 5 fixture sites with resolveTranscriptSource + --session flag + exit 1 on missing`
   - _Requirements: AC1, AC2, AC3, AC4 | Design: Component 2, 4, 5_
 
-- [ ] 1.3 [VERIFY] POC checkpoint — integration test compat via env var
+- [x] 1.3 [VERIFY] POC checkpoint — integration test compat via env var
   - **Do**:
     1. Edit `tests/analyze/integration.test.ts`: add `beforeAll(() => { process.env.CURDX_TRANSCRIPT_FIXTURE = path.resolve('tests/analyze/fixtures/sample.jsonl') })` and matching `afterAll(() => { delete process.env.CURDX_TRANSCRIPT_FIXTURE })`
     2. Run typecheck + integration test suite

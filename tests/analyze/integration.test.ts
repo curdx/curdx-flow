@@ -26,7 +26,7 @@
 //   small (~2.8KB) for stable timing on fast SSDs — a 250KB inflated copy puts
 //   t1 reliably above 50ms on the test runner.
 
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   existsSync,
   mkdirSync,
@@ -95,11 +95,23 @@ async function captureStdout(fn: () => Promise<void>): Promise<string> {
 }
 
 describe('analyze integration', () => {
+  // Task 1.2 swapped the hardcoded POC_FIXTURE_REL for `resolveTranscriptSource`,
+  // which only falls back to the legacy fixture path when CURDX_TRANSCRIPT_FIXTURE
+  // is set (AC4). Wire it here so the snapshot test sees the canonical sample
+  // and runAnalyze doesn't process.exit(1) on a missing real project dir. The
+  // NFR-1 timing test below overrides this to its own inflated copy inside its
+  // own try/finally — that path becomes the state.files key (Task 1.2 keys
+  // state by source.paths[i], i.e. the env-var-supplied path).
+  beforeAll(() => {
+    process.env.CURDX_TRANSCRIPT_FIXTURE = REAL_FIXTURE;
+  });
+
   beforeEach(() => {
     resetFakeHome();
   });
 
   afterAll(() => {
+    delete process.env.CURDX_TRANSCRIPT_FIXTURE;
     if (existsSync(FAKE_HOME)) rmSync(FAKE_HOME, { recursive: true, force: true });
   });
 
@@ -115,6 +127,13 @@ describe('analyze integration', () => {
     const inflated = fixtureBody.repeat(90);
     writeFileSync(inflatedFixturePath, inflated, 'utf8');
 
+    // Task 1.2: state.files key = source.paths[i] = fixtureOverride (when env
+    // var is set). Override the suite-level env var to point at our inflated
+    // copy so the assertion below matches and we exercise the same byte-offset
+    // resume path. cwdSpy is now redundant for resolution (env var bypasses
+    // cwd-based glob) but harmless to keep — kept to minimize surgery.
+    const previousFixtureEnv = process.env.CURDX_TRANSCRIPT_FIXTURE;
+    process.env.CURDX_TRANSCRIPT_FIXTURE = inflatedFixturePath;
     const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(cwdSandbox);
     try {
       // First run — full parse, populates state cache.
@@ -148,6 +167,11 @@ describe('analyze integration', () => {
       }
     } finally {
       cwdSpy.mockRestore();
+      if (previousFixtureEnv === undefined) {
+        delete process.env.CURDX_TRANSCRIPT_FIXTURE;
+      } else {
+        process.env.CURDX_TRANSCRIPT_FIXTURE = previousFixtureEnv;
+      }
       if (existsSync(cwdSandbox)) rmSync(cwdSandbox, { recursive: true, force: true });
     }
   }, 30_000);
