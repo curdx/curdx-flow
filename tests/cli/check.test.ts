@@ -39,7 +39,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -187,5 +187,68 @@ describe("CLI `check` subcommand (Task 3.9)", () => {
     } finally {
       rmSync(fixtureDir, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * --max-global-iterations CLI flag presence (Task 3.5 follow-up,
+ * spec-cost-runaway-guards FR-CLI1 / FR-CLI3).
+ *
+ * The flag has no top-level CLI parser (no `node dist/index.mjs --max-global-
+ * iterations <N>` subcommand) — it is parsed inside the `/curdx-flow:implement`
+ * slash command, which lives in `plugins/curdx-flow/commands/implement.md`.
+ * design.md learning #6 makes this a hard constraint: "CLI flag 设计无 top-
+ * level subcommand — 沿用 implement.md 现有 flag-parsing pattern, src/index.ts
+ * 不动".
+ *
+ * So the load-bearing assertion here is documentation drift: the slash command
+ * doc must continue to (a) advertise the flag in argument-hint, and (b) explain
+ * its semantics in Step 2 / Parse Arguments. If a future edit silently drops
+ * either anchor, users lose discoverability and the spec.schema.json default-30
+ * tightening (FR-D1) becomes unreachable from the user's surface.
+ */
+describe("--max-global-iterations CLI flag (spec-cost-runaway-guards Task 3.5)", () => {
+  const IMPLEMENT_DOC = path.join(
+    REPO_ROOT,
+    "plugins",
+    "curdx-flow",
+    "commands",
+    "implement.md",
+  );
+
+  function readImplement(): string {
+    return readFileSync(IMPLEMENT_DOC, "utf8");
+  }
+
+  it("advertises --max-global-iterations in argument-hint", () => {
+    // The argument-hint frontmatter line is what shows up in slash-command
+    // tab-completion. If it loses the flag, users won't know the flag exists.
+    const doc = readImplement();
+    const argHintLine = doc
+      .split(/\r?\n/)
+      .find((line) => line.startsWith("argument-hint:"));
+    expect(argHintLine, "argument-hint frontmatter line missing").toBeDefined();
+    expect(argHintLine!).toContain("--max-global-iterations");
+  });
+
+  it("documents --max-global-iterations parse semantics in Parse Arguments", () => {
+    // Pin three load-bearing tokens together, in the same line, to defend
+    // against partial drift (e.g. someone keeps the flag name but drops the
+    // default-30 / FR-D1 anchor, decoupling the doc from the schema).
+    const doc = readImplement();
+    const flagLine = doc
+      .split(/\r?\n/)
+      .find(
+        (line) =>
+          line.includes("--max-global-iterations") &&
+          line.includes("default") &&
+          line.includes("30"),
+      );
+    expect(
+      flagLine,
+      "expected a Parse Arguments line citing flag + default + 30",
+    ).toBeDefined();
+    // FR-D1 cite keeps the doc traceable back to requirements.md.
+    expect(flagLine!).toContain("FR-D1");
   });
 });

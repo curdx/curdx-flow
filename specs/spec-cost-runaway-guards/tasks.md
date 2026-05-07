@@ -184,7 +184,7 @@ Focus: all new test files + baseline extension. All tests must pass before Phase
   - **Done when**: All hooks tests pass; no regressions
   - **Commit**: `chore(tests): Phase 3 mid-checkpoint — hooks tests green`
 
-- [ ] 3.5 Extend byte-equal baseline + drift test + CLI flag test
+- [x] 3.5 Extend byte-equal baseline + drift test + CLI flag test
   - **Do**:
     1. `tests/hooks/byte-equal.test.ts`: append baseline entry for `stop-failure-handler.mjs` (reuse existing pattern — same baseline dir per design open Q2 default)
     2. Create `tests/runner/cache-ttl-doc.test.ts`: assert tokens present in `plugins/curdx-flow/references/cache-ttl-and-cost.md` — `"5 minute" OR "5-minute" OR "5min"`, `"GH#46829"`, `"5-10"` (drift test, R5)
