@@ -20,7 +20,7 @@ import {
 describe('PRICING table — three model × five fields', () => {
   it('Opus 4.7 — 5 / 25 / 0.1 / 1.25 / 2', () => {
     const p = PRICING['claude-opus-4-7'];
-    expect(p).toBeDefined();
+    if (!p) throw new Error('PRICING entry missing for claude-opus-4-7');
     expect(p.inputPerMTok).toBe(5);
     expect(p.outputPerMTok).toBe(25);
     expect(p.cacheReadMul).toBe(0.1);
@@ -30,7 +30,7 @@ describe('PRICING table — three model × five fields', () => {
 
   it('Sonnet 4.6 — 3 / 15 / 0.1 / 1.25 / 2', () => {
     const p = PRICING['claude-sonnet-4-6'];
-    expect(p).toBeDefined();
+    if (!p) throw new Error('PRICING entry missing for claude-sonnet-4-6');
     expect(p.inputPerMTok).toBe(3);
     expect(p.outputPerMTok).toBe(15);
     expect(p.cacheReadMul).toBe(0.1);
@@ -40,7 +40,7 @@ describe('PRICING table — three model × five fields', () => {
 
   it('Haiku 4.5 — 1 / 5 / 0.1 / 1.25 / 2', () => {
     const p = PRICING['claude-haiku-4-5-20251001'];
-    expect(p).toBeDefined();
+    if (!p) throw new Error('PRICING entry missing for claude-haiku-4-5-20251001');
     expect(p.inputPerMTok).toBe(1);
     expect(p.outputPerMTok).toBe(5);
     expect(p.cacheReadMul).toBe(0.1);
