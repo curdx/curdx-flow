@@ -184,7 +184,7 @@ Goal: extend drift test to full coverage (dispatch wiring, REVIEW_PASS/FAIL byte
   - **Commit**: `test(runner): extend drift test — dispatch wiring + byte-equal + drift fixture (FR-D1, FR-X3, AC-8.1/8.2)`
   - _Design: Component 7, Test Strategy_
 
-- [ ] 3.2 Verdict schema backwards-compat test + QuickMode bypass test
+- [x] 3.2 Verdict schema backwards-compat test + QuickMode bypass test
   - **Do**:
     1. In `tests/runner/buildFreshness.test.ts` (or a new describe block): add test that a `verificationBlocks` entry WITHOUT `reviews` field still validates (optional field, backwards-compat, FR-T1/T2)
     2. In `tests/hooks/quick-mode-guard.test.ts` (or new describe block): add two fixture tests — (a) `state.quickMode = true` + `codeQuality.verdict = "FAIL"` → output contains `advisory:true`, coordinator continues; (b) `state.quickMode = true` + `specCompliance.verdict = "FAIL"` → coordinator blocks (FR-M1, FR-M2)

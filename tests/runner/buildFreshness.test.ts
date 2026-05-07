@@ -143,3 +143,115 @@ describe('verificationBlocks schema migration', () => {
     }
   });
 });
+
+// Two-stage review schema migration — `reviews` is an additive, OPTIONAL
+// peer-field on a `verificationBlock` (per spec-two-stage-review D3 +
+// types.ts `VerificationBlock.reviews`). A block written before
+// spec-two-stage-review (e.g. by spec-verification-iron-law) only has
+// `{command, exitCode, timestamp, srcMtime}` and MUST still round-trip
+// through merge-state byte-stable (FR-T1/T2 backwards-compat).
+describe('verificationBlock.reviews backwards-compat', () => {
+  test('block WITHOUT reviews field round-trips through merge-state byte-stable', () => {
+    const dir = mkdtempSync(
+      path.join(os.tmpdir(), 'curdx-state-no-reviews-'),
+    );
+    const stateFile = path.join(dir, '.curdx-state.json');
+    const initial = {
+      source: 'spec',
+      name: 'pre-two-stage-spec',
+      basePath: '/tmp/pre-two-stage',
+      phase: 'design',
+      taskIndex: 0,
+      totalTasks: 0,
+    };
+    writeFileSync(stateFile, JSON.stringify(initial), 'utf8');
+    // Iron-law-shaped block: only the 4 required fields, NO `reviews`.
+    const blockNoReviews = {
+      command: 'npm run typecheck',
+      exitCode: 0,
+      timestamp: '2026-05-06T18:00:00.000Z',
+      srcMtime: 1746554400000,
+    };
+    const patch = JSON.stringify({
+      verificationBlocks: { design: blockNoReviews },
+    });
+    try {
+      const r = spawnSync('node', [MERGE_STATE_BUNDLE, stateFile, patch], {
+        encoding: 'utf8',
+        timeout: 5000,
+      });
+      expect(r.status).toBe(0);
+      const onDisk = JSON.parse(readFileSync(stateFile, 'utf8')) as Record<
+        string,
+        unknown
+      >;
+      // existing identity fields preserved
+      expect(onDisk.name).toBe('pre-two-stage-spec');
+      expect(onDisk.phase).toBe('design');
+      // block exists exactly as written; `reviews` field absent (backwards-compat)
+      expect(onDisk.verificationBlocks).toEqual({ design: blockNoReviews });
+      const designBlock = (onDisk.verificationBlocks as Record<string, unknown>)
+        .design as Record<string, unknown>;
+      expect(designBlock.reviews).toBeUndefined();
+      // load-only required fields intact
+      expect(designBlock.command).toBe('npm run typecheck');
+      expect(designBlock.exitCode).toBe(0);
+      expect(designBlock.srcMtime).toBe(1746554400000);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('block WITH partial reviews (only specCompliance) is valid; codeQuality optional', () => {
+    const dir = mkdtempSync(
+      path.join(os.tmpdir(), 'curdx-state-partial-reviews-'),
+    );
+    const stateFile = path.join(dir, '.curdx-state.json');
+    const initial = {
+      source: 'spec',
+      name: 'partial-reviews-spec',
+      basePath: '/tmp/partial-reviews',
+      phase: 'design',
+    };
+    writeFileSync(stateFile, JSON.stringify(initial), 'utf8');
+    // Only specCompliance present; codeQuality omitted (degenerate case
+    // when code-quality-reviewer was unavailable / single-axis review).
+    const blockPartial = {
+      command: 'npm run typecheck',
+      exitCode: 0,
+      timestamp: '2026-05-06T18:00:00.000Z',
+      srcMtime: 1746554400000,
+      reviews: {
+        specCompliance: {
+          verdict: 'pass',
+          findings: [],
+          reviewerId: 'spec-reviewer',
+          timestamp: '2026-05-06T18:01:00.000Z',
+        },
+      },
+    };
+    const patch = JSON.stringify({
+      verificationBlocks: { design: blockPartial },
+    });
+    try {
+      const r = spawnSync('node', [MERGE_STATE_BUNDLE, stateFile, patch], {
+        encoding: 'utf8',
+        timeout: 5000,
+      });
+      expect(r.status).toBe(0);
+      const onDisk = JSON.parse(readFileSync(stateFile, 'utf8')) as Record<
+        string,
+        unknown
+      >;
+      const designBlock = (onDisk.verificationBlocks as Record<string, unknown>)
+        .design as Record<string, unknown>;
+      const reviews = designBlock.reviews as Record<string, unknown>;
+      expect(reviews.specCompliance).toBeDefined();
+      // codeQuality is optional and absent — matches schema additionalProperties:false
+      // with both sub-fields optional under `reviews`.
+      expect(reviews.codeQuality).toBeUndefined();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
