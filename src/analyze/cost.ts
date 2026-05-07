@@ -20,7 +20,7 @@
 //     precision target with a 10× safety margin.
 
 import { PRICING, resolveModelId, type ModelPrice } from './pricing.js';
-import type { Event, EventLogRow, UsageRow } from './types.js';
+import type { AggregateBucket, Event, EventLogRow, UsageRow } from './types.js';
 
 /**
  * Round a USD figure to 4 decimal places ($0.0001 grid).
@@ -340,4 +340,149 @@ export function extractUsageRowsFromEvents(
   }
 
   return rows;
+}
+
+/**
+ * parseCorrelationId — split OB-2 3-segment correlationId.
+ *
+ * Format (FR-4 / OB-2 Q5 lock): `<sid>:<task>:<iter>` — all three segments
+ * non-empty when present. Anything else (undefined, empty string, fewer or
+ * more colons, empty middle segment) → all undefined so the caller routes
+ * the row into the `unknown` bucket without a partial match (Decision 11
+ * — partial buckets risk double-attribution across spec/phase/task levels).
+ *
+ * Pure helper, NEVER-throw — used by aggregateBy.
+ */
+function parseCorrelationId(cid?: string): {
+  sid?: string;
+  task?: string;
+  iter?: string;
+} {
+  if (typeof cid !== 'string' || cid.length === 0) return {};
+  const parts = cid.split(':');
+  if (parts.length !== 3) return {};
+  const [sid, task, iter] = parts;
+  if (!sid || !task || !iter) return {};
+  return { sid, task, iter };
+}
+
+/**
+ * aggregateBy — three-level join: rows → AggregateBucket[] keyed by
+ * spec | phase | task (FR-AGG-1 / FR-AGG-2 / FR-AGG-3 / AC4).
+ *
+ * Bucket key derivation (design §Components #2 三级聚合策略):
+ *   • level='spec'  → key = parsed.sid                   (fallback 'unknown')
+ *   • level='phase' → key = ctx.specPhaseMap[sid]        (fallback 'unknown')
+ *   • level='task'  → key = full correlationId string    (fallback 'unknown')
+ *
+ * Per-bucket accumulation:
+ *   • totalUSD     — sum of computeCost(row), 4-decimal rounded at the boundary
+ *   • rowCount     — total rows in bucket (parent assistant + subagent_trailer)
+ *   • trailerCount — rows where source === 'subagent_trailer' only (FR-AGG-3
+ *                    trailer hit-rate signal)
+ *   • durationMs   — sum of row.durationMs ?? 0 (trailer carries durationMs;
+ *                    parent assistant_turn typically does not)
+ *   • modelMix     — per-model { tokens: input+output, usd: computeCost }
+ *                    (cache_* tokens excluded from mix tokens to keep R6
+ *                    tokenizer cohort breakdown comparable across models —
+ *                    cache writes/reads are billing artifacts not generation)
+ *   • inputTokens / outputTokens / cacheReadTokens / cacheCreate5m/1hTokens
+ *                    — straight per-row sums for downstream R4/R5 (cache hit
+ *                    rate, churn ratio) and R6 (cohort tokens).
+ *
+ * Decision 11 (double-billing guard): same requestId can carry both
+ * source='assistant' (parent) and source='subagent_trailer' (child) — we do
+ * NOT dedupe by requestId here. filter.ts dedupes parent rows upstream;
+ * trailer rows pass through untouched and get bucketed separately by
+ * `source` discriminator. Both contribute independently to totalUSD.
+ *
+ * Output sort: descending totalUSD so R7_topN buckets[0..top-1] is the
+ * cost-leader cut without re-sorting at the render layer.
+ *
+ * NEVER-throw (NFR-9): full body wrapped — malformed input returns [].
+ */
+export function aggregateBy(
+  rows: UsageRow[],
+  level: 'spec' | 'phase' | 'task',
+  ctx?: { specPhaseMap?: Record<string, string> },
+): AggregateBucket[] {
+  try {
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+    const specPhaseMap = ctx?.specPhaseMap ?? {};
+    const buckets = new Map<string, AggregateBucket>();
+
+    for (const row of rows) {
+      if (!row) continue;
+      const parsed = parseCorrelationId(row.correlationId);
+
+      let key: string;
+      let specHint: string | undefined;
+      let phaseHint: string | undefined;
+      if (level === 'spec') {
+        key = parsed.sid ?? 'unknown';
+        specHint = parsed.sid;
+      } else if (level === 'phase') {
+        key = (parsed.sid && specPhaseMap[parsed.sid]) ?? 'unknown';
+        specHint = parsed.sid;
+        phaseHint = parsed.sid ? specPhaseMap[parsed.sid] : undefined;
+      } else {
+        // task
+        key = row.correlationId ?? 'unknown';
+        specHint = parsed.sid;
+        phaseHint = parsed.sid ? specPhaseMap[parsed.sid] : undefined;
+      }
+
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = {
+          level,
+          key,
+          totalUSD: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreate5mTokens: 0,
+          cacheCreate1hTokens: 0,
+          rowCount: 0,
+          trailerCount: 0,
+          durationMs: 0,
+          modelMix: {},
+          spec: specHint,
+          phase: phaseHint,
+        };
+        buckets.set(key, bucket);
+      }
+
+      const usd = computeCost(row);
+      bucket.totalUSD += usd;
+      bucket.inputTokens += row.inputTokens ?? 0;
+      bucket.outputTokens += row.outputTokens ?? 0;
+      bucket.cacheReadTokens += row.cacheReadTokens ?? 0;
+      bucket.cacheCreate5mTokens += row.cacheCreate5mTokens ?? 0;
+      bucket.cacheCreate1hTokens += row.cacheCreate1hTokens ?? 0;
+      bucket.rowCount += 1;
+      if (row.source === 'subagent_trailer') bucket.trailerCount += 1;
+      bucket.durationMs += row.durationMs ?? 0;
+
+      const modelKey = row.model || 'unknown';
+      const mix = bucket.modelMix[modelKey] ?? { tokens: 0, usd: 0 };
+      mix.tokens += (row.inputTokens ?? 0) + (row.outputTokens ?? 0);
+      mix.usd += usd;
+      bucket.modelMix[modelKey] = mix;
+    }
+
+    // Re-round totalUSD at the boundary (Decision 10 — accumulate raw,
+    // round on emit). Per-row computeCost is already 4-decimal rounded so
+    // the sum drift is bounded by N × 0.00005; rounding once here keeps the
+    // bucket-level value exactly representable for the JSON consumer.
+    const out = Array.from(buckets.values()).map((b) => ({
+      ...b,
+      totalUSD: Math.round(b.totalUSD * 10000) / 10000,
+    }));
+    out.sort((a, b) => b.totalUSD - a.totalUSD);
+    return out;
+  } catch {
+    // NFR-9 NEVER-throw — malformed input drops to empty array.
+    return [];
+  }
 }

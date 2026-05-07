@@ -221,7 +221,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(cost): wire trailer extraction into extractUsageRowsFromEvents`
 
-- [ ] 2.4 [VERIFY] Quality checkpoint: typecheck + build + test:analyze
+- [x] 2.4 [VERIFY] Quality checkpoint: typecheck + build + test:analyze
   **Do**: Run typecheck + build + 现有 analyze tests 验证 schema-map 改动 + trailer 路径未破现有行为（US-11 兼容）。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run typecheck && npm run build && npm run test:analyze`
@@ -230,7 +230,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `chore(analyze): pass quality checkpoint after trailer wiring`
 
-- [ ] 2.5 Add aggregateBy three-level join in cost.ts
+- [x] 2.5 Add aggregateBy three-level join in cost.ts
   **Do**: 在 cost.ts 加 `aggregateBy(rows, level, ctx): AggregateBucket[]` — 根据 level 用 correlationId `<sid>:<task>:<iter>` 拆段；task 维度按 correlationId 全段；phase 维度通过 `ctx.specPhaseMap[sid]` 映射；spec 维度取首段 sid。缺 correlationId → fallback `unknown` 桶。每 bucket 累加 totalUSD（renderRound 4 位）/ rowCount / trailerCount / modelMix / durationMs。
 
   **Files**:
