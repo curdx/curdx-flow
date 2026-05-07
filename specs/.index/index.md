@@ -3,7 +3,7 @@
 Auto-generated summary of all specs across configured directories.
 See [index-state.json](./index-state.json) for machine-readable data.
 
-**Last updated:** 2026-05-06T23:47:35Z
+**Last updated:** 2026-05-07T00:31:11Z
 
 ## Directories (1)
 
@@ -18,7 +18,7 @@ See [index-state.json](./index-state.json) for machine-readable data.
 | _epics | ./specs | new |  |
 | cross-platform-support | ./specs | completed | done |
 | plugin-observability | ./specs | completed | done |
-| spec-bounded-parallel-dispatch | ./specs | new |  |
+| spec-bounded-parallel-dispatch | ./specs | execution | 9/9 tasks |
 | spec-cost-runaway-guards | ./specs | new |  |
 | spec-subagent-context-reinjection | ./specs | new |  |
 | spec-two-stage-review | ./specs | new |  |

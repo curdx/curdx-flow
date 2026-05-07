@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-05-06T23:47:35Z",
+  "updated": "2026-05-07T00:31:11Z",
   "directories": [
     {
       "path": "./specs",
@@ -29,7 +29,9 @@
     {
       "name": "spec-bounded-parallel-dispatch",
       "path": "./specs/spec-bounded-parallel-dispatch",
-      "phase": "new"
+      "phase": "completed",
+      "taskIndex": 9,
+      "totalTasks": 9
     },
     {
       "name": "spec-cost-runaway-guards",
