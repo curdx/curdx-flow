@@ -207,7 +207,7 @@ Focus: all new test files + baseline extension. All tests must pass before Phase
 
 ## Phase 4 — Quality (1 task)
 
-- [ ] 4.1 Update CHANGELOG.md (Added / Changed / Fixed sections)
+- [x] 4.1 Update CHANGELOG.md (Added / Changed / Fixed sections)
   - **Do**:
     1. Open `CHANGELOG.md`, prepend new section at top under current `## [Unreleased]` or as new version entry
     2. **Changed**: `maxGlobalIterations` default `100 → 30`; existing state values preserved (FR-C1); opt-in via `--max-global-iterations 100`
