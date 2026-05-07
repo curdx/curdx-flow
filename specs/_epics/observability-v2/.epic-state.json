@@ -4,11 +4,12 @@
   "specs": [
     {
       "name": "spec-analyze-real-transcript",
-      "status": "pending",
+      "status": "completed",
+      "completedAt": "2026-05-07",
       "dependencies": [],
       "size": "S",
       "role": "foundation",
-      "criticalBugFix": "B1: index.ts:23 hardcoded fixture path"
+      "criticalBugFix": "B1 fixed: index.ts no longer hardcoded fixture path; reads real ~/.claude/projects/<encoded>/*.jsonl"
     },
     {
       "name": "spec-decision-event-logging",
