@@ -167,7 +167,7 @@ Focus: 7 unit cases + drift test + byte-equal extension.
 
 ## Phase 4 — Quality (~1 task)
 
-- [ ] 4.1 Append CHANGELOG entry for v7.1.7
+- [x] 4.1 Append CHANGELOG entry for v7.1.7
   - **Do**:
     1. Open `CHANGELOG.md`
     2. In the `## 7.1.7` section (create if absent: `## 7.1.7 — 2026-05-07`), append under `### Added`:
