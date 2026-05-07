@@ -19,7 +19,7 @@ Task 1.6 — stop-failure-handler.ts compiles + builds to .mjs, StopFailure regi
 
 Focus: skeleton + build pipeline green. Skip tests, accept stubs. Types must pass.
 
-- [ ] 1.1 Create stop-failure-handler.ts (8-matcher map + fail-open wrapper)
+- [x] 1.1 Create stop-failure-handler.ts (8-matcher map + fail-open wrapper)
   - **Do**:
     1. Create `src/hooks/stop-failure-handler.ts`: read stdin JSON, extract `matcher`, log `[StopFailure:<matcher>] <description>` to stderr, always `process.exit(0)`
     2. Embed const map with 8 matchers: `rate_limit / authentication_failed / oauth_org_not_allowed / billing_error / invalid_request / server_error / max_output_tokens / unknown`
