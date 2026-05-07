@@ -44,6 +44,61 @@ function writeState(state: StateFile): void {
 }
 
 /**
+ * Trim orphan entries from `state.files` so the file does not grow unbounded
+ * across months of use (D2: dual heuristic). Two passes:
+ *
+ *   Pass 1 — drop any entry whose `lastModifiedMs` is older than 30 days OR
+ *            whose path no longer exists on disk.
+ *   Pass 2 — if more than 100 entries still remain, drop the oldest by
+ *            `lastModifiedMs` until ≤ 100.
+ *
+ * Entries listed in `currentPaths` are never dropped — the active run owns
+ * them and the resume offset must survive the GC. Returns the same `state`
+ * object (mutated in place) so callers can chain with `writeState`.
+ */
+export function cleanupOrphanState(state: StateFile, currentPaths: string[]): StateFile {
+  const now = Date.now();
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  const KEEP_MAX = 100;
+  const protectedKeys = new Set(currentPaths);
+  const dropped: string[] = [];
+
+  // Pass 1: stale (>30d) OR file-gone. Skip protected (current-run) entries.
+  for (const key of Object.keys(state.files)) {
+    if (protectedKeys.has(key)) continue;
+    const entry = state.files[key];
+    if (!entry) continue;
+    const stale = now - entry.lastModifiedMs > THIRTY_DAYS_MS;
+    const gone = !existsSync(key);
+    if (stale || gone) {
+      delete state.files[key];
+      dropped.push(key);
+    }
+  }
+
+  // Pass 2: if still > KEEP_MAX, drop oldest by lastModifiedMs until ≤ cap.
+  // Protected (current-run) entries are filtered out of the candidate pool
+  // so the active session always survives even if it would otherwise be the
+  // oldest in a synthetic fixture.
+  const overflow = Object.keys(state.files).length - KEEP_MAX;
+  if (overflow > 0) {
+    const candidates = Object.entries(state.files)
+      .filter(([k]) => !protectedKeys.has(k))
+      .sort((a, b) => a[1].lastModifiedMs - b[1].lastModifiedMs);
+    for (const [key] of candidates.slice(0, overflow)) {
+      delete state.files[key];
+      dropped.push(key);
+    }
+  }
+
+  if (dropped.length) {
+    // eslint-disable-next-line no-console
+    console.warn(`state: GC dropped ${dropped.length} orphan entr${dropped.length === 1 ? 'y' : 'ies'}`);
+  }
+  return state;
+}
+
+/**
  * Scan ./specs/*\/.curdx-state.json and pluck `phase` from each. Missing dir,
  * missing file, or corrupt JSON all degrade to "skip the spec" rather than
  * throw — this is a sidecar input, not a hard dep.
@@ -240,6 +295,15 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
       };
     }
     void getStateForPath; // satisfy unused-import lint; helper is exported for tests.
+    // Orphan GC: drop stale (>30d), file-gone, or overflow (>100) entries
+    // before persisting. Wrapped fail-open per FR-C3 — a GC failure must
+    // never crash the analyze run.
+    try {
+      cleanupOrphanState(state, pathStats.map((ps) => ps.p));
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('state: GC failed (continuing without cleanup):', (err as Error).message);
+    }
     writeState(state);
   }
 }

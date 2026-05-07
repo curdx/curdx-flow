@@ -69,7 +69,7 @@ Task 1.3 — `resolveTranscriptSource()` wired into index.ts; integration test g
   - **Commit**: `test(analyze): 5 unit tests for resolveTranscriptSource`
   - _Requirements: AC1, AC2, AC3, AC4 | Design: Component 7_
 
-- [ ] 2.2 [P] Add `cleanupOrphanState()` + 3 state GC unit tests
+- [x] 2.2 [P] Add `cleanupOrphanState()` + 3 state GC unit tests
   - **Do**:
     1. Implement `cleanupOrphanState(state, currentPaths)` in `src/analyze/index.ts` per design Component 3 (pass 1: drop mtime > 30d OR `!existsSync`; pass 2: sort by `lastModifiedMs`, drop oldest if > 100; `console.warn` dropped count); wrap call in `finally` block before `writeState()` in try/catch (fail-open)
     2. In `tests/analyze/transcript-path.test.ts` (or new `state-gc.test.ts`), add 3 GC cases: (a) 31d-old entry dropped, (b) 101 entries → oldest 1 dropped, (c) file-gone entry dropped

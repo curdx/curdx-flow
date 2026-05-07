@@ -21,6 +21,8 @@ import {
   resolveTranscriptSource,
   TranscriptNotFoundError,
 } from '../../src/analyze/transcript-path.ts';
+import { cleanupOrphanState } from '../../src/analyze/index.ts';
+import type { StateFile } from '../../src/analyze/types.ts';
 
 let fakeHome: string;
 
@@ -118,5 +120,78 @@ describe('resolveTranscriptSource', () => {
     expect(src.kind).toBe('real');
     expect(src.paths).toHaveLength(1);
     expect(path.basename(src.paths[0]!)).toBe('abc.jsonl');
+  });
+});
+
+// State GC tests (Phase 2 Task 2.2): cleanupOrphanState mutates state.files
+// per the dual heuristic (mtime > 30d OR > 100 keys), preserving any path in
+// `currentPaths`. We seed real fs entries because Pass 1 also drops via
+// existsSync(); seedFixtureFile gives us real files under fakeHome.
+
+function seedFixtureFile(name: string): string {
+  const p = path.join(fakeHome, name);
+  writeFileSync(p, '{}\n');
+  return p;
+}
+
+describe('cleanupOrphanState', () => {
+  it('drops entries older than 30 days (mtime threshold)', () => {
+    const fresh = seedFixtureFile('fresh.jsonl');
+    const stale = seedFixtureFile('stale.jsonl');
+    const now = Date.now();
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+    const state: StateFile = {
+      version: 1,
+      files: {
+        [fresh]: { byteOffset: 10, lastModifiedMs: now - 1000, sizeBytes: 10 },
+        [stale]: { byteOffset: 20, lastModifiedMs: now - THIRTY_DAYS_MS - 1000, sizeBytes: 20 },
+      },
+    };
+
+    cleanupOrphanState(state, []);
+
+    expect(Object.keys(state.files)).toEqual([fresh]);
+    expect(state.files[stale]).toBeUndefined();
+  });
+
+  it('caps state.files at 100 entries by dropping oldest by lastModifiedMs', () => {
+    // Seed 101 fresh on-disk fixtures so Pass 1 leaves them all alive,
+    // then verify Pass 2 trims down to exactly 100 starting from the oldest.
+    const now = Date.now();
+    const state: StateFile = { version: 1, files: {} };
+    const paths: string[] = [];
+    for (let i = 0; i < 101; i++) {
+      const p = seedFixtureFile(`session-${String(i).padStart(3, '0')}.jsonl`);
+      paths.push(p);
+      // i=0 oldest, i=100 newest; all within 30d window.
+      state.files[p] = { byteOffset: i, lastModifiedMs: now - (101 - i) * 1000, sizeBytes: i };
+    }
+
+    cleanupOrphanState(state, []);
+
+    expect(Object.keys(state.files)).toHaveLength(100);
+    // Oldest (paths[0]) was dropped; newest survived.
+    expect(state.files[paths[0]!]).toBeUndefined();
+    expect(state.files[paths[100]!]).toBeDefined();
+  });
+
+  it('preserves entries listed in currentPaths even if stale', () => {
+    const stale = seedFixtureFile('stale-but-current.jsonl');
+    const now = Date.now();
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+    const state: StateFile = {
+      version: 1,
+      files: {
+        [stale]: { byteOffset: 5, lastModifiedMs: now - THIRTY_DAYS_MS - 5000, sizeBytes: 5 },
+      },
+    };
+
+    cleanupOrphanState(state, [stale]);
+
+    // currentPaths protects the entry from BOTH passes.
+    expect(state.files[stale]).toBeDefined();
+    expect(state.files[stale]!.byteOffset).toBe(5);
   });
 });
