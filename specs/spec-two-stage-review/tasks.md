@@ -218,7 +218,7 @@ Goal: DRY audit between the two reviewer prompts; CHANGELOG entry; no residual c
   - **Commit**: `fix(agents): resolve residual cross-domain leakage if found (FR-N5)`
   - _Design: Component 1, Risk 1_
 
-- [ ] 4.2 [P] CHANGELOG entry
+- [x] 4.2 [P] CHANGELOG entry
   - **Do**:
     1. Prepend new section to `CHANGELOG.md` for current version under development
     2. Add under `### Added`: `code-quality-reviewer agent (3-layer drift defense, 30 rubrics)`, `two-stage-review.md reference doc`, `parallel dispatch at design/tasks phase boundaries`
