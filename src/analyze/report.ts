@@ -28,7 +28,7 @@
 // returned by renderReport(). report.ts MUST stay pure so tests (Phase 4)
 // can exercise it on synthetic event arrays without filesystem mocking.
 
-import type { AggregateBucket, Event, Options } from './types.ts';
+import type { AggregateBucket, Event, Options, Recommendation, Severity } from './types.ts';
 
 export interface ErrorLogEntry {
   ts: string;
@@ -65,6 +65,21 @@ export interface RenderOptions extends Options {
    * cross-bucket model union, R6 tokenizer footnote).
    */
   costBreakdown?: CostBreakdownInput;
+  /**
+   * OB-3 recommendations — Phase 4 Task 4.5.
+   *
+   * Optional input. When present, `renderReport` appends a `## Recommendations`
+   * chapter immediately after `## Cost Breakdown` (Decision 4: independent
+   * section after R1-R7). Each entry is rendered with severity color coding
+   * (sev=red / warn=yellow / info=blue / insufficient_data=gray) via ANSI
+   * escapes; `process.env.NO_COLOR` (any non-empty value) disables color and
+   * falls back to plain text severity prefixes.
+   *
+   * Empty array = chapter is skipped (Decision 4 — no empty `## Recommendations`
+   * heading clutter when the rules engine has no findings). index.ts (Task 4.6)
+   * decides what to pass; report.ts only renders.
+   */
+  recommendations?: Recommendation[];
 }
 
 /**
@@ -784,6 +799,100 @@ function renderR7TopN(buckets: AggregateBucket[]): string {
   return lines.join('\n');
 }
 
+/**
+ * Recommendations renderer — Phase 4 Task 4.5.
+ *
+ * Decision 4 (independent section): emits `## Recommendations` immediately
+ * after `## Cost Breakdown`, with one bullet per finding. Decision 7 (4-tier
+ * severity ladder including `insufficient_data`): each entry prefixes a
+ * severity tag using ANSI color when allowed, plain text otherwise.
+ *
+ * Color map (FR-REPORT-3 / NFR-10):
+ *   sev               → red    `[SEV]`     — 31m
+ *   warn              → yellow `[WARN]`    — 33m
+ *   info              → blue   `[INFO]`    — 34m
+ *   insufficient_data → gray   `[N/A]`     — 90m, with `(n=X 不足以判断)` hint
+ *                                              when evidence.n is present
+ *
+ * NO_COLOR honored (https://no-color.org): any non-empty `process.env.NO_COLOR`
+ * disables color codes; the bracket prefix stays so jq / grep callers still
+ * sort by severity.
+ *
+ * Line format: `[<SEV>] <rule> @ <scope> — <message> (<evidence>)` — scope
+ * collapses spec/phase/task into a single readable token; evidence is JSON
+ * one-liner for compact inspection.
+ *
+ * Empty array → returns '' so the caller can skip emitting a heading.
+ */
+const SEV_PREFIX: Record<Severity, string> = {
+  sev: '[SEV]',
+  warn: '[WARN]',
+  info: '[INFO]',
+  insufficient_data: '[N/A]',
+};
+
+const SEV_COLOR: Record<Severity, string> = {
+  sev: '\x1b[31m',
+  warn: '\x1b[33m',
+  info: '\x1b[34m',
+  insufficient_data: '\x1b[90m',
+};
+
+const ANSI_RESET = '\x1b[0m';
+
+function colorAllowed(): boolean {
+  // NO_COLOR spec: any value (including empty string per
+  // https://no-color.org/) disables color. Node sets `process.env.NO_COLOR`
+  // to the literal string, never `undefined` for an unset var, so a simple
+  // truthy check matches "set to anything non-empty"; we treat the empty
+  // string as "set" too because the env spec says presence alone is enough.
+  return !(typeof process !== 'undefined' && process.env && 'NO_COLOR' in process.env);
+}
+
+function severityPrefix(sev: Severity): string {
+  const tag = SEV_PREFIX[sev];
+  if (!colorAllowed()) return tag;
+  return `${SEV_COLOR[sev]}${tag}${ANSI_RESET}`;
+}
+
+function formatScope(scope: Recommendation['scope']): string {
+  const parts: string[] = [];
+  if (scope.spec) parts.push(`spec=${scope.spec}`);
+  if (scope.phase) parts.push(`phase=${scope.phase}`);
+  if (scope.task) parts.push(`task=${scope.task}`);
+  return parts.length === 0 ? 'global' : parts.join('/');
+}
+
+function formatEvidence(evidence: Record<string, unknown>): string {
+  try {
+    return JSON.stringify(evidence);
+  } catch {
+    // NEVER-throw (NFR-9): cyclic refs / BigInt fall back to a placeholder.
+    return '{}';
+  }
+}
+
+export function renderRecommendations(recs: Recommendation[]): string {
+  if (!recs || recs.length === 0) return '';
+  const lines: string[] = [];
+  lines.push('## Recommendations');
+  lines.push('');
+  for (const r of recs) {
+    const prefix = severityPrefix(r.severity);
+    const scope = formatScope(r.scope ?? {});
+    const evidence = formatEvidence(r.evidence ?? {});
+    let line = `- ${prefix} ${r.rule} @ ${scope} — ${r.message} (${evidence})`;
+    if (r.severity === 'insufficient_data') {
+      const n = (r.evidence as { n?: unknown } | undefined)?.n;
+      const nDisplay = typeof n === 'number' ? n : '?';
+      line += ` _n=${nDisplay} 不足以判断_`;
+    }
+    lines.push(line);
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
 export function renderCostBreakdown(input: CostBreakdownInput): string {
   const lines: string[] = [];
   lines.push('## Cost Breakdown');
@@ -836,6 +945,14 @@ export function renderReport(
   // Existing 7 sections above stay byte-for-byte unchanged (NFR-6).
   if (opts.costBreakdown) {
     markdown += '\n' + renderCostBreakdown(opts.costBreakdown);
+  }
+
+  // OB-3 Recommendations chapter — Phase 4 Task 4.5. Sits immediately after
+  // Cost Breakdown (Decision 4). Empty array → renderRecommendations returns
+  // '' and we skip the chapter entirely (no orphan heading).
+  if (opts.recommendations && opts.recommendations.length > 0) {
+    const recsMd = renderRecommendations(opts.recommendations);
+    if (recsMd) markdown += '\n' + recsMd;
   }
 
   const json: ReportJson = {

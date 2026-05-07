@@ -607,7 +607,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(report): render R1-R7 + Cost Breakdown section + tokenizer footnote`
 
-- [ ] 4.5 report.ts — Recommendations section with severity color coding
+- [x] 4.5 report.ts — Recommendations section with severity color coding
   **Do**: 在 report.ts 加 `renderRecommendations(recs)`：插入 `## Recommendations` 章节（紧跟 Cost Breakdown 之后）。每条按 severity 加色编码：sev → `[SEV]` 红 (`\x1b[31m`)；warn → `[WARN]` 黄；info → `[INFO]` 蓝；insufficient_data → `[N/A]` 灰 + "n=X 不足以判断" 提示。禁色环境 (`process.env.NO_COLOR`) 降级纯文本前缀。
 
   **Files**:
