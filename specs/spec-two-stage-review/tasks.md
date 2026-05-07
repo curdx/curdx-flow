@@ -148,7 +148,7 @@ Goal: complete all 4 narrowing passes on spec-reviewer, fill code-quality-review
   - **Commit**: `feat(commands): design.md parallel dispatch + QuickMode branch at Step 4 (D4, D5, FR-D1/D2)`
   - _Design: Component 3, D4, D5_
 
-- [ ] 2.8 [P] Edit `commands/tasks.md`: mirror parallel dispatch from design.md
+- [x] 2.8 [P] Edit `commands/tasks.md`: mirror parallel dispatch from design.md
   - **Do**:
     1. Locate Step 4 (Artifact Review) in `plugins/curdx-flow/commands/tasks.md`
     2. Apply identical parallel dispatch block as 2.7 (verbatim parallel structure — same 6 steps, same links)
