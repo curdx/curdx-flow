@@ -12,11 +12,20 @@ import path from 'node:path';
 import { aggregateBy, computeCost, extractUsageRowsFromEvents } from './cost.ts';
 import { filterEvents } from './filter.ts';
 import { getStateForPath, loadSchemaMap, parseTranscript, shouldRotate } from './parser.ts';
+import { recommend } from './recommend.ts';
 import { redactEvent, redactReportFields } from './redact.ts';
 import { renderReport } from './report.ts';
-import type { ReportJson, SpecStateInfo } from './report.ts';
+import type { CostBreakdownInput, ReportJson, SpecStateInfo } from './report.ts';
 import { resolveTranscriptSource, TranscriptNotFoundError } from './transcript-path.ts';
-import type { AggregateBucket, Counters, Event, EventLogRow, Options, StateFile } from './types.ts';
+import type {
+  AggregateBucket,
+  Counters,
+  Event,
+  EventLogRow,
+  Options,
+  Recommendation,
+  StateFile,
+} from './types.ts';
 
 export type RunAnalyzeOptions = Options;
 
@@ -289,37 +298,17 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
     const errorEntries = loadErrorEntries();
     const specStates = loadSpecStates();
 
-    const { markdown, json } = renderReport(filtered, errorEntries, specStates, {
-      ...opts,
-      limit,
-      schemaDrift: {
-        unknownTypeCount: counters.unknown_type,
-        parseErrorCount: counters.parse_error,
-      },
-    });
-
-    // Belt-and-suspenders pass on the rendered JSON (no-op when redactEvent
-    // already nuked the field, but guards against future renderer additions
-    // that might surface a new path-shaped value).
-    const safeJson = redactReportFields(json, { includePrompts });
-
-    void opts.out;
-
-    // OB-3 cost branch — Task 1.5 (Phase 1 POC).
+    // OB-3 cost branch — Phase 4 Task 4.6 wires `recommend()` + recommendations
+    // into both markdown (`## Recommendations` chapter, after `## Cost Breakdown`)
+    // and JSON (top-level `recommendations: Recommendation[]`, sibling of
+    // `costBreakdown`). The existing 7 flat sections from `renderReport` are
+    // NOT touched (NFR-6 hard constraint).
     //
-    // Opt-in via `--cost-summary`. Walks the same `filtered` event stream
-    // through `extractUsageRowsFromEvents` (assistant_turn main path only;
-    // trailer + aggregateBy land in Phase 2 Tasks 2.2/2.3/2.5/2.7), sums
-    // per-row USD via `computeCost`, and surfaces:
-    //   • markdown: appended `## Cost Summary` section at the end
-    //   • JSON: top-level `totalCost.usd` mirror (Decision 3 / Validation
-    //     Hint — `jq '.totalCost.usd'` must resolve non-null)
-    //
-    // The existing 7 flat sections from `renderReport` are NOT touched
-    // (NFR-6 hard constraint). Phase 2 will inject a sibling `costBreakdown`
-    // object alongside this top-level mirror.
-    let markdownStr = markdown;
-    let jsonObj: Record<string, unknown> = safeJson as unknown as Record<string, unknown>;
+    // Compute the cost aggregates BEFORE calling renderReport so we can pass
+    // costBreakdown + recommendations as RenderOptions; renderReport renders
+    // both extra chapters in a single pass (no post-render markdown surgery).
+    let costBreakdown: CostBreakdownInput | undefined;
+    let recommendations: Recommendation[] = [];
     if (opts.costSummary === true) {
       // Task 2.6 — derive `specPhaseMap: Record<sid, phase>` from the spec
       // state files (`./specs/*\/.curdx-state.json`) loaded above. State files
@@ -328,9 +317,7 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
       // brief is to key by spec name. `aggregateBy` ctx looks up by the
       // correlationId `sid` segment (= transcript filename basename, an
       // anthropic session UUID), so most lookups will fall through to the
-      // 'unknown' phase bucket — that's the explicit NFR-9 contract. This
-      // task wires the map; Task 2.9 plumbs it into `aggregateBy(rows, level,
-      // {specPhaseMap})` as `costBreakdown.R2_perPhase` keying.
+      // 'unknown' phase bucket — that's the explicit NFR-9 contract.
       //
       // Reuses the already-loaded `specStates` from above (loadSpecStates is
       // itself NEVER-throw — missing dir / corrupt JSON → []). The reduce
@@ -357,9 +344,6 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
       //   • Any of {bySpec, byPhase, byTask} = true → ONLY those dims compute
       //   • All three false (cost-summary alone) → all three dims compute (R1+R2+R3+R7)
       //   • `top` only truncates R7 (task-level) buckets
-      // Buckets stay local for now (Phase 1 closes only the totalCost.usd
-      // mirror); Task 2.9 plumbs them into `costBreakdown.{R1,R2,R3,R7}`,
-      // Phase 4 Task 4.4 wires R7 markdown rendering through report.ts.
       const anyByFlag = opts.bySpec === true || opts.byPhase === true || opts.byTask === true;
       const wantSpec = anyByFlag ? opts.bySpec === true : true;
       const wantPhase = anyByFlag ? opts.byPhase === true : true;
@@ -379,15 +363,12 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
         costAggregates.task = taskBuckets.slice(0, top);
       }
 
-      // Task 2.9 — wire costAggregates into the JSON output's `costBreakdown`
-      // sibling alongside the top-level `totalCost.usd` mirror. R4/R5/R6 are
-      // placeholders (Phase 4 will fill cacheHit / wallClock / modelMix). R7
-      // is the top-N task slice (already truncated above when `wantTask`).
-      // The existing 7 flat sections from renderReport remain untouched
-      // (NFR-6 hard constraint).
+      // Task 2.9 — costBreakdown sibling alongside top-level `totalCost.usd`.
+      // R4/R5/R6 derived inside `renderCostBreakdown` from R3 buckets at render
+      // time (see report.ts), so we leave them as empty placeholders here.
       const taskBucketsAll = costAggregates.task ?? [];
       const r7TopN = taskBucketsAll.slice(0, top);
-      const costBreakdown = {
+      costBreakdown = {
         R1_perSpec: costAggregates.spec ?? [],
         R2_perPhase: costAggregates.phase ?? [],
         R3_perTask: taskBucketsAll,
@@ -398,8 +379,59 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
         totalCost: { usd: totalUsd },
       };
 
-      markdownStr = `${markdown}\n## Cost Summary\n\nTotal: $${totalUsd} USD\n`;
-      jsonObj = { ...jsonObj, totalCost: { usd: totalUsd }, costBreakdown };
+      // Task 4.6 — call recommend() over ALL aggregated buckets (spec + phase +
+      // task) so per-rule scope filters (`b.level === 'task'` etc) all see their
+      // intended slice. critical-phase skip list hardcoded per Decision 5
+      // (MVP); future may read from state-file `meta.criticalPhase`.
+      // NEVER-throw constraint: recommend() itself is double-wrapped (per-rule
+      // + per-bucket try/catch — see recommend.ts), but we wrap the dispatch
+      // call too in case import-time evaluation throws (e.g. type drift). On
+      // any failure → empty recommendations array, the chapter is skipped.
+      try {
+        const allBuckets: AggregateBucket[] = [
+          ...(costAggregates.spec ?? []),
+          ...(costAggregates.phase ?? []),
+          ...taskBucketsAll,
+        ];
+        recommendations = recommend(allBuckets, {
+          errorEntries,
+          criticalPhases: ['critical', 'debug-hard', 'security'],
+        });
+      } catch {
+        recommendations = [];
+      }
+    }
+
+    const { markdown, json } = renderReport(filtered, errorEntries, specStates, {
+      ...opts,
+      limit,
+      schemaDrift: {
+        unknownTypeCount: counters.unknown_type,
+        parseErrorCount: counters.parse_error,
+      },
+      ...(costBreakdown ? { costBreakdown } : {}),
+      ...(recommendations.length > 0 ? { recommendations } : {}),
+    });
+
+    // Belt-and-suspenders pass on the rendered JSON (no-op when redactEvent
+    // already nuked the field, but guards against future renderer additions
+    // that might surface a new path-shaped value).
+    const safeJson = redactReportFields(json, { includePrompts });
+
+    void opts.out;
+
+    const markdownStr = markdown;
+    let jsonObj: Record<string, unknown> = safeJson as unknown as Record<string, unknown>;
+    if (opts.costSummary === true && costBreakdown) {
+      // JSON shape: top-level `totalCost.usd` mirror (Decision 3) +
+      // `costBreakdown` sibling (Task 2.9) + `recommendations` sibling (Task
+      // 4.6 / Decision 4). The 7 flat keys from `safeJson` survive untouched.
+      jsonObj = {
+        ...jsonObj,
+        totalCost: { usd: costBreakdown.totalCost.usd },
+        costBreakdown,
+        recommendations,
+      };
     }
 
     const jsonStr = `${JSON.stringify(jsonObj)}\n`;

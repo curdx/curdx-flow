@@ -623,7 +623,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(report): add Recommendations section with severity color coding`
 
-- [ ] 4.6 index.ts — wire renderCostBreakdown + renderRecommendations + recommendations JSON
+- [x] 4.6 index.ts — wire renderCostBreakdown + renderRecommendations + recommendations JSON
   **Do**: 在 index.ts cost branch 调用 `recommend(buckets, {criticalPhases})` → 把 `recommendations` array 写入 markdown (`renderRecommendations`) + JSON 顶层 (`recommendations: Recommendation[]`，与 costBreakdown 平级)。`criticalPhases = ['critical', 'debug-hard', 'security']` hardcode (Decision 5)。
 
   **Files**:
