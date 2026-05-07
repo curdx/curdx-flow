@@ -112,7 +112,7 @@ Focus: Wire remaining 31 sites across 3 hooks. Each hook is one atomic task.
 
 ## Phase 3 — Parser + Tests (3 tasks)
 
-- [ ] 3.1 [P] Extend parser.ts + types.ts: EventLogRow with ?? defaults
+- [x] 3.1 [P] Extend parser.ts + types.ts: EventLogRow with ?? defaults
   - **Do**:
     1. Add `EventLogRow` interface to `src/analyze/types.ts` as superset of existing `ErrorLogEntry` (add `level`, `kind`, `payload`, `correlationId` fields)
     2. Keep `ErrorLogEntry` type alias for backward compat

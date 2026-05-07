@@ -13,9 +13,9 @@ import { filterEvents } from './filter.ts';
 import { getStateForPath, loadSchemaMap, parseTranscript, shouldRotate } from './parser.ts';
 import { redactEvent, redactReportFields } from './redact.ts';
 import { renderReport } from './report.ts';
-import type { ErrorLogEntry, ReportJson, SpecStateInfo } from './report.ts';
+import type { ReportJson, SpecStateInfo } from './report.ts';
 import { resolveTranscriptSource, TranscriptNotFoundError } from './transcript-path.ts';
-import type { Counters, Event, Options, StateFile } from './types.ts';
+import type { Counters, Event, EventLogRow, Options, StateFile } from './types.ts';
 
 export type RunAnalyzeOptions = Options;
 
@@ -134,8 +134,22 @@ function loadSpecStates(): SpecStateInfo[] {
  * Read `errors.jsonl` lazily — one JSON object per line. Same FR-20 stance:
  * missing file or corrupt lines are silent (counted only locally, not surfaced
  * here; parser.ts handles the schema-drift counters for the transcript path).
+ *
+ * D1 (UNIFIED): the file is still named `errors.jsonl` for back-compat, but
+ * post spec-decision-event-logging it carries both legacy errors AND new
+ * decision events. Each row may carry 4 additional fields (level / kind /
+ * payload / correlationId); legacy rows lack them and get default values via
+ * `??` so AC9 round-trip passes:
+ *   • level         → 'error'   (legacy was error-only)
+ *   • kind          → 'unknown' (legacy had no taxonomy)
+ *   • payload       → undefined (no structured data)
+ *   • correlationId → undefined (no 3-segment id)
+ *
+ * Return type widened to `EventLogRow[]` (superset of `ErrorLogEntry`); this
+ * is structurally compatible with `renderReport`'s `ErrorLogEntry[]` param so
+ * existing consumers remain untouched.
  */
-function loadErrorEntries(): ErrorLogEntry[] {
+function loadErrorEntries(): EventLogRow[] {
   if (!existsSync(ERRORS_LOG_PATH)) return [];
   let raw: string;
   try {
@@ -143,11 +157,25 @@ function loadErrorEntries(): ErrorLogEntry[] {
   } catch {
     return [];
   }
-  const out: ErrorLogEntry[] = [];
+  const out: EventLogRow[] = [];
   for (const line of raw.split(/\r?\n/)) {
     if (!line) continue;
     try {
       const parsed = JSON.parse(line) as Record<string, unknown>;
+      const level: EventLogRow['level'] =
+        parsed.level === 'error' ||
+        parsed.level === 'info' ||
+        parsed.level === 'metric' ||
+        parsed.level === 'decision'
+          ? parsed.level
+          : 'error';
+      const kind = typeof parsed.kind === 'string' ? parsed.kind : 'unknown';
+      const payload =
+        parsed.payload && typeof parsed.payload === 'object' && !Array.isArray(parsed.payload)
+          ? (parsed.payload as Record<string, unknown>)
+          : undefined;
+      const correlationId =
+        typeof parsed.correlationId === 'string' ? parsed.correlationId : undefined;
       out.push({
         ts: typeof parsed.ts === 'string' ? parsed.ts : '',
         ...(typeof parsed.hook === 'string' ? { hook: parsed.hook } : {}),
@@ -155,6 +183,10 @@ function loadErrorEntries(): ErrorLogEntry[] {
         ...(typeof parsed.msg === 'string' ? { msg: parsed.msg } : {}),
         ...(typeof parsed.cwd === 'string' ? { cwd: parsed.cwd } : {}),
         ...(typeof parsed.transcript_path === 'string' ? { transcript_path: parsed.transcript_path } : {}),
+        level,
+        kind,
+        ...(payload !== undefined ? { payload } : {}),
+        ...(correlationId !== undefined ? { correlationId } : {}),
       });
     } catch {
       continue;

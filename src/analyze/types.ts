@@ -91,6 +91,34 @@ export interface StateFile {
 }
 
 /**
+ * EventLogRow — superset of `ErrorLogEntry` (defined in report.ts) carrying
+ * the 4 fields added by spec-decision-event-logging (OB-2 / D1 UNIFIED):
+ *   • level         — 'error' | 'info' | 'metric' | 'decision'
+ *   • kind          — EventKind string (matches src/hooks/_shared/error-logger
+ *                     EventKind union); 'unknown' for legacy / unrecognized
+ *   • payload       — optional structured data, white-list redacted at write
+ *   • correlationId — 3-segment `<session_id>:<task_idx>:<iter>` per FR-4
+ *
+ * Old rows (errors.jsonl from before the schema bump) lack all 4 fields.
+ * `loadErrorEntries()` in index.ts populates them with `??` defaults
+ * (`level='error'`, `kind='unknown'`, others `undefined`) so AC9 round-trip
+ * passes without breaking existing ErrorLogEntry consumers — this interface
+ * is purely additive.
+ */
+export interface EventLogRow {
+  ts: string;
+  hook?: string;
+  event?: string;
+  msg?: string;
+  cwd?: string;
+  transcript_path?: string;
+  level?: 'error' | 'info' | 'metric' | 'decision';
+  kind?: string;
+  payload?: Record<string, unknown>;
+  correlationId?: string;
+}
+
+/**
  * Schema map placeholder — Task 2.2 fills the canonical JSON at
  * plugins/curdx-flow/schemas/transcript-events.json. parser.ts reads it via
  * a lazy loader and falls back to a built-in whitelist when missing/corrupt.
