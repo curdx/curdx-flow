@@ -40,7 +40,7 @@ Focus: schema 升级 + logHookEvent + 最小接入证明可行。不加测试，
   - **Commit**: `feat(error-logger): add rotation + safeRename + prune (D2 retention=5, D3 suffix)`
   - _Design: Component 3, Component 4, Component 5_
 
-- [ ] 1.3 [P] New correlation.ts: buildCorrelationId 3-segment helper
+- [x] 1.3 [P] New correlation.ts: buildCorrelationId 3-segment helper
   - **Do**:
     1. Create `src/hooks/_shared/correlation.ts`
     2. Export `buildCorrelationId(stdin: HookStdin, state: CurdxState | null): string`
