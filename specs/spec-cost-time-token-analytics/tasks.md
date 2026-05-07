@@ -727,7 +727,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: None
 
-- [ ] 4.13 [VERIFY-FINAL] Full pipeline + e2e
+- [x] 4.13 [VERIFY-FINAL] Full pipeline + e2e
   **Do**: Run 完整 npm verify 套（npm run verify = typecheck + check-versions + check:hooks-fresh + build + check:bundle + test:hooks + test:analyze + check-verification-blocks）+ POC milestone smoke。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run verify && node dist/index.mjs analyze --cost-summary --json 2>/dev/null | jq -e '.totalCost.usd != null and (.recommendations | type == "array")' && echo VERIFY_FINAL_PASS`
