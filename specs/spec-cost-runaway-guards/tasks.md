@@ -112,7 +112,7 @@ Focus: coordinator-side check + CLI flag + reference doc. Types + build must pas
   - **Commit**: `feat(coordinator): add --max-global-iterations CLI flag`
   - _Requirements: FR-CLI1, FR-CLI2, US-6_
 
-- [ ] 2.3 Create cache-ttl-and-cost.md reference doc (4 sections)
+- [x] 2.3 Create cache-ttl-and-cost.md reference doc (4 sections)
   - **Do**:
     1. Create `plugins/curdx-flow/references/cache-ttl-and-cost.md`
     2. §1 — 5-min cache TTL trap: default 5min TTL; GH#46829 closed-not-planned silent regression; link
