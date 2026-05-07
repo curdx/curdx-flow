@@ -41,7 +41,7 @@ Focus: skeleton + build pipeline green. Skip tests, accept stubs. Types must pas
   - **Commit**: `build(hooks): register stop-failure-handler in build-hooks.mjs`
   - _Requirements: FR-H4, FR-T4_
 
-- [ ] 1.3 [P] Register StopFailure event in hooks.json
+- [x] 1.3 [P] Register StopFailure event in hooks.json
   - **Do**:
     1. Open `plugins/curdx-flow/hooks/hooks.json`
     2. Add entry under hooks array: `{ "event": "StopFailure", "command": "node hooks/scripts/stop-failure-handler.mjs" }` (no matcher filter — handler enumerates internally per C7)
