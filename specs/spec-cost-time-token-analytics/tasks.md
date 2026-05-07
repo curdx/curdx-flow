@@ -389,16 +389,18 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `test(cost): add ±0.001 USD precision for 3 model + cache mults`
 
-- [ ] 3.3 [VERIFY] Quality checkpoint: typecheck + test:analyze
+- [x] 3.3 [VERIFY] Quality checkpoint: typecheck + test:analyze
   **Do**: Run 验证两 test 文件添加后无 regression。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run typecheck && npm run test:analyze`
 
   **Done when**: 全 exit 0；新增 pricing/cost 单测全过。
 
+  **Status (2026-05-07, retry)**: VERIFICATION_PASS — typecheck exit 0；test:analyze 54/54 pass。pricing.test.ts 类型收窄 fix 已落 (commit b7560a9，runtime guard 替代 toBeDefined)。FR-2 streaming RSS test 在内存压力下偶发 ≥200MB（连续重跑首次可能 213MB→204MB→141MB→140MB→141MB），单独跑稳定通过；pre-existing budget 紧度问题，与本任务 fix 无关。
+
   **Commit**: `chore(analyze): pass quality checkpoint after pricing+cost tests`
 
-- [ ] 3.4 [P] cost.test.ts — extractTrailerUsage regex test
+- [x] 3.4 [P] cost.test.ts — extractTrailerUsage regex test
   **Do**: 在 cost.test.ts 加 `extractTrailerUsage` 测：(1) 1 个 trailer 命中返回 1 个 row；(2) 5 个 trailer (单 text)→ 5 row；(3) 0 trailer 返回 []；(4) 跨行 `\n` 字面 + JSON-escape `\\n` 双形式都匹配；(5) 损坏 trailer (缺 closing tag) → []，不抛。
 
   **Files**:
