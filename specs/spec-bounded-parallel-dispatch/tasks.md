@@ -73,7 +73,7 @@ Goal: update the 3 confirmed hard path references from `parallel-research.md` �
 
 Goal: add `bounded-parallel-dispatch-doc.test.ts` with 8 assertions per design.md test strategy table — this serves as E2E validation.
 
-- [ ] 3.1 Create `tests/runner/bounded-parallel-dispatch-doc.test.ts` with 8 assertions
+- [x] 3.1 Create `tests/runner/bounded-parallel-dispatch-doc.test.ts` with 8 assertions
   - **Do**: Mirror `tests/runner/iron-law-doc.test.ts` structure. Implement all 8 tests from design.md Test Strategy table:
     1. `new-doc-exists` — file exists at `plugins/curdx-flow/references/bounded-parallel-dispatch.md`
     2. `old-stub-redirect` — old path file exists, ≤3 lines (or exactly 1 content line), matches `/Moved to.*bounded-parallel-dispatch\.md/`
