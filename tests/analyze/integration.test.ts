@@ -697,4 +697,101 @@ describe('OB-3 cost pipeline', () => {
       }
     }
   }, 30_000);
+
+  // Task 4.8 — Cost Breakdown markdown snapshot + Recommendations chapter.
+  //
+  // Refs: FR-REPORT-1 (R1-R7 sub-section structure) / FR-REPORT-3
+  // (Recommendations chapter after R1-R7) / FR-REPORT-4 (R6 tokenizer footer
+  // for Opus 4.7 token-count drift) / NFR-6 (7 flat sections preserved) /
+  // US-10 (operator scans markdown report) / AC5 (R1-R7 + Recommendations
+  // surface in markdown) / AC8 (tokenizer footnote present even when R6
+  // empty).
+  //
+  // Why fixture cache_read=0 across all rows guarantees ≥1 recommendation:
+  //   COST_FIXTURE_ROWS row 0 has input_tokens=1M and cache_read=0, so
+  //   recommend.ts rule-1 (cache-hit-low) computes denom = 0 + 0 + 0 + 1M =
+  //   1M and hit = 0 / 1M = 0. 0 < REC_THRESHOLDS.cacheHitSev (0.30) emits a
+  //   `sev` finding for that bucket. Plus rule-4 / rule-7 may also fire,
+  //   so the array is reliably non-empty (we assert >= 1 not exact count).
+  //
+  // Test shape: two runAnalyze calls inside one it() — markdown branch
+  // (json:false) for grep checks, json branch for `.recommendations` array.
+  // Per task brief: string-includes only; no full markdown snapshot.
+  it('Cost Breakdown markdown snapshot + Recommendations (FR-REPORT-1/3/4 / NFR-6 / US-10 / AC5 / AC8)', async () => {
+    const previousFixtureEnv = process.env.CURDX_TRANSCRIPT_FIXTURE;
+    process.env.CURDX_TRANSCRIPT_FIXTURE = COST_FIXTURE_PATH;
+    try {
+      // Markdown branch — assert headers, R1-R7 sub-titles, R6 tokenizer
+      // footer, and the Recommendations chapter all surface.
+      const md = await captureStdout(() =>
+        runAnalyze({
+          json: false,
+          costSummary: true,
+          byTask: true,
+          includePrompts: true,
+        } as Parameters<typeof runAnalyze>[0]),
+      );
+
+      expect(md).toContain('## Cost Breakdown');
+      expect(md).toContain('### R1');
+      expect(md).toContain('### R2');
+      expect(md).toContain('### R3');
+      expect(md).toContain('### R4');
+      expect(md).toContain('### R5');
+      expect(md).toContain('### R6');
+      expect(md).toContain('### R7');
+      // R6 tokenizer footnote — AC8 / FR-REPORT-4. report.ts emits
+      // "_Note: Opus 4.7 tokenizer counts ~35% more tokens..._" both when
+      // R6 has data and when empty (so the grep is data-independent).
+      expect(md).toContain('tokenizer');
+      expect(md).toContain('## Recommendations');
+
+      // 7 flat sections still present (NFR-6 — Cost Breakdown chapter is
+      // purely additive). We sample 3 unique markers to keep the assertion
+      // tight without snapshotting full render output.
+      expect(md).toContain('## Hook Failures');
+      expect(md).toContain('## Slash Commands');
+      expect(md).toContain('## Schema Drift');
+
+      // JSON branch — assert `.recommendations` is an array with ≥ 1
+      // finding (cache-hit-low sev from Opus row's 0% hit-rate, see header
+      // comment above for fixture math).
+      const jsonOut = await captureStdout(() =>
+        runAnalyze({
+          json: true,
+          costSummary: true,
+          byTask: true,
+          includePrompts: true,
+        } as Parameters<typeof runAnalyze>[0]),
+      );
+      const parsed = JSON.parse(jsonOut) as Record<string, unknown>;
+
+      // 7 flat sections still in JSON top-level (NFR-6 byte-stability proxy).
+      const SEVEN_FLAT_KEYS = [
+        'hookFailures',
+        'slashCommands',
+        'subagents',
+        'specFunnel',
+        'hookDuration',
+        'schemaDrift',
+        'parentChain',
+      ];
+      for (const k of SEVEN_FLAT_KEYS) {
+        expect(parsed).toHaveProperty(k);
+      }
+
+      const recs = parsed.recommendations as Array<{ rule: string; severity: string }>;
+      expect(Array.isArray(recs)).toBe(true);
+      expect(recs.length).toBeGreaterThanOrEqual(1);
+      // Each recommendation has the canonical {rule, severity} shape.
+      expect(typeof recs[0]?.rule).toBe('string');
+      expect(typeof recs[0]?.severity).toBe('string');
+    } finally {
+      if (previousFixtureEnv === undefined) {
+        delete process.env.CURDX_TRANSCRIPT_FIXTURE;
+      } else {
+        process.env.CURDX_TRANSCRIPT_FIXTURE = previousFixtureEnv;
+      }
+    }
+  }, 30_000);
 });

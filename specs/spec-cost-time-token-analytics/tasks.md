@@ -640,7 +640,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(analyze): wire recommend output into markdown + JSON`
 
-- [ ] 4.7 [VERIFY] Quality checkpoint: typecheck + build + test:analyze
+- [x] 4.7 [VERIFY] Quality checkpoint: typecheck + build + test:analyze
   **Do**: Run 三件套 + integration 测验证 Cost Breakdown + Recommendations 渲染齐备。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run typecheck && npm run build && npm run test:analyze`
@@ -649,7 +649,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `chore(analyze): pass quality checkpoint after report rendering`
 
-- [ ] 4.8 integration.test.ts — Cost Breakdown + Recommendations snapshot
+- [x] 4.8 integration.test.ts — Cost Breakdown + Recommendations snapshot
   **Do**: 在 integration.test.ts OB-3 组加 markdown snapshot：`## Cost Breakdown` + R1-R7 子标题 + R6 tokenizer footer + `## Recommendations` 段全在；`--json` `.recommendations` 数组含 ≥ 1 推荐对象（fixture cache_read=0 全 cache_write 强造 SEV）。
 
   **Files**:
