@@ -92,7 +92,6 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 | Consistency | Design component responsibilities map to requirements FRs; no orphan components | Components exist that don't trace to any FR; FRs have no corresponding design component |
 | Feasibility | File paths reference existing files or are clearly new creation targets; APIs and tools referenced exist | File paths reference non-existent files without noting creation; APIs or tools referenced don't exist |
 | Patterns | Design follows existing codebase conventions (frontmatter format, signal patterns, delegation patterns) | Design introduces new patterns without justification when existing patterns would work |
-| Principles | Solution follows SOLID (single responsibility per component, open-closed, dependency inversion), DRY (no duplicated responsibilities across components), and KISS (simplest approach that meets requirements) | Over-engineered solution; components with multiple unrelated responsibilities; duplicated logic across components; unnecessary abstractions or indirection |
 | Holistic Awareness | Design considers impact on the broader system beyond the immediate feature; addresses cross-cutting concerns (error handling, logging, config); notes effects on existing modules and shared patterns | Design is tunnel-visioned to feature scope; ignores impact on existing modules; no mention of cross-cutting concerns or system-wide implications |
 
 **Examples**:
@@ -104,8 +103,6 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 - Feasibility FAIL: "Import from `utils/validator.ts`" but file doesn't exist and isn't listed as a creation target.
 - Patterns PASS: Agent omits `model` field in frontmatter (inherits parent model automatically), matching existing agents like spec-executor.md.
 - Patterns FAIL: Agent hardcodes a specific model like `model: claude-3-opus` when all other agents omit it to inherit dynamically.
-- Principles PASS: Each component has a single, well-defined responsibility. No business logic duplicated between components. Architecture uses the simplest pattern that satisfies the requirements.
-- Principles FAIL: Component A handles both data validation and UI rendering. The same filtering logic appears in Component B and Component C. An abstract factory pattern is used where a simple function would suffice.
 - Holistic Awareness PASS: "Impact: modifying the command parser affects all 4 phase commands. Migration: existing specs will continue to work because the new field is optional."
 - Holistic Awareness FAIL: Design only discusses the new feature files with no mention of how changes affect the existing command flow or shared utilities.
 

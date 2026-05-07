@@ -40,7 +40,7 @@ Goal: prove schema change + 1 narrowing pass + code-quality-reviewer skeleton + 
   - **Commit**: `feat(agents): add code-quality-reviewer.md skeleton with 3-layer drift defense (D1)`
   - _Design: Component 2_
 
-- [ ] 1.3 Spec-reviewer narrow Pass-1: cut Design/Principles block
+- [x] 1.3 Spec-reviewer narrow Pass-1: cut Design/Principles block
   - **Do**:
     1. Open `plugins/curdx-flow/agents/spec-reviewer.md`
     2. Delete the entire Design / Principles subsection (7 items: SOLID/DRY/KISS/YAGNI/etc.) — these are all `[QUALITY]` and belong to code-quality-reviewer
