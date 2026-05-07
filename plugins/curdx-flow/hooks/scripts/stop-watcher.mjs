@@ -9,12 +9,12 @@ const __dirname = __ccd(__filename);
 import {
   existsSync as existsSync2,
   readFileSync as readFileSync3,
-  readdirSync as readdirSync2,
-  statSync as statSync2,
-  unlinkSync
+  readdirSync as readdirSync3,
+  statSync as statSync3,
+  unlinkSync as unlinkSync2
 } from "node:fs";
 import { spawn } from "node:child_process";
-import { basename as basename3, dirname, join as join3 } from "node:path";
+import { basename as basename4, dirname, join as join3 } from "node:path";
 import { fileURLToPath } from "node:url";
 import process5 from "node:process";
 
@@ -23,7 +23,16 @@ import path2 from "node:path";
 import process4 from "node:process";
 
 // src/hooks/_shared/error-logger.ts
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
+import {
+  appendFileSync,
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync
+} from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import process2 from "node:process";
@@ -34,6 +43,11 @@ var MAX_LINE_BYTES = 4096;
 var MSG_MAX = 500;
 var STACK_MAX = 2e3;
 var STR_MAX = 500;
+var ROTATE_SIZE_BYTES = 10 * 1024 * 1024;
+var ROTATE_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
+var ROTATE_THROTTLE_N = 10;
+var ROTATE_KEEP = 5;
+var RENAME_RETRY_DELAYS_MS = [50, 200, 500];
 var cachedEnabled = null;
 function readEnabled() {
   if (cachedEnabled !== null) return cachedEnabled;
@@ -56,27 +70,125 @@ function trunc(s, max) {
   if (typeof s !== "string") return void 0;
   return s.length <= max ? s : s.slice(0, max);
 }
-function logHookError(ctx, err) {
+var KNOWN_KINDS = /* @__PURE__ */ new Set([
+  "stop_block_continuation",
+  "stop_block_cost_runaway",
+  "stop_block_verification_failed",
+  "stop_allow_early_exit",
+  "task_verify_pass",
+  "task_verify_fail",
+  "subagent_context_injected",
+  "subagent_injection_failed",
+  "stop_failure_rate_limit",
+  "stop_failure_other",
+  "unknown"
+]);
+function coerceKind(raw) {
+  return typeof raw === "string" && KNOWN_KINDS.has(raw) ? raw : "unknown";
+}
+function shouldRotate(filePath) {
+  try {
+    const st = statSync(filePath);
+    if (st.size > ROTATE_SIZE_BYTES) return true;
+    if (Date.now() - st.mtimeMs > ROTATE_AGE_MS) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+function safeRename(from, to) {
+  try {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (e) {
+      const code = e.code;
+      if (code === "EBUSY" || code === "EPERM") {
+        for (const ms of RENAME_RETRY_DELAYS_MS) {
+          const end = Date.now() + ms;
+          while (Date.now() < end) {
+          }
+          try {
+            renameSync(from, to);
+            return;
+          } catch {
+          }
+        }
+      }
+      try {
+        copyFileSync(from, to);
+        unlinkSync(from);
+      } catch {
+      }
+    }
+  } catch {
+  }
+}
+function pruneRotatedFiles(dir) {
+  try {
+    const entries = readdirSync(dir);
+    const rotated = [];
+    for (const name of entries) {
+      if (!name.startsWith("errors.") || !name.endsWith(".jsonl")) continue;
+      if (name === "errors.jsonl") continue;
+      const full = path.join(dir, name);
+      try {
+        rotated.push({ p: full, m: statSync(full).mtimeMs });
+      } catch {
+      }
+    }
+    rotated.sort((a, b) => b.m - a.m);
+    for (const { p } of rotated.slice(ROTATE_KEEP)) {
+      try {
+        unlinkSync(p);
+      } catch {
+      }
+    }
+  } catch {
+  }
+}
+var rotateCounter = 0;
+function rotateIfNeeded(filePath) {
+  try {
+    rotateCounter = (rotateCounter + 1) % ROTATE_THROTTLE_N;
+    if (rotateCounter !== 0) return;
+    if (!shouldRotate(filePath)) return;
+    const iso = (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+    const dir = path.dirname(filePath);
+    const target = path.join(dir, `errors.${iso}-${process2.pid}.jsonl`);
+    safeRename(filePath, target);
+    pruneRotatedFiles(dir);
+  } catch {
+  }
+}
+function logHookEvent(input, err) {
   try {
     if (!readEnabled()) return;
-    const stack = ctx.stack ?? err?.stack;
-    const msg = ctx.msg ?? err?.message;
+    const stack = input.stack ?? err?.stack;
+    const msg = input.msg ?? err?.message;
+    const level = input.level ?? "info";
+    const kind = coerceKind(input.kind);
     const record = {
       ts: (/* @__PURE__ */ new Date()).toISOString(),
-      level: "error",
-      hook: trunc(ctx.hook, STR_MAX) ?? "",
-      event: trunc(ctx.event, STR_MAX) ?? ""
+      level,
+      hook: trunc(input.hook, STR_MAX) ?? "",
+      event: trunc(input.event, STR_MAX) ?? "",
+      kind
     };
     const optionalEntries = [
       ["msg", trunc(msg, MSG_MAX)],
-      ["cwd", trunc(ctx.cwd, STR_MAX)],
-      ["transcript_path", trunc(ctx.transcript_path, STR_MAX)],
-      ["spec", trunc(ctx.spec, STR_MAX)],
-      ["path", trunc(ctx.path, STR_MAX)],
-      ["stack", trunc(stack, STACK_MAX)]
+      ["cwd", trunc(input.cwd, STR_MAX)],
+      ["transcript_path", trunc(input.transcript_path, STR_MAX)],
+      ["spec", trunc(input.spec, STR_MAX)],
+      ["path", trunc(input.path, STR_MAX)],
+      ["stack", trunc(stack, STACK_MAX)],
+      ["correlationId", trunc(input.correlationId, STR_MAX)]
     ];
     for (const [k, v] of optionalEntries) {
       if (v !== void 0) record[k] = v;
+    }
+    if (input.payload !== void 0) {
+      record.payload = input.payload;
     }
     let line = JSON.stringify(record);
     if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
@@ -87,13 +199,21 @@ function logHookError(ctx, err) {
       delete record.msg;
       line = JSON.stringify(record);
     }
+    if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
+      delete record.payload;
+      line = JSON.stringify(record);
+    }
     try {
       mkdirSync(ERRORS_DIR, { recursive: true });
     } catch {
     }
+    rotateIfNeeded(ERRORS_LOG);
     appendFileSync(ERRORS_LOG, line + "\n");
   } catch {
   }
+}
+function logHookError(ctx, err) {
+  logHookEvent({ ...ctx, level: "error", kind: ctx.kind ?? "unknown" }, err);
 }
 
 // src/hooks/_shared/stdin.ts
@@ -167,7 +287,7 @@ async function runHook(handler, options = {}) {
 }
 
 // src/hooks/_shared/path-resolver.ts
-import { existsSync, readFileSync as readFileSync2, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync as readFileSync2, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
 var DEFAULT_SPECS_DIR = "./specs";
 var SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
@@ -180,7 +300,7 @@ function warn(msg) {
 }
 function isDir(p) {
   try {
-    return statSync(p).isDirectory();
+    return statSync2(p).isDirectory();
   } catch {
     return false;
   }
@@ -271,12 +391,12 @@ function resolveCurrent(opts) {
 }
 
 // src/hooks/_shared/atomic-write.ts
-import { writeFileSync, renameSync } from "node:fs";
+import { writeFileSync, renameSync as renameSync2 } from "node:fs";
 import { randomBytes } from "node:crypto";
 function writeFileAtomic(path3, data) {
   const tmp = `${path3}.tmp.${process.pid}.${randomBytes(6).toString("hex")}`;
   writeFileSync(tmp, data);
-  renameSync(tmp, path3);
+  renameSync2(tmp, path3);
 }
 
 // src/hooks/_shared/markdown-task-parser.ts
@@ -404,6 +524,16 @@ async function walkSrcTree(dir) {
   return maxMtime;
 }
 
+// src/hooks/_shared/correlation.ts
+import { basename as basename3 } from "node:path";
+function buildCorrelationId(stdin, state) {
+  const transcriptPath = stdin?.transcript_path;
+  const sessionId = transcriptPath ? basename3(transcriptPath).replace(/\.(jsonl|json)$/, "") : "unknown";
+  const taskIdx = state?.taskIndex ?? 0;
+  const iter = state?.phase === "execution" ? state?.taskIteration ?? 1 : state?.globalIteration ?? 1;
+  return `${sessionId}:${taskIdx}:${iter}`;
+}
+
 // src/hooks/stop-watcher.ts
 var SETTINGS_REL_PATH2 = ".claude/curdx-flow.local.md";
 var ALL_TASKS_COMPLETE_RE = /(^|\W)ALL_TASKS_COMPLETE(\W|$)/;
@@ -447,7 +577,7 @@ function readEnabledSetting(settingsPath) {
 async function maybeWaitForRecentStateFile(stateFile) {
   let mtimeMs;
   try {
-    mtimeMs = statSync2(stateFile).mtimeMs;
+    mtimeMs = statSync3(stateFile).mtimeMs;
   } catch {
     return;
   }
@@ -525,7 +655,7 @@ function fireUpdateSpecIndex() {
 function cleanupStaleProgressFiles(specDirFs) {
   let entries;
   try {
-    entries = readdirSync2(specDirFs);
+    entries = readdirSync3(specDirFs);
   } catch {
     return;
   }
@@ -536,13 +666,13 @@ function cleanupStaleProgressFiles(specDirFs) {
     const fp = join3(specDirFs, name);
     let mtimeMs;
     try {
-      mtimeMs = statSync2(fp).mtimeMs;
+      mtimeMs = statSync3(fp).mtimeMs;
     } catch {
       continue;
     }
     if (now - mtimeMs > sixtyMinMs) {
       try {
-        unlinkSync(fp);
+        unlinkSync2(fp);
       } catch {
       }
     }
@@ -734,27 +864,98 @@ ${parallelInstructions}
 }
 runHook(async (input) => {
   if (input?.stop_hook_active === true) {
+    logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "info",
+      kind: "stop_allow_early_exit",
+      payload: { reason: "stop_hook_active" },
+      correlationId: buildCorrelationId(input, null)
+    });
     return;
   }
   const cwd = input?.cwd;
-  if (!cwd) return;
+  if (!cwd) {
+    logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "info",
+      kind: "stop_allow_early_exit",
+      payload: { reason: "no_cwd" },
+      correlationId: buildCorrelationId(input, null)
+    });
+    return;
+  }
   const settingsPath = join3(cwd, SETTINGS_REL_PATH2);
   if (existsSync2(settingsPath)) {
     const enabled = readEnabledSetting(settingsPath);
-    if (enabled === "false") return;
+    if (enabled === "false") {
+      logHookEvent({
+        hook: "stop-watcher",
+        event: "Stop",
+        level: "info",
+        kind: "stop_allow_early_exit",
+        payload: { reason: "disabled" },
+        correlationId: buildCorrelationId(input, null),
+        cwd
+      });
+      return;
+    }
   }
   const rawSpecPath = resolveCurrent({ cwd });
-  if (!rawSpecPath) return;
+  if (!rawSpecPath) {
+    logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "info",
+      kind: "stop_allow_early_exit",
+      payload: { reason: "no_spec" },
+      correlationId: buildCorrelationId(input, null),
+      cwd
+    });
+    return;
+  }
   const specPath = preserveDotPrefix(rawSpecPath, getSpecsDirs({ cwd }));
-  const specName = basename3(specPath);
+  const specName = basename4(specPath);
   const stateFile = join3(cwd, specPath, ".curdx-state.json");
-  if (!existsSync2(stateFile)) return;
+  if (!existsSync2(stateFile)) {
+    logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "info",
+      kind: "stop_allow_early_exit",
+      payload: { reason: "no_state", specName },
+      correlationId: buildCorrelationId(input, null),
+      cwd,
+      spec: specName
+    });
+    return;
+  }
   await maybeWaitForRecentStateFile(stateFile);
   try {
     const capState = JSON.parse(readFileSync3(stateFile, "utf8"));
     if (capState.completed !== true) {
       const runawayBlock = buildCostRunawayBlock(capState, specName, stateFile);
-      if (runawayBlock) return runawayBlock;
+      if (runawayBlock) {
+        logHookEvent({
+          hook: "stop-watcher",
+          event: "Stop",
+          level: "decision",
+          kind: "stop_block_cost_runaway",
+          payload: {
+            specName,
+            phase: typeof capState.phase === "string" ? capState.phase : "unknown",
+            globalIteration: capState.globalIteration,
+            taskIteration: capState.taskIteration,
+            maxGlobalIterations: capState.maxGlobalIterations,
+            maxTaskIterations: capState.maxTaskIterations
+          },
+          correlationId: buildCorrelationId(input, capState),
+          cwd,
+          spec: specName
+        });
+        return runawayBlock;
+      }
     }
   } catch {
   }
@@ -772,6 +973,20 @@ runHook(async (input) => {
         stateMalformed = true;
       }
       if (stateMalformed) {
+        logHookEvent({
+          hook: "stop-watcher",
+          event: "Stop",
+          level: "decision",
+          kind: "stop_block_verification_failed",
+          payload: {
+            specName,
+            reason: "malformed_state_on_completion",
+            variant
+          },
+          correlationId: buildCorrelationId(input, null),
+          cwd,
+          spec: specName
+        });
         return buildMalformedVerificationBlock(specName);
       }
       const epicName = parsedState && typeof parsedState.epicName === "string" && parsedState.epicName.length > 0 ? parsedState.epicName : void 0;
@@ -786,9 +1001,39 @@ runHook(async (input) => {
               join3(cwd, specPath)
             );
           } catch {
+            logHookEvent({
+              hook: "stop-watcher",
+              event: "Stop",
+              level: "decision",
+              kind: "stop_block_verification_failed",
+              payload: {
+                specName,
+                phase: knownPhase,
+                reason: "verify_threw",
+                variant
+              },
+              correlationId: buildCorrelationId(input, parsedState),
+              cwd,
+              spec: specName
+            });
             return buildMalformedVerificationBlock(specName);
           }
           if (!result.ok) {
+            logHookEvent({
+              hook: "stop-watcher",
+              event: "Stop",
+              level: "decision",
+              kind: "stop_block_verification_failed",
+              payload: {
+                specName,
+                phase: knownPhase,
+                reason: result.reason ?? "verification_failed",
+                variant
+              },
+              correlationId: buildCorrelationId(input, parsedState),
+              cwd,
+              spec: specName
+            });
             return buildVerificationBlockFailDecision(
               knownPhase,
               result,
@@ -802,6 +1047,21 @@ runHook(async (input) => {
         markSpecCompletedInEpic(cwd, epicName, specName);
       }
       fireUpdateSpecIndex();
+      logHookEvent({
+        hook: "stop-watcher",
+        event: "Stop",
+        level: "info",
+        kind: "stop_allow_early_exit",
+        payload: {
+          reason: "all_tasks_complete",
+          specName,
+          epicName,
+          variant
+        },
+        correlationId: buildCorrelationId(input, parsedState ?? null),
+        cwd,
+        spec: specName
+      });
       return void 0;
     };
     if (tailContainsCompletionMarker(transcriptPath, 500)) {
@@ -819,6 +1079,17 @@ runHook(async (input) => {
   try {
     state = JSON.parse(readFileSync3(stateFile, "utf8"));
   } catch {
+    logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "decision",
+      kind: "stop_block_verification_failed",
+      payload: { specName, reason: "corrupt_state" },
+      correlationId: buildCorrelationId(input, null),
+      cwd,
+      spec: specName,
+      path: stateFile
+    });
     return buildCorruptStateBlock(specPath);
   }
   if (state.completed === true) {
@@ -832,6 +1103,16 @@ runHook(async (input) => {
   const nativeSync = defaultTrueIfFalsyOrNull(state.nativeSyncEnabled);
   const globalIteration = typeof state.globalIteration === "number" ? state.globalIteration : 1;
   if (quickMode && phase !== "execution") {
+    logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "decision",
+      kind: "stop_block_continuation",
+      payload: { specName, phase, reason: "quick_mode" },
+      correlationId: buildCorrelationId(input, state),
+      cwd,
+      spec: specName
+    });
     return buildQuickModeBlock(phase, specName);
   }
   if (phase === "execution") {
@@ -849,6 +1130,23 @@ runHook(async (input) => {
           `[curdx-flow] State says complete but tasks.md has ${unchecked} unchecked items
 `
         );
+        logHookEvent({
+          hook: "stop-watcher",
+          event: "Stop",
+          level: "decision",
+          kind: "stop_block_continuation",
+          payload: {
+            specName,
+            phase,
+            reason: "unchecked_tasks",
+            taskIndex,
+            totalTasks,
+            unchecked
+          },
+          correlationId: buildCorrelationId(input, state),
+          cwd,
+          spec: specName
+        });
         return buildUncheckedTasksBlock(
           specPath,
           taskIndex,
@@ -901,6 +1199,25 @@ runHook(async (input) => {
       }
     }
     cleanupStaleProgressFiles(join3(cwd, specPath));
+    logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "decision",
+      kind: "stop_block_continuation",
+      payload: {
+        specName,
+        phase,
+        reason: "continuation",
+        taskIndex,
+        totalTasks,
+        taskIteration,
+        globalIteration,
+        isParallel
+      },
+      correlationId: buildCorrelationId(input, state),
+      cwd,
+      spec: specName
+    });
     return buildContinuationBlock({
       specName,
       specPath,

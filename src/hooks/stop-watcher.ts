@@ -66,8 +66,10 @@ import { getSpecsDirs, resolveCurrent } from "./_shared/path-resolver.js";
 import { writeFileAtomic } from "./_shared/atomic-write.js";
 import { extractTaskBlock } from "./_shared/markdown-task-parser.js";
 import { getVerificationPhase, verifyPhaseBlock } from "./lib/verify-blocks.js";
+import { buildCorrelationId } from "./_shared/correlation.js";
+import * as eventLog from "./_shared/error-logger.js";
 import type { BlockDecisionOutput } from "./_shared/types.js";
-import type { CurdxState } from "./_shared/types.js";
+import type { CurdxState, HookStdin } from "./_shared/types.js";
 
 interface EpicState {
   specs?: Array<{ name: string; status?: string; [k: string]: unknown }>;
@@ -685,27 +687,85 @@ runHook(async (input) => {
   // verificationBlocks read by future spec E). Behavior preserved: silent
   // return = allow stop (runHook serializes void as no-decision).
   if (input?.stop_hook_active === true) {
+    // Site 1/14: re-invocation guard — record the silent allow so analyze can
+    // count nested-stop bursts (otherwise these are invisible to observability).
+    eventLog.logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "info",
+      kind: "stop_allow_early_exit",
+      payload: { reason: "stop_hook_active" },
+      correlationId: buildCorrelationId(input as HookStdin | null, null),
+    });
     return;
   }
 
   const cwd = input?.cwd;
-  if (!cwd) return;
+  if (!cwd) {
+    // Site 2/14: missing cwd — no spec context, allow silently.
+    eventLog.logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "info",
+      kind: "stop_allow_early_exit",
+      payload: { reason: "no_cwd" },
+      correlationId: buildCorrelationId(input as HookStdin | null, null),
+    });
+    return;
+  }
 
   // Honor enabled:false toggle.
   const settingsPath = join(cwd, SETTINGS_REL_PATH);
   if (existsSync(settingsPath)) {
     const enabled = readEnabledSetting(settingsPath);
-    if (enabled === "false") return;
+    if (enabled === "false") {
+      // Site 3/14: user disabled hooks via local settings.
+      eventLog.logHookEvent({
+        hook: "stop-watcher",
+        event: "Stop",
+        level: "info",
+        kind: "stop_allow_early_exit",
+        payload: { reason: "disabled" },
+        correlationId: buildCorrelationId(input as HookStdin | null, null),
+        cwd,
+      });
+      return;
+    }
   }
 
   // Resolve current spec. Re-attach `./` prefix that posix.join strips, so
   // the continuation prompt embeds a path byte-equal to the v6 bash baseline.
   const rawSpecPath = resolveCurrent({ cwd });
-  if (!rawSpecPath) return;
+  if (!rawSpecPath) {
+    // Site 4/14: no active spec — nothing to continue, allow silently.
+    eventLog.logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "info",
+      kind: "stop_allow_early_exit",
+      payload: { reason: "no_spec" },
+      correlationId: buildCorrelationId(input as HookStdin | null, null),
+      cwd,
+    });
+    return;
+  }
   const specPath = preserveDotPrefix(rawSpecPath, getSpecsDirs({ cwd }));
   const specName = basename(specPath);
   const stateFile = join(cwd, specPath, ".curdx-state.json");
-  if (!existsSync(stateFile)) return;
+  if (!existsSync(stateFile)) {
+    // Site 5/14: spec resolved but no .curdx-state.json — pre-/post-loop, allow.
+    eventLog.logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "info",
+      kind: "stop_allow_early_exit",
+      payload: { reason: "no_state", specName },
+      correlationId: buildCorrelationId(input as HookStdin | null, null),
+      cwd,
+      spec: specName,
+    });
+    return;
+  }
 
   // Race-condition safeguard.
   await maybeWaitForRecentStateFile(stateFile);
@@ -719,7 +779,27 @@ runHook(async (input) => {
     const capState = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
     if (capState.completed !== true) {
       const runawayBlock = buildCostRunawayBlock(capState, specName, stateFile);
-      if (runawayBlock) return runawayBlock;
+      if (runawayBlock) {
+        // Site 6/14: cost-runaway hard block (globalIteration / taskIteration cap).
+        eventLog.logHookEvent({
+          hook: "stop-watcher",
+          event: "Stop",
+          level: "decision",
+          kind: "stop_block_cost_runaway",
+          payload: {
+            specName,
+            phase: typeof capState.phase === "string" ? capState.phase : "unknown",
+            globalIteration: capState.globalIteration,
+            taskIteration: capState.taskIteration,
+            maxGlobalIterations: capState.maxGlobalIterations,
+            maxTaskIterations: capState.maxTaskIterations,
+          },
+          correlationId: buildCorrelationId(input as HookStdin | null, capState),
+          cwd,
+          spec: specName,
+        });
+        return runawayBlock;
+      }
     }
   } catch {
     // fall through to existing corrupt-state handling
@@ -750,6 +830,23 @@ runHook(async (input) => {
         stateMalformed = true;
       }
       if (stateMalformed) {
+        // Site 7/14: state JSON unparseable on completion path — surface as
+        // malformed verificationBlocks (design L357), distinct from the
+        // generic corrupt-state block on the non-completion code path.
+        eventLog.logHookEvent({
+          hook: "stop-watcher",
+          event: "Stop",
+          level: "decision",
+          kind: "stop_block_verification_failed",
+          payload: {
+            specName,
+            reason: "malformed_state_on_completion",
+            variant,
+          },
+          correlationId: buildCorrelationId(input as HookStdin | null, null),
+          cwd,
+          spec: specName,
+        });
         return buildMalformedVerificationBlock(specName);
       }
       const epicName =
@@ -780,9 +877,41 @@ runHook(async (input) => {
           } catch {
             // Unexpected throw inside verify-blocks (e.g. malformed shape on
             // verificationBlocks access). Surface the malformed message.
+            // Site 8/14: verifyPhaseBlock threw — treat as malformed verif block.
+            eventLog.logHookEvent({
+              hook: "stop-watcher",
+              event: "Stop",
+              level: "decision",
+              kind: "stop_block_verification_failed",
+              payload: {
+                specName,
+                phase: knownPhase,
+                reason: "verify_threw",
+                variant,
+              },
+              correlationId: buildCorrelationId(input as HookStdin | null, parsedState),
+              cwd,
+              spec: specName,
+            });
             return buildMalformedVerificationBlock(specName);
           }
           if (!result.ok) {
+            // Site 9/14: verification block missing/failed/stale (Layer-1 iron-law).
+            eventLog.logHookEvent({
+              hook: "stop-watcher",
+              event: "Stop",
+              level: "decision",
+              kind: "stop_block_verification_failed",
+              payload: {
+                specName,
+                phase: knownPhase,
+                reason: result.reason ?? "verification_failed",
+                variant,
+              },
+              correlationId: buildCorrelationId(input as HookStdin | null, parsedState),
+              cwd,
+              spec: specName,
+            });
             return buildVerificationBlockFailDecision(
               knownPhase,
               result,
@@ -797,6 +926,24 @@ runHook(async (input) => {
         markSpecCompletedInEpic(cwd, epicName, specName);
       }
       fireUpdateSpecIndex();
+      // Site 10/14: ALL_TASKS_COMPLETE side-effect path — spec finalized,
+      // epic state mutated (when applicable), update-spec-index spawned, then
+      // allow stop. This is the canonical "spec done" event analyze keys on.
+      eventLog.logHookEvent({
+        hook: "stop-watcher",
+        event: "Stop",
+        level: "info",
+        kind: "stop_allow_early_exit",
+        payload: {
+          reason: "all_tasks_complete",
+          specName,
+          epicName,
+          variant,
+        },
+        correlationId: buildCorrelationId(input as HookStdin | null, parsedState ?? null),
+        cwd,
+        spec: specName,
+      });
       return undefined;
     };
 
@@ -817,6 +964,19 @@ runHook(async (input) => {
   try {
     state = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
   } catch {
+    // Site 11/14: corrupt state file — distinct from malformed-on-completion
+    // (sites 7/8) which fire only after ALL_TASKS_COMPLETE was seen.
+    eventLog.logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "decision",
+      kind: "stop_block_verification_failed",
+      payload: { specName, reason: "corrupt_state" },
+      correlationId: buildCorrelationId(input as HookStdin | null, null),
+      cwd,
+      spec: specName,
+      path: stateFile,
+    });
     return buildCorruptStateBlock(specPath);
   }
 
@@ -855,6 +1015,18 @@ runHook(async (input) => {
   // (D5: stop_hook_active re-invocation already short-circuited at the top of
   // runHook; no inner guard needed here.)
   if (quickMode && phase !== "execution") {
+    // Site 12/14: quick-mode hold — block stop on non-execution phases so the
+    // model keeps producing artifacts without user intervention.
+    eventLog.logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "decision",
+      kind: "stop_block_continuation",
+      payload: { specName, phase, reason: "quick_mode" },
+      correlationId: buildCorrelationId(input as HookStdin | null, state),
+      cwd,
+      spec: specName,
+    });
     return buildQuickModeBlock(phase, specName);
   }
 
@@ -878,6 +1050,25 @@ runHook(async (input) => {
         process.stderr.write(
           `[curdx-flow] State says complete but tasks.md has ${unchecked} unchecked items\n`,
         );
+        // Site 13/14: state index reached totalTasks but tasks.md still has
+        // unchecked items — block to force the model to finish them.
+        eventLog.logHookEvent({
+          hook: "stop-watcher",
+          event: "Stop",
+          level: "decision",
+          kind: "stop_block_continuation",
+          payload: {
+            specName,
+            phase,
+            reason: "unchecked_tasks",
+            taskIndex,
+            totalTasks,
+            unchecked,
+          },
+          correlationId: buildCorrelationId(input as HookStdin | null, state),
+          cwd,
+          spec: specName,
+        });
         return buildUncheckedTasksBlock(
           specPath,
           taskIndex,
@@ -948,6 +1139,27 @@ runHook(async (input) => {
     // runHook serializes the JSON last. Cleanup is best-effort (>60 min files)
     // and produces no stdout/stderr in steady state, so reordering is safe.
     cleanupStaleProgressFiles(join(cwd, specPath));
+    // Site 14/14: continuation block — most-common decision path. This is the
+    // canonical "loop is alive, more work remains" event that drives iter counters.
+    eventLog.logHookEvent({
+      hook: "stop-watcher",
+      event: "Stop",
+      level: "decision",
+      kind: "stop_block_continuation",
+      payload: {
+        specName,
+        phase,
+        reason: "continuation",
+        taskIndex,
+        totalTasks,
+        taskIteration,
+        globalIteration,
+        isParallel,
+      },
+      correlationId: buildCorrelationId(input as HookStdin | null, state),
+      cwd,
+      spec: specName,
+    });
     return buildContinuationBlock({
       specName,
       specPath,

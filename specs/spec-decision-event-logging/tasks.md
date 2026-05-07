@@ -66,7 +66,7 @@ Focus: schema 升级 + logHookEvent + 最小接入证明可行。不加测试，
 
 Focus: Wire remaining 31 sites across 3 hooks. Each hook is one atomic task.
 
-- [ ] 2.1 Wire stop-watcher.ts (14 sites)
+- [x] 2.1 Wire stop-watcher.ts (14 sites)
   - **Do**:
     1. Import `logHookEvent`, `buildCorrelationId` at top of `src/hooks/stop-watcher.ts`
     2. Add `logHookEvent` at all 14 decision sites: 8 allow (`kind: 'stop_allow'`), 5 block (`kind: 'stop_block'`), 1 side-effect (`kind: 'stop_side_effect'`)
