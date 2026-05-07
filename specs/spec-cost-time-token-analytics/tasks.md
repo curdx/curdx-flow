@@ -157,7 +157,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `chore(analyze): POC milestone — totalCost.usd smoke pass`
 
-- [ ] 1.8 [VERIFY] POC milestone gate
+- [x] 1.8 [VERIFY] POC milestone gate
   **Do**: 确认 1.1-1.7 全 commit 到位 + POC smoke 跑通；无失败时给 spec-executor 绿灯进入 Phase 2 重构。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && git log --oneline -8 | grep -E "POC|cost-summary|pricing.ts|computeCost" | wc -l | xargs -I{} test {} -ge 4 && echo PHASE1_GATE_PASS`

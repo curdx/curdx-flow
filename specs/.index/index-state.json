@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-05-07T13:25:06Z",
+  "updated": "2026-05-07T14:22:03Z",
   "directories": [
     {
       "path": "./specs",
@@ -50,7 +50,9 @@
     {
       "name": "spec-cost-time-token-analytics",
       "path": "./specs/spec-cost-time-token-analytics",
-      "phase": "design",
+      "phase": "tasks",
+      "taskIndex": 0,
+      "totalTasks": 48,
       "awaitingApproval": true
     },
     {
