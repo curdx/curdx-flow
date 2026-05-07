@@ -551,3 +551,63 @@ describe("byte-equal SubagentStart baseline (frozen v7.1.7 output)", () => {
     },
   );
 });
+
+// ---------------------------------------------------------------------------
+// StopFailure byte-equal baseline (task 3.5)
+//
+// Mirrors the SubagentStart frozen-baseline pattern above. The
+// stop-failure-handler hook is brand new in v7.1.7 (spec E) — there is NO
+// v6.0.6 baseline to diff against. We freeze the CURRENT v7.1.7 output for the
+// canonical `{"matcher":"rate_limit"}` stdin and assert byte-for-byte stability
+// on every future run. Drift fails loudly; intentional output changes must
+// re-freeze the constant below in the same commit (drift gate, not a
+// snapshot-update test).
+//
+// Stdin shape: `{"matcher":"rate_limit"}` — the most common StopFailure
+// matcher (Anthropic API 429), exercising the canonical happy path through
+// MATCHER_DESCRIPTIONS in src/hooks/stop-failure-handler.ts.
+//
+// Output contract (from src/hooks/stop-failure-handler.ts):
+//   - stdout: empty (FR-H3 — observability hook does not emit stdout)
+//   - stderr: `[StopFailure:rate_limit] <description>\n` (em-dash U+2014)
+//   - exit  : 0 (fail-open per FR-H5 / NFR-5)
+// captured.combined therefore equals stderr + stdout + "EXIT_CODE=0\n",
+// mirroring runV7StdinHook's interleaving contract.
+//
+// We invoke the bundle directly via spawnSync (no fixture file) because the
+// hook's stdin is a 2-key literal and it does not consume the
+// `{cwd, hookEvent, ...}` envelope that runV7StdinHook's readFixture expects.
+// ---------------------------------------------------------------------------
+
+const STOP_FAILURE_BASELINE =
+  "[StopFailure:rate_limit] Anthropic API 429 — request throttled\n" +
+  "EXIT_CODE=0\n";
+
+describe("byte-equal StopFailure baseline (frozen v7.1.7 output)", () => {
+  it.skipIf(process.platform === "win32")(
+    "stop-failure-handler / rate_limit",
+    () => {
+      const bundle = path.join(HOOKS_DIR, "stop-failure-handler.mjs");
+      if (!existsSync(bundle)) {
+        throw new Error(`Missing StopFailure bundle: ${bundle}`);
+      }
+      const result = spawnSync("node", [bundle], {
+        input: '{"matcher":"rate_limit"}',
+        cwd: REPO_ROOT,
+        env: { ...process.env, CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT },
+        encoding: "utf8",
+        timeout: 5000,
+      });
+      // Same interleaving as runV7StdinHook: stderr first (the hook writes its
+      // observability line to stderr only), then stdout (empty), then the
+      // exit-code marker.
+      const combined =
+        (result.stderr ?? "") +
+        (result.stdout ?? "") +
+        `EXIT_CODE=${result.status ?? -1}\n`;
+      // No normalize() pass needed — output is fully deterministic (no
+      // mtimes, no ISO timestamps, no path separators). Compare verbatim.
+      expect(combined).toEqual(STOP_FAILURE_BASELINE);
+    },
+  );
+});
