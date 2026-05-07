@@ -304,7 +304,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(analyze): emit costBreakdown JSON structure with R1/R2/R3/R7`
 
-- [ ] 2.10 Add lastCostSummary cache discriminator in StateFile
+- [x] 2.10 Add lastCostSummary cache discriminator in StateFile
   **Do**: 在 index.ts 缓存读写处加 `lastCostSummary` 字段读写：当 `opts.costSummary` 与上次 state 中 `lastCostSummary` 不同时，bust includePrompts 缓存（避免老报表复用）。
 
   **Files**:
