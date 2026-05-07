@@ -86,7 +86,7 @@ Goal: complete all 4 narrowing passes on spec-reviewer, fill code-quality-review
   - **Commit**: `refactor(agents): spec-reviewer narrow Pass-2 — Holistic-Awareness 5→2 keep (E1)`
   - _Design: Component 1_
 
-- [ ] 2.2 Spec-reviewer narrow Pass-3 + Pass-4: Quality-Gates trim + move Execution/No-Hallucinations
+- [x] 2.2 Spec-reviewer narrow Pass-3 + Pass-4: Quality-Gates trim + move Execution/No-Hallucinations
   - **Do**:
     1. In Tasks / Quality-Gates: keep only `tasks-exist` item; remove `frequency-optimal` (belongs to code-quality)
     2. In Execution / No-Hallucinations: move all 6 items verbatim to a TODO comment block in `code-quality-reviewer.md` (will be activated in 2.3); delete from spec-reviewer
