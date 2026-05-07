@@ -1,0 +1,34 @@
+{
+  "name": "observability-v2",
+  "goal": "给 curdx-flow 加完整可观测性体系 — 让插件自己能告诉用户哪 spec/phase/task 该优化。先修 analyze 命令读真 transcript 的 critical bug，再升级 L3 业务事件日志，再加 cost/time/token 分析（含价格表、cache 命中率、subagent 分摊、推荐引擎）。",
+  "specs": [
+    {
+      "name": "spec-analyze-real-transcript",
+      "status": "pending",
+      "dependencies": [],
+      "size": "S",
+      "role": "foundation",
+      "criticalBugFix": "B1: index.ts:23 hardcoded fixture path"
+    },
+    {
+      "name": "spec-decision-event-logging",
+      "status": "pending",
+      "dependencies": ["spec-analyze-real-transcript"],
+      "size": "S-M",
+      "criticalBugFix": "B2-B6: error-logger schema upgrade"
+    },
+    {
+      "name": "spec-cost-time-token-analytics",
+      "status": "pending",
+      "dependencies": ["spec-decision-event-logging"],
+      "size": "M",
+      "preTask": "Task 0: create sample-with-usage.jsonl fixture (3-model coverage)"
+    }
+  ],
+  "output": "spec-files",
+  "issueNumber": null,
+  "createdAt": "2026-05-07",
+  "branch": "epic/observability-v2",
+  "research": "specs/_epics/observability-v2/research.md",
+  "epicDoc": "specs/_epics/observability-v2/epic.md"
+}
