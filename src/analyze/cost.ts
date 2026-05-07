@@ -234,7 +234,50 @@ export function extractUsageRowsFromEvents(
 
   for (const ev of events) {
     try {
-      if (!ev || ev.kind !== 'assistant_turn') continue;
+      if (!ev) continue;
+
+      // Sidechain trailer path (Decision 11 — independent billing channel).
+      // `<usage>...</usage>` blocks live inside tool_result content text on
+      // user_turn events: payload.message.content[].type === 'tool_result'
+      // → item.content[].type === 'text' → item.content[].text. Some
+      // assistant_turn payloads also surface tool_result blocks in their
+      // own content arrays; we scan both shapes from the same root for
+      // forward compatibility (NEVER-throw — `?.` chains drop on miss).
+      //
+      // Trailer rows are appended alongside the parent assistant_turn row;
+      // filter.ts dedupe runs on requestId at the parser layer (parent only),
+      // so trailer rows pass through untouched (Decision 11). The
+      // `source: 'subagent_trailer'` discriminator on each row keeps
+      // aggregateBy bucket math correct without re-deduping.
+      try {
+        const payloadAny = ev.payload as Record<string, unknown> | undefined;
+        const message = payloadAny?.['message'] as Record<string, unknown> | undefined;
+        const outerContent = message?.['content'];
+        if (Array.isArray(outerContent)) {
+          for (const item of outerContent) {
+            // Each item may be a tool_result with a nested content array of
+            // {type:'text', text:'...'} segments. Other item shapes (text,
+            // tool_use) carry no trailer and are skipped silently.
+            const inner = (item as Record<string, unknown> | null)?.['content'];
+            if (!Array.isArray(inner)) continue;
+            for (const seg of inner) {
+              const text = (seg as Record<string, unknown> | null)?.['text'];
+              if (typeof text !== 'string' || text.length === 0) continue;
+              const trailerRows = extractTrailerUsage(text, {
+                ts: ev.ts,
+                requestId: ev.requestId ?? '',
+                correlationId: readString(payloadAny, 'correlationId'),
+              });
+              if (trailerRows.length > 0) rows.push(...trailerRows);
+            }
+          }
+        }
+      } catch {
+        // NFR-9 NEVER-throw — trailer scan is best-effort; one malformed
+        // event drops its trailer rows but never blocks the main path.
+      }
+
+      if (ev.kind !== 'assistant_turn') continue;
 
       const payload = ev.payload as Record<string, unknown> | undefined;
       const model = readString(payload, 'message.model');

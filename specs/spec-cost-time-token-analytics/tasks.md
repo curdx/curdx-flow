@@ -205,7 +205,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(cost): add extractTrailerUsage with global non-greedy regex`
 
-- [ ] 2.3 [P] Wire trailer extraction into extractUsageRowsFromEvents
+- [x] 2.3 [P] Wire trailer extraction into extractUsageRowsFromEvents
   **Do**: 在 cost.ts 的 `extractUsageRowsFromEvents` 加 sidechain 路径：扫 `tool_result` event（或 sidechain assistant_turn 嵌套 content），对每个 `content[].text` 字段触发 `extractTrailerUsage(text, {ts, requestId, correlationId})`，把返回的 `UsageRow[]` 与主路径 row 合并到统一数组。
 
   **Files**:
