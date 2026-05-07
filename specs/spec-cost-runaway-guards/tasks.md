@@ -101,7 +101,7 @@ Focus: coordinator-side check + CLI flag + reference doc. Types + build must pas
   - **Commit**: `feat(coordinator): add pre-dispatch cap check to implement.md`
   - _Requirements: FR-E1, US-1, US-2, AC-1.1, AC-2.2_
 
-- [ ] 2.2 [P] Add --max-global-iterations CLI flag to implement.md
+- [x] 2.2 [P] Add --max-global-iterations CLI flag to implement.md
   - **Do**:
     1. In `plugins/curdx-flow/commands/implement.md`, locate existing `--max-task-iterations` flag parsing block (L42-47 and L73-78 per design)
     2. Add parallel `--max-global-iterations` entry with identical pattern: parse flag value, write to `state.maxGlobalIterations` on init/update

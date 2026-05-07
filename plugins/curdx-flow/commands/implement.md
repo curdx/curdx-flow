@@ -1,6 +1,6 @@
 ---
 description: Start task execution loop
-argument-hint: [--max-task-iterations 5] [--max-global-iterations 100] [--recovery-mode]
+argument-hint: [--max-task-iterations 5] [--max-global-iterations 30] [--recovery-mode]
 allowed-tools: [Read, Write, Edit, Task, Bash, Skill]
 ---
 
@@ -42,8 +42,8 @@ specs_dirs: ["./specs", "./packages/api/specs", "./packages/web/specs"]
 ## Step 2: Parse Arguments
 
 From `$ARGUMENTS`:
-- **--max-task-iterations**: Max retries per task (default: 5)
-- **--max-global-iterations**: Max total loop iterations (default: 100). Safety limit to prevent infinite execution loops.
+- **--max-task-iterations**: Max retries per task (default: 5). Cap on per-task retry loop; when hit, the current task is marked failed and the retry loop breaks (US-2 / AC-2.2). Override example: `--max-task-iterations 10`.
+- **--max-global-iterations**: Max total loop iterations (default: 30 per FR-D1; tightened from legacy 100 to bound cost runaway blast radius). Safety limit to prevent infinite execution loops; when hit, the coordinator halts entirely (US-1 / AC-1.1). Override example: `--max-global-iterations 100` to opt back into legacy cap. Mirrors `--max-task-iterations` parse pattern: flag value propagates into `state.maxGlobalIterations` at init.
 - **--recovery-mode**: Enable iterative failure recovery (default: false). When enabled, failed tasks trigger automatic fix task generation instead of stopping.
 
 ## Step 3: Initialize Execution State
@@ -75,7 +75,7 @@ Update `.curdx-state.json` by merging these fields into the existing object:
   "maxFixTasksPerOriginal": 3,
   "maxFixTaskDepth": 3,
   "globalIteration": 1,
-  "maxGlobalIterations": "<parsed from --max-global-iterations or default 100>",
+  "maxGlobalIterations": "<parsed from --max-global-iterations or default 30 (FR-D1; legacy 100 preserved on existing state files per FR-C1)>",
   "fixTaskMap": {},
   "modificationMap": {},
   "maxModificationsPerTask": 3,
@@ -98,7 +98,7 @@ Where `$MAX_TASK_ITER`, `$RECOVERY_MODE`, `$MAX_GLOBAL_ITER` come from parsed ar
 **Preserved fields** (set by earlier phases, must NOT be removed):
 - `source`, `name`, `basePath`, `commitSpec`, `relatedSpecs`
 
-**Backwards Compatibility**: State files from earlier versions may lack new fields. The system handles missing fields gracefully with defaults (globalIteration: 1, maxGlobalIterations: 100, maxFixTaskDepth: 3, modificationMap: {}, maxModificationsPerTask: 3, maxModificationDepth: 2, nativeTaskMap: {}, nativeSyncEnabled: true, nativeSyncFailureCount: 0).
+**Backwards Compatibility**: State files from earlier versions may lack new fields. The system handles missing fields gracefully with defaults (globalIteration: 1, maxGlobalIterations: 30 for new init per FR-D1; legacy state files storing 100 are preserved as-is per FR-C1, maxFixTaskDepth: 3, modificationMap: {}, maxModificationsPerTask: 3, maxModificationDepth: 2, nativeTaskMap: {}, nativeSyncEnabled: true, nativeSyncFailureCount: 0).
 
 ## Step 4: Execute Task Loop
 
