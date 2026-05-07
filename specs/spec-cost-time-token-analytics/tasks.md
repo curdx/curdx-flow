@@ -581,7 +581,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `test(recommend): add 8 rules × 4 severity coverage`
 
-- [ ] 4.3 [VERIFY] Quality checkpoint: typecheck + test:analyze
+- [x] 4.3 [VERIFY] Quality checkpoint: typecheck + test:analyze
   **Do**: Run 验证 recommend.ts 8 rule 全实现 + 测试全过。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run typecheck && npm run test:analyze`
@@ -590,7 +590,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `chore(recommend): pass quality checkpoint after 8 rules impl`
 
-- [ ] 4.4 report.ts — R1-R7 markdown rendering + Cost Breakdown section
+- [x] 4.4 report.ts — R1-R7 markdown rendering + Cost Breakdown section
   **Do**: 在 report.ts 加 `renderCostBreakdown(buckets)` 渲染 markdown：插入 `## Cost Breakdown` 章节（在现有 7 flat section 之后），包含 R1-R7 子段表格（design §Components #5 列表）。R6 末尾加 tokenizer 脚注（FR-REPORT-4 / AC8）。R4 hitRate 公式注释。
 
   **Files**:

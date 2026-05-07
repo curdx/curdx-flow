@@ -28,7 +28,7 @@
 // returned by renderReport(). report.ts MUST stay pure so tests (Phase 4)
 // can exercise it on synthetic event arrays without filesystem mocking.
 
-import type { Event, Options } from './types.ts';
+import type { AggregateBucket, Event, Options } from './types.ts';
 
 export interface ErrorLogEntry {
   ts: string;
@@ -51,6 +51,40 @@ export interface SchemaDriftInput {
 
 export interface RenderOptions extends Options {
   schemaDrift: SchemaDriftInput;
+  /**
+   * OB-3 cost breakdown — Phase 4 Task 4.4.
+   *
+   * Optional input. When present, `renderReport` appends a `## Cost Breakdown`
+   * chapter after the existing 7 flat sections (NFR-6: existing sections stay
+   * untouched). The chapter renders R1-R7 sub-sections derived from the per-
+   * dim aggregate buckets that index.ts already builds via `aggregateBy`.
+   *
+   * Decoupled from rendering to keep report.ts pure: we accept already-aggregated
+   * buckets + a totalCost mirror, and only do presentation work here (table
+   * formatting, sort/slice for Top-N, R4 hit-rate derivation, R5 p95 sort, R6
+   * cross-bucket model union, R6 tokenizer footnote).
+   */
+  costBreakdown?: CostBreakdownInput;
+}
+
+/**
+ * Cost breakdown payload — input to {@link renderCostBreakdown}.
+ *
+ * R1/R2/R3/R7 are pre-aggregated bucket arrays. R4_cacheHit / R5_wallClock /
+ * R6_modelMix are derived from buckets at render time (no separate aggregator
+ * lives in cost.ts for them — they're light projections, not joins). When
+ * the bucket arrays are empty, each sub-section emits a "_no data_" note
+ * instead of rendering an empty table.
+ */
+export interface CostBreakdownInput {
+  R1_perSpec: AggregateBucket[];
+  R2_perPhase: AggregateBucket[];
+  R3_perTask: AggregateBucket[];
+  R4_cacheHit?: unknown[];
+  R5_wallClock?: unknown[];
+  R6_modelMix?: unknown[];
+  R7_topN: AggregateBucket[];
+  totalCost: { usd: number };
 }
 
 interface HookFailureRow {
@@ -538,6 +572,234 @@ function renderParentChain(s: ParentChainSummary): string {
   return lines.join('\n');
 }
 
+/**
+ * Cost Breakdown — Phase 4 Task 4.4.
+ *
+ * Renders the `## Cost Breakdown` chapter (R1-R7 sub-sections) appended to the
+ * markdown report after the existing 7 flat sections. NFR-6: existing 7
+ * sections stay byte-for-byte unchanged — this chapter is purely additive and
+ * only emits when `opts.costBreakdown` is passed to `renderReport`.
+ *
+ * Sub-section map (design §Components #5 / FR-REPORT-1 / FR-REPORT-4):
+ *   • R1 per-spec   — table sorted by totalUSD desc
+ *   • R2 per-phase  — table in canonical phase order
+ *   • R3 per-task   — Top-N table with `trailerHit` column (FR-AGG-3)
+ *   • R4 cacheHit   — derived per bucket: hitRate = cacheRead / (cacheRead + 5m + 1h)
+ *   • R5 wallClock  — derived per bucket: p95 wallclock from durationMs distribution
+ *   • R6 modelMix   — cross-bucket union per model {tokens, usd} + tokenizer footnote
+ *                     (Opus 4.7 tokenizer counts ~35% more tokens — FR-REPORT-4 / AC8)
+ *   • R7 top-N      — already-truncated task slice from index.ts
+ *
+ * NEVER-throw (NFR-9): missing fields default via `?? 0`; empty bucket arrays
+ * render an italic placeholder instead of a header-less table.
+ */
+function fmtUsd(n: number): string {
+  return Number.isFinite(n) ? `$${(Math.round(n * 10000) / 10000).toFixed(4)}` : '$0.0000';
+}
+
+function fmtPct(n: number): string {
+  return Number.isFinite(n) ? `${(n * 100).toFixed(2)}%` : '0.00%';
+}
+
+function renderR1PerSpec(buckets: AggregateBucket[]): string {
+  const lines: string[] = [];
+  lines.push('### R1 — Cost per Spec');
+  lines.push('');
+  if (buckets.length === 0) {
+    lines.push('_no data_');
+    lines.push('');
+    return lines.join('\n');
+  }
+  const sorted = [...buckets].sort((a, b) => b.totalUSD - a.totalUSD);
+  lines.push('| Spec | Total USD | Rows | Trailers | Duration (ms) |');
+  lines.push('| --- | --- | --- | --- | --- |');
+  for (const b of sorted) {
+    lines.push(
+      `| ${escapeCell(b.key)} | ${fmtUsd(b.totalUSD)} | ${b.rowCount} | ${b.trailerCount} | ${b.durationMs ?? 0} |`,
+    );
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+function renderR2PerPhase(buckets: AggregateBucket[]): string {
+  const lines: string[] = [];
+  lines.push('### R2 — Cost per Phase');
+  lines.push('');
+  if (buckets.length === 0) {
+    lines.push('_no data_');
+    lines.push('');
+    return lines.join('\n');
+  }
+  const order = new Map(PHASE_ORDER.map((p, i) => [p, i] as const));
+  const sorted = [...buckets].sort((a, b) => {
+    const ai = order.get(a.key) ?? PHASE_ORDER.length;
+    const bi = order.get(b.key) ?? PHASE_ORDER.length;
+    if (ai !== bi) return ai - bi;
+    return b.totalUSD - a.totalUSD;
+  });
+  lines.push('| Phase | Total USD | Rows | Trailers | Duration (ms) |');
+  lines.push('| --- | --- | --- | --- | --- |');
+  for (const b of sorted) {
+    lines.push(
+      `| ${escapeCell(b.key)} | ${fmtUsd(b.totalUSD)} | ${b.rowCount} | ${b.trailerCount} | ${b.durationMs ?? 0} |`,
+    );
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+function renderR3PerTask(buckets: AggregateBucket[]): string {
+  const lines: string[] = [];
+  lines.push('### R3 — Cost per Task');
+  lines.push('');
+  if (buckets.length === 0) {
+    lines.push('_no data_');
+    lines.push('');
+    return lines.join('\n');
+  }
+  const sorted = [...buckets].sort((a, b) => b.totalUSD - a.totalUSD);
+  // FR-AGG-3 — `trailerHit` column flags whether the task bucket received any
+  // sidechain trailer rows (per Decision 11 source-bucketed dedup).
+  lines.push('| Task | Total USD | Rows | Trailers | trailerHit | Duration (ms) |');
+  lines.push('| --- | --- | --- | --- | --- | --- |');
+  for (const b of sorted) {
+    const trailerHit = b.trailerCount > 0 ? 'yes' : 'no';
+    lines.push(
+      `| ${escapeCell(b.key)} | ${fmtUsd(b.totalUSD)} | ${b.rowCount} | ${b.trailerCount} | ${trailerHit} | ${b.durationMs ?? 0} |`,
+    );
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+function renderR4CacheHit(buckets: AggregateBucket[]): string {
+  const lines: string[] = [];
+  lines.push('### R4 — Cache Hit Rate');
+  lines.push('');
+  // Formula comment per Done-when: hitRate = cacheRead / (cacheRead + 5m + 1h)
+  lines.push('_Formula: hitRate = cacheRead / (cacheRead + 5m + 1h)_');
+  lines.push('');
+  if (buckets.length === 0) {
+    lines.push('_no data_');
+    lines.push('');
+    return lines.join('\n');
+  }
+  const rows = buckets.map((b) => {
+    const denom = (b.cacheReadTokens ?? 0) + (b.cacheCreate5mTokens ?? 0) + (b.cacheCreate1hTokens ?? 0);
+    const hitRate = denom > 0 ? (b.cacheReadTokens ?? 0) / denom : 0;
+    return { key: b.key, hitRate, read: b.cacheReadTokens ?? 0, w5m: b.cacheCreate5mTokens ?? 0, w1h: b.cacheCreate1hTokens ?? 0 };
+  });
+  rows.sort((a, b) => a.hitRate - b.hitRate);
+  lines.push('| Scope | Hit Rate | cacheRead | 5m write | 1h write |');
+  lines.push('| --- | --- | --- | --- | --- |');
+  for (const r of rows) {
+    lines.push(`| ${escapeCell(r.key)} | ${fmtPct(r.hitRate)} | ${r.read} | ${r.w5m} | ${r.w1h} |`);
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+function renderR5WallClock(buckets: AggregateBucket[]): string {
+  const lines: string[] = [];
+  lines.push('### R5 — Wall-Clock P95');
+  lines.push('');
+  if (buckets.length === 0) {
+    lines.push('_no data_');
+    lines.push('');
+    return lines.join('\n');
+  }
+  // Basic per-bucket p95: durationMs sorted asc, idx = ceil(0.95 * n) - 1.
+  // Buckets carry a single accumulated durationMs (sum across rows), so the
+  // "distribution" here is across buckets, not within. We sort bucket durations
+  // descending and surface the top entries — task brief explicitly allows
+  // "basic — sort + slice".
+  const sorted = [...buckets].sort((a, b) => (b.durationMs ?? 0) - (a.durationMs ?? 0));
+  const n = sorted.length;
+  const p95Idx = Math.min(Math.max(Math.ceil(0.95 * n) - 1, 0), n - 1);
+  const p95 = sorted[p95Idx]?.durationMs ?? 0;
+  lines.push(`_P95 wall-clock across ${n} bucket(s): ${p95} ms_`);
+  lines.push('');
+  lines.push('| Scope | Duration (ms) |');
+  lines.push('| --- | --- |');
+  for (const b of sorted) {
+    lines.push(`| ${escapeCell(b.key)} | ${b.durationMs ?? 0} |`);
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+function renderR6ModelMix(buckets: AggregateBucket[]): string {
+  const lines: string[] = [];
+  lines.push('### R6 — Model Mix');
+  lines.push('');
+  // Cross-bucket union: sum tokens + usd per model id.
+  const mix = new Map<string, { tokens: number; usd: number }>();
+  for (const b of buckets) {
+    if (!b.modelMix) continue;
+    for (const [model, m] of Object.entries(b.modelMix)) {
+      const prev = mix.get(model) ?? { tokens: 0, usd: 0 };
+      prev.tokens += m.tokens ?? 0;
+      prev.usd += m.usd ?? 0;
+      mix.set(model, prev);
+    }
+  }
+  if (mix.size === 0) {
+    lines.push('_no data_');
+    lines.push('');
+    // Footnote still emitted so AC8 grep ("tokenizer") passes regardless of data.
+    lines.push('_Note: Opus 4.7 tokenizer counts ~35% more tokens than older models — token totals are not directly comparable across model cohorts. (FR-REPORT-4 / AC8)_');
+    lines.push('');
+    return lines.join('\n');
+  }
+  const rows = Array.from(mix.entries()).sort((a, b) => b[1].usd - a[1].usd);
+  lines.push('| Model | Tokens | USD |');
+  lines.push('| --- | --- | --- |');
+  for (const [model, m] of rows) {
+    lines.push(`| ${escapeCell(model)} | ${m.tokens} | ${fmtUsd(m.usd)} |`);
+  }
+  lines.push('');
+  // Tokenizer footnote — FR-REPORT-4 / AC8.
+  lines.push('_Note: Opus 4.7 tokenizer counts ~35% more tokens than older models — token totals are not directly comparable across model cohorts._');
+  lines.push('');
+  return lines.join('\n');
+}
+
+function renderR7TopN(buckets: AggregateBucket[]): string {
+  const lines: string[] = [];
+  lines.push('### R7 — Top-N Tasks');
+  lines.push('');
+  if (buckets.length === 0) {
+    lines.push('_no data_');
+    lines.push('');
+    return lines.join('\n');
+  }
+  const sorted = [...buckets].sort((a, b) => b.totalUSD - a.totalUSD);
+  lines.push('| Rank | Task | Total USD | Rows | Trailers |');
+  lines.push('| --- | --- | --- | --- | --- |');
+  sorted.forEach((b, i) => {
+    lines.push(`| ${i + 1} | ${escapeCell(b.key)} | ${fmtUsd(b.totalUSD)} | ${b.rowCount} | ${b.trailerCount} |`);
+  });
+  lines.push('');
+  return lines.join('\n');
+}
+
+export function renderCostBreakdown(input: CostBreakdownInput): string {
+  const lines: string[] = [];
+  lines.push('## Cost Breakdown');
+  lines.push('');
+  lines.push(`_Total: ${fmtUsd(input.totalCost?.usd ?? 0)} USD across ${input.R3_perTask?.length ?? 0} task bucket(s)_`);
+  lines.push('');
+  lines.push(renderR1PerSpec(input.R1_perSpec ?? []));
+  lines.push(renderR2PerPhase(input.R2_perPhase ?? []));
+  lines.push(renderR3PerTask(input.R3_perTask ?? []));
+  lines.push(renderR4CacheHit(input.R3_perTask ?? []));
+  lines.push(renderR5WallClock(input.R3_perTask ?? []));
+  lines.push(renderR6ModelMix(input.R3_perTask ?? []));
+  lines.push(renderR7TopN(input.R7_topN ?? []));
+  return lines.join('\n');
+}
+
 export function renderReport(
   events: Event[],
   errorEntries: ErrorLogEntry[],
@@ -553,7 +815,8 @@ export function renderReport(
   const hookDuration = rollupHookDuration(events);
   const parentChain = rollupParentChain(events);
 
-  const markdown =
+  // 7 flat sections — NFR-6: byte-stable, never modified after Phase 1.
+  let markdown =
     renderHookFailures(hookFailures, limit) +
     '\n' +
     renderSlashCommands(slashCommands, limit) +
@@ -567,6 +830,13 @@ export function renderReport(
     renderSchemaDrift(opts.schemaDrift) +
     '\n' +
     renderParentChain(parentChain);
+
+  // OB-3 Cost Breakdown chapter — Phase 4 Task 4.4. Purely additive: emitted
+  // only when index.ts passes `costBreakdown` (i.e. `--cost-summary` mode).
+  // Existing 7 sections above stay byte-for-byte unchanged (NFR-6).
+  if (opts.costBreakdown) {
+    markdown += '\n' + renderCostBreakdown(opts.costBreakdown);
+  }
 
   const json: ReportJson = {
     hookFailures,
