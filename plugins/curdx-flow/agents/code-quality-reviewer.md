@@ -62,36 +62,59 @@ You do NOT receive:
 
 ## Rubrics
 
-<!-- Placeholder — Task 2.4 fleshes out the 30 quality items across rubrics:
-     code smell, security, implementation quality, readability.
-     Until 2.4 lands, this agent fails closed: emit REVIEW_FAIL with finding
-     "Rubrics not yet defined; refusing to pass without quality criteria". -->
+Each bullet below is one quality dimension. Apply every rubric to the artifact under review. A finding is a FAIL when the bullet's negative case is observed; otherwise PASS. Findings that touch the 4 Exclusion-List items above are discarded before computing the verdict.
 
-<!-- TODO: Task 2.3 will activate these moved items below -->
-<!-- MOVED FROM spec-reviewer Execution/No-Hallucinations:
+### Code smell
 
-### Execution Rubric
+- Detect dead code: imports, functions, branches, or fields with no caller in the diff or repo. Flag with file:line and the unused name.
+- Reject duplicated logic: copy-pasted blocks across files or functions where extraction would reduce surface area. Flag both occurrences.
+- Catch deep nesting: control flow nested ≥4 levels (loops + conditionals) inside a single function. Suggest extract-method or guard-clause shape.
+- Surface god objects: a single class/module that owns >7 unrelated responsibilities. Cite the responsibility list as evidence.
+- Spot magic constants: hard-coded numbers/strings appearing ≥2 times where a named constant would clarify intent. Exclude ports/version strings used once.
+- Flag long parameter lists: functions with >5 positional parameters that should accept an options object or be split. Cite the call sites.
 
-Cross-reference implementation against the design.md Components section. Each task should map to a specific component (A, B, C, D, etc.) and the implementation must fulfill that component's documented responsibilities.
+### Security
 
-| Dimension | PASS Criteria | FAIL Criteria |
-|-----------|--------------|---------------|
-| Alignment | Implementation matches the design.md component responsibilities for the relevant component (e.g., Component A responsibilities, Component B integration points) | Implementation deviates from design without documented reason; component responsibilities not fulfilled |
-| Correctness | Changed files match the task's Files list; no undocumented file changes | Files changed that aren't in the task's Files list, or listed files not changed |
-| Completeness | All "Done when" criteria are verifiable in the changed code | "Done when" criteria cannot be verified from the implementation |
-| No Hallucinations | Imports reference real modules; APIs called actually exist; file paths are valid | Imports reference non-existent modules; API calls to non-existent endpoints; invalid file paths |
+- Inspect input validation: every external input (user, network, file, env) is validated for type, range, and shape before use. Flag any unchecked boundary.
+- Reject string-built queries/commands: SQL, shell, eval, or template literals that interpolate untrusted data. Demand parameterized API or explicit escape.
+- Catch secret leakage: API keys, tokens, passwords committed in source, logged, or echoed in error messages. Flag the file:line and the leaked token shape.
+- Verify authorization checks: privileged code paths enforce role/scope checks before mutation. Flag missing-or-bypassed checks with file:line.
+- Audit dependency surface: new third-party imports added in this diff have a known maintainer + recent release. Flag unmaintained or typosquat-shaped names.
 
-**Examples**:
-- Alignment PASS: Task references "Design: Component B" and the implementation adds a review loop to the phase command, matching Component B's documented responsibility to "invoke spec-reviewer after phase agent completes."
-- Alignment FAIL: Design says Component C adds Layer 5 to implement.md, but implementation adds it as Layer 3 replacing an existing layer.
-- Correctness PASS: Task lists `Files: commands/research.md` and only that file was changed.
-- Correctness FAIL: Task lists `Files: commands/research.md` but `commands/design.md` was also modified without documentation.
-- Completeness PASS: "Done when: research.md contains Artifact Review section" and `grep -q "Artifact Review" commands/research.md` succeeds.
-- Completeness FAIL: "Done when: all four commands have review loops" but `commands/tasks.md` has no review section.
-- No Hallucinations PASS: Code references `agents/spec-reviewer.md` which exists in the file structure.
-- No Hallucinations FAIL: Code imports from `utils/review-engine.js` which doesn't exist anywhere in the codebase.
+### Implementation quality
 
-END MOVED -->
+- Examine error handling: every fallible call (I/O, network, parse, subprocess) has explicit error treatment — propagate, recover, or fail loudly with context. Flag silent catches and bare `except`/`catch (_)`.
+- Reject hard-coded environment paths: absolute paths, `/tmp/...`, host names, or platform-specific separators that break portability. Suggest config or `path.join`.
+- Detect resource leaks: opened files, sockets, handles, or transactions without a matching close/finally/`using`. Cite the open site.
+- Audit concurrency safety: shared state mutated from multiple async tasks/threads without lock, atomic, or message boundary. Flag the unprotected write.
+- Catch logic-vs-config mixing: business rules baked into deploy manifests or vice versa. Suggest the correct home.
+- Verify atomicity boundaries: multi-step operations that can crash mid-way leave inconsistent state. Demand transaction, rollback, or idempotent retry.
+- Reject premature abstraction: factories/strategies/adapters with one concrete implementation in the diff. Flag the YAGNI shape.
+
+### Readability
+
+- Demand intention-revealing names: functions, variables, and types named for what they mean, not what they hold. Flag `data`, `tmp`, `obj`, single-letter non-loop names.
+- Inspect comment quality: comments explain *why* (intent, constraint, decision) — not *what* (the code already says that). Flag redundant `// increment i` comments and demand `// because` ones at non-obvious sites.
+- Reject inconsistent style: same file or module mixes naming conventions (camel vs snake), import order, or quote style against the local norm. Flag the deviation.
+- Catch over-long functions: bodies >50 lines or >2 screens that warrant decomposition. Cite the function and propose split points.
+- Verify diff readability: changes scoped to the task's intent — no unrelated reformatting noise mixed into a behavioral commit. Flag drive-by reformat hunks.
+
+### Test quality
+
+- Reject mock-only assertions: tests that exercise only mocks/stubs without touching real behavior. Demand at least one assertion against the system under test's real output.
+- Detect flaky-prone patterns: time-of-day, sleep-based timing, network reach to live hosts, random without seed. Flag and propose deterministic shape.
+- Verify branch coverage: every documented `Done when` / acceptance criterion has at least one matching test or executable verify command. Flag uncovered criteria.
+- Catch assertion-light tests: a test body that runs production code but asserts nothing or only `not null`. Demand value-shape assertions.
+- Reject test interdependence: test N depends on test N-1's side effects (shared global state, ordered DB seed). Flag the order coupling.
+
+### No-hallucinations
+
+- Inspect imports: every imported module/package exists in the project's manifest, lockfile, or stdlib. Flag invented module names with file:line.
+- Verify API calls: methods/functions invoked actually exist on the cited type/class — confirm against the linked file or library docs.
+- Audit file path references: paths in code, comments, or docstrings resolve to real files in the tree (or are clearly marked as creation targets).
+- Reject fabricated CLI flags: subprocess invocations that pass flags not present in the tool's `--help`. Cite the offending flag.
+- Catch invented config keys: reads from `process.env.X` or config object fields that no schema, default, or producer defines. Flag the source.
+- Verify cited line numbers: any "see file:NN" reference inside the artifact actually points at the claimed content. Flag stale or invented anchors.
 
 ## Output Format
 

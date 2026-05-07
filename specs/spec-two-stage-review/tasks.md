@@ -104,7 +104,7 @@ Goal: complete all 4 narrowing passes on spec-reviewer, fill code-quality-review
   - **Done when**: Zero type errors; all drift test cases still green (no regressions from narrowing)
   - **Commit**: None
 
-- [ ] 2.4 [P] Fill code-quality-reviewer rubrics (~30 items)
+- [x] 2.4 [P] Fill code-quality-reviewer rubrics (~30 items)
   - **Do**:
     1. Activate the TODO block from 2.2: convert 6 No-Hallucinations items to live rubric entries
     2. Add 17 adapted [QUALITY] items from original spec-reviewer (before narrowing): code smell, security, implementation quality, readability, test quality — use concrete sub-bullets per category
