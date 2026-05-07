@@ -54,7 +54,7 @@ Focus: get lib + hook compiling and firing end-to-end. Skip polish, accept hardc
   - **Commit**: `feat(subagent-injector): register subagent-context-injector in build-hooks HOOK_ENTRIES`
   - _Design: Component 5_
 
-- [ ] 1.4 [P] Register `SubagentStart` event in `hooks.json`
+- [x] 1.4 [P] Register `SubagentStart` event in `hooks.json`
   - **Do**:
     1. Open `plugins/curdx-flow/hooks/hooks.json`
     2. Add top-level `"SubagentStart"` key with same shape as existing `"SessionStart"` entry:
