@@ -279,7 +279,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(analyze): wire --by-spec/by-phase/by-task/top CLI flags`
 
-- [ ] 2.8 [VERIFY] Quality checkpoint: typecheck + build
+- [x] 2.8 [VERIFY] Quality checkpoint: typecheck + build
   **Do**: Run typecheck + build 验证 5 flag 全接线后无破坏。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run typecheck && npm run build`
@@ -288,7 +288,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `chore(analyze): pass quality checkpoint after 5 CLI flag wiring`
 
-- [ ] 2.9 Wire cost branch JSON output costBreakdown structure
+- [x] 2.9 Wire cost branch JSON output costBreakdown structure
   **Do**: 在 index.ts cost branch 用 `aggregateBy` 输出构造 `costBreakdown: { R1_perSpec, R2_perPhase, R3_perTask, R7_topN, totalCost: { usd } }` 嵌入 `--json` 输出顶层。**保留** 现有 7 flat section 一字不改（plan/requirements 强约束）。顶层 `totalCost.usd` mirror 不变（Phase 1 已加）。R4/R5/R6 字段先占位空数组（report.ts Phase 4 落实）。
 
   **Files**:

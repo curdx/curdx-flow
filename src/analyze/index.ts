@@ -378,10 +378,28 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
         const taskBuckets = aggregateBy(usageRows, 'task', { specPhaseMap });
         costAggregates.task = taskBuckets.slice(0, top);
       }
-      void costAggregates; // Task 2.9 wires into costBreakdown.{R1,R2,R3,R7}.
+
+      // Task 2.9 — wire costAggregates into the JSON output's `costBreakdown`
+      // sibling alongside the top-level `totalCost.usd` mirror. R4/R5/R6 are
+      // placeholders (Phase 4 will fill cacheHit / wallClock / modelMix). R7
+      // is the top-N task slice (already truncated above when `wantTask`).
+      // The existing 7 flat sections from renderReport remain untouched
+      // (NFR-6 hard constraint).
+      const taskBucketsAll = costAggregates.task ?? [];
+      const r7TopN = taskBucketsAll.slice(0, top);
+      const costBreakdown = {
+        R1_perSpec: costAggregates.spec ?? [],
+        R2_perPhase: costAggregates.phase ?? [],
+        R3_perTask: taskBucketsAll,
+        R4_cacheHit: [] as unknown[],
+        R5_wallClock: [] as unknown[],
+        R6_modelMix: [] as unknown[],
+        R7_topN: r7TopN,
+        totalCost: { usd: totalUsd },
+      };
 
       markdownStr = `${markdown}\n## Cost Summary\n\nTotal: $${totalUsd} USD\n`;
-      jsonObj = { ...jsonObj, totalCost: { usd: totalUsd } };
+      jsonObj = { ...jsonObj, totalCost: { usd: totalUsd }, costBreakdown };
     }
 
     const jsonStr = `${JSON.stringify(jsonObj)}\n`;
