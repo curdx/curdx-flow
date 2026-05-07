@@ -319,7 +319,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(analyze): add lastCostSummary cache discriminator`
 
-- [ ] 2.11 [VERIFY] Quality checkpoint: typecheck + build + test:analyze
+- [x] 2.11 [VERIFY] Quality checkpoint: typecheck + build + test:analyze
   **Do**: Run 三件套验证 Phase 2 重构未破现有 integration test。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run typecheck && npm run build && npm run test:analyze`
@@ -328,7 +328,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `chore(analyze): pass quality checkpoint after Phase 2 refactor`
 
-- [ ] 2.12 Smoke verify costBreakdown + 5 flags
+- [x] 2.12 Smoke verify costBreakdown + 5 flags
   **Do**: Run `analyze` 用 5 个 flag 组合验证 JSON 输出结构齐全 + R3_perTask 数组非空（前提：本地 transcript 含 assistant_turn）。
 
   **Files**: (no edit — smoke)
