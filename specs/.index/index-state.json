@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-05-07T14:22:03Z",
+  "updated": "2026-05-07T15:24:57Z",
   "directories": [
     {
       "path": "./specs",
@@ -50,10 +50,9 @@
     {
       "name": "spec-cost-time-token-analytics",
       "path": "./specs/spec-cost-time-token-analytics",
-      "phase": "tasks",
-      "taskIndex": 0,
-      "totalTasks": 48,
-      "awaitingApproval": true
+      "phase": "execution",
+      "taskIndex": 22,
+      "totalTasks": 48
     },
     {
       "name": "spec-decision-event-logging",

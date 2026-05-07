@@ -531,7 +531,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `test(integration): assert requestId dedup preserves trailer path`
 
-- [ ] 3.13 [VERIFY] Quality checkpoint: typecheck + test:analyze
+- [x] 3.13 [VERIFY] Quality checkpoint: typecheck + test:analyze
   **Do**: Run 验证 Phase 3 13 任务后所有测试齐绿 + 无 regression。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run typecheck && npm run test:analyze`
