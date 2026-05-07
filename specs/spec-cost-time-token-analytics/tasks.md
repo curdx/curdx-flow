@@ -546,7 +546,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
 > 目标：recommend 8 rules 实体落定 + report.ts R1-R7 markdown 渲染 + Recommendations 章节 + CHANGELOG/README + VE smoke + CI 全绿。
 
-- [ ] 4.1 Implement recommend.ts 8 rules
+- [x] 4.1 Implement recommend.ts 8 rules
   **Do**: 在 recommend.ts 实现 8 rules + insufficient_data 第 4 档判定（design §Components #3 表）：rule-1 cache-hit-low / rule-2 output-tok-high / rule-3 hit-cap-rate / rule-4 opus-mix-high (skip critical phase) / rule-5 cost-per-task spike (MAD on bucket cost array) / rule-6 wall-clock-p95 / rule-7 cache-churn / rule-8 retry-loop。每 rule 缺数据 → severity='insufficient_data'。所有 rule try/catch 包，异常 → log via `logHookEvent({kind:'analyze_internal_error'})`。
 
   **Files**:
