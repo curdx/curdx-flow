@@ -19,7 +19,7 @@ Task 1.5 — typecheck passes + drift test asserts spec-reviewer.md has no quali
 
 Goal: prove schema change + 1 narrowing pass + code-quality-reviewer skeleton + minimal drift test are self-consistent and typecheck-clean.
 
-- [ ] 1.1 [P] Schema + types: add `reviews` field to VerificationBlock
+- [x] 1.1 [P] Schema + types: add `reviews` field to VerificationBlock
   - **Do**:
     1. Open `src/hooks/_shared/types.ts`; append `ReviewVerdict` interface and add optional `reviews?: { specCompliance?: ReviewVerdict; codeQuality?: ReviewVerdict }` to `VerificationBlock`
     2. Open `plugins/curdx-flow/schemas/spec.schema.json`; add optional `reviews` sub-schema under `verificationBlocks` item definition (additionalProperties preserved, backwards-compat)

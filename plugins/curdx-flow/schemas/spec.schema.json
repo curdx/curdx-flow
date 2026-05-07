@@ -52,6 +52,44 @@
         "failedReason": {
           "type": "string",
           "description": "Optional failure detail when exitCode is non-zero"
+        },
+        "reviews": {
+          "type": "object",
+          "description": "Two-stage review verdicts (spec-two-stage-review D3). Keyed-object shape isomorphic to the parent verificationBlocks map. Both sub-fields optional for backwards-compat with pre-two-stage-review states.",
+          "additionalProperties": false,
+          "properties": {
+            "specCompliance": { "$ref": "#/$defs/reviewVerdict" },
+            "codeQuality": { "$ref": "#/$defs/reviewVerdict" }
+          }
+        }
+      }
+    },
+
+    "reviewVerdict": {
+      "type": "object",
+      "description": "Reviewer verdict emitted at phase boundaries by spec-compliance / code-quality reviewers. 'advisory' surfaces findings without blocking (used by code-quality in QuickMode bypass per FR-M2).",
+      "required": ["verdict", "findings", "reviewerId", "timestamp"],
+      "additionalProperties": false,
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": ["pass", "fail", "advisory"],
+          "description": "Reviewer outcome. 'pass' = no blocking issues; 'fail' = hard block; 'advisory' = surface findings, do not block"
+        },
+        "findings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Reviewer notes (one per concern). Empty array allowed on pass; fail/advisory should populate at least one entry"
+        },
+        "reviewerId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Agent identifier (e.g. 'spec-reviewer', 'code-quality-reviewer'). Used by drift tests to confirm domain ownership"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 UTC timestamp when verdict was recorded"
         }
       }
     }

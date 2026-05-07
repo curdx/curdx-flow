@@ -123,6 +123,33 @@ export type VerificationPhase =
   | "execution";
 
 /**
+ * Reviewer verdict persisted as a peer-field on a `VerificationBlock` (D3).
+ *
+ * Two-stage review (spec-two-stage-review) runs spec-compliance and
+ * code-quality reviewers at phase boundaries; each emits one of these
+ * records into `VerificationBlock.reviews.{specCompliance|codeQuality}`.
+ *
+ *  - `verdict`     : "pass" | "fail" | "advisory"
+ *                    "advisory" surfaces findings without blocking (used by
+ *                    code-quality reviewer in QuickMode bypass per FR-M2 —
+ *                    spec-compliance remains a hard gate, code-quality
+ *                    degrades to advisory only).
+ *  - `findings`    : reviewer notes (one per concern). Empty array on pass
+ *                    is allowed; `fail`/`advisory` should populate ≥1 entry
+ *                    so downstream tooling can render rationale.
+ *  - `reviewerId`  : agent identifier (e.g. `spec-reviewer`,
+ *                    `code-quality-reviewer`). Used by drift tests to
+ *                    confirm domain ownership.
+ *  - `timestamp`   : ISO-8601 instant the verdict was recorded.
+ */
+export interface ReviewVerdict {
+  verdict: "pass" | "fail" | "advisory";
+  findings: string[];
+  reviewerId: string;
+  timestamp: string;
+}
+
+/**
  * Verification record persisted on `CurdxState.verificationBlocks[phase]`.
  *
  * Captures the outcome of running a phase's `Verify` command (per design
@@ -137,6 +164,12 @@ export type VerificationPhase =
  * Optional fields enrich the record without being load-bearing for gating:
  *  - `description`  : human-readable summary of what was checked
  *  - `failedReason` : populated only when `exitCode !== 0`
+ *  - `reviews`      : two-stage review verdicts (spec-two-stage-review D3) —
+ *                     keyed-object shape isomorphic to the parent
+ *                     `verificationBlocks` map; O(1) lookup, no semantic key
+ *                     loss vs an array of `{reviewerId,...}` entries.
+ *                     Both sub-fields optional for backwards-compat with
+ *                     pre-two-stage-review states.
  */
 export interface VerificationBlock {
   command: string;
@@ -145,6 +178,10 @@ export interface VerificationBlock {
   srcMtime: number;
   description?: string;
   failedReason?: string;
+  reviews?: {
+    specCompliance?: ReviewVerdict;
+    codeQuality?: ReviewVerdict;
+  };
 }
 
 /**
