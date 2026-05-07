@@ -13,10 +13,11 @@
     },
     {
       "name": "spec-decision-event-logging",
-      "status": "pending",
+      "status": "completed",
+      "completedAt": "2026-05-07",
       "dependencies": ["spec-analyze-real-transcript"],
       "size": "S-M",
-      "criticalBugFix": "B2-B6: error-logger schema upgrade"
+      "criticalBugFix": "B2-B6 fixed: 4-field schema (level/kind/payload/correlationId) + rotation + 34 hook sites wired"
     },
     {
       "name": "spec-cost-time-token-analytics",
