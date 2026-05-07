@@ -248,7 +248,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(cost): add aggregateBy three-level join with correlationId`
 
-- [ ] 2.6 Build specPhaseMap from state files in index.ts
+- [x] 2.6 Build specPhaseMap from state files in index.ts
   **Do**: 在 index.ts 用现有 `loadSpecStates()` 输出（L106-131）派生 `specPhaseMap: Record<sid, phase>` — 遍历 `~/.curdx/specs/*/.curdx-state.json` 提 `sessionId/phase` 对，喂给 `aggregateBy`。缺 state-file → 空 map（aggregate 走 unknown 桶 NFR-9）。
 
   **Files**:

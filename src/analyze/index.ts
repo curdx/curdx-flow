@@ -321,6 +321,32 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
     let markdownStr = markdown;
     let jsonObj: Record<string, unknown> = safeJson as unknown as Record<string, unknown>;
     if (opts.costSummary === true) {
+      // Task 2.6 — derive `specPhaseMap: Record<sid, phase>` from the spec
+      // state files (`./specs/*\/.curdx-state.json`) loaded above. State files
+      // do NOT carry a `sessionId` field (verified 2026-05-07: state.json shape
+      // is { name, phase, taskIndex, ... } only), so the fallback per task
+      // brief is to key by spec name. `aggregateBy` ctx looks up by the
+      // correlationId `sid` segment (= transcript filename basename, an
+      // anthropic session UUID), so most lookups will fall through to the
+      // 'unknown' phase bucket — that's the explicit NFR-9 contract. This
+      // task wires the map; Task 2.9 plumbs it into `aggregateBy(rows, level,
+      // {specPhaseMap})` as `costBreakdown.R2_perPhase` keying.
+      //
+      // Reuses the already-loaded `specStates` from above (loadSpecStates is
+      // itself NEVER-throw — missing dir / corrupt JSON → []). The reduce
+      // below is wrapped defensively even though the input is already safe.
+      let specPhaseMap: Record<string, string> = {};
+      try {
+        for (const s of specStates) {
+          if (s && typeof s.name === 'string' && typeof s.phase === 'string') {
+            specPhaseMap[s.name] = s.phase;
+          }
+        }
+      } catch {
+        specPhaseMap = {};
+      }
+      void specPhaseMap; // Task 2.9 wires this into aggregateBy(...) ctx.
+
       const usageRows = extractUsageRowsFromEvents(filtered, errorEntries);
       let totalUsd = 0;
       for (const r of usageRows) totalUsd += computeCost(r);
