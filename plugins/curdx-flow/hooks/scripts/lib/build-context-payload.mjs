@@ -31,20 +31,10 @@ function buildSessionStartPayload(state, specDir) {
     payload.awaitingApproval = false;
     return payload;
   }
-  if (typeof state.phase === "string") {
-    payload.phase = state.phase;
-  }
-  if (typeof state.taskIndex === "number") {
-    payload.taskIndex = state.taskIndex;
-  }
-  if (typeof state.totalTasks === "number") {
-    payload.totalTasks = state.totalTasks;
-  }
-  if (state.awaitingApproval === true) {
-    payload.awaitingApproval = true;
-  } else if (state.awaitingApproval === false) {
-    payload.awaitingApproval = false;
-  }
+  payload.phase = typeof state.phase === "string" ? state.phase : "unknown";
+  payload.taskIndex = typeof state.taskIndex === "number" ? state.taskIndex : 0;
+  payload.totalTasks = typeof state.totalTasks === "number" ? state.totalTasks : 0;
+  payload.awaitingApproval = state.awaitingApproval === true;
   return payload;
 }
 function buildSubagentBlock(state, specDir) {

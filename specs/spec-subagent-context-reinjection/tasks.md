@@ -85,7 +85,7 @@ Focus: get lib + hook compiling and firing end-to-end. Skip polish, accept hardc
 
 Focus: surgical refactor of `load-spec-context.ts` to use shared lib; byte-equal baseline must hold.
 
-- [ ] 2.1 Surgical refactor `load-spec-context.ts` to import shared lib
+- [x] 2.1 Surgical refactor `load-spec-context.ts` to import shared lib
   - **Do**:
     1. Open `src/hooks/load-spec-context.ts`
     2. Add import: `import { buildContextPayload } from "./lib/build-context-payload"`

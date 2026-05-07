@@ -22,6 +22,7 @@ import { basename, join } from "node:path";
 import process from "node:process";
 import { runHook } from "./_shared/run-hook.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
+import { buildContextPayload } from "./lib/build-context-payload.js";
 import type { ContextBlockOutput } from "./_shared/types.js";
 import type { CurdxState } from "./_shared/types.js";
 
@@ -145,20 +146,18 @@ runHook(async (input) => {
       process.stderr.write(
         `[curdx-flow] Spec completed: ${specName} (${at}). Run /curdx-flow:refactor to reopen or /curdx-flow:new for a new spec.\n`,
       );
-      block.phase = "completed";
-      block.awaitingApproval = false;
+      Object.assign(block, JSON.parse(buildContextPayload(state, specPath)));
       return block;
     }
-    const phase = state.phase ?? "unknown";
-    const taskIndex = typeof state.taskIndex === "number" ? state.taskIndex : 0;
+    // D4 surgical refactor: state-derived payload fields now come from the
+    // shared lib; stderr banner still uses local variables for byte-equal
+    // formatting parity with v6 baseline.
+    Object.assign(block, JSON.parse(buildContextPayload(state, specPath)));
+    const phase = block.phase ?? "unknown";
+    const taskIndex = typeof block.taskIndex === "number" ? block.taskIndex : 0;
     const totalTasks =
-      typeof state.totalTasks === "number" ? state.totalTasks : 0;
-    const awaiting = state.awaitingApproval === true;
-
-    block.phase = phase;
-    block.taskIndex = taskIndex;
-    block.totalTasks = totalTasks;
-    block.awaitingApproval = awaiting;
+      typeof block.totalTasks === "number" ? block.totalTasks : 0;
+    const awaiting = block.awaitingApproval === true;
 
     process.stderr.write(
       `[curdx-flow] Phase: ${phase} | Task: ${taskIndex + 1}/${totalTasks} | Awaiting approval: ${awaiting}\n`,

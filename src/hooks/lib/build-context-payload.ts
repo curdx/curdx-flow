@@ -105,20 +105,17 @@ function buildSessionStartPayload(
     return payload;
   }
 
-  if (typeof state.phase === "string") {
-    payload.phase = state.phase;
-  }
-  if (typeof state.taskIndex === "number") {
-    payload.taskIndex = state.taskIndex;
-  }
-  if (typeof state.totalTasks === "number") {
-    payload.totalTasks = state.totalTasks;
-  }
-  if (state.awaitingApproval === true) {
-    payload.awaitingApproval = true;
-  } else if (state.awaitingApproval === false) {
-    payload.awaitingApproval = false;
-  }
+  // Byte-equal with load-spec-context.ts defaults: emit phase/taskIndex/
+  // totalTasks/awaitingApproval unconditionally with the same fallbacks the
+  // SessionStart handler used inline pre-D4 (phase ?? "unknown", numeric ?? 0,
+  // awaitingApproval === true). Insertion order also matches the handler so
+  // JSON.stringify output is byte-stable.
+  payload.phase = typeof state.phase === "string" ? state.phase : "unknown";
+  payload.taskIndex =
+    typeof state.taskIndex === "number" ? state.taskIndex : 0;
+  payload.totalTasks =
+    typeof state.totalTasks === "number" ? state.totalTasks : 0;
+  payload.awaitingApproval = state.awaitingApproval === true;
   return payload;
 }
 
