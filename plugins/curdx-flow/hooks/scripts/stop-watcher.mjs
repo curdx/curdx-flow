@@ -9,9 +9,9 @@ const __dirname = __ccd(__filename);
 import {
   existsSync as existsSync2,
   readFileSync as readFileSync3,
-  readdirSync as readdirSync2,
-  statSync as statSync2,
-  unlinkSync
+  readdirSync as readdirSync3,
+  statSync as statSync3,
+  unlinkSync as unlinkSync2
 } from "node:fs";
 import { spawn } from "node:child_process";
 import { basename as basename3, dirname, join as join3 } from "node:path";
@@ -23,7 +23,16 @@ import path2 from "node:path";
 import process4 from "node:process";
 
 // src/hooks/_shared/error-logger.ts
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
+import {
+  appendFileSync,
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync
+} from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import process2 from "node:process";
@@ -34,6 +43,11 @@ var MAX_LINE_BYTES = 4096;
 var MSG_MAX = 500;
 var STACK_MAX = 2e3;
 var STR_MAX = 500;
+var ROTATE_SIZE_BYTES = 10 * 1024 * 1024;
+var ROTATE_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
+var ROTATE_THROTTLE_N = 10;
+var ROTATE_KEEP = 5;
+var RENAME_RETRY_DELAYS_MS = [50, 200, 500];
 var cachedEnabled = null;
 function readEnabled() {
   if (cachedEnabled !== null) return cachedEnabled;
@@ -56,27 +70,125 @@ function trunc(s, max) {
   if (typeof s !== "string") return void 0;
   return s.length <= max ? s : s.slice(0, max);
 }
-function logHookError(ctx, err) {
+var KNOWN_KINDS = /* @__PURE__ */ new Set([
+  "stop_block_continuation",
+  "stop_block_cost_runaway",
+  "stop_block_verification_failed",
+  "stop_allow_early_exit",
+  "task_verify_pass",
+  "task_verify_fail",
+  "subagent_context_injected",
+  "subagent_injection_failed",
+  "stop_failure_rate_limit",
+  "stop_failure_other",
+  "unknown"
+]);
+function coerceKind(raw) {
+  return typeof raw === "string" && KNOWN_KINDS.has(raw) ? raw : "unknown";
+}
+function shouldRotate(filePath) {
+  try {
+    const st = statSync(filePath);
+    if (st.size > ROTATE_SIZE_BYTES) return true;
+    if (Date.now() - st.mtimeMs > ROTATE_AGE_MS) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+function safeRename(from, to) {
+  try {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (e) {
+      const code = e.code;
+      if (code === "EBUSY" || code === "EPERM") {
+        for (const ms of RENAME_RETRY_DELAYS_MS) {
+          const end = Date.now() + ms;
+          while (Date.now() < end) {
+          }
+          try {
+            renameSync(from, to);
+            return;
+          } catch {
+          }
+        }
+      }
+      try {
+        copyFileSync(from, to);
+        unlinkSync(from);
+      } catch {
+      }
+    }
+  } catch {
+  }
+}
+function pruneRotatedFiles(dir) {
+  try {
+    const entries = readdirSync(dir);
+    const rotated = [];
+    for (const name of entries) {
+      if (!name.startsWith("errors.") || !name.endsWith(".jsonl")) continue;
+      if (name === "errors.jsonl") continue;
+      const full = path.join(dir, name);
+      try {
+        rotated.push({ p: full, m: statSync(full).mtimeMs });
+      } catch {
+      }
+    }
+    rotated.sort((a, b) => b.m - a.m);
+    for (const { p } of rotated.slice(ROTATE_KEEP)) {
+      try {
+        unlinkSync(p);
+      } catch {
+      }
+    }
+  } catch {
+  }
+}
+var rotateCounter = 0;
+function rotateIfNeeded(filePath) {
+  try {
+    rotateCounter = (rotateCounter + 1) % ROTATE_THROTTLE_N;
+    if (rotateCounter !== 0) return;
+    if (!shouldRotate(filePath)) return;
+    const iso = (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+    const dir = path.dirname(filePath);
+    const target = path.join(dir, `errors.${iso}-${process2.pid}.jsonl`);
+    safeRename(filePath, target);
+    pruneRotatedFiles(dir);
+  } catch {
+  }
+}
+function logHookEvent(input, err) {
   try {
     if (!readEnabled()) return;
-    const stack = ctx.stack ?? err?.stack;
-    const msg = ctx.msg ?? err?.message;
+    const stack = input.stack ?? err?.stack;
+    const msg = input.msg ?? err?.message;
+    const level = input.level ?? "info";
+    const kind = coerceKind(input.kind);
     const record = {
       ts: (/* @__PURE__ */ new Date()).toISOString(),
-      level: "error",
-      hook: trunc(ctx.hook, STR_MAX) ?? "",
-      event: trunc(ctx.event, STR_MAX) ?? ""
+      level,
+      hook: trunc(input.hook, STR_MAX) ?? "",
+      event: trunc(input.event, STR_MAX) ?? "",
+      kind
     };
     const optionalEntries = [
       ["msg", trunc(msg, MSG_MAX)],
-      ["cwd", trunc(ctx.cwd, STR_MAX)],
-      ["transcript_path", trunc(ctx.transcript_path, STR_MAX)],
-      ["spec", trunc(ctx.spec, STR_MAX)],
-      ["path", trunc(ctx.path, STR_MAX)],
-      ["stack", trunc(stack, STACK_MAX)]
+      ["cwd", trunc(input.cwd, STR_MAX)],
+      ["transcript_path", trunc(input.transcript_path, STR_MAX)],
+      ["spec", trunc(input.spec, STR_MAX)],
+      ["path", trunc(input.path, STR_MAX)],
+      ["stack", trunc(stack, STACK_MAX)],
+      ["correlationId", trunc(input.correlationId, STR_MAX)]
     ];
     for (const [k, v] of optionalEntries) {
       if (v !== void 0) record[k] = v;
+    }
+    if (input.payload !== void 0) {
+      record.payload = input.payload;
     }
     let line = JSON.stringify(record);
     if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
@@ -87,13 +199,21 @@ function logHookError(ctx, err) {
       delete record.msg;
       line = JSON.stringify(record);
     }
+    if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
+      delete record.payload;
+      line = JSON.stringify(record);
+    }
     try {
       mkdirSync(ERRORS_DIR, { recursive: true });
     } catch {
     }
+    rotateIfNeeded(ERRORS_LOG);
     appendFileSync(ERRORS_LOG, line + "\n");
   } catch {
   }
+}
+function logHookError(ctx, err) {
+  logHookEvent({ ...ctx, level: "error", kind: ctx.kind ?? "unknown" }, err);
 }
 
 // src/hooks/_shared/stdin.ts
@@ -167,7 +287,7 @@ async function runHook(handler, options = {}) {
 }
 
 // src/hooks/_shared/path-resolver.ts
-import { existsSync, readFileSync as readFileSync2, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync as readFileSync2, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
 var DEFAULT_SPECS_DIR = "./specs";
 var SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
@@ -180,7 +300,7 @@ function warn(msg) {
 }
 function isDir(p) {
   try {
-    return statSync(p).isDirectory();
+    return statSync2(p).isDirectory();
   } catch {
     return false;
   }
@@ -271,12 +391,12 @@ function resolveCurrent(opts) {
 }
 
 // src/hooks/_shared/atomic-write.ts
-import { writeFileSync, renameSync } from "node:fs";
+import { writeFileSync, renameSync as renameSync2 } from "node:fs";
 import { randomBytes } from "node:crypto";
 function writeFileAtomic(path3, data) {
   const tmp = `${path3}.tmp.${process.pid}.${randomBytes(6).toString("hex")}`;
   writeFileSync(tmp, data);
-  renameSync(tmp, path3);
+  renameSync2(tmp, path3);
 }
 
 // src/hooks/_shared/markdown-task-parser.ts
@@ -447,7 +567,7 @@ function readEnabledSetting(settingsPath) {
 async function maybeWaitForRecentStateFile(stateFile) {
   let mtimeMs;
   try {
-    mtimeMs = statSync2(stateFile).mtimeMs;
+    mtimeMs = statSync3(stateFile).mtimeMs;
   } catch {
     return;
   }
@@ -525,7 +645,7 @@ function fireUpdateSpecIndex() {
 function cleanupStaleProgressFiles(specDirFs) {
   let entries;
   try {
-    entries = readdirSync2(specDirFs);
+    entries = readdirSync3(specDirFs);
   } catch {
     return;
   }
@@ -536,13 +656,13 @@ function cleanupStaleProgressFiles(specDirFs) {
     const fp = join3(specDirFs, name);
     let mtimeMs;
     try {
-      mtimeMs = statSync2(fp).mtimeMs;
+      mtimeMs = statSync3(fp).mtimeMs;
     } catch {
       continue;
     }
     if (now - mtimeMs > sixtyMinMs) {
       try {
-        unlinkSync(fp);
+        unlinkSync2(fp);
       } catch {
       }
     }
