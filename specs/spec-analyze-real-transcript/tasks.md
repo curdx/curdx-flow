@@ -79,7 +79,7 @@ Task 1.3 — `resolveTranscriptSource()` wired into index.ts; integration test g
   - **Commit**: `feat(analyze): add cleanupOrphanState GC (mtime>30d OR >100 keys) + 3 unit tests`
   - _Requirements: AC5 | Design: Component 3, D2_
 
-- [ ] 2.3 [VERIFY] Phase 2 quality checkpoint — typecheck + full test:analyze
+- [x] 2.3 [VERIFY] Phase 2 quality checkpoint — typecheck + full test:analyze
   - **Do**: Run full quality suite to confirm all 8 tests pass (5 resolver + 3 GC) and no type errors
   - **Verify**: `npm run typecheck && npm run test:analyze 2>&1 | tail -5`
   - **Done when**: `typecheck` exits 0; `test:analyze` shows 0 failures; GC + resolver + integration all green
@@ -98,13 +98,13 @@ Task 1.3 — `resolveTranscriptSource()` wired into index.ts; integration test g
   - **Commit**: `chore(changelog): document OB-1 real transcript resolver fix`
   - _Design: File Structure_
 
-- [ ] V4 [VERIFY] Full local CI: typecheck + test:analyze + verify
+- [x] V4 [VERIFY] Full local CI: typecheck + test:analyze + verify
   - **Do**: Run complete local CI suite
   - **Verify**: `npm run typecheck && npm run test:analyze && npm run verify`
   - **Done when**: All commands exit 0; 0 type errors; 0 test failures; build succeeds
   - **Commit**: `chore(analyze): pass full local CI` (if fixes needed)
 
-- [ ] V6 [VERIFY] AC checklist — programmatic verification
+- [x] V6 [VERIFY] AC checklist — programmatic verification
   - **Do**: Verify each AC is satisfied via grep/test commands
   - **Verify**:
     - AC1 (cwd encoding): `grep -q "replace.*\/.*-" src/analyze/transcript-path.ts && echo AC1_PASS`
