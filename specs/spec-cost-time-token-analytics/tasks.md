@@ -460,7 +460,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(recommend): add recommend.ts skeleton + REC_THRESHOLDS + MAD`
 
-- [ ] 3.8 [P] Create recommend.test.ts — MAD 11 edge cases
+- [x] 3.8 [P] Create recommend.test.ts — MAD 11 edge cases
   **Do**: 创建 recommend.test.ts 测 `findOutliers` / `modifiedZScore` 11 边界（research §MAD case 表）：N=0 / N=1 / N=4 / all-equal / MAD=0+outlier / 单 outlier / 多 outlier / 负 outlier / 输入不被改 (no-mutation) / N<10 / Symbol 排序稳定。
 
   **Files**:
