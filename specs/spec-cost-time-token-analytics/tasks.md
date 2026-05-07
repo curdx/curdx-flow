@@ -29,7 +29,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
 ## Phase 0: Pre-Task Fixture (blocker)
 
-- [ ] 0.1 Create sample-with-usage.jsonl fixture
+- [x] 0.1 Create sample-with-usage.jsonl fixture
   **Do**: Create JSONL fixture with 3 model × ≥1 row 嵌套 usage + 1 sidechain row + 1 row 含 `<usage>` trailer + 1 老 schema 行（缺嵌套 cache_creation 测兼容）。脱敏自 session 5b0d961c（research §Trailer 真样本来源）。
 
   **Files**:
