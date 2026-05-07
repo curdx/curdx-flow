@@ -90,7 +90,7 @@ Task 1.3 — `resolveTranscriptSource()` wired into index.ts; integration test g
 
 ## Phase 3 — Quality + Release
 
-- [ ] 3.1 CHANGELOG entry for OB-1 fix
+- [x] 3.1 CHANGELOG entry for OB-1 fix
   - **Do**: Prepend under `### Fixed` in the latest unreleased section: `- **analyze**: read real \`~/.claude/projects/<encoded-cwd>/*.jsonl\` transcripts instead of hardcoded fixture; add \`--session <uuid>\` flag; state file GC (mtime > 30 days or > 100 keys); \`CURDX_TRANSCRIPT_FIXTURE\` env var for test isolation (OB-1, resolves B1 critical bug)`
   - **Files**: `CHANGELOG.md` (EDIT)
   - **Done when**: Entry present under `### Fixed`; no duplicate
