@@ -140,7 +140,7 @@ Focus: coordinator-side check + CLI flag + reference doc. Types + build must pas
 
 Focus: all new test files + baseline extension. All tests must pass before Phase 4.
 
-- [ ] 3.1 Unit tests: stop-failure-handler.test.ts (5 cases)
+- [x] 3.1 Unit tests: stop-failure-handler.test.ts (5 cases)
   - **Do**:
     1. Create `tests/hooks/stop-failure-handler.test.ts`
     2. Case 1: known matcher `rate_limit` → stderr contains `[StopFailure:rate_limit]`, exit 0
