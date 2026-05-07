@@ -130,6 +130,60 @@ Then Read and follow these references in order. They contain the complete coordi
 5. **Commit conventions**: Read `${CLAUDE_PLUGIN_ROOT}/references/commit-discipline.md` and follow it.
    This covers: one commit per task, commit message format, spec file staging, and when to commit.
 
+### Pre-Dispatch Cap Check (MANDATORY — runs every iteration, before any Task(...) call)
+
+CRITICAL: At the top of every iteration loop body, immediately after reading `.curdx-state.json` and BEFORE any `Task(...)` delegation call, the coordinator MUST evaluate the cost-runaway caps. This is the coordinator-side enforcement of `maxGlobalIterations` / `maxTaskIterations` (spec-cost-runaway-guards FR-E1 / US-1 / US-2 / AC-1.1 / AC-2.2). The stop-watcher hook is the last-mile safety net; this pre-check is the first-line defense and avoids burning a dispatch round-trip when the cap is already breached.
+
+**Step A: Read caps from state**
+
+After reading `.curdx-state.json`, extract:
+- `globalIter = state.globalIteration` (default `1` if missing)
+- `maxGlobal = state.maxGlobalIterations` (default `30` per FR-D1; legacy state files may store `100` — preserve as-is)
+- `taskIter = state.taskIteration` (default `1` if missing)
+- `maxTask = state.maxTaskIterations` (default `5`)
+
+**Step B: Global cap pre-check (halts loop entirely)**
+
+If `globalIteration >= maxGlobalIterations`:
+1. Do NOT delegate. Do NOT call `Task(...)`. Do NOT advance `taskIndex`.
+2. Output the D4 cost-runaway STOP message verbatim (mirrors `buildCostRunawayBlock` in `src/hooks/stop-watcher.ts` so user sees identical wording from either surface):
+
+   ```text
+   Cost runaway guard tripped: globalIteration={globalIter} >= maxGlobalIterations={maxGlobal}.
+   Loop blocked. Either:
+   - Investigate why your loop ran {globalIter} iterations (check .progress.md)
+   - Override with: /curdx-flow:implement --max-global-iterations <higher-cap>
+   - Reset by editing {state-file-path}: set globalIteration to a lower value
+
+   Spec: {specName}  Phase: implement
+   ```
+
+3. Halt the coordinator loop. Do NOT output `ALL_TASKS_COMPLETE` (tasks remain incomplete). Do NOT output `TASK_COMPLETE`.
+
+**Step C: Task-level cap pre-check (fails current task, breaks retry loop)**
+
+Else if `taskIteration >= maxTaskIterations`:
+1. Do NOT delegate the current task again. Mark the current task as failed in `.progress.md` (append a Learnings entry: `Task ${taskIndex} hit taskIteration cap (${taskIter} >= ${maxTask}) — marked failed, retry loop broken`).
+2. Output the task-level D4 message variant verbatim:
+
+   ```text
+   Cost runaway guard tripped: taskIteration={taskIter} >= maxTaskIterations={maxTask}.
+   Loop blocked. Either:
+   - Investigate why your loop ran {taskIter} iterations (check .progress.md)
+   - Override with: /curdx-flow:implement --max-task-iterations <higher-cap>
+   - Reset by editing {state-file-path}: set taskIteration to a lower value
+
+   Spec: {specName}  Phase: implement
+   ```
+
+3. Break the per-task retry loop. Do not advance `taskIndex` automatically — surface the failure so the user can decide whether to override the cap, fix the underlying problem, or accept the partial completion. Do NOT output `ALL_TASKS_COMPLETE`.
+
+**Step D: Caps OK → proceed to standard delegation**
+
+Only when both `globalIteration < maxGlobalIterations` AND `taskIteration < maxTaskIterations`, fall through to the standard task-delegation flow defined in `coordinator-pattern.md` (Parse Current Task → Parallel Group Detection → Task Delegation).
+
+> **Defense-in-depth note**: The stop-watcher hook re-evaluates the same condition via `buildCostRunawayBlock(state)` and emits the identical message string. If this coordinator pre-check is somehow skipped (e.g., manual override of state mid-iteration), the hook still blocks. Both surfaces use the same template so the user never sees split error wording.
+
 ### Key Coordinator Behaviors (quick reference — see coordinator-pattern.md for authoritative details)
 
 - **You are a COORDINATOR, not an implementer.** Delegate via Task tool. Never implement yourself.

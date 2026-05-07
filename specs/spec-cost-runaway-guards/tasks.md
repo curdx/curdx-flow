@@ -89,7 +89,7 @@ Focus: skeleton + build pipeline green. Skip tests, accept stubs. Types must pas
 
 Focus: coordinator-side check + CLI flag + reference doc. Types + build must pass.
 
-- [ ] 2.1 Coordinator pre-check in implement.md (pre-dispatch cap block)
+- [x] 2.1 Coordinator pre-check in implement.md (pre-dispatch cap block)
   - **Do**:
     1. Open `plugins/curdx-flow/commands/implement.md`
     2. At top of iteration loop body (before dispatch), insert pre-dispatch check block: read `state.globalIteration` and `state.maxGlobalIterations`; if `globalIteration >= maxGlobalIterations`, output D4 cost-runaway STOP message and halt (do not dispatch)
