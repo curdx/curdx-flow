@@ -22,6 +22,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const HOOK_ENTRIES = [
   'src/hooks/load-spec-context.ts',
   'src/hooks/quick-mode-guard.ts',
+  'src/hooks/stop-failure-handler.ts',
   'src/hooks/stop-watcher.ts',
   'src/hooks/subagent-context-injector.ts',
   'src/hooks/task-completed-verifier.ts',

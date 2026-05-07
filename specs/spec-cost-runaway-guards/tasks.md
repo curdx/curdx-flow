@@ -31,7 +31,7 @@ Focus: skeleton + build pipeline green. Skip tests, accept stubs. Types must pas
   - **Commit**: `feat(hooks): add stop-failure-handler stub with 8-matcher map`
   - _Requirements: FR-H1, FR-H2, FR-H3, FR-H5_
 
-- [ ] 1.2 [P] Register stop-failure-handler entry in build-hooks.mjs
+- [x] 1.2 [P] Register stop-failure-handler entry in build-hooks.mjs
   - **Do**:
     1. Open `scripts/build-hooks.mjs`, locate `HOOK_ENTRIES` array (or equivalent entry list)
     2. Append entry: `{ src: 'src/hooks/stop-failure-handler.ts', out: 'plugins/curdx-flow/hooks/scripts/stop-failure-handler.mjs' }`
