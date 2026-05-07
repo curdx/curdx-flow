@@ -93,7 +93,7 @@ Goal: add `bounded-parallel-dispatch-doc.test.ts` with 8 assertions per design.m
 
 ## Phase 4 — Quality gates + PR
 
-- [ ] 4.1 CHANGELOG entry
+- [x] 4.1 CHANGELOG entry
   - **Do**: Prepend new section in `CHANGELOG.md` under the current unreleased heading (or create one if absent); categorize as: **Added** — review/debug domain rules, 3-criteria independence checklist, subagent-vs-grep guidance; **Changed** — rename `parallel-research.md` → `bounded-parallel-dispatch.md`, cross-link to `coordinator-pattern.md` in §1; match Keep-a-Changelog format per CLAUDE.md Release SOP §3
   - **Files**: `CHANGELOG.md`
   - **Done when**: CHANGELOG has new entry referencing `bounded-parallel-dispatch.md` and listing Added/Changed categories
