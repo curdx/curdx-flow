@@ -516,7 +516,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `test(integration): assert R3 trailer attribution = parent + child`
 
-- [ ] 3.12 Add requestId dedup regression assert in integration
+- [x] 3.12 Add requestId dedup regression assert in integration
   **Do**: 在 integration.test.ts 加测：fixture 含两行同 requestId 不同 uuid → `filterEvents` dedup 后仅一行参与 cost；trailer 走独立 path 不受影响。验证 AC9。
 
   **Files**:

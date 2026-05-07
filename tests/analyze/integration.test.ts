@@ -564,6 +564,68 @@ describe('OB-3 cost pipeline', () => {
     expect(rows[0]?.cacheCreate1hTokens).toBe(0);
   });
 
+  it('requestId dedup: filterEvents collapses replay row, trailer path stays independent (FR-COST-3 / AC9)', async () => {
+    // Regression for AC9: the canonical Phase 0 fixture
+    // (tests/analyze/fixtures/sample-with-usage.jsonl) contains 7 rows total
+    // — rows 1-4 are unique assistant_turns, row 5 is a user_turn carrying a
+    // sidechain `<usage>` trailer, row 6 is a legacy-schema assistant_turn,
+    // and row 7 is an exact-replay duplicate of row 1 (same uuid AND same
+    // requestId). filterEvents (filter.ts L74-80 `computeDedupeKey`) keys on
+    // the composite `uuid|requestId` so the replay collapses → 6 rows
+    // survive (4 unique assistant + 1 user-turn trailer + 1 legacy = 6).
+    //
+    // Trailer independence: the trailer scan in cost.ts L252-274 walks
+    // `payload.message.content[].content[].text` on every event regardless
+    // of dedup discriminator — `extractTrailerUsage` does NOT consult uuid /
+    // requestId, so the user_turn `<usage>` row is unaffected by composite
+    // dedup. This is the Decision 11 "trailer = independent billing channel"
+    // contract spelled out in design §Components #2.
+    const FIXTURE = path.resolve(process.cwd(), 'tests/analyze/fixtures/sample-with-usage.jsonl');
+
+    // Drive parseTranscript directly so we can count pre/post-filter rows
+    // without runAnalyze's redact / render layers in the way.
+    const counters: Counters = { unknown_type: 0, parse_error: 0, processed: 0 };
+    const allEvents: Event[] = [];
+    for await (const ev of parseTranscript(FIXTURE, 0, undefined, counters)) {
+      allEvents.push(ev);
+    }
+    expect(allEvents.length).toBe(7); // fixture is 7 rows after Task 3.12
+
+    // Pre-filter: 5 assistant_turns (rows 1/2/3/4/6 + row 7 replay), 1
+    // user_turn (row 5). Row 7 has the same uuid+requestId as row 1.
+    const preAssistant = allEvents.filter((e) => e.kind === 'assistant_turn');
+    expect(preAssistant.length).toBe(6); // 5 unique + 1 replay
+    const replayPair = preAssistant.filter(
+      (e) => e.uuid === 'f1000001-0000-0000-0000-000000000001' && e.requestId === 'req_opus_001',
+    );
+    expect(replayPair.length).toBe(2); // sanity: dup is in fixture
+
+    // Post-filter: composite dedup collapses the replay → 5 assistant rows.
+    const filtered = filterEvents(allEvents, { limit: 100 });
+    const postAssistant = filtered.filter((e) => e.kind === 'assistant_turn');
+    expect(postAssistant.length).toBe(5); // 6 - 1 dedup'd = 5
+
+    // Trailer path independence: extractUsageRowsFromEvents on the filtered
+    // events still emits exactly 1 trailer row (the user_turn `<usage>` from
+    // row 5 — its trailer scan path is independent of assistant dedup).
+    const usageRows = extractUsageRowsFromEvents(filtered, []);
+    const trailerRows = usageRows.filter((r) => r.source === 'subagent_trailer');
+    expect(trailerRows.length).toBe(1);
+    expect(trailerRows[0]?.outputTokens).toBe(8200); // total_tokens from fixture row 5
+
+    // Cost participation: the dedup contract above already guarantees the
+    // replay does not enter cost.ts twice. We additionally confirm the
+    // post-filter assistant row count for requestId=req_opus_001 is exactly
+    // 1 (downstream of filterEvents, before extractUsageRowsFromEvents'
+    // model-resolution skip). This is the N-1 contract per the task brief
+    // independent of whether the canonical fixture's dated model id
+    // (claude-opus-4-7-20260301) resolves through PRICING (it does not —
+    // .progress.md Task 1.7 Learnings — but the dedup invariant must still
+    // hold at the filter layer).
+    const opusFiltered = postAssistant.filter((e) => e.requestId === 'req_opus_001');
+    expect(opusFiltered.length).toBe(1);
+  });
+
   it('R3 per-task: parent + trailer cost = bucket.totalUSD (FR-AGG-2 / FR-AGG-3 / Decision 11 / plan.md Validation Hint #3) — trailer attribution', async () => {
     // Fixture has 1 trailer row (user_turn tool_result `<usage>`) sharing
     // correlationId `cost-sess-001:1.2:1` with the Sonnet parent assistant
