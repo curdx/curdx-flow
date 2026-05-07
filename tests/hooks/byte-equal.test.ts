@@ -500,3 +500,54 @@ describe("byte-equal regression vs v6.0.6 baseline", () => {
     }
   }
 });
+
+// ---------------------------------------------------------------------------
+// SubagentStart byte-equal baseline (task 3.2)
+//
+// The SubagentStart hook is brand new in v7.1.7 — there is NO v6.0.6 baseline
+// to diff against. Instead we freeze the CURRENT v7.1.7 output as the
+// reference and assert byte-for-byte stability on every future run. Once a
+// drift lands, this assertion fails loudly; intentional output changes must
+// re-freeze the constant below in the same commit (drift gate, not a
+// snapshot-update test).
+//
+// Fixture: tests/hooks/fixtures/subagent-context-injector/with-spec.json
+// Workspace: /tmp/curdx-fixture-spec (provisioned by provisionWorkspaces above
+// with phase=execution, taskIndex=1, totalTasks=3, completed=false). The
+// frozen baseline below is the exact stdout the hook emits against that
+// workspace. Stderr is empty on the happy path (no fail-open trace), and the
+// hook exits 0 — captured combined output is therefore stdout + EXIT_CODE
+// only, mirroring runV7StdinHook's interleaving contract.
+// ---------------------------------------------------------------------------
+
+const SUBAGENT_START_BASELINE =
+  '{"hookSpecificOutput":{"hookEventName":"SubagentStart",' +
+  '"additionalContext":"<curdx-spec-context>\\n' +
+  "phase: execution\\n" +
+  "spec: specs/demo-spec\\n" +
+  "iron-law: No completion claim without fresh verification.\\n" +
+  '</curdx-spec-context>"},"continue":true}\n' +
+  "EXIT_CODE=0\n";
+
+describe("byte-equal SubagentStart baseline (frozen v7.1.7 output)", () => {
+  it.skipIf(process.platform === "win32")(
+    "subagent-context-injector / with-spec.json",
+    () => {
+      const fixturePath = path.join(
+        FIXTURE_DIR,
+        "subagent-context-injector",
+        "with-spec.json",
+      );
+      if (!existsSync(fixturePath)) {
+        throw new Error(`Missing SubagentStart fixture: ${fixturePath}`);
+      }
+      const captured = runV7StdinHook(
+        "subagent-context-injector",
+        fixturePath,
+      );
+      // No normalize() pass needed — output is fully deterministic (no
+      // mtimes, no ISO timestamps, no path separators). Compare verbatim.
+      expect(captured.combined).toEqual(SUBAGENT_START_BASELINE);
+    },
+  );
+});

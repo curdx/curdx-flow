@@ -129,7 +129,7 @@ Focus: 7 unit cases + drift test + byte-equal extension.
   - **Commit**: `test(subagent-injector): add unit cases a-e (happy path, fail-open, size, iron-law)`
   - _Requirements: FR-9, FR-10, NFR-1 | Design: §Test Strategy (a)-(e)_
 
-- [ ] 3.2 Extend `tests/hooks/subagent-context-injector.test.ts` — cases (f)-(g) + extend byte-equal
+- [x] 3.2 Extend `tests/hooks/subagent-context-injector.test.ts` — cases (f)-(g) + extend byte-equal
   - **Do**:
     1. In same test file, add case (f): `state.completed===true` → output `{continue:true}`, no `additionalContext`
     2. Add case (g): quick-mode flag set in state → injection still present (universal D2)

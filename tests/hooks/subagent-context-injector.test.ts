@@ -100,4 +100,65 @@ describe("subagent-context-injector (SubagentStart hook)", () => {
       }).hookSpecificOutput?.additionalContext ?? "";
     expect(ctx).toContain(IRON_LAW_SUMMARY);
   });
+
+  it("(f) completed spec: state.completed===true → {continue:true}, no additionalContext", () => {
+    // Build a fixture whose state has `completed:true`. The hook must
+    // fail-open with `{continue:true}` and emit NO `hookSpecificOutput`
+    // (subagent dispatch under a completed spec is a coordinator-side bug;
+    // this hook stays silent — design open question 5).
+    const completed = createFixtureSpec({
+      specName: "completed-spec",
+      state: {
+        completed: true,
+        completedAt: "2026-01-01T00:00:00.000Z",
+      },
+    });
+    try {
+      const r = runHook("subagent-context-injector", FIXTURE, {
+        cwd: completed.cwd,
+      });
+      expect(r.exitCode).toBe(0);
+      expect(r.json).toEqual({ continue: true });
+      // Defensive: ensure no injection field leaked through.
+      const out = r.json as {
+        hookSpecificOutput?: unknown;
+      };
+      expect(out.hookSpecificOutput).toBeUndefined();
+    } finally {
+      completed.cleanup();
+    }
+  });
+
+  it("(g) quick mode: state.quickMode===true → injection still present (universal D2)", () => {
+    // D2: universal injection — no `agent_type` filter and no `quickMode`
+    // gate v1. The hook fires regardless of the spec's quick-mode flag, so
+    // the assertion shape mirrors case (a). Filter is a purely additive
+    // future change with zero breaking risk.
+    const quick = createFixtureSpec({
+      specName: "quick-spec",
+      state: { quickMode: true, phase: "design" },
+    });
+    try {
+      const r = runHook("subagent-context-injector", FIXTURE, {
+        cwd: quick.cwd,
+      });
+      expect(r.exitCode).toBe(0);
+      const out = r.json as {
+        hookSpecificOutput?: {
+          hookEventName?: string;
+          additionalContext?: string;
+        };
+        continue?: boolean;
+      };
+      expect(out.continue).toBe(true);
+      expect(out.hookSpecificOutput?.hookEventName).toBe("SubagentStart");
+      const ctx = out.hookSpecificOutput?.additionalContext ?? "";
+      expect(ctx).toContain("phase:");
+      expect(ctx).toContain("spec:");
+      expect(ctx).toContain("iron-law:");
+      expect(ctx).toContain(IRON_LAW_SUMMARY);
+    } finally {
+      quick.cleanup();
+    }
+  });
 });
