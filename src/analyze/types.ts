@@ -59,6 +59,12 @@ export interface Options {
   includePrompts?: boolean;
   /** Filter to single session UUID — wired through resolveTranscriptSource. */
   session?: string;
+  /** OB-3 cost analytics flags (Task 1.1). All optional — additive, no breaking change. */
+  costSummary?: boolean;
+  bySpec?: boolean;
+  byPhase?: boolean;
+  byTask?: boolean;
+  top?: number;
 }
 
 /**
@@ -88,6 +94,8 @@ export interface StateFile {
   lastReportMarkdown?: string;
   /** Discriminator for the cached report so toggling --include-prompts busts it. */
   lastIncludePrompts?: boolean;
+  /** OB-3 cache discriminator — toggling --cost-summary busts the cached report. */
+  lastCostSummary?: boolean;
 }
 
 /**
@@ -116,6 +124,89 @@ export interface EventLogRow {
   kind?: string;
   payload?: Record<string, unknown>;
   correlationId?: string;
+}
+
+/**
+ * UsageRow — single billing row extracted from transcript events.
+ *
+ * Two sources (Decision 11 — source-bucketed dedup):
+ *   • 'assistant'         — main-thread assistant turn payload.message.usage
+ *   • 'subagent_trailer'  — `<usage>...</usage>` block in sidechain
+ *                            tool_result.content[].text (Decision 12: trailer
+ *                            tokens fully attributed to outputTokens).
+ *
+ * `correlationId` follows OB-2 3-segment `<session_id>:<task_idx>:<iter>` so
+ * cost.ts `aggregateBy` can join with state-file specPhaseMap (Decision 4).
+ * `isSidechain` flags rows from sidechain assistant turns for R3 sub-agent
+ * cost attribution.
+ */
+export interface UsageRow {
+  ts: string;
+  requestId: string;
+  uuid?: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreate5mTokens: number;
+  cacheCreate1hTokens: number;
+  correlationId?: string;
+  isSidechain?: boolean;
+  source: 'assistant' | 'subagent_trailer';
+  durationMs?: number;
+}
+
+/**
+ * AggregateBucket — output of `aggregateBy(rows, level, ctx)`.
+ *
+ * One bucket per `key` at the requested `level` (spec / phase / task).
+ * `modelMix` keyed by canonical model id (post `resolveModelId`) gives R6
+ * tokenizer cohort breakdown. `totalUSD` is rounded to 4 decimals at render
+ * time (Decision 10) but stored raw here so further aggregation does not
+ * accumulate rounding error.
+ */
+export interface AggregateBucket {
+  level: 'spec' | 'phase' | 'task';
+  key: string;
+  totalUSD: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreate5mTokens: number;
+  cacheCreate1hTokens: number;
+  rowCount: number;
+  trailerCount: number;
+  durationMs: number;
+  modelMix: Record<string, { tokens: number; usd: number }>;
+  spec?: string;
+  phase?: string;
+}
+
+/**
+ * Severity ladder for recommendations (Decision 7 — 4 tiers including
+ * `insufficient_data` as an explicit "can't compute" tier so NFR-10 does
+ * not silently render OK).
+ */
+export type Severity = 'info' | 'warn' | 'sev' | 'insufficient_data';
+
+/**
+ * Recommendation — one finding emitted by `recommend()`.
+ *
+ * `rule` is the stable identifier (e.g. `R1_high_cache_5m_write`). `scope`
+ * is the precise dimension of the violation (any of spec/phase/task may be
+ * absent for global rules). `evidence` carries rule-specific raw numbers so
+ * downstream `jq` filters can re-rank without recomputing.
+ */
+export interface Recommendation {
+  rule: string;
+  severity: Severity;
+  scope: {
+    spec?: string;
+    phase?: string;
+    task?: string;
+  };
+  message: string;
+  evidence: Record<string, unknown>;
 }
 
 /**

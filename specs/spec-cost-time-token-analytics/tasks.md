@@ -54,7 +54,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
 > 目标：跑通 `analyze --cost-summary --json | jq '.totalCost.usd'` 非 null。允许硬编码、跳过 trailer、跳过 aggregateBy 三级聚合，单层 totalCost 即可。
 
-- [ ] 1.1 Add UsageRow + AggregateBucket + Severity + Recommendation types
+- [x] 1.1 Add UsageRow + AggregateBucket + Severity + Recommendation types
   **Do**: 在 types.ts 加 `UsageRow` / `AggregateBucket` / `Severity` / `Recommendation` interface + `Options.costSummary?` / `Options.bySpec?` / `Options.byPhase?` / `Options.byTask?` / `Options.top?` 扩；`StateFile` 加 `lastCostSummary?: boolean`。
 
   **Files**:
