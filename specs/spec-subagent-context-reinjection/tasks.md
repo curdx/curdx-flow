@@ -43,7 +43,7 @@ Focus: get lib + hook compiling and firing end-to-end. Skip polish, accept hardc
   - **Commit**: `feat(subagent-injector): add SubagentStart hook handler with fail-open error paths`
   - _Requirements: FR-1, FR-9, FR-10, FR-11 | Design: Component 2, D2_
 
-- [ ] 1.3 [P] Register hook in `scripts/build-hooks.mjs`
+- [x] 1.3 [P] Register hook in `scripts/build-hooks.mjs`
   - **Do**:
     1. Open `scripts/build-hooks.mjs`, locate `HOOK_ENTRIES` array
     2. Append `'src/hooks/subagent-context-injector.ts'` entry
