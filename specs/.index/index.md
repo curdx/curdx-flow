@@ -3,7 +3,7 @@
 Auto-generated summary of all specs across configured directories.
 See [index-state.json](./index-state.json) for machine-readable data.
 
-**Last updated:** 2026-05-07T00:31:11Z
+**Last updated:** 2026-05-07T01:47:33Z
 
 ## Directories (1)
 
@@ -21,7 +21,7 @@ See [index-state.json](./index-state.json) for machine-readable data.
 | spec-bounded-parallel-dispatch | ./specs | execution | 9/9 tasks |
 | spec-cost-runaway-guards | ./specs | new |  |
 | spec-subagent-context-reinjection | ./specs | new |  |
-| spec-two-stage-review | ./specs | new |  |
+| spec-two-stage-review | ./specs | execution | 22/22 tasks |
 | spec-verification-iron-law | ./specs | execution | 53/53 tasks |
 | state-completion-marker | ./specs | execution | 51/51 tasks |
 
