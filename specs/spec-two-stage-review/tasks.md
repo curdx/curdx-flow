@@ -174,7 +174,7 @@ Goal: complete all 4 narrowing passes on spec-reviewer, fill code-quality-review
 
 Goal: extend drift test to full coverage (dispatch wiring, REVIEW_PASS/FAIL byte-equal, QuickMode bypass, verdict schema backwards-compat).
 
-- [ ] 3.1 Extend drift test: dispatch wiring + byte-equal assertions
+- [x] 3.1 Extend drift test: dispatch wiring + byte-equal assertions
   - **Do**:
     1. In `tests/runner/two-stage-review.test.ts` add test cases: (a) both `commands/design.md` and `commands/tasks.md` contain `bounded-parallel-dispatch` link and dual Task call pattern (FR-D1/D2); (b) `REVIEW_PASS` and `REVIEW_FAIL` strings are byte-equal across both agent files (NFR-1, FR-X3)
     2. Add drift fixture test: mock a finding that crosses domain (e.g. `"spec-reviewer"` finding contains `"code smell"`) and assert it gets flagged as advisory (FR-X2)
