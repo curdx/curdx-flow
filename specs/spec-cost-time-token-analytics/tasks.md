@@ -565,7 +565,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(recommend): implement 8 rules + insufficient_data 4th severity`
 
-- [ ] 4.2 recommend.test.ts — 8 rules × 4 severity coverage
+- [x] 4.2 recommend.test.ts — 8 rules × 4 severity coverage
   **Do**: 在 recommend.test.ts 加 8 rule × 4 severity (info/warn/sev/insufficient_data) ≥ 24 test case + rule-4 critical phase skip + rule-5 n<10 → insufficient_data。
 
   **Files**:
