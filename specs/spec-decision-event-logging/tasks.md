@@ -124,7 +124,7 @@ Focus: Wire remaining 31 sites across 3 hooks. Each hook is one atomic task.
   - **Commit**: `feat(parser): extend EventLogRow 4-field read with ?? defaults + coerceKind`
   - _Design: Component 8, Component 9_
 
-- [ ] 3.2 Add tests/hooks/event-logger.test.ts (7 cases)
+- [x] 3.2 Add tests/hooks/event-logger.test.ts (7 cases)
   - **Do**:
     1. Create `tests/hooks/event-logger.test.ts` with vitest
     2. Cases: rotation throttle N=10 (skip 9/10), size >10MB triggers rotate, age >30d triggers rotate, payload redact white-list pass-through, correlationId 3-segment format, round-trip old-format row parses with defaults, coerceKind unknown value → `'unknown'`
