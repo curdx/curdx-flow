@@ -19,7 +19,7 @@ Task 1.5 — shared lib + new hook source compile + minimal hook fires and emits
 
 Focus: get lib + hook compiling and firing end-to-end. Skip polish, accept hardcoded exit paths.
 
-- [ ] 1.1 Create shared lib `build-context-payload.ts`
+- [x] 1.1 Create shared lib `build-context-payload.ts`
   - **Do**:
     1. Create `src/hooks/lib/build-context-payload.ts`
     2. Export `IRON_LAW_SUMMARY = "No completion claim without fresh verification."`
