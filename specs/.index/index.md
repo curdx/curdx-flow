@@ -3,7 +3,7 @@
 Auto-generated summary of all specs across configured directories.
 See [index-state.json](./index-state.json) for machine-readable data.
 
-**Last updated:** 2026-05-07T12:41:50Z
+**Last updated:** 2026-05-07T13:11:10Z
 
 ## Directories (1)
 
@@ -21,7 +21,7 @@ See [index-state.json](./index-state.json) for machine-readable data.
 | spec-analyze-real-transcript | ./specs | execution | 9/9 tasks |
 | spec-bounded-parallel-dispatch | ./specs | execution | 9/9 tasks |
 | spec-cost-runaway-guards | ./specs | execution | 21/21 tasks |
-| spec-cost-time-token-analytics | ./specs | research | awaiting approval |
+| spec-cost-time-token-analytics | ./specs | requirements | awaiting approval |
 | spec-decision-event-logging | ./specs | execution | 12/12 tasks |
 | spec-subagent-context-reinjection | ./specs | execution | 15/15 tasks |
 | spec-two-stage-review | ./specs | execution | 22/22 tasks |
