@@ -382,8 +382,18 @@ function resolveCurrent(opts) {
   return posix.join(defaultDir, normalized);
 }
 
-// src/hooks/lib/build-context-payload.ts
+// src/hooks/_shared/correlation.ts
 import { basename as basename2 } from "node:path";
+function buildCorrelationId(stdin, state) {
+  const transcriptPath = stdin?.transcript_path;
+  const sessionId = transcriptPath ? basename2(transcriptPath).replace(/\.(jsonl|json)$/, "") : "unknown";
+  const taskIdx = state?.taskIndex ?? 0;
+  const iter = state?.phase === "execution" ? state?.taskIteration ?? 1 : state?.globalIteration ?? 1;
+  return `${sessionId}:${taskIdx}:${iter}`;
+}
+
+// src/hooks/lib/build-context-payload.ts
+import { basename as basename3 } from "node:path";
 var IRON_LAW_SUMMARY = "No completion claim without fresh verification.";
 var DEFAULT_MAX_BYTES = 2048;
 var PayloadOverBudgetError = class extends Error {
@@ -401,7 +411,7 @@ var PayloadOverBudgetError = class extends Error {
   }
 };
 function buildSessionStartPayload(state, specDir) {
-  const specName = basename2(specDir);
+  const specName = basename3(specDir);
   const payload = { specName };
   if (state.completed === true) {
     payload.phase = "completed";
@@ -437,22 +447,59 @@ function buildContextPayload(state, specDir, opts) {
 // src/hooks/subagent-context-injector.ts
 var FAIL_OPEN = { continue: true };
 runHook(async (input) => {
+  const stdin = input ?? null;
   try {
     const eventName = input?.hook_event_name;
     if (typeof eventName === "string" && eventName !== "SubagentStart") {
+      logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        payload: { reason: "event_mismatch", got: eventName },
+        correlationId: buildCorrelationId(stdin, null)
+      });
       return FAIL_OPEN;
     }
     const cwd = input?.cwd;
     if (typeof cwd !== "string" || cwd.length === 0) {
+      logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        payload: { reason: "no_cwd" },
+        correlationId: buildCorrelationId(stdin, null)
+      });
       return FAIL_OPEN;
     }
     const specPath = resolveCurrent({ cwd });
     if (!specPath) {
+      logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        payload: { reason: "no_spec" },
+        correlationId: buildCorrelationId(stdin, null),
+        cwd
+      });
       return FAIL_OPEN;
     }
     const specDirFs = join2(cwd, specPath);
     const stateFile = join2(specDirFs, ".curdx-state.json");
     if (!existsSync2(stateFile)) {
+      logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        payload: { reason: "no_state", specPath },
+        correlationId: buildCorrelationId(stdin, null),
+        cwd,
+        spec: specPath,
+        path: stateFile
+      });
       return FAIL_OPEN;
     }
     let state;
@@ -464,9 +511,31 @@ runHook(async (input) => {
         `[subagent-context-injector] state parse failed: ${msg}
 `
       );
+      logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        msg: `state parse failed: ${msg}`,
+        payload: { reason: "state_parse_fail", specPath },
+        correlationId: buildCorrelationId(stdin, null),
+        cwd,
+        spec: specPath,
+        path: stateFile
+      });
       return FAIL_OPEN;
     }
     if (state.completed === true) {
+      logHookEvent({
+        hook: "subagent-context-injector",
+        event: "SubagentStart",
+        level: "decision",
+        kind: "unknown",
+        payload: { reason: "completed_spec", specPath },
+        correlationId: buildCorrelationId(stdin, state),
+        cwd,
+        spec: specPath
+      });
       return FAIL_OPEN;
     }
     const additionalContext = buildContextPayload(state, specPath, {
@@ -479,11 +548,35 @@ runHook(async (input) => {
       },
       continue: true
     };
+    logHookEvent({
+      hook: "subagent-context-injector",
+      event: "SubagentStart",
+      level: "info",
+      kind: "subagent_context_injected",
+      payload: {
+        bytes: Buffer.byteLength(additionalContext, "utf8"),
+        specPath
+      },
+      correlationId: buildCorrelationId(stdin, state),
+      cwd,
+      spec: specPath
+    });
     return out;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    const stack = e instanceof Error ? e.stack : void 0;
     process5.stderr.write(`[subagent-context-injector] ${msg}
 `);
+    logHookEvent({
+      hook: "subagent-context-injector",
+      event: "SubagentStart",
+      level: "error",
+      kind: "subagent_injection_failed",
+      msg,
+      stack,
+      correlationId: buildCorrelationId(stdin, null),
+      cwd: typeof input?.cwd === "string" ? input.cwd : void 0
+    });
     return FAIL_OPEN;
   }
 });
