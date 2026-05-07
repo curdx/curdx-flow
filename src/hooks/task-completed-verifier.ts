@@ -43,7 +43,9 @@ import process from "node:process";
 import { readStdinJson } from "./_shared/stdin.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
 import { getVerificationPhase, verifyPhaseBlock } from "./lib/verify-blocks.js";
-import type { CurdxState } from "./_shared/types.js";
+import { buildCorrelationId } from "./_shared/correlation.js";
+import * as eventLog from "./_shared/error-logger.js";
+import type { CurdxState, HookStdin } from "./_shared/types.js";
 
 interface TaskCompletedStdin {
   cwd?: string;
@@ -71,14 +73,43 @@ async function main(): Promise<void> {
   try {
     input = await readStdinJson<TaskCompletedStdin>();
   } catch {
+    // Site 1/9: stdin parse fail — defensive pass-through (fail-open).
+    eventLog.logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "stdin_parse_fail" },
+      correlationId: buildCorrelationId(null, null),
+    });
     passThrough();
   }
 
   // Paths 2 & 3: AC-2.4 defensive guard.
   if (input.hook_event_name !== "TaskCompleted") {
+    // Site 2/9: event mismatch — wrong hook envelope, allow silently.
+    eventLog.logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "event_mismatch", got: input.hook_event_name },
+      correlationId: buildCorrelationId(input as HookStdin | null, null),
+      cwd: typeof input.cwd === "string" ? input.cwd : undefined,
+    });
     passThrough();
   }
   if (typeof input.task_id !== "string" || input.task_id.length === 0) {
+    // Site 3/9: task_id missing — Agent Teams disabled or malformed envelope.
+    eventLog.logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "no_task_id" },
+      correlationId: buildCorrelationId(input as HookStdin | null, null),
+      cwd: typeof input.cwd === "string" ? input.cwd : undefined,
+    });
     passThrough();
   }
 
@@ -90,11 +121,32 @@ async function main(): Promise<void> {
     : process.cwd();
   const specPath = resolveCurrent({ cwd });
   if (!specPath) {
+    // Site 4/9: no active spec — not a curdx spec, allow silently.
+    eventLog.logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "no_spec" },
+      correlationId: buildCorrelationId(input as HookStdin | null, null),
+      cwd,
+    });
     passThrough();
   }
   const specDir = join(cwd, specPath as string);
   const stateFile = join(specDir, ".curdx-state.json");
   if (!existsSync(stateFile)) {
+    // Site 5/9: spec resolved but no .curdx-state.json — pre-/post-loop, allow.
+    eventLog.logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "no_state", specPath: specPath as string },
+      correlationId: buildCorrelationId(input as HookStdin | null, null),
+      cwd,
+      spec: specPath as string,
+    });
     passThrough();
   }
 
@@ -106,6 +158,18 @@ async function main(): Promise<void> {
   try {
     state = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
   } catch {
+    // Site 6/9: state JSON parse fail — corrupt state, fail-open per FR-8.
+    eventLog.logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "state_parse_fail", specPath: specPath as string },
+      correlationId: buildCorrelationId(input as HookStdin | null, null),
+      cwd,
+      spec: specPath as string,
+      path: stateFile,
+    });
     passThrough();
   }
 
@@ -113,6 +177,21 @@ async function main(): Promise<void> {
   // Shared phase-detection lives in lib/verify-blocks.ts (Task 4.1 DRY).
   const phase = getVerificationPhase(state);
   if (phase === null) {
+    // Site 7/9: phase resolve fail — legacy/unknown phase, fail-open per FR-8.
+    eventLog.logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: {
+        reason: "phase_resolve_fail",
+        statePhase: state.phase,
+        specPath: specPath as string,
+      },
+      correlationId: buildCorrelationId(input as HookStdin | null, state),
+      cwd,
+      spec: specPath as string,
+    });
     passThrough();
   }
 
@@ -120,8 +199,34 @@ async function main(): Promise<void> {
   // truth across 4 callers).
   const result = await verifyPhaseBlock(state, phase, specDir);
   if (!result.ok) {
+    // Site 8/9: verifyPhaseBlock failed at TaskCompleted — block decision.
+    eventLog.logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "decision",
+      kind: "task_verify_fail",
+      payload: {
+        reason: result.reason ?? "verification failed",
+        phase,
+        specPath: specPath as string,
+      },
+      correlationId: buildCorrelationId(input as HookStdin | null, state),
+      cwd,
+      spec: specPath as string,
+    });
     emitBlock(result.reason ?? "verification failed");
   }
+  // Site 9/9: verification passed — Task allowed to complete.
+  eventLog.logHookEvent({
+    hook: "task-completed-verifier",
+    event: "TaskCompleted",
+    level: "info",
+    kind: "task_verify_pass",
+    payload: { phase, specPath: specPath as string },
+    correlationId: buildCorrelationId(input as HookStdin | null, state),
+    cwd,
+    spec: specPath as string,
+  });
   process.exit(0);
 }
 

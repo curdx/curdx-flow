@@ -77,7 +77,7 @@ Focus: Wire remaining 31 sites across 3 hooks. Each hook is one atomic task.
   - **Commit**: `feat(stop-watcher): wire 14 logHookEvent decision sites`
   - _Design: Component 7_
 
-- [ ] 2.2 Wire task-completed-verifier.ts (9 sites)
+- [x] 2.2 Wire task-completed-verifier.ts (9 sites)
   - **Do**:
     1. Import `logHookEvent`, `buildCorrelationId` in `src/hooks/task-completed-verifier.ts`
     2. Add `logHookEvent` at 9 sites: 7 guards (`kind: 'task_completion_block'`), 1 block, 1 success (`kind: 'task_completion_pass'`)

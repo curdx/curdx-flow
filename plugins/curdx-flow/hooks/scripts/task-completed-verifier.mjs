@@ -6,9 +6,9 @@ const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
 // src/hooks/task-completed-verifier.ts
-import { existsSync as existsSync2, readFileSync as readFileSync2 } from "node:fs";
+import { existsSync as existsSync2, readFileSync as readFileSync3 } from "node:fs";
 import { join as join3 } from "node:path";
-import process3 from "node:process";
+import process4 from "node:process";
 
 // src/hooks/_shared/stdin.ts
 import process2 from "node:process";
@@ -210,57 +210,352 @@ async function walkSrcTree(dir) {
   return maxMtime;
 }
 
+// src/hooks/_shared/correlation.ts
+import { basename as basename3 } from "node:path";
+function buildCorrelationId(stdin, state) {
+  const transcriptPath = stdin?.transcript_path;
+  const sessionId = transcriptPath ? basename3(transcriptPath).replace(/\.(jsonl|json)$/, "") : "unknown";
+  const taskIdx = state?.taskIndex ?? 0;
+  const iter = state?.phase === "execution" ? state?.taskIteration ?? 1 : state?.globalIteration ?? 1;
+  return `${sessionId}:${taskIdx}:${iter}`;
+}
+
+// src/hooks/_shared/error-logger.ts
+import {
+  appendFileSync,
+  copyFileSync,
+  mkdirSync,
+  readdirSync as readdirSync2,
+  readFileSync as readFileSync2,
+  renameSync,
+  statSync as statSync2,
+  unlinkSync
+} from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
+import process3 from "node:process";
+var SETTINGS_PATH = path.join(homedir(), ".claude", "settings.json");
+var ERRORS_DIR = path.join(homedir(), ".claude", "curdx-flow");
+var ERRORS_LOG = path.join(ERRORS_DIR, "errors.jsonl");
+var MAX_LINE_BYTES = 4096;
+var MSG_MAX = 500;
+var STACK_MAX = 2e3;
+var STR_MAX = 500;
+var ROTATE_SIZE_BYTES = 10 * 1024 * 1024;
+var ROTATE_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
+var ROTATE_THROTTLE_N = 10;
+var ROTATE_KEEP = 5;
+var RENAME_RETRY_DELAYS_MS = [50, 200, 500];
+var cachedEnabled = null;
+function readEnabled() {
+  if (cachedEnabled !== null) return cachedEnabled;
+  try {
+    const raw = readFileSync2(SETTINGS_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.errorLogEnabled === "boolean") {
+      cachedEnabled = parsed.errorLogEnabled;
+      return cachedEnabled;
+    }
+    cachedEnabled = true;
+    return cachedEnabled;
+  } catch {
+    process3.stderr.write("[error-logger] settings.json missing/corrupt, defaulting errorLogEnabled=true\n");
+    cachedEnabled = true;
+    return cachedEnabled;
+  }
+}
+function trunc(s, max) {
+  if (typeof s !== "string") return void 0;
+  return s.length <= max ? s : s.slice(0, max);
+}
+var KNOWN_KINDS = /* @__PURE__ */ new Set([
+  "stop_block_continuation",
+  "stop_block_cost_runaway",
+  "stop_block_verification_failed",
+  "stop_allow_early_exit",
+  "task_verify_pass",
+  "task_verify_fail",
+  "subagent_context_injected",
+  "subagent_injection_failed",
+  "stop_failure_rate_limit",
+  "stop_failure_other",
+  "unknown"
+]);
+function coerceKind(raw) {
+  return typeof raw === "string" && KNOWN_KINDS.has(raw) ? raw : "unknown";
+}
+function shouldRotate(filePath) {
+  try {
+    const st = statSync2(filePath);
+    if (st.size > ROTATE_SIZE_BYTES) return true;
+    if (Date.now() - st.mtimeMs > ROTATE_AGE_MS) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+function safeRename(from, to) {
+  try {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (e) {
+      const code = e.code;
+      if (code === "EBUSY" || code === "EPERM") {
+        for (const ms of RENAME_RETRY_DELAYS_MS) {
+          const end = Date.now() + ms;
+          while (Date.now() < end) {
+          }
+          try {
+            renameSync(from, to);
+            return;
+          } catch {
+          }
+        }
+      }
+      try {
+        copyFileSync(from, to);
+        unlinkSync(from);
+      } catch {
+      }
+    }
+  } catch {
+  }
+}
+function pruneRotatedFiles(dir) {
+  try {
+    const entries = readdirSync2(dir);
+    const rotated = [];
+    for (const name of entries) {
+      if (!name.startsWith("errors.") || !name.endsWith(".jsonl")) continue;
+      if (name === "errors.jsonl") continue;
+      const full = path.join(dir, name);
+      try {
+        rotated.push({ p: full, m: statSync2(full).mtimeMs });
+      } catch {
+      }
+    }
+    rotated.sort((a, b) => b.m - a.m);
+    for (const { p } of rotated.slice(ROTATE_KEEP)) {
+      try {
+        unlinkSync(p);
+      } catch {
+      }
+    }
+  } catch {
+  }
+}
+var rotateCounter = 0;
+function rotateIfNeeded(filePath) {
+  try {
+    rotateCounter = (rotateCounter + 1) % ROTATE_THROTTLE_N;
+    if (rotateCounter !== 0) return;
+    if (!shouldRotate(filePath)) return;
+    const iso = (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+    const dir = path.dirname(filePath);
+    const target = path.join(dir, `errors.${iso}-${process3.pid}.jsonl`);
+    safeRename(filePath, target);
+    pruneRotatedFiles(dir);
+  } catch {
+  }
+}
+function logHookEvent(input, err) {
+  try {
+    if (!readEnabled()) return;
+    const stack = input.stack ?? err?.stack;
+    const msg = input.msg ?? err?.message;
+    const level = input.level ?? "info";
+    const kind = coerceKind(input.kind);
+    const record = {
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      level,
+      hook: trunc(input.hook, STR_MAX) ?? "",
+      event: trunc(input.event, STR_MAX) ?? "",
+      kind
+    };
+    const optionalEntries = [
+      ["msg", trunc(msg, MSG_MAX)],
+      ["cwd", trunc(input.cwd, STR_MAX)],
+      ["transcript_path", trunc(input.transcript_path, STR_MAX)],
+      ["spec", trunc(input.spec, STR_MAX)],
+      ["path", trunc(input.path, STR_MAX)],
+      ["stack", trunc(stack, STACK_MAX)],
+      ["correlationId", trunc(input.correlationId, STR_MAX)]
+    ];
+    for (const [k, v] of optionalEntries) {
+      if (v !== void 0) record[k] = v;
+    }
+    if (input.payload !== void 0) {
+      record.payload = input.payload;
+    }
+    let line = JSON.stringify(record);
+    if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
+      delete record.stack;
+      line = JSON.stringify(record);
+    }
+    if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
+      delete record.msg;
+      line = JSON.stringify(record);
+    }
+    if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
+      delete record.payload;
+      line = JSON.stringify(record);
+    }
+    try {
+      mkdirSync(ERRORS_DIR, { recursive: true });
+    } catch {
+    }
+    rotateIfNeeded(ERRORS_LOG);
+    appendFileSync(ERRORS_LOG, line + "\n");
+  } catch {
+  }
+}
+
 // src/hooks/task-completed-verifier.ts
 function passThrough() {
-  process3.stdout.write(JSON.stringify({ continue: true }));
-  process3.exit(0);
+  process4.stdout.write(JSON.stringify({ continue: true }));
+  process4.exit(0);
 }
 function emitBlock(reason) {
-  process3.stdout.write(JSON.stringify({ decision: "block", reason }));
-  process3.exit(2);
+  process4.stdout.write(JSON.stringify({ decision: "block", reason }));
+  process4.exit(2);
 }
 async function main() {
   let input;
   try {
     input = await readStdinJson();
   } catch {
+    logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "stdin_parse_fail" },
+      correlationId: buildCorrelationId(null, null)
+    });
     passThrough();
   }
   if (input.hook_event_name !== "TaskCompleted") {
+    logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "event_mismatch", got: input.hook_event_name },
+      correlationId: buildCorrelationId(input, null),
+      cwd: typeof input.cwd === "string" ? input.cwd : void 0
+    });
     passThrough();
   }
   if (typeof input.task_id !== "string" || input.task_id.length === 0) {
+    logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "no_task_id" },
+      correlationId: buildCorrelationId(input, null),
+      cwd: typeof input.cwd === "string" ? input.cwd : void 0
+    });
     passThrough();
   }
-  const cwd = typeof input.cwd === "string" && input.cwd.length > 0 ? input.cwd : process3.cwd();
+  const cwd = typeof input.cwd === "string" && input.cwd.length > 0 ? input.cwd : process4.cwd();
   const specPath = resolveCurrent({ cwd });
   if (!specPath) {
+    logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "no_spec" },
+      correlationId: buildCorrelationId(input, null),
+      cwd
+    });
     passThrough();
   }
   const specDir = join3(cwd, specPath);
   const stateFile = join3(specDir, ".curdx-state.json");
   if (!existsSync2(stateFile)) {
+    logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "no_state", specPath },
+      correlationId: buildCorrelationId(input, null),
+      cwd,
+      spec: specPath
+    });
     passThrough();
   }
   let state;
   try {
-    state = JSON.parse(readFileSync2(stateFile, "utf8"));
+    state = JSON.parse(readFileSync3(stateFile, "utf8"));
   } catch {
+    logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: { reason: "state_parse_fail", specPath },
+      correlationId: buildCorrelationId(input, null),
+      cwd,
+      spec: specPath,
+      path: stateFile
+    });
     passThrough();
   }
   const phase = getVerificationPhase(state);
   if (phase === null) {
+    logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "info",
+      kind: "unknown",
+      payload: {
+        reason: "phase_resolve_fail",
+        statePhase: state.phase,
+        specPath
+      },
+      correlationId: buildCorrelationId(input, state),
+      cwd,
+      spec: specPath
+    });
     passThrough();
   }
   const result = await verifyPhaseBlock(state, phase, specDir);
   if (!result.ok) {
+    logHookEvent({
+      hook: "task-completed-verifier",
+      event: "TaskCompleted",
+      level: "decision",
+      kind: "task_verify_fail",
+      payload: {
+        reason: result.reason ?? "verification failed",
+        phase,
+        specPath
+      },
+      correlationId: buildCorrelationId(input, state),
+      cwd,
+      spec: specPath
+    });
     emitBlock(result.reason ?? "verification failed");
   }
-  process3.exit(0);
+  logHookEvent({
+    hook: "task-completed-verifier",
+    event: "TaskCompleted",
+    level: "info",
+    kind: "task_verify_pass",
+    payload: { phase, specPath },
+    correlationId: buildCorrelationId(input, state),
+    cwd,
+    spec: specPath
+  });
+  process4.exit(0);
 }
 main().catch((err) => {
   const stack = err instanceof Error ? err.stack ?? err.message : String(err);
-  process3.stderr.write(`[task-completed-verifier] ${stack}
+  process4.stderr.write(`[task-completed-verifier] ${stack}
 `);
   emitBlock("internal error in verify-blocks; see logs");
 });
