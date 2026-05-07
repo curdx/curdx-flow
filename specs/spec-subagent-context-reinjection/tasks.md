@@ -140,7 +140,7 @@ Focus: 7 unit cases + drift test + byte-equal extension.
   - **Commit**: `test(subagent-injector): add cases f-g + SubagentStart byte-equal baseline`
   - _Requirements: FR-11, FR-12, AC-9.1 | Design: §Test Strategy (f)-(g)_
 
-- [ ] 3.3 Create drift test `tests/runner/subagent-context-doc.test.ts`
+- [x] 3.3 Create drift test `tests/runner/subagent-context-doc.test.ts`
   - **Do**:
     1. Create `tests/runner/subagent-context-doc.test.ts`
     2. Import `IRON_LAW_SUMMARY` from `../../src/hooks/lib/build-context-payload`
