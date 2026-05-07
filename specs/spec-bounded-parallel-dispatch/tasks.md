@@ -19,7 +19,7 @@ Task 1.2 — both files in place: `bounded-parallel-dispatch.md` (9 sections, �
 
 Goal: create the renamed doc with full content and replace the old path with a stub.
 
-- [ ] 1.1 Create `bounded-parallel-dispatch.md` with 9 sections
+- [x] 1.1 Create `bounded-parallel-dispatch.md` with 9 sections
   - **Do**:
     1. Read `plugins/curdx-flow/references/parallel-research.md` verbatim (160 LOC baseline)
     2. Create `plugins/curdx-flow/references/bounded-parallel-dispatch.md`: copy old content for §1/§6/§7/§8/§9 (PRESERVE VERBATIM per FR-Doc-5); add 1-line cross-link to `coordinator-pattern.md` at end of §1; INSERT §2 Domain Coverage (table: Research/Review/Debug rows per design.md shape); INSERT §3 Independence Criteria (3-item checklist, exact wording from design.md §3 shape); INSERT §4 Per-Domain Anti-patterns (3 research preserved + 5 review NEW + 5 debug NEW = 13 total, each shaped as "1-sentence + Coordinator: do this instead"); INSERT §5 Subagent-vs-Grep (Anthropic citation verbatim from design.md §5 shape)
