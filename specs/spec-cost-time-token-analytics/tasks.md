@@ -71,7 +71,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(analyze): add UsageRow + AggregateBucket + Recommendation types`
 
-- [ ] 1.2 [P] Create pricing.ts with PRICING + alias + LAST_UPDATED
+- [x] 1.2 [P] Create pricing.ts with PRICING + alias + LAST_UPDATED
   **Do**: 创建 pricing.ts 含 `PRICING` 三 model × 5 字段（Opus 4.7 / Sonnet 4.6 / Haiku 4.5），`MODEL_ALIASES` 含 `claude-haiku-4-5 → claude-haiku-4-5-20251001`，`LAST_UPDATED = '2026-05-07'`，`SOURCE_URL`，`resolveModelId(s)` 函数。
 
   **Files**:
