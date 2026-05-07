@@ -122,6 +122,91 @@ function readString(
 }
 
 /**
+ * Subagent `<usage>` trailer regex — design-locked (design §Components #2).
+ *
+ * Matches the text-embedded usage block that subagents emit in
+ * `tool_result.content[].text`:
+ *
+ *   <usage>
+ *   total_tokens: 8200
+ *   tool_uses: 14
+ *   duration_ms: 9450
+ *   </usage>
+ *
+ * `[\s\S]*?` is the cross-line non-greedy class — research §Trailer JSON-escape
+ * implementation showed the literal "\n" in the JSON-string form does not match
+ * with `.` even under `s` flag in some Node versions, so `[\s\S]` is the
+ * portable choice. Global flag captures every trailer in a multi-trailer text
+ * (session 5b0d961c peak: 181 trailers in a single tool_result).
+ */
+const TRAILER_RE =
+  /<usage>[\s\S]*?total_tokens:\s*(\d+)[\s\S]*?tool_uses:\s*(\d+)[\s\S]*?duration_ms:\s*(\d+)[\s\S]*?<\/usage>/g;
+
+/**
+ * extractTrailerUsage — sidechain `<usage>` trailer → UsageRow[].
+ *
+ * Parses every `<usage>...</usage>` block in `text` (a single
+ * `tool_result.content[].text` string from a sidechain assistant turn) and
+ * emits one UsageRow per match. Decision 12: trailer tokens are attributed
+ * entirely to `outputTokens` — the subagent reports its own total without
+ * splitting input/output, and output-side pricing (5× input) is the safe
+ * over-attribution direction (we'd rather over-count than miss).
+ *
+ * Inherits `ts` / `requestId` / `correlationId` from the parent assistant
+ * turn so aggregateBy task-level joins via correlationId still group child
+ * trailer rows under the parent task bucket. `source: 'subagent_trailer'` is
+ * the discriminator that lets aggregateBy distinguish parent vs child without
+ * deduping (Decision 11 — same requestId, different source = independent
+ * billing channel).
+ *
+ * Model is set to `'unknown'` here because the trailer text doesn't carry
+ * model id — `computeCost` will return 0 for the row, which is the
+ * conservative-floor outcome until Task 2.3 (the wire-in step) decides
+ * whether to inherit parent's model. Phase 2 task scope keeps this function
+ * pure: regex → UsageRow[], no model resolution.
+ *
+ * NEVER-throw (NFR-9): the entire body is try/catch wrapped — a malformed
+ * input string returns `[]` so the caller's row array is preserved.
+ */
+export function extractTrailerUsage(
+  text: string,
+  parent: Pick<UsageRow, 'ts' | 'requestId' | 'correlationId'>,
+): UsageRow[] {
+  try {
+    if (typeof text !== 'string' || text.length === 0) return [];
+    const rows: UsageRow[] = [];
+    // Reset lastIndex defensively — TRAILER_RE is module-level so a stale
+    // lastIndex from a previous call could skip matches on the same input.
+    TRAILER_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = TRAILER_RE.exec(text)) !== null) {
+      const totalTokens = parseInt(m[1] ?? '0', 10);
+      const durationMs = parseInt(m[3] ?? '0', 10);
+      // m[2] (tool_uses) is captured for completeness but not stored — it's
+      // not on UsageRow; recommend.ts retry-loop rule (FR-RULE-8) reads
+      // tool_uses from a different code path.
+      rows.push({
+        ts: parent.ts,
+        requestId: parent.requestId,
+        correlationId: parent.correlationId,
+        model: 'unknown',
+        inputTokens: 0,
+        outputTokens: Number.isFinite(totalTokens) ? totalTokens : 0,
+        cacheReadTokens: 0,
+        cacheCreate5mTokens: 0,
+        cacheCreate1hTokens: 0,
+        durationMs: Number.isFinite(durationMs) ? durationMs : 0,
+        source: 'subagent_trailer',
+      });
+    }
+    return rows;
+  } catch {
+    // NFR-9 NEVER-throw — malformed input drops to empty array.
+    return [];
+  }
+}
+
+/**
  * extractUsageRowsFromEvents — main path: assistant_turn → UsageRow[].
  *
  * Phase 1 scope: walks `events` looking for `kind === 'assistant_turn'`,

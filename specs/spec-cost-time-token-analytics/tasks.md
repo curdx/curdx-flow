@@ -188,7 +188,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(schema-map): add assistant.message.usage 6 fields for OB-3`
 
-- [ ] 2.2 [P] Add extractTrailerUsage with regex parsing in cost.ts
+- [x] 2.2 [P] Add extractTrailerUsage with regex parsing in cost.ts
   **Do**: 在 cost.ts 加 `extractTrailerUsage(text, parent): UsageRow[]` 函数，用 design-locked global 非贪婪 regex 跨行匹配 `<usage>...total_tokens...tool_uses...duration_ms...</usage>`，每命中构造 1 个 `UsageRow{source: 'subagent_trailer', outputTokens: total_tokens, inputTokens: 0, durationMs}`，继承 parent.requestId/correlationId/ts。catch 异常 → 返回 `[]`。
 
   **Files**:
