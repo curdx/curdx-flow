@@ -357,7 +357,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
 > 目标：单测全覆盖（pricing × cost × recommend skeleton + integration R1-R7 snapshot），保证 ±0.001 USD 精度可证 + 老 schema 向后兼容。
 
-- [ ] 3.1 [P] Create pricing.test.ts — 3 model × 5 field + alias
+- [x] 3.1 [P] Create pricing.test.ts — 3 model × 5 field + alias
   **Do**: 创建 pricing.test.ts 测：(1) 三 model 各 5 字段正确读 (Opus 4.7 / Sonnet 4.6 / Haiku 4.5)；(2) `resolveModelId('claude-haiku-4-5')` 返回 `'claude-haiku-4-5-20251001'`；(3) `resolveModelId('unknown')` 返回 undefined；(4) `LAST_UPDATED` 是 ISO 日期字符串 (≤ 90 天内)；(5) `SOURCE_URL` 含 `platform.claude.com`。
 
   **Files**:
@@ -373,7 +373,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `test(analyze): add pricing.test.ts covering 3 model × 5 field + alias`
 
-- [ ] 3.2 [P] Create cost.test.ts — computeCost ±0.001 USD precision
+- [x] 3.2 [P] Create cost.test.ts — computeCost ±0.001 USD precision
   **Do**: 创建 cost.test.ts 测 `computeCost`：(1) Opus 4.7 input=1M output=1M → `$5 + $25 = $30` ±0.001；(2) Sonnet 4.6 同型 → `$3 + $15 = $18`；(3) Haiku 4.5 同型 → `$1 + $5 = $6`；(4) Opus cache_read=1M → `$0.5`（5 × 0.1）；(5) cache_5m_write=1M → `$6.25`（5 × 1.25）；(6) cache_1h_write=1M → `$10`（5 × 2.0）；(7) unknown model → 0 (skip)。
 
   **Files**:
