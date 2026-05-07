@@ -89,7 +89,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(analyze): add pricing.ts with 3 model × 5 field static table`
 
-- [ ] 1.3 [P] Create cost.ts skeleton with computeCost basic formula
+- [x] 1.3 [P] Create cost.ts skeleton with computeCost basic formula
   **Do**: 创建 cost.ts 含 `computeCost(row: UsageRow): number` 单 row USD 公式 + `extractUsageRowsFromEvents(events, errorEntries)` 主路径（仅 assistant_turn payload，不接 trailer）。零 throw，缺字段走 `?? 0`。返回值 4 位小数 round。
 
   **Files**:
