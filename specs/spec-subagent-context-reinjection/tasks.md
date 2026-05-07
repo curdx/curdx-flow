@@ -31,7 +31,7 @@ Focus: get lib + hook compiling and firing end-to-end. Skip polish, accept hardc
   - **Commit**: `feat(subagent-injector): add build-context-payload shared lib with IRON_LAW_SUMMARY`
   - _Requirements: FR-1, FR-5, FR-7 | Design: Component 1, D1, D3_
 
-- [ ] 1.2 Create `subagent-context-injector.ts` hook handler
+- [x] 1.2 Create `subagent-context-injector.ts` hook handler
   - **Do**:
     1. Create `src/hooks/subagent-context-injector.ts`
     2. Import existing `readStdinJson` (lib/stdin.ts), `resolveActiveSpec` (lib/spec-resolver.ts), `readStateFile` (lib/state.ts), and new `buildContextPayload` + `IRON_LAW_SUMMARY`
