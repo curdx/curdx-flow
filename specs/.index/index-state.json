@@ -1,10 +1,10 @@
 {
   "version": "1.0",
-  "updated": "2026-05-07T04:04:05Z",
+  "updated": "2026-05-07T12:41:50Z",
   "directories": [
     {
       "path": "./specs",
-      "specsCount": 9,
+      "specsCount": 12,
       "isDefault": true
     }
   ],
@@ -27,6 +27,13 @@
       "phase": "completed"
     },
     {
+      "name": "spec-analyze-real-transcript",
+      "path": "./specs/spec-analyze-real-transcript",
+      "phase": "completed",
+      "taskIndex": 9,
+      "totalTasks": 9
+    },
+    {
       "name": "spec-bounded-parallel-dispatch",
       "path": "./specs/spec-bounded-parallel-dispatch",
       "phase": "completed",
@@ -39,6 +46,19 @@
       "phase": "completed",
       "taskIndex": 21,
       "totalTasks": 21
+    },
+    {
+      "name": "spec-cost-time-token-analytics",
+      "path": "./specs/spec-cost-time-token-analytics",
+      "phase": "research",
+      "awaitingApproval": true
+    },
+    {
+      "name": "spec-decision-event-logging",
+      "path": "./specs/spec-decision-event-logging",
+      "phase": "completed",
+      "taskIndex": 12,
+      "totalTasks": 12
     },
     {
       "name": "spec-subagent-context-reinjection",
