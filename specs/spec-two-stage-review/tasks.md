@@ -207,7 +207,7 @@ Goal: extend drift test to full coverage (dispatch wiring, REVIEW_PASS/FAIL byte
 
 Goal: DRY audit between the two reviewer prompts; CHANGELOG entry; no residual cross-domain leakage.
 
-- [ ] 4.1 [P] DRY audit + residual-leakage grep gate
+- [x] 4.1 [P] DRY audit + residual-leakage grep gate
   - **Do**:
     1. Grep `plugins/curdx-flow/agents/spec-reviewer.md` for quality-domain keywords: `["code quality","smell","security","readability","hallucination"]` — must be 0 hits
     2. Grep `plugins/curdx-flow/agents/code-quality-reviewer.md` for compliance-domain keywords: `["traceability","requirement coverage","artifact format","phase structure"]` in rubric items (exclusion list section itself is OK) — must be 0 hits outside exclusion section
