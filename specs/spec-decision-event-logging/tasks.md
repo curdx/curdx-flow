@@ -135,7 +135,7 @@ Focus: Wire remaining 31 sites across 3 hooks. Each hook is one atomic task.
   - **Commit**: `test(event-logger): add 7 cases — rotation/redact/correlationId/round-trip`
   - _Design: Component 10, Test Strategy_
 
-- [ ] 3.3 [VERIFY] Full test suite: test:hooks + test:analyze + typecheck
+- [x] 3.3 [VERIFY] Full test suite: test:hooks + test:analyze + typecheck
   - **Do**:
     1. Run full test suite for both test namespaces
     2. Run typecheck
@@ -148,7 +148,7 @@ Focus: Wire remaining 31 sites across 3 hooks. Each hook is one atomic task.
 
 ## Phase 4 — Release (1 task)
 
-- [ ] 4.1 CHANGELOG entry + V4/V6 full local CI
+- [x] 4.1 CHANGELOG entry + V4/V6 full local CI
   - **Do**:
     1. Prepend OB-2 entry to `CHANGELOG.md`: schema upgrade (4 fields), logHookEvent API, 33+ hook sites, rotation + safeRename, D1-D4 decisions
     2. Run full local CI: `npm run verify`
