@@ -133,7 +133,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(analyze): wire --cost-summary CLI flag with totalCost output`
 
-- [ ] 1.6 [VERIFY] Quality checkpoint: typecheck + build
+- [x] 1.6 [VERIFY] Quality checkpoint: typecheck + build
   **Do**: Run typecheck + build 验证 CLI 接线无破坏。
 
   **Verify**: `cd /Users/wdx/opc/curdx-flow && npm run typecheck && npm run build`
@@ -142,7 +142,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `chore(analyze): pass quality checkpoint after CLI wiring`
 
-- [ ] 1.7 [POC MILESTONE] Manual smoke — totalCost.usd non-null
+- [x] 1.7 [POC MILESTONE] Manual smoke — totalCost.usd non-null
   **Do**: Run analyze on real local transcript with `--cost-summary --json` 跑通顶层 `totalCost.usd` 非 null。验证 plan.md Validation Hint 命令。
 
   **Files**: (no edit — read-only smoke)
