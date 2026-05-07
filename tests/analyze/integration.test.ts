@@ -411,6 +411,35 @@ describe('OB-3 cost pipeline', () => {
         },
       },
     },
+    // Sidechain trailer row — user_turn with tool_result carrying a
+    // `<usage>...</usage>` block. Same correlationId as the Sonnet parent
+    // (1.2:1) so aggregateBy task-level groups it under the parent bucket.
+    // extractTrailerUsage emits a UsageRow with model='unknown' (USD=$0)
+    // but trailerCount=1 contributes to the parent task bucket.
+    // R3 attribution contract (Decision 11 / FR-AGG-2 / FR-AGG-3 /
+    // plan.md Validation Hint #3): bucket.totalUSD = parent.usd + trailer.usd.
+    {
+      type: 'user',
+      timestamp: '2026-05-07T08:00:25.000Z',
+      uuid: 'cost-int-0006',
+      sessionId: 'cost-sess-001',
+      correlationId: 'cost-sess-001:1.2:1',
+      message: {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'toolu_int_subagent_01',
+            content: [
+              {
+                type: 'text',
+                text: 'Subagent finished.\n<usage>total_tokens: 8200\ntool_uses: 14\nduration_ms: 9450</usage>',
+              },
+            ],
+          },
+        ],
+      },
+    },
   ];
 
   const COST_FIXTURE_DIR = path.join(tmpdir(), 'curdx-flow-integration-cost');
@@ -534,4 +563,76 @@ describe('OB-3 cost pipeline', () => {
     expect(rows[0]?.cacheCreate5mTokens).toBe(300);
     expect(rows[0]?.cacheCreate1hTokens).toBe(0);
   });
+
+  it('R3 per-task: parent + trailer cost = bucket.totalUSD (FR-AGG-2 / FR-AGG-3 / Decision 11 / plan.md Validation Hint #3) — trailer attribution', async () => {
+    // Fixture has 1 trailer row (user_turn tool_result `<usage>`) sharing
+    // correlationId `cost-sess-001:1.2:1` with the Sonnet parent assistant
+    // row. aggregateBy task-level must:
+    //   • group parent + sidechain + trailer under the same bucket key
+    //   • emit trailerCount === 1 (sidechain assistant rows carry source
+    //     `'assistant'`, not `'subagent_trailer'` — only `<usage>`-derived
+    //     rows bump trailerCount)
+    //   • bucket.totalUSD === parent.assistant.usd + trailer.usd
+    //     (trailer.usd === 0 because extractTrailerUsage sets model='unknown'
+    //      → computeCost floors to $0; sidechain Sonnet row also $0 because
+    //      its tokens are all 0)
+    const previousFixtureEnv = process.env.CURDX_TRANSCRIPT_FIXTURE;
+    process.env.CURDX_TRANSCRIPT_FIXTURE = COST_FIXTURE_PATH;
+    try {
+      // includePrompts: true is required so redact.ts's user_turn content
+      // stub-out (privacy pass) doesn't strip the `<usage>...</usage>`
+      // tool_result text before extractUsageRowsFromEvents runs the trailer
+      // scan. Production path: operators opt into trailer-rich analytics
+      // via `--include-prompts` (already wired through runAnalyze options).
+      const out = await captureStdout(() =>
+        runAnalyze({
+          json: true,
+          costSummary: true,
+          byTask: true,
+          includePrompts: true,
+        } as Parameters<typeof runAnalyze>[0]),
+      );
+      const parsed = JSON.parse(out) as Record<string, unknown>;
+      const cb = parsed.costBreakdown as Record<string, unknown>;
+      const r3 = cb.R3_perTask as Array<{
+        key: string;
+        totalUSD: number;
+        trailerCount: number;
+        rowCount: number;
+      }>;
+
+      // Locate the Sonnet parent task bucket — its key === correlationId
+      // (cost.ts L430: task-level uses raw correlationId as bucket key).
+      const TRAILER_TASK_KEY = 'cost-sess-001:1.2:1';
+      const trailerBucket = r3.find((b) => b.key === TRAILER_TASK_KEY);
+      expect(trailerBucket).toBeDefined();
+      if (!trailerBucket) throw new Error('trailer bucket not found');
+
+      // trailerCount === 1: only the user_turn `<usage>` row contributes
+      // (the sidechain assistant row is source='assistant' — Decision 11).
+      expect(trailerBucket.trailerCount).toBe(1);
+
+      // Fixture math:
+      //   parent.assistant.usd = Sonnet 1M output × $15/M = $15.0000
+      //   trailer.usd          = model='unknown' → $0
+      //   sidechain.assistant.usd = Sonnet with all-zero tokens = $0
+      //   bucket.totalUSD      = $15 + $0 + $0 = $15
+      // Decision 11 contract: parent + trailer attribution sums to bucket.
+      const PARENT_USD = 15.0;
+      const TRAILER_USD = 0; // model='unknown' floor
+      const expectedTotal = PARENT_USD + TRAILER_USD;
+      // 4-decimal precision floor (NFR-3 ±0.001 USD; Decision 10 round-on-emit).
+      expect(Math.abs(trailerBucket.totalUSD - expectedTotal)).toBeLessThan(0.001);
+
+      // rowCount must include parent + sidechain + trailer = 3 rows
+      // (proves aggregateBy did NOT dedupe across source discriminator).
+      expect(trailerBucket.rowCount).toBe(3);
+    } finally {
+      if (previousFixtureEnv === undefined) {
+        delete process.env.CURDX_TRANSCRIPT_FIXTURE;
+      } else {
+        process.env.CURDX_TRANSCRIPT_FIXTURE = previousFixtureEnv;
+      }
+    }
+  }, 30_000);
 });

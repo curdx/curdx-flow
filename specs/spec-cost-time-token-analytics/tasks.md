@@ -501,7 +501,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `test(integration): add OB-3 cost pipeline group + backward compat`
 
-- [ ] 3.11 Add R3 trailer attribution assertion in integration
+- [x] 3.11 Add R3 trailer attribution assertion in integration
   **Do**: 在 integration.test.ts 的 OB-3 测试组加 R3 task 维度 assertion：fixture 中 trailer parent 行 + sidechain trailer 行同 correlationId → bucket.totalUSD = parent.usd + trailer.usd（plan.md Validation Hint "R3 = 父 + 子"）；trailerCount=1。
 
   **Files**:
