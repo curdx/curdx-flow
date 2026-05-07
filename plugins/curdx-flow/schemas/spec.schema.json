@@ -153,8 +153,8 @@
         "maxGlobalIterations": {
           "type": "integer",
           "minimum": 1,
-          "default": 100,
-          "description": "Safety cap on total iterations"
+          "default": 30,
+          "description": "Safety cap on total iterations. Tightened to 30 in v7.1.7 (~1hr unattended). Use --max-global-iterations 100 to opt back to legacy."
         },
         "relatedSpecs": {
           "type": "array",

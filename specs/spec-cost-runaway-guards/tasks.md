@@ -51,7 +51,7 @@ Focus: skeleton + build pipeline green. Skip tests, accept stubs. Types must pas
   - **Commit**: `feat(hooks): register StopFailure event in hooks.json`
   - _Requirements: FR-H4_
 
-- [ ] 1.4 Schema default tightening: maxGlobalIterations 100 → 30
+- [x] 1.4 Schema default tightening: maxGlobalIterations 100 → 30
   - **Do**:
     1. Open `plugins/curdx-flow/schemas/spec.schema.json`
     2. Find `maxGlobalIterations` property, change `"default": 100` → `"default": 30`
