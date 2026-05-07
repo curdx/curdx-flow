@@ -56,7 +56,7 @@ Task 1.3 — `resolveTranscriptSource()` wired into index.ts; integration test g
 
 ## Phase 2 — Core (Unit Tests + State GC)
 
-- [ ] 2.1 [P] Add 5 unit tests in `tests/analyze/transcript-path.test.ts`
+- [x] 2.1 [P] Add 5 unit tests in `tests/analyze/transcript-path.test.ts`
   - **Do**:
     1. Test 1 — encoding: `resolveTranscriptSource` with mock homedir dir; assert `encodedDir` ends with `-Users-x-foo`
     2. Test 2 — multi-session glob: create 3 temp `.jsonl` files in encoded dir; assert `paths.length === 3`
