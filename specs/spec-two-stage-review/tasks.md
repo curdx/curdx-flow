@@ -51,7 +51,7 @@ Goal: prove schema change + 1 narrowing pass + code-quality-reviewer skeleton + 
   - **Commit**: `refactor(agents): spec-reviewer narrow Pass-1 — cut Design/Principles 7-item block (E1)`
   - _Design: Component 1_
 
-- [ ] 1.4 Create minimal drift test asserting POC invariants
+- [x] 1.4 Create minimal drift test asserting POC invariants
   - **Do**:
     1. Create `tests/runner/two-stage-review.test.ts`
     2. Add 3 test cases: (a) `spec-reviewer.md` has zero hits for `["code quality","smell","security","readability"]`; (b) `code-quality-reviewer.md` exists and contains ≥4 exclusion keywords; (c) `REVIEW_PASS` and `REVIEW_FAIL` strings are identical (byte-equal) across both agent files
