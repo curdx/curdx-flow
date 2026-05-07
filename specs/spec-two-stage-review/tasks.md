@@ -126,7 +126,7 @@ Goal: complete all 4 narrowing passes on spec-reviewer, fill code-quality-review
   - **Commit**: `docs(references): add two-stage-review.md domain boundary + SLSA shape (AC-12.4)`
   - _Design: Component 6_
 
-- [ ] 2.6 Finalize `code-quality-reviewer.md`: add role boundary + link reference doc
+- [x] 2.6 Finalize `code-quality-reviewer.md`: add role boundary + link reference doc
   - **Do**:
     1. Replace Role boundary stub with concrete paragraph: cite `references/two-stage-review.md`, state domain scope (code smell / security / implementation quality / readability / test quality)
     2. Add `do NOT comment on` section header with the 4 exclusion items as a formatted bulleted list
