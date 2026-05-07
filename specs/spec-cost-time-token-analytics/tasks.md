@@ -417,7 +417,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `test(cost): add extractTrailerUsage regex 5-case coverage`
 
-- [ ] 3.5 [P] cost.test.ts — aggregateBy 3-level snapshot
+- [x] 3.5 [P] cost.test.ts — aggregateBy 3-level snapshot
   **Do**: 在 cost.test.ts 加 `aggregateBy` 测：构造 10 fake UsageRow（3 spec × 2 phase × 含 trailer + 含 unknown correlationId）→ 三 level 输出 bucket count + totalUSD + trailerCount 全断言。验证 source='subagent_trailer' 与 source='assistant' 同 requestId 不去重 (Decision 11)，分桶累加。
 
   **Files**:

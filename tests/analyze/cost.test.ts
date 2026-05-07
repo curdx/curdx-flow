@@ -22,7 +22,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { computeCost, extractTrailerUsage } from '../../src/analyze/cost.ts';
+import { aggregateBy, computeCost, extractTrailerUsage } from '../../src/analyze/cost.ts';
 import type { UsageRow } from '../../src/analyze/types.ts';
 
 function row(overrides: Partial<UsageRow>): UsageRow {
@@ -182,5 +182,318 @@ describe('extractTrailerUsage', () => {
     expect(() => extractTrailerUsage(broken, PARENT)).not.toThrow();
     const rows = extractTrailerUsage(broken, PARENT);
     expect(rows).toEqual([]);
+  });
+});
+
+// aggregateBy — 3-level (spec | phase | task) bucket join over UsageRow[]
+// (FR-AGG-1 / FR-AGG-2 / FR-AGG-3 / Decision 11 / AC4).
+//
+// Fixture rationale — 10 rows covering the 3 dimensional axes the
+// aggregation contract has to defend against simultaneously:
+//   • spec axis     — 2 spec ids (sid1, sid2) + 1 unknown (no correlationId)
+//   • phase axis    — sid1→'design', sid2→'requirements', unknown→'unknown'
+//   • task axis     — 4 distinct correlationIds (sid1:1.1:1, sid1:1.2:1,
+//                     sid2:2.1:1) + the missing-id 'unknown' bucket
+//   • source axis   — assistant + subagent_trailer pairs sharing requestId
+//                     to lock Decision 11 (no requestId-dedup; trailer rows
+//                     bucket alongside parent and BOTH contribute to USD).
+//   • model axis    — Opus 4.7 / Sonnet 4.6 / Haiku 4.5 across rows so
+//                     modelMix accumulation is exercised per bucket.
+//
+// All assertions cite `toBeCloseTo(usd, 3)` for ±0.001 USD precision per AC3
+// when checking summed totals, exact integers for token / count fields.
+
+const SPEC_PHASE_MAP: Record<string, string> = {
+  sid1: 'design',
+  sid2: 'requirements',
+};
+
+// Per-row USD reference (computed against pricing.ts numbers, MTok scale):
+//   Opus 4.7   1MTok in + 1MTok out = $5  + $25 = $30
+//   Opus 4.7   1MTok in              = $5
+//   Sonnet 4.6 1MTok in + 1MTok out = $3  + $15 = $18
+//   Haiku 4.5  1MTok in + 1MTok out = $1  + $5  = $6
+//   trailer    1MTok out (model='unknown' → cost=0; trailer rows are
+//              bucket-counted but contribute $0 to totalUSD per Decision 12
+//              + cost.ts `extractTrailerUsage` setting model='unknown')
+const FIXTURE_ROWS: UsageRow[] = [
+  // sid1 / task 1.1 — assistant (Opus 4.7) + trailer same requestId
+  {
+    ts: '2026-05-07T00:00:00Z',
+    requestId: 'req-1',
+    model: 'claude-opus-4-7',
+    inputTokens: 1_000_000,
+    outputTokens: 1_000_000,
+    cacheReadTokens: 0,
+    cacheCreate5mTokens: 0,
+    cacheCreate1hTokens: 0,
+    correlationId: 'sid1:1.1:1',
+    source: 'assistant',
+  },
+  {
+    ts: '2026-05-07T00:00:01Z',
+    requestId: 'req-1', // same requestId as above — Decision 11 no-dedup
+    model: 'unknown',
+    inputTokens: 0,
+    outputTokens: 1_000_000,
+    cacheReadTokens: 0,
+    cacheCreate5mTokens: 0,
+    cacheCreate1hTokens: 0,
+    correlationId: 'sid1:1.1:1',
+    source: 'subagent_trailer',
+    durationMs: 9450,
+  },
+  // sid1 / task 1.2 — assistant (Sonnet 4.6) + trailer same requestId
+  {
+    ts: '2026-05-07T00:01:00Z',
+    requestId: 'req-2',
+    model: 'claude-sonnet-4-6',
+    inputTokens: 1_000_000,
+    outputTokens: 1_000_000,
+    cacheReadTokens: 0,
+    cacheCreate5mTokens: 0,
+    cacheCreate1hTokens: 0,
+    correlationId: 'sid1:1.2:1',
+    source: 'assistant',
+  },
+  {
+    ts: '2026-05-07T00:01:01Z',
+    requestId: 'req-2',
+    model: 'unknown',
+    inputTokens: 0,
+    outputTokens: 500_000,
+    cacheReadTokens: 0,
+    cacheCreate5mTokens: 0,
+    cacheCreate1hTokens: 0,
+    correlationId: 'sid1:1.2:1',
+    source: 'subagent_trailer',
+    durationMs: 4200,
+  },
+  // sid1 / task 1.2 — second assistant (Haiku 4.5) under same task
+  {
+    ts: '2026-05-07T00:01:02Z',
+    requestId: 'req-3',
+    model: 'claude-haiku-4-5-20251001',
+    inputTokens: 1_000_000,
+    outputTokens: 1_000_000,
+    cacheReadTokens: 0,
+    cacheCreate5mTokens: 0,
+    cacheCreate1hTokens: 0,
+    correlationId: 'sid1:1.2:1',
+    source: 'assistant',
+  },
+  // sid2 / task 2.1 — assistant (Opus 4.7) input-only
+  {
+    ts: '2026-05-07T00:02:00Z',
+    requestId: 'req-4',
+    model: 'claude-opus-4-7',
+    inputTokens: 1_000_000,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreate5mTokens: 0,
+    cacheCreate1hTokens: 0,
+    correlationId: 'sid2:2.1:1',
+    source: 'assistant',
+  },
+  // sid2 / task 2.1 — assistant (Sonnet 4.6) full
+  {
+    ts: '2026-05-07T00:02:01Z',
+    requestId: 'req-5',
+    model: 'claude-sonnet-4-6',
+    inputTokens: 1_000_000,
+    outputTokens: 1_000_000,
+    cacheReadTokens: 0,
+    cacheCreate5mTokens: 0,
+    cacheCreate1hTokens: 0,
+    correlationId: 'sid2:2.1:1',
+    source: 'assistant',
+  },
+  // sid2 / task 2.1 — trailer (different requestId)
+  {
+    ts: '2026-05-07T00:02:02Z',
+    requestId: 'req-6',
+    model: 'unknown',
+    inputTokens: 0,
+    outputTokens: 200_000,
+    cacheReadTokens: 0,
+    cacheCreate5mTokens: 0,
+    cacheCreate1hTokens: 0,
+    correlationId: 'sid2:2.1:1',
+    source: 'subagent_trailer',
+    durationMs: 1500,
+  },
+  // unknown bucket — no correlationId at all
+  {
+    ts: '2026-05-07T00:03:00Z',
+    requestId: 'req-7',
+    model: 'claude-haiku-4-5-20251001',
+    inputTokens: 1_000_000,
+    outputTokens: 1_000_000,
+    cacheReadTokens: 0,
+    cacheCreate5mTokens: 0,
+    cacheCreate1hTokens: 0,
+    source: 'assistant',
+  },
+  // unknown bucket — malformed correlationId (only 2 segments)
+  {
+    ts: '2026-05-07T00:03:01Z',
+    requestId: 'req-8',
+    model: 'claude-opus-4-7',
+    inputTokens: 1_000_000,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreate5mTokens: 0,
+    cacheCreate1hTokens: 0,
+    correlationId: 'malformed:id',
+    source: 'assistant',
+  },
+];
+
+describe('aggregateBy', () => {
+  it("level='spec' — 2 sid buckets + 1 unknown bucket; trailerCount + modelMix per spec (FR-AGG-1 / Decision 11)", () => {
+    const buckets = aggregateBy(FIXTURE_ROWS, 'spec', { specPhaseMap: SPEC_PHASE_MAP });
+    // 3 buckets total: sid1 / sid2 / unknown
+    expect(buckets).toHaveLength(3);
+    const byKey = Object.fromEntries(buckets.map((b) => [b.key, b]));
+
+    const sid1 = byKey['sid1'];
+    const sid2 = byKey['sid2'];
+    const unk = byKey['unknown'];
+    if (!sid1 || !sid2 || !unk) throw new Error('missing expected spec bucket');
+
+    // sid1 holds 5 rows (2 task-1.1 + 3 task-1.2), 2 trailers
+    expect(sid1.rowCount).toBe(5);
+    expect(sid1.trailerCount).toBe(2);
+    // totalUSD: Opus full ($30) + Sonnet full ($18) + Haiku full ($6) + 2 trailers ($0)
+    expect(sid1.totalUSD).toBeCloseTo(54, 3);
+    // modelMix: 3 model entries — Opus / Sonnet / Haiku / unknown trailer
+    expect(sid1.modelMix['claude-opus-4-7']).toEqual({ tokens: 2_000_000, usd: 30 });
+    expect(sid1.modelMix['claude-sonnet-4-6']).toEqual({ tokens: 2_000_000, usd: 18 });
+    expect(sid1.modelMix['claude-haiku-4-5-20251001']).toEqual({ tokens: 2_000_000, usd: 6 });
+    // trailer rows roll under model='unknown' with usd=0; tokens summed from output
+    expect(sid1.modelMix['unknown']).toEqual({ tokens: 1_500_000, usd: 0 });
+    // duration only carried by trailer rows; parent rows have undefined → 0 contribution
+    expect(sid1.durationMs).toBe(9450 + 4200);
+
+    // sid2 holds 3 rows (2 assistant + 1 trailer)
+    expect(sid2.rowCount).toBe(3);
+    expect(sid2.trailerCount).toBe(1);
+    // totalUSD: Opus input-only ($5) + Sonnet full ($18) + 1 trailer ($0)
+    expect(sid2.totalUSD).toBeCloseTo(23, 3);
+    expect(sid2.modelMix['claude-opus-4-7']).toEqual({ tokens: 1_000_000, usd: 5 });
+    expect(sid2.modelMix['claude-sonnet-4-6']).toEqual({ tokens: 2_000_000, usd: 18 });
+    expect(sid2.modelMix['unknown']).toEqual({ tokens: 200_000, usd: 0 });
+    expect(sid2.durationMs).toBe(1500);
+
+    // unknown bucket: missing correlationId row + malformed (2-seg) row
+    expect(unk.rowCount).toBe(2);
+    expect(unk.trailerCount).toBe(0);
+    // Haiku full ($6) + Opus input-only ($5)
+    expect(unk.totalUSD).toBeCloseTo(11, 3);
+
+    // Sum across all buckets equals total fixture row count (no row drops, AC4)
+    const sumRows = buckets.reduce((acc, b) => acc + b.rowCount, 0);
+    expect(sumRows).toBe(FIXTURE_ROWS.length);
+  });
+
+  it("level='phase' — sid→phase via specPhaseMap; missing sid → 'unknown' bucket (FR-AGG-2 / NFR-9)", () => {
+    const buckets = aggregateBy(FIXTURE_ROWS, 'phase', { specPhaseMap: SPEC_PHASE_MAP });
+    // 3 buckets: design (sid1) / requirements (sid2) / unknown (no sid + malformed)
+    expect(buckets).toHaveLength(3);
+    const byKey = Object.fromEntries(buckets.map((b) => [b.key, b]));
+
+    const design = byKey['design'];
+    const reqs = byKey['requirements'];
+    const unk = byKey['unknown'];
+    if (!design || !reqs || !unk) throw new Error('missing expected phase bucket');
+
+    // design = sid1 rollup
+    expect(design.rowCount).toBe(5);
+    expect(design.trailerCount).toBe(2);
+    expect(design.totalUSD).toBeCloseTo(54, 3);
+
+    // requirements = sid2 rollup
+    expect(reqs.rowCount).toBe(3);
+    expect(reqs.trailerCount).toBe(1);
+    expect(reqs.totalUSD).toBeCloseTo(23, 3);
+
+    // unknown bucket: missing-correlationId row + malformed-2seg row both fall here
+    expect(unk.rowCount).toBe(2);
+    expect(unk.trailerCount).toBe(0);
+    expect(unk.totalUSD).toBeCloseTo(11, 3);
+
+    // Sum row preservation across all buckets (AC4)
+    expect(buckets.reduce((acc, b) => acc + b.rowCount, 0)).toBe(FIXTURE_ROWS.length);
+  });
+
+  it("level='task' — full correlationId keys; same requestId NOT deduped (Decision 11 / AC4)", () => {
+    const buckets = aggregateBy(FIXTURE_ROWS, 'task', { specPhaseMap: SPEC_PHASE_MAP });
+    // 5 task keys at task level: sid1:1.1:1 / sid1:1.2:1 / sid2:2.1:1 +
+    // raw 'malformed:id' (parseCorrelationId rejects it for sid/phase paths
+    // but task level keys on `row.correlationId ?? 'unknown'` — so the raw
+    // string survives as its own bucket) + 'unknown' (the row with no cid).
+    expect(buckets).toHaveLength(5);
+    const byKey = Object.fromEntries(buckets.map((b) => [b.key, b]));
+
+    const t11 = byKey['sid1:1.1:1'];
+    const t12 = byKey['sid1:1.2:1'];
+    const t21 = byKey['sid2:2.1:1'];
+    const malformed = byKey['malformed:id'];
+    const unk = byKey['unknown'];
+    if (!t11 || !t12 || !t21 || !malformed || !unk) {
+      throw new Error('missing expected task bucket');
+    }
+
+    // sid1:1.1:1 — Decision 11 lock: parent (req-1, assistant) + trailer
+    // (req-1, subagent_trailer) BOTH bucketed despite shared requestId.
+    expect(t11.rowCount).toBe(2);
+    expect(t11.trailerCount).toBe(1);
+    expect(t11.totalUSD).toBeCloseTo(30, 3); // $30 Opus + $0 trailer
+    // both rows survive the bucket (no requestId-dedup at aggregateBy layer)
+    expect(t11.modelMix['claude-opus-4-7']).toEqual({ tokens: 2_000_000, usd: 30 });
+    expect(t11.modelMix['unknown']).toEqual({ tokens: 1_000_000, usd: 0 });
+    expect(t11.durationMs).toBe(9450);
+
+    // sid1:1.2:1 — also a parent+trailer requestId pair (req-2) AND a third
+    // independent assistant row (req-3 Haiku); proves trailer dedup is NOT
+    // requestId-based AND multi-assistant-rows-per-task accumulate cleanly.
+    expect(t12.rowCount).toBe(3);
+    expect(t12.trailerCount).toBe(1);
+    expect(t12.totalUSD).toBeCloseTo(18 + 6, 3); // Sonnet full + Haiku full + $0 trailer
+    expect(t12.modelMix['claude-sonnet-4-6']).toEqual({ tokens: 2_000_000, usd: 18 });
+    expect(t12.modelMix['claude-haiku-4-5-20251001']).toEqual({ tokens: 2_000_000, usd: 6 });
+    expect(t12.modelMix['unknown']).toEqual({ tokens: 500_000, usd: 0 });
+    expect(t12.durationMs).toBe(4200);
+
+    // sid2:2.1:1 — 3 distinct requestIds (req-4, req-5, req-6 trailer)
+    expect(t21.rowCount).toBe(3);
+    expect(t21.trailerCount).toBe(1);
+    expect(t21.totalUSD).toBeCloseTo(5 + 18, 3); // Opus input-only + Sonnet full + $0 trailer
+    expect(t21.durationMs).toBe(1500);
+
+    // unknown bucket holds the row with missing correlationId (Haiku full)
+    expect(unk.rowCount).toBe(1);
+    expect(unk.trailerCount).toBe(0);
+    expect(unk.totalUSD).toBeCloseTo(6, 3);
+
+    // malformed:id bucket — task-level keys on raw correlationId so a
+    // 2-segment string surfaces as its own (degenerate) bucket. spec/phase
+    // levels still bin it into 'unknown' since parseCorrelationId rejects
+    // it; the divergence between levels is intentional (Decision 11 — task
+    // level is the most granular and faithfully echoes the raw id).
+    expect(malformed.rowCount).toBe(1);
+    expect(malformed.trailerCount).toBe(0);
+    expect(malformed.totalUSD).toBeCloseTo(5, 3);
+
+    // Buckets pre-sorted desc by totalUSD (R7_topN slice contract)
+    for (let i = 0; i < buckets.length - 1; i++) {
+      const cur = buckets[i];
+      const next = buckets[i + 1];
+      if (!cur || !next) throw new Error('bucket pair missing');
+      expect(cur.totalUSD).toBeGreaterThanOrEqual(next.totalUSD);
+    }
+
+    // Row preservation across all task buckets (AC4)
+    expect(buckets.reduce((acc, b) => acc + b.rowCount, 0)).toBe(FIXTURE_ROWS.length);
   });
 });
