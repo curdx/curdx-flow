@@ -116,7 +116,7 @@ Goal: complete all 4 narrowing passes on spec-reviewer, fill code-quality-review
   - **Commit**: `feat(agents): code-quality-reviewer full rubrics — 30 items adapted from E1 audit (D1)`
   - _Design: Component 2, D1_
 
-- [ ] 2.5 [P] Create `references/two-stage-review.md` reference doc
+- [x] 2.5 [P] Create `references/two-stage-review.md` reference doc
   - **Do**:
     1. Create `plugins/curdx-flow/references/two-stage-review.md`
     2. Add 5 sections: (1) domain boundary table spec-compliance vs code-quality, (2) anti-rationalization rule, (3) SLSA-shape verdict field glossary, (4) 3-layer drift defense implementation details, (5) exclusion list minimum keyword set
