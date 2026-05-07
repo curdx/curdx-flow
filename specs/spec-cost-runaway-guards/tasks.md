@@ -154,7 +154,7 @@ Focus: all new test files + baseline extension. All tests must pass before Phase
   - **Commit**: `test(hooks): add 5 unit tests for stop-failure-handler`
   - _Requirements: FR-H3, FR-H5, NFR-5, FR-T1_
 
-- [ ] 3.2 Unit tests: max-iterations-enforcement.test.ts (3 boundary cases)
+- [x] 3.2 Unit tests: max-iterations-enforcement.test.ts (3 boundary cases)
   - **Do**:
     1. Create `tests/hooks/max-iterations-enforcement.test.ts`
     2. Case 1: `globalIteration = cap - 1` → stop-watcher DOES NOT block (under cap); verify decision is not `block`
