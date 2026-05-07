@@ -172,7 +172,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
 > 目标：把 POC 最小代码扩到 design 完整接口面 — trailer regex / aggregateBy 三级聚合 / 5 CLI flag 全接 / schema-map JSON 加 6 字段 / cache discriminator。
 
-- [ ] 2.1 Extend schema-map JSON with assistant.message.usage fields
+- [x] 2.1 Extend schema-map JSON with assistant.message.usage fields
   **Do**: 改 `transcript-events.json` 给 `assistant.fields` 加 6 项：`message.model` / `message.usage.input_tokens` / `message.usage.output_tokens` / `message.usage.cache_read_input_tokens` / `message.usage.cache_creation_input_tokens` / `message.usage.cache_creation.ephemeral_5m_input_tokens` / `message.usage.cache_creation.ephemeral_1h_input_tokens`（外加现有 `attributionPlugin` / `attributionSkill`）。advisory only，零代码改动。
 
   **Files**:
