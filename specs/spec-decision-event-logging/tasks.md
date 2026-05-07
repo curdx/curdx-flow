@@ -16,7 +16,7 @@ Task 1.4 — schema 扩展 + logHookEvent + stop-failure-handler 最小接入 + 
 
 Focus: schema 升级 + logHookEvent + 最小接入证明可行。不加测试，不 wire 所有 sites。
 
-- [ ] 1.1 [P] Extend error-logger.ts: 4-field schema + logHookEvent + coerceKind
+- [x] 1.1 [P] Extend error-logger.ts: 4-field schema + logHookEvent + coerceKind
   - **Do**:
     1. Add `EventLevel`, `EventKind` type exports to `src/hooks/_shared/error-logger.ts`
     2. Add `LogHookEventInput` interface with `level?`, `kind?`, `payload?`, `correlationId?` optional fields
