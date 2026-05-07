@@ -9,14 +9,14 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { homedir } from 'node:os';
 import path from 'node:path';
 
-import { computeCost, extractUsageRowsFromEvents } from './cost.ts';
+import { aggregateBy, computeCost, extractUsageRowsFromEvents } from './cost.ts';
 import { filterEvents } from './filter.ts';
 import { getStateForPath, loadSchemaMap, parseTranscript, shouldRotate } from './parser.ts';
 import { redactEvent, redactReportFields } from './redact.ts';
 import { renderReport } from './report.ts';
 import type { ReportJson, SpecStateInfo } from './report.ts';
 import { resolveTranscriptSource, TranscriptNotFoundError } from './transcript-path.ts';
-import type { Counters, Event, EventLogRow, Options, StateFile } from './types.ts';
+import type { AggregateBucket, Counters, Event, EventLogRow, Options, StateFile } from './types.ts';
 
 export type RunAnalyzeOptions = Options;
 
@@ -345,14 +345,41 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
       } catch {
         specPhaseMap = {};
       }
-      void specPhaseMap; // Task 2.9 wires this into aggregateBy(...) ctx.
-
       const usageRows = extractUsageRowsFromEvents(filtered, errorEntries);
       let totalUsd = 0;
       for (const r of usageRows) totalUsd += computeCost(r);
       // 4-decimal round at the boundary (Decision 10) — matches per-row
       // round4 in cost.ts so re-summing across rows doesn't drift.
       totalUsd = Math.round(totalUsd * 10000) / 10000;
+
+      // Task 2.7 — wire --by-spec / --by-phase / --by-task / --top flags.
+      // Selection rules (FR-CLI-1 / AC7 / design §Components #7 5 CLI flag 接线):
+      //   • Any of {bySpec, byPhase, byTask} = true → ONLY those dims compute
+      //   • All three false (cost-summary alone) → all three dims compute (R1+R2+R3+R7)
+      //   • `top` only truncates R7 (task-level) buckets
+      // Buckets stay local for now (Phase 1 closes only the totalCost.usd
+      // mirror); Task 2.9 plumbs them into `costBreakdown.{R1,R2,R3,R7}`,
+      // Phase 4 Task 4.4 wires R7 markdown rendering through report.ts.
+      const anyByFlag = opts.bySpec === true || opts.byPhase === true || opts.byTask === true;
+      const wantSpec = anyByFlag ? opts.bySpec === true : true;
+      const wantPhase = anyByFlag ? opts.byPhase === true : true;
+      const wantTask = anyByFlag ? opts.byTask === true : true;
+      const top = typeof opts.top === 'number' && Number.isFinite(opts.top) && opts.top > 0
+        ? Math.floor(opts.top)
+        : 10;
+      const costAggregates: {
+        spec?: AggregateBucket[];
+        phase?: AggregateBucket[];
+        task?: AggregateBucket[];
+      } = {};
+      if (wantSpec) costAggregates.spec = aggregateBy(usageRows, 'spec', { specPhaseMap });
+      if (wantPhase) costAggregates.phase = aggregateBy(usageRows, 'phase', { specPhaseMap });
+      if (wantTask) {
+        const taskBuckets = aggregateBy(usageRows, 'task', { specPhaseMap });
+        costAggregates.task = taskBuckets.slice(0, top);
+      }
+      void costAggregates; // Task 2.9 wires into costBreakdown.{R1,R2,R3,R7}.
+
       markdownStr = `${markdown}\n## Cost Summary\n\nTotal: $${totalUsd} USD\n`;
       jsonObj = { ...jsonObj, totalCost: { usd: totalUsd } };
     }

@@ -263,7 +263,7 @@ OB-3 闭环 spec — 在 `src/analyze/` 现有 5-piece pipeline 上追加 3 个�
 
   **Commit**: `feat(analyze): build specPhaseMap from state files for aggregateBy`
 
-- [ ] 2.7 Wire --by-spec / --by-phase / --by-task / --top flags in index.ts
+- [x] 2.7 Wire --by-spec / --by-phase / --by-task / --top flags in index.ts
   **Do**: citty 加 4 flag (`bySpec` / `byPhase` / `byTask` 全 boolean default false；`top` number default 10)。cost branch 内根据 flag 决定调用 `aggregateBy(rows, 'spec'|'phase'|'task', {specPhaseMap})` 哪些维度；都不开 + `--cost-summary` 时全开 R1+R2+R3 + R7。`--top` 仅影响 R7 截断。
 
   **Files**:
