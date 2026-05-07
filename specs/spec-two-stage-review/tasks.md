@@ -137,7 +137,7 @@ Goal: complete all 4 narrowing passes on spec-reviewer, fill code-quality-review
   - **Commit**: `feat(agents): code-quality-reviewer — role boundary + exclusion list + output protocol (AC-10.2, FR-A4)`
   - _Design: Component 2_
 
-- [ ] 2.7 [P] Edit `commands/design.md`: parallel dispatch Step 4 + QuickMode branch
+- [x] 2.7 [P] Edit `commands/design.md`: parallel dispatch Step 4 + QuickMode branch
   - **Do**:
     1. Locate Step 4 (Artifact Review) in `plugins/curdx-flow/commands/design.md`
     2. Replace single `Task(spec-reviewer)` call with the 6-step parallel dispatch block (per design Component 3): read bounded-parallel-dispatch ref, ONE message dispatch both reviewers, wait, reconcile (no cross-pollination), merge-state append reviews, QuickMode branch (D5 pseudocode)
