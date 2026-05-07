@@ -28,7 +28,7 @@ Focus: schema 升级 + logHookEvent + 最小接入证明可行。不加测试，
   - **Commit**: `feat(error-logger): add 4-field schema + logHookEvent + coerceKind`
   - _Design: Component 1, Component 2_
 
-- [ ] 1.2 [P] Add rotation helpers to error-logger.ts: rotateIfNeeded + safeRename + prune
+- [x] 1.2 [P] Add rotation helpers to error-logger.ts: rotateIfNeeded + safeRename + prune
   - **Do**:
     1. Add `rotateIfNeeded(filePath: string)` with throttle counter N=10, `shouldRotate` (size >10MB OR age >30d)
     2. Add `safeRename(src, dst)` — 4-step: renameSync → EBUSY retry chain (50/200/500ms) → EXDEV copy+unlink → silent give-up

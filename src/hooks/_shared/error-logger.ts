@@ -24,7 +24,16 @@
  * (Phase 3 tests inject a temp settings.json and need to clear the cache
  * between cases).
  */
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -37,6 +46,13 @@ const MAX_LINE_BYTES = 4096;
 const MSG_MAX = 500;
 const STACK_MAX = 2000;
 const STR_MAX = 500;
+
+// Rotation thresholds (D2/D3 design decisions).
+const ROTATE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const ROTATE_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const ROTATE_THROTTLE_N = 10; // only stat every 10th call (p99 budget)
+const ROTATE_KEEP = 5; // retention count (D2 hardcoded)
+const RENAME_RETRY_DELAYS_MS = [50, 200, 500] as const;
 
 let cachedEnabled: boolean | null = null;
 
@@ -121,6 +137,99 @@ export function coerceKind(raw: unknown): EventKind {
   return typeof raw === 'string' && KNOWN_KINDS.has(raw as EventKind)
     ? (raw as EventKind)
     : 'unknown';
+}
+
+/**
+ * Returns true when `filePath` exists and either exceeds 10 MB OR is older
+ * than 30 days. Missing file → false (nothing to rotate). NEVER-throw —
+ * any `statSync` failure (ENOENT, EPERM, mocked-fs) is caught and treated
+ * as "do not rotate".
+ */
+export function shouldRotate(filePath: string): boolean {
+  try {
+    const st = statSync(filePath);
+    if (st.size > ROTATE_SIZE_BYTES) return true;
+    if (Date.now() - st.mtimeMs > ROTATE_AGE_MS) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Renames `from` → `to` durably across platforms.
+ * - POSIX same-FS: `renameSync` is atomic.
+ * - Windows: file-locking (EBUSY/EPERM) gets a 50/200/500ms retry chain.
+ * - Cross-device (EXDEV) or final retry failure: copy + unlink fallback.
+ * NEVER throws — outer wrapper swallows everything (NFR-9).
+ */
+export function safeRename(from: string, to: string): void {
+  try {
+    try { renameSync(from, to); return; } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === 'EBUSY' || code === 'EPERM') {
+        for (const ms of RENAME_RETRY_DELAYS_MS) {
+          const end = Date.now() + ms;
+          while (Date.now() < end) { /* spin: hooks are short-lived, no await available */ }
+          try { renameSync(from, to); return; } catch { /* keep retrying */ }
+        }
+      }
+      // EXDEV or exhausted retries → copy + unlink fallback.
+      try { copyFileSync(from, to); unlinkSync(from); } catch { /* give up silently */ }
+    }
+  } catch { /* NEVER-throw outer */ }
+}
+
+/**
+ * Keeps the newest 5 rotated files in `dir` (matching `errors.<*>.jsonl`,
+ * NOT the live `errors.jsonl`). Sorts by mtime desc, unlinks the rest.
+ * NEVER throws.
+ */
+export function pruneRotatedFiles(dir: string): void {
+  try {
+    const entries = readdirSync(dir);
+    const rotated: Array<{ p: string; m: number }> = [];
+    for (const name of entries) {
+      // Match `errors.<something>.jsonl` but NOT the live `errors.jsonl`.
+      if (!name.startsWith('errors.') || !name.endsWith('.jsonl')) continue;
+      if (name === 'errors.jsonl') continue;
+      const full = path.join(dir, name);
+      try {
+        rotated.push({ p: full, m: statSync(full).mtimeMs });
+      } catch { /* skip unreadable entry */ }
+    }
+    rotated.sort((a, b) => b.m - a.m); // newest first
+    for (const { p } of rotated.slice(ROTATE_KEEP)) {
+      try { unlinkSync(p); } catch { /* skip */ }
+    }
+  } catch { /* NEVER-throw */ }
+}
+
+let rotateCounter = 0;
+
+/**
+ * Throttled rotation check. Only every Nth call (N=10) actually invokes
+ * `shouldRotate` to keep the p99 hot-path budget (~50ms/spec) intact.
+ * On hit: rename live log to `errors.<ISO-ts>-<pid>.jsonl`, then prune.
+ * NEVER throws.
+ */
+export function rotateIfNeeded(filePath: string): void {
+  try {
+    rotateCounter = (rotateCounter + 1) % ROTATE_THROTTLE_N;
+    if (rotateCounter !== 0) return;
+    if (!shouldRotate(filePath)) return;
+    // ISO-ts compact form `20260507T143205Z` is dictionary-ordered = sort order.
+    const iso = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+    const dir = path.dirname(filePath);
+    const target = path.join(dir, `errors.${iso}-${process.pid}.jsonl`);
+    safeRename(filePath, target);
+    pruneRotatedFiles(dir);
+  } catch { /* NEVER-throw */ }
+}
+
+/** Test-only: reset throttle counter so unit tests get deterministic behavior. */
+export function __resetRotateCounterForTest(): void {
+  rotateCounter = 0;
 }
 
 export interface LogHookErrorContext {
@@ -222,6 +331,7 @@ export function logHookEvent(input: LogHookEventInput, err?: Error): void {
     } catch {
       // ignore — appendFileSync failure below will swallow.
     }
+    rotateIfNeeded(ERRORS_LOG);
     appendFileSync(ERRORS_LOG, line + '\n');
   } catch {
     // NFR-9: hook events logging MUST NOT cascade. Swallow everything.
