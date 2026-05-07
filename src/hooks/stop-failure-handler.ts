@@ -41,6 +41,9 @@
  */
 import process from "node:process";
 
+import { buildCorrelationId } from "./_shared/correlation.ts";
+import * as eventLog from "./_shared/error-logger.ts";
+
 /**
  * 8-matcher human-readable description map. Source: research.md table.
  * Keep in sync with Anthropic's matcher list — adding a 9th matcher is a
@@ -93,6 +96,16 @@ async function main(): Promise<void> {
     payload = JSON.parse(trimmed);
   } catch {
     process.stderr.write("stop-failure-handler: malformed stdin\n");
+    // Site 3: error path — malformed stdin. correlationId is unavailable
+    // (StopFailure envelope has no spec/session context), so pass null/null.
+    eventLog.logHookEvent({
+      hook: "stop-failure-handler",
+      event: "StopFailure",
+      level: "error",
+      kind: "unknown",
+      msg: "malformed stdin",
+      correlationId: buildCorrelationId(null, null),
+    });
     process.exit(0);
   }
 
@@ -111,6 +124,30 @@ async function main(): Promise<void> {
     `unrecognised matcher (echoed verbatim from stdin)`;
 
   process.stderr.write(`[StopFailure:${matcher}] ${description}\n`);
+
+  // Sites 1 & 2: matcher dispatch. rate_limit is the highest-signal matcher
+  // (most common cause of stalled loops) and gets its own kind so analyze can
+  // count throttling separately from the long-tail of other failure modes.
+  if (matcher === "rate_limit") {
+    eventLog.logHookEvent({
+      hook: "stop-failure-handler",
+      event: "StopFailure",
+      level: "info",
+      kind: "stop_failure_rate_limit",
+      payload: { matcher, description },
+      correlationId: buildCorrelationId(null, null),
+    });
+  } else {
+    eventLog.logHookEvent({
+      hook: "stop-failure-handler",
+      event: "StopFailure",
+      level: "info",
+      kind: "stop_failure_other",
+      payload: { matcher, description },
+      correlationId: buildCorrelationId(null, null),
+    });
+  }
+
   process.exit(0);
 }
 

@@ -51,7 +51,7 @@ Focus: schema 升级 + logHookEvent + 最小接入证明可行。不加测试，
   - **Commit**: `feat(correlation): add buildCorrelationId 3-segment helper`
   - _Design: Component 6_
 
-- [ ] 1.4 [VERIFY] Wire stop-failure-handler.ts (3 sites) + POC checkpoint
+- [x] 1.4 [VERIFY] Wire stop-failure-handler.ts (3 sites) + POC checkpoint
   - **Do**:
     1. Import `logHookEvent` and `buildCorrelationId` in `src/hooks/stop-failure-handler.ts`
     2. Add `logHookEvent` call at all 3 decision sites: matcher hit (`kind: 'matcher_hit'`), matcher miss (`kind: 'matcher_miss'`), unknown (`kind: 'unknown'`)
