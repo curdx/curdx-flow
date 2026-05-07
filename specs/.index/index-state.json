@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-05-07T02:44:50Z",
+  "updated": "2026-05-07T04:04:05Z",
   "directories": [
     {
       "path": "./specs",
@@ -36,7 +36,9 @@
     {
       "name": "spec-cost-runaway-guards",
       "path": "./specs/spec-cost-runaway-guards",
-      "phase": "new"
+      "phase": "completed",
+      "taskIndex": 21,
+      "totalTasks": 21
     },
     {
       "name": "spec-subagent-context-reinjection",

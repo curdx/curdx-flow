@@ -43,7 +43,8 @@
     },
     {
       "name": "spec-cost-runaway-guards",
-      "status": "pending",
+      "status": "completed",
+      "completedAt": "2026-05-07",
       "dependencies": [
         "spec-verification-iron-law"
       ],
@@ -51,7 +52,7 @@
       "externalBlockersResolved": [
         "state-completion-marker (completed 2026-05-05)"
       ],
-      "preCheck": "verify StopFailure event GA in target Claude Code version"
+      "preCheckResolved": "StopFailure event verified GA (observability-only; 8 matchers)"
     }
   ],
   "output": "spec-files",
