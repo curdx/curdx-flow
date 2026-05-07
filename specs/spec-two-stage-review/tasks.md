@@ -29,7 +29,7 @@ Goal: prove schema change + 1 narrowing pass + code-quality-reviewer skeleton + 
   - **Commit**: `feat(types): add ReviewVerdict + VerificationBlock.reviews keyed field (D3)`
   - _Design: Component 4, D3_
 
-- [ ] 1.2 [P] Create `code-quality-reviewer.md` skeleton
+- [x] 1.2 [P] Create `code-quality-reviewer.md` skeleton
   - **Do**:
     1. Create `plugins/curdx-flow/agents/code-quality-reviewer.md` with frontmatter (`name`, `description`, `model: sonnet`, `color: orange`)
     2. Add skeleton sections: Role boundary (stub), Exclusion list with exactly these 4 items: `traceability to requirements`, `phase artifact structure`, `requirement coverage`, `artifact format / front-matter`
