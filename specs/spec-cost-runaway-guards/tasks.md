@@ -167,7 +167,7 @@ Focus: all new test files + baseline extension. All tests must pass before Phase
   - **Commit**: `test(hooks): add boundary enforcement tests for max-iterations`
   - _Requirements: FR-E1, FR-E2, FR-E3, US-9, FR-T2, R6_
 
-- [ ] 3.3 Extend stop-watcher.test.ts (+2 hard block cases)
+- [x] 3.3 Extend stop-watcher.test.ts (+2 hard block cases)
   - **Do**:
     1. Open `tests/hooks/stop-watcher.test.ts`
     2. Add test: globalIteration at cap → decision is `block` (was previously soft warn — regression guard)

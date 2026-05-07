@@ -445,4 +445,130 @@ describe("stop-watcher (Stop hook)", () => {
       reentrantSpec.cleanup();
     }
   });
+
+  // -----------------------------------------------------------------------
+  // Cost-runaway gate hard-block regression guards (Task 3.3 — spec
+  // spec-cost-runaway-guards). The pre-7.2 stop-watcher only emitted a soft
+  // stderr warn when an iteration cap was hit; Task 1.6 replaced that with a
+  // hard `decision: "block"` via `buildCostRunawayBlock`. These two cases
+  // pin the new behavior at the boundary AND assert the gate's insertion
+  // order in the runHook pipeline:
+  //
+  //   stop_hook_active early-exit  (must fire FIRST — no block)
+  //     ↓
+  //   buildCostRunawayBlock        (must fire BEFORE verifyPhaseBlock)
+  //     ↓
+  //   verifyPhaseBlock missing/failed/stale gates
+  //
+  // Case (i) below provokes both gates simultaneously (missing
+  // verificationBlocks + cap-tripped) and asserts the cost-runaway message
+  // wins — proving the cost-runaway gate sits ahead of the iron-law gate.
+  // -----------------------------------------------------------------------
+
+  it("(h): globalIteration === maxGlobalIterations → hard block with 'Cost runaway guard' reason", () => {
+    // Exact-equal boundary: the gate uses `>=` semantics, so equality must
+    // trip it (regression guard against any future `>` typo). This case
+    // duplicates the spirit of max-iterations-enforcement.test.ts case 1
+    // intentionally — co-located here so the stop-watcher suite catches a
+    // regression even if the dedicated boundary file is removed/refactored.
+    const capSpec = createFixtureSpec({
+      state: {
+        phase: "execution",
+        taskIndex: 1,
+        totalTasks: 3,
+        globalIteration: 30,
+        maxGlobalIterations: 30,
+        taskIteration: 1,
+        maxTaskIterations: 5,
+      },
+    });
+    try {
+      const r = runHook(
+        "stop-watcher",
+        "tests/hooks/fixtures/stop-watcher/execution-block.json",
+        { cwd: capSpec.cwd },
+      );
+      expect(r.exitCode).toBe(0);
+      expect(r.json).toBeDefined();
+      expect((r.json as any).decision).toBe("block");
+      expect((r.json as any).reason).toContain("Cost runaway guard");
+      expect((r.json as any).reason).toContain("globalIteration=30");
+      expect((r.json as any).reason).toContain("maxGlobalIterations=30");
+    } finally {
+      capSpec.cleanup();
+    }
+  });
+
+  it("(i): cap insertion order — fires AFTER stop_hook_active early-exit, BEFORE verifyPhaseBlock", () => {
+    // Two-part assertion proving the gate's pipeline position:
+    //
+    // Part 1: stop_hook_active=true + cap-tripped + missing block →
+    //   silent early-exit (no Cost-runaway message, no missing-block
+    //   message). Confirms the D5 guard sits ABOVE the cost-runaway gate.
+    //
+    // Part 2: stop_hook_active=false + cap-tripped + missing block + cwd
+    //   pointing at all-complete fixture (which would normally trigger the
+    //   verifyPhaseBlock missing-block message under handleCompletion) →
+    //   the COST-RUNAWAY message wins. Confirms the cost-runaway gate
+    //   sits BELOW stop_hook_active but ABOVE verifyPhaseBlock.
+    const orderingSpec = createFixtureSpec({
+      state: {
+        phase: "execution",
+        taskIndex: 1,
+        totalTasks: 3,
+        globalIteration: 30,
+        maxGlobalIterations: 30,
+        taskIteration: 1,
+        maxTaskIterations: 5,
+        // verificationBlocks intentionally absent → verifyPhaseBlock would
+        // emit the "no verification block" message if it were reached.
+      },
+    });
+    try {
+      // Part 1: stop_hook_active=true short-circuits before cost-runaway.
+      const reentrantStdin = JSON.stringify({
+        hookEvent: "Stop",
+        cwd: orderingSpec.cwd,
+        transcript_path: "/tmp/curdx-fixture-transcripts/complete.txt",
+        stop_hook_active: true,
+      });
+      const reentrantResult = spawnSync("node", [STOP_WATCHER_BUNDLE], {
+        input: reentrantStdin,
+        cwd: orderingSpec.cwd,
+        env: {
+          ...process.env,
+          CLAUDE_PLUGIN_ROOT: path.join(
+            REPO_ROOT_FOR_BUNDLE,
+            "plugins/curdx-flow",
+          ),
+        },
+        encoding: "utf8",
+        timeout: 5000,
+      });
+      expect(reentrantResult.status).toBe(0);
+      expect(reentrantResult.stdout ?? "").toBe("");
+      // Neither gate's message leaks: stop_hook_active wins.
+      expect(norm(reentrantResult.stderr)).not.toContain("Cost runaway guard");
+      expect(norm(reentrantResult.stderr)).not.toContain("no verification block");
+
+      // Part 2: stop_hook_active=false → cost-runaway fires before
+      // verifyPhaseBlock (despite all-complete fixture pointing at a
+      // transcript with ALL_TASKS_COMPLETE, which would normally route
+      // through handleCompletion → verifyPhaseBlock missing-block path).
+      const r = runHook(
+        "stop-watcher",
+        "tests/hooks/fixtures/stop-watcher/all-complete.json",
+        { cwd: orderingSpec.cwd },
+      );
+      expect(r.exitCode).toBe(0);
+      expect(r.json).toBeDefined();
+      expect((r.json as any).decision).toBe("block");
+      // Cost-runaway message wins over verifyPhaseBlock's "no verification
+      // block" message — load-bearing assertion for insertion order.
+      expect((r.json as any).reason).toContain("Cost runaway guard");
+      expect((r.json as any).reason).not.toContain("no verification block");
+    } finally {
+      orderingSpec.cleanup();
+    }
+  });
 });
