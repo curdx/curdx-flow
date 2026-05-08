@@ -2,9 +2,9 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 7.1.7 — 2026-05-07
 
-### Added — observability-v2 epic (OB-1 + OB-2 error-logger + OB-3)
+### Added — observability-v2 epic (OB-1 + OB-2 error-logger + OB-3, PR #7)
 
 #### OB-3 — cost / time / token analytics (spec-cost-time-token-analytics)
 - **`npx curdx-flow analyze --cost-summary` flag suite.** New citty flag turns on cost / time / token aggregation across the spec funnel. Companion flags `--by-spec`, `--by-phase`, `--by-task`, `--top <N>`, and the existing `--since <duration>` compose freely. Off by default — the v7.1.7 baseline `analyze` 7-section report is preserved byte-equal when `--cost-summary` is absent (NFR-6).
@@ -30,9 +30,7 @@ All notable changes to `@curdx/flow` are documented here. Format follows [Keep a
 - **`cleanupOrphanState` helper in `src/analyze/index.ts`.** Two-pass GC over `state.files`: pass 1 drops entries with `lastModifiedMs > 30 days ago` OR `!existsSync(path)`; pass 2 caps total at 100 entries. Active session paths protected. Fail-open per FR-C3.
 - **8 new tests in `tests/analyze/transcript-path.test.ts`.** cwd `/`→`-` encoding, multi-session glob, missing project dir → `TranscriptNotFoundError`, `fixtureOverride` short-circuit, `--session` filter, 30-day GC, 100-entry cap, file-gone GC.
 
-## 7.1.7 — 2026-05-06
-
-### Added
+### Added — verification iron law + parallel dispatch + cost-runaway guards (PR #5)
 
 - **Layer-2 opt-in `TaskCompleted` hook (`plugins/curdx-flow/hooks/scripts/task-completed.mjs`).** Fires when a task is marked complete and inspects the active spec's `verificationBlocks` state field; if any block is unresolved, the hook emits a non-blocking warning to remind the executor that the next phase requires real-environment verification proof. Wired into `plugins/curdx-flow/hooks/hooks.json` as opt-in (Layer-2) — disabled by default to keep the baseline path zero-friction; users opt in by enabling the hook entry. Pairs with the `verifyPhaseBlock` gate in `stop-watcher.mjs` (see *Changed*) so blocking enforcement and surfaced reminders share the same state field.
 - **`verificationBlocks` state schema field on `.curdx-state.json` (`plugins/curdx-flow/schemas/spec.schema.json`).** Optional array of `{ phase: string, requiredArtifact: string, resolved: boolean }` records. Phase commands write a block when they finish a deliverable that the next phase must verify against the real environment (e.g. design phase produces an architectural claim that tasks-phase implementation must reproduce). The block stays unresolved until a `[VERIFY]` task or VE proof clears it. Legacy state files without the field continue to work — `verificationBlocks === undefined` is treated as "no outstanding blocks", preserving backwards compatibility with v7.0.x and earlier 7.1.x state files.
