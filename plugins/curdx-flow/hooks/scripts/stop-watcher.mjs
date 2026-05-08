@@ -894,6 +894,9 @@ runHook(async (input) => {
       if (stateMalformed) {
         return buildMalformedVerificationBlock(specName);
       }
+      if (parsedState?.completed === true) {
+        return void 0;
+      }
       const epicName = parsedState && typeof parsedState.epicName === "string" && parsedState.epicName.length > 0 ? parsedState.epicName : void 0;
       if (parsedState) {
         const knownPhase = getVerificationPhase(parsedState);

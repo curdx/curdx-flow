@@ -156,6 +156,71 @@ describe("stop-watcher (Stop hook)", () => {
     }
   });
 
+  // Regression guard: completed=true must short-circuit the iron-law gate
+  // INSIDE handleCompletion() (stop-watcher.ts L755) too — not just the
+  // mainline gate at L826. Symptom before fix: a finalized spec retained
+  // per NFR-5a would still trigger "Phase 'execution' has no verification
+  // block" whenever the user stopped a session and the transcript happened
+  // to contain ALL_TASKS_COMPLETE, because the verification gate at L786
+  // ran without checking state.completed.
+  it("completed=true + ALL_TASKS_COMPLETE in transcript + no verificationBlocks → silent return (handleCompletion gate)", () => {
+    const completedSpec = createFixtureSpec({
+      state: {
+        phase: "execution",
+        taskIndex: 3,
+        totalTasks: 3,
+        completed: true,
+        completedAt: "2026-05-04T13:00:00.000Z",
+        // verificationBlocks intentionally absent — the L786 gate would
+        // emit "no verification block" if not short-circuited by the
+        // completed flag. That is the bug we are guarding against.
+      },
+    });
+    try {
+      // Provision a transcript inside the fixture spec dir (cross-platform —
+      // createFixtureSpec already uses os.tmpdir()). The transcript contains
+      // ALL_TASKS_COMPLETE, which forces handleCompletion() to run.
+      const transcriptPath = path.join(
+        completedSpec.cwd,
+        "transcript-with-marker.txt",
+      );
+      writeFileSync(
+        transcriptPath,
+        "line one\nline two\nline three\nALL_TASKS_COMPLETE\n",
+      );
+
+      const stdin = JSON.stringify({
+        hookEvent: "Stop",
+        cwd: completedSpec.cwd,
+        transcript_path: transcriptPath,
+        stop_hook_active: false,
+      });
+
+      const result = spawnSync("node", [STOP_WATCHER_BUNDLE], {
+        input: stdin,
+        cwd: completedSpec.cwd,
+        env: {
+          ...process.env,
+          CLAUDE_PLUGIN_ROOT: path.join(
+            REPO_ROOT_FOR_BUNDLE,
+            "plugins/curdx-flow",
+          ),
+        },
+        encoding: "utf8",
+        timeout: 5000,
+      });
+
+      expect(result.status).toBe(0);
+      // Silent return: no decision block, just the stderr completion banner.
+      expect(result.stdout ?? "").toBe("");
+      expect(norm(result.stderr ?? "")).toContain(
+        "ALL_TASKS_COMPLETE detected",
+      );
+    } finally {
+      completedSpec.cleanup();
+    }
+  });
+
   // NFR-5b / NFR-2: v7.0.x legacy state without `completed` field must fall
   // through to the existing in-progress continuation logic (backwards-compat).
   // Uses `createLegacyState()` to build the pre-v7.1.0 shape from scratch
