@@ -752,6 +752,17 @@ runHook(async (input) => {
       if (stateMalformed) {
         return buildMalformedVerificationBlock(specName);
       }
+
+      // Spec already finalized (NFR-5a v7.1.0): the loop legitimately ended
+      // in a prior turn and the state file is being retained for audit. Skip
+      // the iron-law gate to avoid harassing the user about a phase whose
+      // work is already done. Mirrors the in-progress-path check at L826
+      // below; the two paths cannot share a single check because this
+      // handleCompletion branch returns before reaching L826.
+      if (parsedState?.completed === true) {
+        return undefined;
+      }
+
       const epicName =
         parsedState && typeof parsedState.epicName === "string" &&
           parsedState.epicName.length > 0
