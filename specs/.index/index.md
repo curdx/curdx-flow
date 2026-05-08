@@ -3,15 +3,15 @@
 Auto-generated summary of all specs across configured directories.
 See [index-state.json](./index-state.json) for machine-readable data.
 
-**Last updated:** 2026-05-07T04:04:05Z
+**Last updated:** 2026-05-07T23:51:14Z
 
 ## Directories (1)
 
 | Directory | Specs | Default |
 |-----------|-------|---------|
-| ./specs | 9 | Yes |
+| ./specs | 10 | Yes |
 
-## All Specs (9)
+## All Specs (10)
 
 | Spec | Directory | Phase | Status |
 |------|-----------|-------|--------|
@@ -20,6 +20,7 @@ See [index-state.json](./index-state.json) for machine-readable data.
 | plugin-observability | ./specs | completed | done |
 | spec-bounded-parallel-dispatch | ./specs | execution | 9/9 tasks |
 | spec-cost-runaway-guards | ./specs | execution | 21/21 tasks |
+| spec-cost-time-token-analytics | ./specs | execution | 48/48 tasks |
 | spec-subagent-context-reinjection | ./specs | execution | 15/15 tasks |
 | spec-two-stage-review | ./specs | execution | 22/22 tasks |
 | spec-verification-iron-law | ./specs | execution | 53/53 tasks |
