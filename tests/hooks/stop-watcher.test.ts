@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runHook } from "./_helpers.js";
@@ -9,6 +10,11 @@ import {
   createLegacyState,
   type FixtureSpec,
 } from "./_fixture-setup.js";
+
+// Cross-platform fixture transcript path. Hardcoded `/tmp/` fails on Windows
+// (CI Node22 leg) — see commit history for the original POC-gate test failure.
+const FIXTURE_TRANSCRIPT_DIR = path.join(os.tmpdir(), "curdx-fixture-transcripts");
+const FIXTURE_TRANSCRIPT_FILE = path.join(FIXTURE_TRANSCRIPT_DIR, "complete.txt");
 
 // ---------------------------------------------------------------------------
 // POC-gate (Task 1.8) helpers — local to this test file.
@@ -71,13 +77,13 @@ describe("stop-watcher (Stop hook)", () => {
       "{ this is not json",
     );
     // POC-gate fixtures (a)+(b) reference all-complete.json, whose
-    // transcript_path points at /tmp/curdx-fixture-transcripts/complete.txt.
+    // transcript_path points at FIXTURE_TRANSCRIPT_FILE (platform tmpdir).
     // byte-equal.test.ts beforeAll provisions this file, but if that suite
     // hasn't run yet (test isolation / fork ordering) we provision it here
     // defensively so these cases stay self-contained.
-    mkdirSync("/tmp/curdx-fixture-transcripts", { recursive: true });
+    mkdirSync(FIXTURE_TRANSCRIPT_DIR, { recursive: true });
     writeFileSync(
-      "/tmp/curdx-fixture-transcripts/complete.txt",
+      FIXTURE_TRANSCRIPT_FILE,
       "line one\nline two\nline three\nALL_TASKS_COMPLETE\n",
     );
   });
@@ -199,7 +205,7 @@ describe("stop-watcher (Stop hook)", () => {
   // The gate fires inside `handleCompletion()` (stop-watcher.ts ~L630) which
   // only runs when ALL_TASKS_COMPLETE is detected in the transcript. We use
   // the existing `all-complete.json` fixture (transcript_path points at
-  // /tmp/curdx-fixture-transcripts/complete.txt which contains the marker —
+  // FIXTURE_TRANSCRIPT_FILE under the platform tmpdir — contains the marker;
   // provisioned by byte-equal.test.ts beforeAll, but that helper writes it
   // unconditionally so it's already on disk by the time these tests run on
   // any machine that has run the suite once; we re-provision defensively in
@@ -416,7 +422,7 @@ describe("stop-watcher (Stop hook)", () => {
       const stdin = JSON.stringify({
         hookEvent: "Stop",
         cwd: reentrantSpec.cwd,
-        transcript_path: "/tmp/curdx-fixture-transcripts/complete.txt",
+        transcript_path: FIXTURE_TRANSCRIPT_FILE,
         stop_hook_active: true,
       });
       const result = spawnSync("node", [STOP_WATCHER_BUNDLE], {
@@ -529,7 +535,7 @@ describe("stop-watcher (Stop hook)", () => {
       const reentrantStdin = JSON.stringify({
         hookEvent: "Stop",
         cwd: orderingSpec.cwd,
-        transcript_path: "/tmp/curdx-fixture-transcripts/complete.txt",
+        transcript_path: FIXTURE_TRANSCRIPT_FILE,
         stop_hook_active: true,
       });
       const reentrantResult = spawnSync("node", [STOP_WATCHER_BUNDLE], {
