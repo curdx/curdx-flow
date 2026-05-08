@@ -66,6 +66,11 @@ jobs:
       - run: npm ci
       - run: npm run build:hooks
       - run: npm run test:hooks
+      # check:bundle validates dist/index.mjs (the CLI bundle output by tsup,
+      # not the plugin hook bundles). Must run `build` first — `build:hooks`
+      # only emits plugin hook .mjs files, not dist/.
+      - run: npm run build
+      - run: npm run check:bundle
 
   all-green:
     runs-on: ubuntu-latest
