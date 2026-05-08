@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import os from "node:os";
 import path from "node:path";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -77,6 +78,22 @@ export function runHook(
       // fixture JSON's `cwd` (e.g., "/tmp/curdx-fixture-spec") is irrelevant
       // on Windows; we substitute the runtime path here.
       parsed.cwd = options.cwd;
+
+      // Bug 3 fix: same treatment for `transcript_path`. Static fixtures
+      // (e.g., all-complete.json) hardcode `/tmp/curdx-fixture-transcripts/...`,
+      // which doesn't reliably resolve on Windows. If the field starts with
+      // `/tmp/`, replace the prefix with the platform tmpdir so the hook reads
+      // the file the test's beforeEach actually provisions there.
+      if (
+        typeof parsed.transcript_path === "string" &&
+        parsed.transcript_path.startsWith("/tmp/")
+      ) {
+        parsed.transcript_path = path.join(
+          os.tmpdir(),
+          parsed.transcript_path.slice("/tmp/".length),
+        );
+      }
+
       stdin = JSON.stringify(parsed);
     }
   } catch {
