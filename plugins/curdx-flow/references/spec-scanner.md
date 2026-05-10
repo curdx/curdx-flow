@@ -225,7 +225,7 @@ Determine spec phase from directory contents:
 
 | Phase | Action |
 |-------|--------|
-| research | Create research team, spawn parallel teammates, merge results |
+| research | Dispatch bounded parallel research via direct `Task(...)`, merge results |
 | requirements | Invoke product-manager agent |
 | design | Invoke architect-reviewer agent |
 | tasks | Invoke task-planner agent |

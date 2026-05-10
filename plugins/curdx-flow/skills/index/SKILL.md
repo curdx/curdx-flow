@@ -13,7 +13,7 @@ You are running the codebase indexing command. This scans the repository to gene
 
 ## Checklist
 
-Use TaskCreate to track these steps:
+Use native task UI tracking if `TaskCreate` is available; otherwise keep this checklist inline:
 
 - [ ] Parse arguments and validate
 - [ ] Pre-scan interview (skip if --quick)

@@ -144,7 +144,7 @@ The goal MUST be captured before proceeding:
      "taskIteration": 1,
      "maxTaskIterations": 5,
      "globalIteration": 1,
-     "maxGlobalIterations": 100
+     "maxGlobalIterations": 30
    }
    ```
 

@@ -2,7 +2,7 @@
 name: start
 description: Use when starting curdx-flow, creating a spec, resuming work, or routing intent.
 argument-hint: "[name] [goal] [--fresh] [--quick] [--commit-spec] [--no-commit-spec] [--specs-dir <path>] [--tasks-size fine|coarse]"
-allowed-tools: "*"
+allowed-tools: "Read Write Edit Bash Task Skill AskUserQuestion"
 disable-model-invocation: true
 ---
 
@@ -114,7 +114,7 @@ Continuing...
 
 | Phase | Action |
 |-------|--------|
-| research | Create research team, spawn parallel teammates, merge results |
+| research | Dispatch bounded parallel research via direct `Task(...)`, merge results |
 | requirements | Invoke product-manager agent |
 | design | Invoke architect-reviewer agent |
 | tasks | Invoke task-planner agent |
@@ -143,7 +143,7 @@ Continuing...
      "source": "spec", "name": "$name", "basePath": "$basePath",
      "phase": "research", "taskIndex": 0, "totalTasks": 0,
      "taskIteration": 1, "maxTaskIterations": 5,
-     "globalIteration": 1, "maxGlobalIterations": 100,
+     "globalIteration": 1, "maxGlobalIterations": 30,
      "commitSpec": true, "quickMode": false,
      "discoveredSkills": [],
      "completed": false
@@ -193,7 +193,7 @@ Continuing...
       If no skills match: `- No skills matched`
 10. Update Spec Index: `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet`
 11. **Goal Interview** -- Read `${CLAUDE_PLUGIN_ROOT}/references/goal-interview.md` and follow brainstorming dialogue
-12. **Team Research Phase** -- Read `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md` and follow the dispatch pattern
+12. **Parallel Research Phase** -- Read `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md` and follow the direct Task dispatch pattern; Agent Teams are optional only when enabled and available
 13. **Skill Discovery Pass 2 (Post-Research Retry)** -- Re-scan skills with enriched context after research completes:
 
     ### Skill Discovery Pass 2
@@ -266,7 +266,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/references/quick-mode.md` and follow the full quick 
 
 **Summary**: Validates input, infers name, creates spec directory, initializes state with quickMode=true, then runs all phases sequentially (research, requirements, design, tasks) delegating to subagents with Quick Mode Directive. Each artifact gets a review loop (max 3 iterations). After all artifacts generated, transitions to execution and invokes spec-executor for task 1.
 
-**IMPORTANT**: Each phase MUST be tracked as a native Claude task via `TaskCreate` / `TaskUpdate`. Create a task at phase start (with `activeForm` for spinner text), mark it completed when the phase finishes. This provides visible progress in the UI. See quick-mode.md steps 11-15 for the exact pattern.
+**IMPORTANT**: If native task UI tools are available, track each phase via `TaskCreate` / `TaskUpdate` for visible progress. If unavailable, continue without native task tracking; phase artifacts and state updates remain the source of truth. See quick-mode.md steps 11-15 for the exact optional pattern.
 
 <mandatory>
 ## CRITICAL: Delegation Requirement
@@ -286,7 +286,7 @@ You MUST delegate ALL substantive work to subagents. This is NON-NEGOTIABLE rega
 
 | Work Type | Subagent |
 |-----------|----------|
-| Research | Research Team (multiple parallel teammates) |
+| Research | `research-analyst` and Explore-style research subagents via direct Task dispatch |
 | Requirements | `product-manager` |
 | Design | `architect-reviewer` |
 | Task Planning | `task-planner` |

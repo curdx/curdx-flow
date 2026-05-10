@@ -5,6 +5,7 @@ arguments:
   - name: message
     description: Your feedback or issue description
     required: false
+allowed-tools: "Bash AskUserQuestion"
 disable-model-invocation: true
 ---
 

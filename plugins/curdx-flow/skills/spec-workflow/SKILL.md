@@ -1,9 +1,10 @@
 ---
 name: spec-workflow
-description: Primary curdx-flow skill for spec-driven development workflows and phase orchestration.
+description: Use when planning, running, or resuming curdx-flow spec-driven workflows.
 when_to_use: Use when user asks to build, implement, plan, triage, decompose, resume, inspect status, or run any curdx-flow research/requirements/design/tasks/implementation phase.
 argument-hint: "[intent-or-spec]"
 version: 0.2.0
+user-invocable: false
 ---
 
 # Spec Workflow

@@ -2,7 +2,7 @@
 name: research
 description: Use when running or re-running discovery research for the active spec.
 argument-hint: "[spec-name]"
-allowed-tools: "*"
+allowed-tools: "Read Write Edit Bash Task AskUserQuestion"
 disable-model-invocation: true
 ---
 

@@ -2,7 +2,7 @@
 name: requirements
 description: Use when a spec has research or goal context and needs requirements.
 argument-hint: "[spec-name]"
-allowed-tools: "*"
+allowed-tools: "Read Write Edit Bash Task AskUserQuestion"
 disable-model-invocation: true
 ---
 
@@ -17,7 +17,7 @@ Create a task for each item and complete in order:
 
 1. **Gather context** -- resolve spec, read research and goal
 2. **Interview** -- brainstorming dialogue (skip if `--quick`)
-3. **Execute requirements** -- dispatch product-manager via team
+3. **Execute requirements** -- dispatch product-manager via direct Task; Agent Teams optional
 4. **Artifact review** -- spec-reviewer validation loop (only if `--quick`)
 5. **Walkthrough & approval** -- display summary, get user approval
 6. **Finalize** -- update state, commit, stop

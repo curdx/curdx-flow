@@ -146,13 +146,13 @@ to fields missing on init, not to stored values). To explicitly opt back
 into legacy behavior on a new spec:
 
 ```bash
-npx curdx-flow:implement --max-global-iterations 100
+/curdx-flow:implement --max-global-iterations 100
 ```
 
 To opt into a tighter cap for a one-off loop:
 
 ```bash
-npx curdx-flow:implement --max-global-iterations 10
+/curdx-flow:implement --max-global-iterations 10
 ```
 
 The CLI flag is parsed in `plugins/curdx-flow/skills/implement/SKILL.md` (Step 2

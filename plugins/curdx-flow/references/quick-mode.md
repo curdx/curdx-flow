@@ -71,7 +71,7 @@ Validation Sequence:
    { source: "plan", name, basePath, phase: "research",
      taskIndex: 0, totalTasks: 0, taskIteration: 1,
      maxTaskIterations: 5, globalIteration: 1,
-     maxGlobalIterations: 100, commitSpec: $commitSpec,
+     maxGlobalIterations: 30, commitSpec: $commitSpec,
      quickMode: true, discoveredSkills: [] }
 6. Write .progress.md with original goal
 7. Update .current-spec (bare name or full path)
@@ -110,9 +110,9 @@ Validation Sequence:
          ```
 11. Research Phase: TaskCreate("Research for $spec", activeForm: "Researching") if available, run direct parallel Task research flow (Agent Teams optional only when enabled), skip walkthrough, clear awaitingApproval, TaskUpdate(completed) if available
 12. Skill Discovery Pass 2: re-scan skills using goal + research Executive Summary, invoke new matches
-13. Requirements Phase: TaskCreate("Requirements for $spec", activeForm: "Generating requirements"), delegate to product-manager with Quick Mode Directive, review loop, TaskUpdate(completed)
-14. Design Phase: TaskCreate("Design for $spec", activeForm: "Generating design"), delegate to architect-reviewer with Quick Mode Directive, review loop, TaskUpdate(completed)
-15. Tasks Phase: TaskCreate("Tasks for $spec", activeForm: "Generating tasks"), delegate to task-planner with Quick Mode Directive, review loop, TaskUpdate(completed)
+13. Requirements Phase: TaskCreate("Requirements for $spec", activeForm: "Generating requirements") if available, delegate to product-manager with Quick Mode Directive, review loop, TaskUpdate(completed) if available
+14. Design Phase: TaskCreate("Design for $spec", activeForm: "Generating design") if available, delegate to architect-reviewer with Quick Mode Directive, review loop, TaskUpdate(completed) if available
+15. Tasks Phase: TaskCreate("Tasks for $spec", activeForm: "Generating tasks") if available, delegate to task-planner with Quick Mode Directive, review loop, TaskUpdate(completed) if available
 16. Transition to Execution:
     - Count total tasks (number of `- [ ]` checkboxes)
     - Update state: phase="execution", totalTasks=<count>, taskIndex=0

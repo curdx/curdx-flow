@@ -1,6 +1,6 @@
 ---
 name: communication-style
-description: Concise output rules for curdx-flow artifacts and phase summaries.
+description: Use when writing curdx-flow phase artifacts, reviews, walkthroughs, or progress summaries.
 when_to_use: Use when writing research.md, requirements.md, design.md, tasks.md, reviews, walkthroughs, progress summaries, or subagent phase output.
 version: 0.2.0
 user-invocable: false

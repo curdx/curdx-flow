@@ -21,6 +21,7 @@ describe("init-execution-state", () => {
         taskIndex: 0,
         taskIteration: 1,
         globalIteration: 1,
+        maxGlobalIterations: 30,
         recoveryMode: false,
         completed: false,
       });

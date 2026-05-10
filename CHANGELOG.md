@@ -2,6 +2,20 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.14 — 2026-05-10
+
+### Fixed
+
+- **Fresh spec state now consistently uses the bounded `maxGlobalIterations: 30` default.** `/curdx-flow:start`, `/curdx-flow:new`, quick mode, and the execution-state hook fallback now agree with the implement skill's cost-runaway contract. Existing legacy state files that already store `100` remain compatible.
+- **Agent Teams are no longer documented as the stable default anywhere in the workflow path.** Research, triage, scanner resume guidance, and core delegation rules now use direct `Task(...)` dispatch as the baseline, with Agent Teams only as an optional experimental overlay when enabled and available.
+- **Public entrypoint skill tool grants are narrower.** Shipped `/curdx-flow:*` skills no longer use `allowed-tools: "*"`, reducing accidental broad permission grants while preserving the tools each workflow actually needs.
+- **Support skills are hidden from the slash menu but remain model-invocable background guidance.** `spec-workflow`, `curdx-core`, `communication-style`, `interview-framework`, and `verification-before-completion` now have trigger-focused descriptions and explicit background-skill metadata.
+- **Help and cost references now expose the current iteration-cap interface.** `/curdx-flow:help` documents both `--max-task-iterations` and `--max-global-iterations`; cost docs use the real `/curdx-flow:implement` invocation form.
+
+### Added
+
+- **Runner guards for runtime-contract drift.** Manifest integrity tests now lock bounded iteration defaults, forbid wildcard grants on public entrypoints, require support skills to stay hidden/background-invocable, reject old "research team as default" wording, and verify help documents the global iteration cap.
+
 ## 7.1.13 — 2026-05-10
 
 ### Changed

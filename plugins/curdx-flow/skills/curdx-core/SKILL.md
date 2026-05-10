@@ -1,6 +1,6 @@
 ---
 name: curdx-core
-description: Core curdx-flow behavior for arguments, state, delegation, execution loop, and skill entrypoint rules.
+description: Use when handling curdx-flow flags, state files, delegation, execution loops, or skill entrypoint rules.
 when_to_use: Use when user mentions curdx-flow flags, quick mode, commit spec, max iterations, .curdx-state.json, execution loop, coordinator behavior, or subagent delegation.
 version: 0.2.0
 user-invocable: false
@@ -17,12 +17,13 @@ All curdx-flow public entrypoint skills support these standard arguments:
 | Argument | Short | Description | Default |
 |----------|-------|-------------|---------|
 | `--quick` | `-q` | Skip interactive phases, auto-generate artifacts, start execution immediately | false |
-| `--commit` | `-c` | Commit and push spec/feature files after generation | true (normal), false (quick) |
-| `--no-commit` | | Explicitly disable committing files | - |
+| `--commit-spec` | | Commit and push spec files after each phase | true (normal), false (quick) |
+| `--no-commit-spec` | | Explicitly disable committing spec files | - |
 | `--max-task-iterations` | `-m` | Max retries per failed task before stopping | 5 |
+| `--max-global-iterations` | | Max whole-spec loop iterations before stopping | 30 |
 | `--fresh` | `-f` | Force new spec/feature, overwrite if exists | false |
 
-Argument precedence: `--no-commit` > `--commit` > mode default.
+Argument precedence: `--no-commit-spec` > `--commit-spec` > mode default.
 
 ## Execution Modes
 
@@ -40,7 +41,7 @@ Argument precedence: `--no-commit` > `--commit` > mode default.
 - Agents receive a "be more opinionated" directive since there is no user feedback
 - spec-reviewer validates each artifact (max 3 iterations)
 - Immediately start execution after all phases complete
-- Do NOT commit by default (use `--commit` to override)
+- Do NOT commit spec files by default (use `--commit-spec` to override)
 - Still delegate to subagents (delegation is mandatory)
 
 ## State File
@@ -115,7 +116,7 @@ curdx-flow is skills-only at the plugin surface.
 
 | Work Type | Delegate To |
 |-----------|-------------|
-| Research | Research Team (parallel teammates) |
+| Research | Bounded parallel direct `Task(...)` dispatch to `research-analyst` / Explore-style research |
 | Requirements | product-manager subagent |
 | Design | architect-reviewer subagent |
 | Task planning | task-planner subagent |

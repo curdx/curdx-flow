@@ -26,7 +26,7 @@ const EMBEDDED_TEMPLATE = {
   taskIteration: 1,
   maxTaskIterations: 5,
   globalIteration: 1,
-  maxGlobalIterations: 100,
+  maxGlobalIterations: 30,
   recoveryMode: false,
   fixTaskMap: {},
   modificationMap: {},

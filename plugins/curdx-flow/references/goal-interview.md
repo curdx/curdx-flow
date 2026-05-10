@@ -89,12 +89,12 @@ After interview and approach selection, update `.progress.md`:
 [Any follow-up responses from "Other" selections]
 ```
 
-## Pass Context to Research Team
+## Pass Context to Research Tasks
 
-Include goal interview context in each research teammate's task description:
+Include goal interview context in each direct research `Task(...)` prompt:
 
 ```text
-Each TaskCreate description should include:
+Each research task prompt should include:
 
 Goal Interview Context:
 [Include all topic-response pairs from the Goal Interview section of .progress.md]

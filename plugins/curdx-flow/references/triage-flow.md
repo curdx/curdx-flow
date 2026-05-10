@@ -8,11 +8,11 @@ The triage flow decomposes a large feature into multiple specs. It uses two rese
 
 ## Step 1: Exploration Research
 
-Spawn research team (same parallel-research pattern as `/curdx-flow:start`) with a triage-focused prompt.
+Run the same bounded parallel direct `Task(...)` research pattern as `/curdx-flow:start`, using triage-focused prompts.
 
 ### Research Prompt Customization
 
-When spawning the research team, use this directive instead of the standard spec research directive:
+When dispatching research tasks, use this directive instead of the standard spec research directive:
 
 TRIAGE RESEARCH DIRECTIVE:
 You are researching for an EPIC TRIAGE -- a large feature decomposition.
@@ -41,7 +41,7 @@ Focus on understanding the LANDSCAPE, not implementation details:
 
 Output: research.md at <basePath>/research.md
 
-### Research Team Dispatch
+### Research Dispatch
 
 Follow `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md` but with:
 - basePath = epic directory (e.g., `./specs/_epics/<epic-name>`)

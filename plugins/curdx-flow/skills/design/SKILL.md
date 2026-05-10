@@ -2,7 +2,7 @@
 name: design
 description: Use when a spec has requirements.md and needs technical design.
 argument-hint: "[spec-name]"
-allowed-tools: "*"
+allowed-tools: "Read Write Edit Bash Task AskUserQuestion"
 disable-model-invocation: true
 ---
 
@@ -17,7 +17,7 @@ Create a task for each item and complete in order:
 
 1. **Gather context** -- resolve spec, read requirements and research
 2. **Interview** -- brainstorming dialogue (skip if `--quick`)
-3. **Execute design** -- dispatch architect-reviewer via team
+3. **Execute design** -- dispatch architect-reviewer via direct Task; Agent Teams optional
 4. **Artifact review** -- parallel two-stage review (`spec-reviewer` + `code-quality-reviewer`); QuickMode bypass per D5
 5. **Walkthrough & approval** -- display summary, get user approval
 6. **Finalize** -- update state, commit, stop

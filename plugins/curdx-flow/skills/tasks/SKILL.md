@@ -2,7 +2,7 @@
 name: tasks
 description: Use when a spec has design.md and needs implementation tasks.
 argument-hint: "[spec-name] [--tasks-size fine|coarse]"
-allowed-tools: "*"
+allowed-tools: "Read Write Edit Bash Task AskUserQuestion"
 disable-model-invocation: true
 ---
 
@@ -17,7 +17,7 @@ Create a task for each item and complete in order:
 
 1. **Gather context** -- resolve spec, read design, requirements, research
 2. **Interview** -- brainstorming dialogue (skip if `--quick`)
-3. **Execute task generation** -- dispatch task-planner via team
+3. **Execute task generation** -- dispatch task-planner via direct Task; Agent Teams optional
 4. **Artifact review** -- parallel two-stage review (`spec-reviewer` + `code-quality-reviewer`); QuickMode bypass per D5
 5. **Walkthrough & approval** -- display summary, get user approval
 6. **Finalize** -- update state, commit, stop

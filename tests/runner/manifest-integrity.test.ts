@@ -42,6 +42,14 @@ const LEGACY_ENTRYPOINT_SKILLS = [
   "triage",
 ] as const;
 
+const SUPPORT_SKILLS = [
+  "communication-style",
+  "curdx-core",
+  "interview-framework",
+  "spec-workflow",
+  "verification-before-completion",
+] as const;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -290,7 +298,94 @@ describe("skills frontmatter integrity", () => {
       expect(desc, `${file}: description must describe when to use the skill`).toMatch(
         /^Use when\b/,
       );
-      expect(desc.length, `${file}: public entrypoint description should stay terse`).toBeLessThanOrEqual(120);
+      expect(desc.length, `${file}: public entrypoint description should stay terse`).toBeLessThanOrEqual(
+        120,
+      );
+    }
+  });
+
+  it("support skills are model-invocable background guidance, not slash-menu commands", () => {
+    for (const name of SUPPORT_SKILLS) {
+      const file = path.join(SKILLS_DIR, name, "SKILL.md");
+      const fm = extractFrontmatter(readFileSync(file, "utf8"));
+      const fields = parseFrontmatterFields(fm!);
+      const desc = fields.get("description") ?? "";
+
+      expect(fields.get("user-invocable"), `${file}: support skills should stay hidden`).toBe(
+        "false",
+      );
+      expect(
+        fields.get("disable-model-invocation"),
+        `${file}: support skills should remain available to Claude when relevant`,
+      ).not.toBe("true");
+      expect(desc, `${file}: support skill descriptions should be trigger-focused`).toMatch(
+        /^Use when\b/,
+      );
+    }
+  });
+
+  it("public entrypoint skills avoid wildcard tool grants", () => {
+    for (const name of LEGACY_ENTRYPOINT_SKILLS) {
+      const file = path.join(SKILLS_DIR, name, "SKILL.md");
+      const fm = extractFrontmatter(readFileSync(file, "utf8"));
+      const tools = parseFrontmatterFields(fm!).get("allowed-tools");
+
+      if (tools === undefined) continue;
+      expect(tools, `${file}: avoid broad wildcard tool grants`).not.toBe('"*"');
+      expect(tools, `${file}: avoid broad wildcard tool grants`).not.toBe("*");
+    }
+  });
+
+  it("phase entrypoint docs use direct Task as the default, not Agent Teams", () => {
+    for (const name of ["research", "requirements", "design", "tasks", "triage"] as const) {
+      const file = path.join(SKILLS_DIR, name, "SKILL.md");
+      const body = readFileSync(file, "utf8");
+
+      expect(body, `${file}: should not describe team dispatch as the default`).not.toMatch(
+        /via team|Team Research Phase|Research Team \(multiple parallel teammates\)/,
+      );
+      expect(body, `${file}: should document direct Task dispatch`).toMatch(
+        /direct Task|Direct Task/,
+      );
+    }
+  });
+
+  it("workflow docs no longer describe research teams as the stable default", () => {
+    const files = [
+      path.join(SKILLS_DIR, "start", "SKILL.md"),
+      path.join(SKILLS_DIR, "curdx-core", "SKILL.md"),
+      path.join(REFERENCES_DIR, "goal-interview.md"),
+      path.join(REFERENCES_DIR, "triage-flow.md"),
+      path.join(REFERENCES_DIR, "spec-scanner.md"),
+    ];
+
+    for (const file of files) {
+      const body = readFileSync(file, "utf8");
+      expect(body, `${file}: use direct Task dispatch language instead`).not.toMatch(
+        /Research Team|research team|create research team|spawn parallel teammates/,
+      );
+    }
+  });
+
+  it("new spec state defaults use bounded global iterations", () => {
+    const startBody = readFileSync(path.join(SKILLS_DIR, "start", "SKILL.md"), "utf8");
+    const newBody = readFileSync(path.join(SKILLS_DIR, "new", "SKILL.md"), "utf8");
+    const quickModeBody = readFileSync(
+      path.join(REFERENCES_DIR, "quick-mode.md"),
+      "utf8",
+    );
+
+    for (const [label, body] of [
+      ["start", startBody],
+      ["new", newBody],
+      ["quick-mode", quickModeBody],
+    ] as const) {
+      expect(body, `${label}: expected maxGlobalIterations default 30`).toMatch(
+        /maxGlobalIterations["\s:]+30/,
+      );
+      expect(body, `${label}: must not initialize new state with legacy cap 100`).not.toMatch(
+        /maxGlobalIterations["\s:]+100/,
+      );
     }
   });
 
@@ -300,6 +395,15 @@ describe("skills frontmatter integrity", () => {
     for (const name of LEGACY_ENTRYPOINT_SKILLS) {
       expect(body, `help missing /curdx-flow:${name}`).toContain(`/curdx-flow:${name}`);
     }
+  });
+
+  it("help documents both task and global iteration caps", () => {
+    const body = readFileSync(path.join(SKILLS_DIR, "help", "SKILL.md"), "utf8");
+
+    expect(body).toContain(
+      "/curdx-flow:implement [--max-task-iterations 5] [--max-global-iterations 30]",
+    );
+    expect(body).toContain("`--max-global-iterations`: Max whole-spec loop iterations");
   });
 
   it("public entrypoint docs do not suggest un-namespaced legacy slash commands", () => {

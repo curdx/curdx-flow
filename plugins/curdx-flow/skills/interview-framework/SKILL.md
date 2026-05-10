@@ -1,6 +1,6 @@
 ---
 name: interview-framework
-description: Adaptive interview pattern for curdx-flow phase planning and requirements discovery.
+description: Use when curdx-flow needs user decisions after codebase facts are discovered.
 when_to_use: Use before research, requirements, design, tasks, or triage when user decisions are needed and codebase facts must be discovered before asking.
 version: 0.2.0
 user-invocable: false

@@ -19,6 +19,7 @@ Use this reference when maintaining `plugins/curdx-flow/skills/**`.
    - Public `/curdx-flow:*` workflow skills keep `disable-model-invocation: true`.
    - Phase-changing examples must use the full `/curdx-flow:<name>` namespace.
    - Support skills carry reusable guidance and may be model-invoked.
+   - Avoid `allowed-tools: "*"` on shipped skills; list the smallest practical tool set.
 
 3. **Keep SKILL.md as the router.**
    - Put long contracts under `skills/<name>/references/` or plugin-global `${CLAUDE_PLUGIN_ROOT}/references/`.
@@ -29,8 +30,13 @@ Use this reference when maintaining `plugins/curdx-flow/skills/**`.
    - Phase skills coordinate, validate, and delegate.
    - Subagents perform research, product, design, task planning, refactor, and execution work.
    - A coordinator may synthesize or route, but must not silently replace a specialist agent's role.
+   - Direct `Task(...)` dispatch is the default. Agent Teams remain optional and experimental; never make `TeamCreate`, `TaskCreate`, `TaskList`, or `SendMessage` a hard dependency.
 
 5. **Verification is part of the skill contract.**
    - Add runner tests for every public surface rule.
    - Run `claude plugin validate ./plugins/curdx-flow` after manifest or frontmatter changes.
    - Use `claudecc --plugin-dir ./plugins/curdx-flow` smoke tests for slash-skill behavior when login state is available.
+
+6. **Execution state defaults must stay bounded.**
+   - New state initialization uses `maxGlobalIterations: 30`.
+   - Existing state files that already store legacy `100` are preserved by runtime compatibility logic.

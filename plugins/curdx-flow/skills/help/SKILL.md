@@ -111,9 +111,10 @@ Phase skills use the `commitSpec` setting from `.curdx-state.json` (set during `
 
 ### implement skill
 ```
-/curdx-flow:implement [--max-task-iterations 5]
+/curdx-flow:implement [--max-task-iterations 5] [--max-global-iterations 30]
 ```
 - `--max-task-iterations`: Max retries per task before failure (default: 5)
+- `--max-global-iterations`: Max whole-spec loop iterations before cost-runaway stop (default: 30)
 
 ### refactor skill
 ```

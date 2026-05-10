@@ -1,6 +1,6 @@
 ---
 name: verification-before-completion
-description: Verification rules for fixes, phase exits, completion claims, and mock-heavy test risk.
+description: Use when checking fixes, phase exits, completion evidence, or mock-heavy tests before claiming success.
 when_to_use: Use when reproducing failures, verifying BEFORE/AFTER state, handling VF tasks, checking verificationBlocks, validating completion evidence, or auditing mock-only tests.
 version: 0.2.0
 user-invocable: false
