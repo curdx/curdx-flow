@@ -2,6 +2,17 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.12 — 2026-05-10
+
+### Fixed
+
+- **Help output now lists the full skills-only slash surface.** `/curdx-flow:help` now includes all 15 public entrypoint skills, including `triage`, `refactor`, and `index`, so Claude Code and users see the same command surface after the commands-to-skills migration.
+- **Epic triage next-step prompts use namespaced slash skills.** Remaining bare `/start` and `/triage` examples were updated to `/curdx-flow:start` and `/curdx-flow:triage`.
+
+### Added
+
+- **Runner guard for help/entrypoint drift.** Manifest integrity tests now assert `/curdx-flow:help` lists every public entrypoint skill and public entrypoint docs do not reintroduce un-namespaced legacy slash command suggestions.
+
 ## 7.1.11 — 2026-05-10
 
 ### Changed

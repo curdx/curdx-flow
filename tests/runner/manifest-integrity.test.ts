@@ -281,6 +281,42 @@ describe("skills frontmatter integrity", () => {
     }
   });
 
+  it("help lists every public slash skill entrypoint", () => {
+    const body = readFileSync(path.join(SKILLS_DIR, "help", "SKILL.md"), "utf8");
+
+    for (const name of LEGACY_ENTRYPOINT_SKILLS) {
+      expect(body, `help missing /curdx-flow:${name}`).toContain(`/curdx-flow:${name}`);
+    }
+  });
+
+  it("public entrypoint docs do not suggest un-namespaced legacy slash commands", () => {
+    const slashNames = LEGACY_ENTRYPOINT_SKILLS.join("|");
+    const bareSlash = new RegExp(
+      "(^|[\\s`'\"(])/(?:" + slashNames + ")(?=[\\s`'\"<]|$)",
+      "gm",
+    );
+
+    const offenders: Array<{ file: string; match: string }> = [];
+    for (const name of LEGACY_ENTRYPOINT_SKILLS) {
+      const file = path.join(SKILLS_DIR, name, "SKILL.md");
+      const body = readFileSync(file, "utf8");
+      const matches = [...body.matchAll(bareSlash)];
+      for (const match of matches) {
+        const hit = match[0] ?? "";
+        const before = body.slice(Math.max(0, (match.index ?? 0) - 10), match.index ?? 0);
+        if (before.endsWith("curdx-flow:")) continue;
+        offenders.push({ file: path.relative(REPO_ROOT, file), match: hit });
+      }
+    }
+
+    expect(
+      offenders,
+      `Un-namespaced slash commands found:\n${offenders
+        .map((o) => `  ${o.file}: ${o.match}`)
+        .join("\n")}`,
+    ).toEqual([]);
+  });
+
   it("deprecated skill aliases are hidden from model invocation", () => {
     const file = path.join(SKILLS_DIR, "reality-verification", "SKILL.md");
     const fm = extractFrontmatter(readFileSync(file, "utf8"));

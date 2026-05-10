@@ -8,7 +8,7 @@ The triage flow decomposes a large feature into multiple specs. It uses two rese
 
 ## Step 1: Exploration Research
 
-Spawn research team (same parallel-research pattern as /start) with a triage-focused prompt.
+Spawn research team (same parallel-research pattern as `/curdx-flow:start`) with a triage-focused prompt.
 
 ### Research Prompt Customization
 
@@ -148,7 +148,7 @@ Run both handlers. Add cross-references:
 
 ## Epic Status Display
 
-When showing epic status (used by both /triage and /start):
+When showing epic status (used by both `/curdx-flow:triage` and `/curdx-flow:start`):
 
 ```
 Epic: <epic-name>

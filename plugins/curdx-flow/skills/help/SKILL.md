@@ -18,6 +18,7 @@ curdx-flow is **skills-only at the plugin surface**: skills carry both canonical
 | Skill | Description |
 |---------|-------------|
 | `/curdx-flow:start [name] [goal]` | Smart entry point: resume or create new |
+| `/curdx-flow:triage [epic-name] [goal]` | Decompose a large feature into dependency-aware specs |
 | `/curdx-flow:new <name> [goal]` | Create new spec and start research |
 | `/curdx-flow:research` | Run/re-run research phase |
 | `/curdx-flow:requirements` | Generate requirements (approves research) |
@@ -26,6 +27,8 @@ curdx-flow is **skills-only at the plugin surface**: skills carry both canonical
 | `/curdx-flow:implement` | Start execution loop (approves tasks) |
 | `/curdx-flow:status` | Show all specs and progress |
 | `/curdx-flow:switch <name>` | Change active spec |
+| `/curdx-flow:refactor [spec-name]` | Update spec files after execution learnings |
+| `/curdx-flow:index [options]` | Index codebase components and external resources |
 | `/curdx-flow:cancel` | Cancel active loop, cleanup state |
 | `/curdx-flow:feedback [message]` | Submit feedback or report an issue |
 | `/curdx-flow:help` | Show this help |
@@ -99,11 +102,30 @@ The `--commit-spec` setting is stored in `.curdx-state.json` and applies to all 
 ```
 Phase skills use the `commitSpec` setting from `.curdx-state.json` (set during `/curdx-flow:start`).
 
+### triage skill
+```
+/curdx-flow:triage [epic-name] [goal]
+```
+- Decompose a large feature into multiple specs with dependencies and interface contracts
+- Use when one goal is too broad for a single spec
+
 ### implement skill
 ```
 /curdx-flow:implement [--max-task-iterations 5]
 ```
 - `--max-task-iterations`: Max retries per task before failure (default: 5)
+
+### refactor skill
+```
+/curdx-flow:refactor [spec-name] [--file=requirements|design|tasks]
+```
+- Update requirements, design, and tasks after implementation learnings
+
+### index skill
+```
+/curdx-flow:index [--path=dir] [--type=types] [--changed] [--quick] [--dry-run]
+```
+- Generate `specs/.index/` component and external-resource context for future specs
 
 ## Directory Structure
 

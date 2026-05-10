@@ -85,7 +85,7 @@ fi
    - If user declines: continue normal Step 4 routing
 
 **If no active epic AND goal appears complex** (multiple distinct components, cross-cutting concerns, user mentions "big" or "large"):
-- Suggest: "This looks like it might need multiple specs. Want to run `/triage` instead?"
+- Suggest: "This looks like it might need multiple specs. Want to run `/curdx-flow:triage` instead?"
 - If user accepts: invoke `/curdx-flow:triage` with no positional args and let triage collect epic-name + goal interactively. STOP.
 - If user declines: continue normal Step 4 routing.
 

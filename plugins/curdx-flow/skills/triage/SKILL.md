@@ -38,7 +38,7 @@ Then ask the user:
 - **Create a new epic** -- proceed to Step 2
 - **View epic details** -- show full epic.md content
 
-If user chooses to continue: suggest next unblocked spec, offer to run `/start <spec-name>`. STOP.
+If user chooses to continue: suggest next unblocked spec, offer to run `/curdx-flow:start <spec-name>`. STOP.
 
 **If no active epic**: Proceed to Step 2.
 
@@ -116,8 +116,8 @@ Output: ./specs/_epics/$EPIC_NAME/epic.md
 
 **Ready to start**: <first spec with no dependencies>
 
--> Next: Run /start <first-spec-name> to begin the first spec
-   Or run /triage to see epic status at any time
+-> Next: Run /curdx-flow:start <first-spec-name> to begin the first spec
+   Or run /curdx-flow:triage to see epic status at any time
 ```
 
 Then STOP. End response immediately.
