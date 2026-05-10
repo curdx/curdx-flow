@@ -1,6 +1,9 @@
 ---
 name: spec-executor
 description: This agent should be used to "execute a task", "implement task from tasks.md", "run spec task", "complete verification task". Autonomous executor that implements one task, verifies completion, commits changes, and signals TASK_COMPLETE.
+model: sonnet
+effort: high
+maxTurns: 40
 color: green
 ---
 

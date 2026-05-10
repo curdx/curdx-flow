@@ -1,6 +1,6 @@
 ---
 description: Generate requirements from goal and research
-argument-hint: [spec-name]
+argument-hint: "[spec-name]"
 allowed-tools: "*"
 ---
 
@@ -67,23 +67,28 @@ Append to `.progress.md` under "Interview Responses":
 
 Pass combined context to delegation prompt as "Interview Context".
 
-## Step 3: Execute Requirements (Team-Based)
+## Step 3: Execute Requirements (Task-Based, Teams Optional)
 
 <mandatory>
-**Use Claude Code Teams with `product-manager` as the teammate subagent type.**
+**Default path: use the normal `Task` tool with `product-manager`. Do not require Agent Teams.**
 
-Follow the full team lifecycle:
+Agent Teams are experimental and disabled by default in Claude Code. Use the team lifecycle only when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set and the `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` tools are visible in the current session. If any team tool is unavailable or fails, immediately continue with the direct `Task(subagent_type: product-manager)` path. Treat this as the normal path, not a degraded path.
 
-1. **Clean up stale team (MANDATORY FIRST ACTION)**: Call `TeamDelete()` before anything else. This releases whatever team the session is currently leading (could be from any prior phase). Errors mean no team was active -- harmless, proceed.
-2. **Create team**: `TeamCreate(team_name: "requirements-$spec")`
-3. **Create task**: `TaskCreate(subject: "Generate requirements for $spec", activeForm: "Generating requirements")`
-4. **Spawn teammate**: `Task(subagent_type: product-manager, team_name: "requirements-$spec", name: "pm-1")` — delegate with research context, goal, and interview context. Instruct to create user stories with acceptance criteria, functional requirements (FR-*), non-functional requirements (NFR-*), glossary, out-of-scope, dependencies. Output to `./specs/$spec/requirements.md`.
-5. **Wait for completion**: Monitor via TaskList.
-6. **Shutdown**: `SendMessage(type: "shutdown_request", recipient: "pm-1")`
-7. **Collect results**: Read `./specs/$spec/requirements.md`.
-8. **Clean up**: `TeamDelete()`.
+Direct path:
 
-**Fallback**: If TeamCreate fails with "already leading" error, call `TeamDelete()` and retry `TeamCreate` once. If still fails, fall back to direct `Task(subagent_type: product-manager)` call.
+1. Optionally create a visible native task with `TaskCreate(subject: "Generate requirements for $spec", activeForm: "Generating requirements")`. If unavailable or failing, continue without it.
+2. Dispatch `Task(subagent_type: product-manager)` with research context, goal, and interview context. Instruct it to create user stories with acceptance criteria, functional requirements (FR-*), non-functional requirements (NFR-*), glossary, out-of-scope, dependencies. Output to `./specs/$spec/requirements.md`.
+3. Wait for the Task result, then read `./specs/$spec/requirements.md`.
+
+Optional Agent Teams path:
+
+1. `TeamDelete()` once to release any stale team; errors are harmless.
+2. `TeamCreate(team_name: "requirements-$spec")`
+3. `TaskCreate(subject: "Generate requirements for $spec", activeForm: "Generating requirements")`
+4. `Task(subagent_type: product-manager, team_name: "requirements-$spec", name: "pm-1")` with the same prompt as the direct path.
+5. Wait via automatic teammate messages or a single `TaskList` check.
+6. `SendMessage(type: "shutdown_request", recipient: "pm-1")`
+7. Read `./specs/$spec/requirements.md`, then `TeamDelete()`.
 </mandatory>
 
 ## Step 4: Artifact Review (only in --quick mode)
@@ -144,7 +149,7 @@ Ask ONE question: "How do you want to proceed?" with these options via AskUserQu
 **If "Run review"**: Invoke spec-reviewer via Task tool with full requirements.md content (upstream: research.md). Display findings table. If REVIEW_PASS, note it. If REVIEW_FAIL, show feedback. Then loop back to this same 3-choice question (user decides next action).
 **If "Request changes" or "Other"**:
 1. Ask what to change
-2. Re-invoke product-manager using **cleanup-and-recreate** team pattern (TeamDelete old -> TeamCreate new -> spawn with feedback -> wait -> shutdown -> TeamDelete)
+2. Re-invoke product-manager with direct `Task(subagent_type: product-manager)` and feedback; use the optional team lifecycle only if Agent Teams are enabled and available
 3. Re-display walkthrough, ask again with same 3 choices. Loop until approved.
 
 ## Step 6: Finalize

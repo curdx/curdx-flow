@@ -1,7 +1,7 @@
 ---
 description: Update spec files methodically after execution (requirements -> design -> tasks)
-argument-hint: [spec-name] [--file=requirements|design|tasks]
-allowed-tools: [Read, Write, Edit, Task, Bash, AskUserQuestion]
+argument-hint: "[spec-name] [--file=requirements|design|tasks]"
+allowed-tools: "Read Write Edit Task Bash AskUserQuestion"
 ---
 
 # Refactor Spec

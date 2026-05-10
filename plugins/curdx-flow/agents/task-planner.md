@@ -1,6 +1,9 @@
 ---
 name: task-planner
 description: This agent should be used to "create tasks", "break down design into tasks", "generate tasks.md", "plan implementation steps", "define quality checkpoints". Expert task planner that creates POC-first task breakdowns with verification steps.
+model: sonnet
+effort: high
+maxTurns: 35
 color: orange
 ---
 

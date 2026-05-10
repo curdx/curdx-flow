@@ -108,7 +108,7 @@ Validation Sequence:
          - WARNING: Reproduction command exited 0; bug may not be reproducible with this command
          - Timestamp: <ISO 8601>
          ```
-11. Research Phase: TaskCreate("Research for $spec", activeForm: "Researching"), run Team Research flow (skip walkthrough), clear awaitingApproval, TaskUpdate(completed)
+11. Research Phase: TaskCreate("Research for $spec", activeForm: "Researching") if available, run direct parallel Task research flow (Agent Teams optional only when enabled), skip walkthrough, clear awaitingApproval, TaskUpdate(completed) if available
 12. Skill Discovery Pass 2: re-scan skills using goal + research Executive Summary, invoke new matches
 13. Requirements Phase: TaskCreate("Requirements for $spec", activeForm: "Generating requirements"), delegate to product-manager with Quick Mode Directive, review loop, TaskUpdate(completed)
 14. Design Phase: TaskCreate("Design for $spec", activeForm: "Generating design"), delegate to architect-reviewer with Quick Mode Directive, review loop, TaskUpdate(completed)

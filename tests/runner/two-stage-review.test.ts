@@ -123,6 +123,8 @@ describe('two-stage-review drift detection', () => {
     // defined. If this link is gone, the coordinator silently regresses
     // to sequential dispatch.
     expect(doc).toContain('bounded-parallel-dispatch');
+    expect(doc).toContain('direct `Task(subagent_type: architect-reviewer)`');
+    expect(doc).toContain('Agent Teams are experimental and disabled by default');
 
     // Both reviewers must be invoked via Task subagent. The literal
     // `subagent_type: <name>` form is what the dispatcher matches; a prose
@@ -140,6 +142,8 @@ describe('two-stage-review drift detection', () => {
     // command files (e.g. tasks.md forgets one reviewer) silently breaks
     // the post-tasks gate while post-design still passes.
     expect(doc).toContain('bounded-parallel-dispatch');
+    expect(doc).toContain('direct `Task(subagent_type: task-planner)`');
+    expect(doc).toContain('Agent Teams are experimental and disabled by default');
     expect(doc).toMatch(/subagent_type:\s*spec-reviewer/);
     expect(doc).toMatch(/subagent_type:\s*code-quality-reviewer/);
   });

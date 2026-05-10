@@ -2,6 +2,9 @@
 name: code-quality-reviewer
 description: This agent should be used to "review code quality", "check code smell", "audit implementation quality", "review readability", or "audit security of changed code". Read-only code-quality reviewer that runs as an independent fresh subagent thread. Validates implementation/design quality only — never comments on spec-compliance dimensions (traceability, artifact structure, requirement coverage, front-matter). Outputs `REVIEW_PASS` or `REVIEW_FAIL` on the final line.
 model: sonnet
+effort: medium
+maxTurns: 20
+tools: Read, Grep, Glob
 color: orange
 ---
 

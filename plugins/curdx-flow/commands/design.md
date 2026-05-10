@@ -1,6 +1,6 @@
 ---
 description: Generate technical design from requirements
-argument-hint: [spec-name]
+argument-hint: "[spec-name]"
 allowed-tools: "*"
 ---
 
@@ -68,23 +68,28 @@ Append to `.progress.md` under "Interview Responses":
 
 Pass combined context to delegation prompt as "Interview Context".
 
-## Step 3: Execute Design (Team-Based)
+## Step 3: Execute Design (Task-Based, Teams Optional)
 
 <mandatory>
-**Use Claude Code Teams with `architect-reviewer` as the teammate subagent type.**
+**Default path: use the normal `Task` tool with `architect-reviewer`. Do not require Agent Teams.**
 
-Follow the full team lifecycle:
+Agent Teams are experimental and disabled by default in Claude Code. Use the team lifecycle only when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set and the `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` tools are visible in the current session. If any team tool is unavailable or fails, immediately continue with the direct `Task(subagent_type: architect-reviewer)` path. Treat this as the normal path, not a degraded path.
 
-1. **Clean up stale team (MANDATORY FIRST ACTION)**: Call `TeamDelete()` before anything else. This releases whatever team the session is currently leading (could be from any prior phase). Errors mean no team was active -- harmless, proceed.
-2. **Create team**: `TeamCreate(team_name: "design-$spec")`
-3. **Create task**: `TaskCreate(subject: "Generate technical design for $spec", activeForm: "Generating design")`
-4. **Spawn teammate**: `Task(subagent_type: architect-reviewer, team_name: "design-$spec", name: "architect-1")` — delegate with requirements, research, and interview context. Instruct to design architecture with mermaid diagrams, component responsibilities, technical decisions with rationale, file structure, error handling, test strategy. Output to `./specs/$spec/design.md`.
-5. **Wait for completion**: Monitor via TaskList.
-6. **Shutdown**: `SendMessage(type: "shutdown_request", recipient: "architect-1")`
-7. **Collect results**: Read `./specs/$spec/design.md`.
-8. **Clean up**: `TeamDelete()`.
+Direct path:
 
-**Fallback**: If TeamCreate fails with "already leading" error, call `TeamDelete()` and retry `TeamCreate` once. If still fails, fall back to direct `Task(subagent_type: architect-reviewer)` call.
+1. Optionally create a visible native task with `TaskCreate(subject: "Generate technical design for $spec", activeForm: "Generating design")`. If unavailable or failing, continue without it.
+2. Dispatch `Task(subagent_type: architect-reviewer)` with requirements, research, and interview context. Instruct it to design architecture with mermaid diagrams, component responsibilities, technical decisions with rationale, file structure, error handling, test strategy. Output to `./specs/$spec/design.md`.
+3. Wait for the Task result, then read `./specs/$spec/design.md`.
+
+Optional Agent Teams path:
+
+1. `TeamDelete()` once to release any stale team; errors are harmless.
+2. `TeamCreate(team_name: "design-$spec")`
+3. `TaskCreate(subject: "Generate technical design for $spec", activeForm: "Generating design")`
+4. `Task(subagent_type: architect-reviewer, team_name: "design-$spec", name: "architect-1")` with the same prompt as the direct path.
+5. Wait via automatic teammate messages or a single `TaskList` check.
+6. `SendMessage(type: "shutdown_request", recipient: "architect-1")`
+7. Read `./specs/$spec/design.md`, then `TeamDelete()`.
 </mandatory>
 
 ## Step 4: Artifact Review (Parallel Two-Stage)
@@ -100,19 +105,15 @@ This step runs the **two-stage review protocol** at the design phase boundary: `
 
 The two reviewers do **not** see each other's output (Layer 2 isolation). The coordinator never arbitrates findings across domains.
 
-### 4.1 Bounded parallel dispatch (per Component 3)
+### 4.1 Bounded parallel dispatch (direct Task default)
 
 ```
-1. TeamDelete()                      # MANDATORY first action — releases any stale team
-2. TeamCreate(team_name: "review-design-$spec")
-3. TaskCreate(subject: "Spec-compliance review of design.md",
-              activeForm: "Reviewing design (spec-compliance)")
-   TaskCreate(subject: "Code-quality review of design.md",
-              activeForm: "Reviewing design (code-quality)")
-4. # ALL Task calls in ONE message — see bounded-parallel-dispatch.md anti-pattern #3
+1. Optional TaskCreate(subject: "Spec-compliance review of design.md",
+                       activeForm: "Reviewing design (spec-compliance)")
+   Optional TaskCreate(subject: "Code-quality review of design.md",
+                       activeForm: "Reviewing design (code-quality)")
+2. # ALL Task calls in ONE message — see bounded-parallel-dispatch.md anti-pattern #3
    Task(subagent_type: spec-reviewer,
-        team_name: "review-design-$spec",
-        name: "compliance-1",
         prompt: "Review ./specs/$spec/design.md for spec-compliance ONLY.
                  Upstream: requirements.md + research.md.
                  Your domain: traceability, phase artifact structure, requirement
@@ -122,8 +123,6 @@ The two reviewers do **not** see each other's output (Layer 2 isolation). The co
                  reference). Emit a markdown findings table and a final line
                  `REVIEW_PASS` or `REVIEW_FAIL` (byte-equal).")
    Task(subagent_type: code-quality-reviewer,
-        team_name: "review-design-$spec",
-        name: "quality-1",
         prompt: "Review ./specs/$spec/design.md for code-quality ONLY.
                  Your domain: code smell / security / implementation quality /
                  readability / test quality / no-hallucinations. Do NOT comment
@@ -132,18 +131,17 @@ The two reviewers do **not** see each other's output (Layer 2 isolation). The co
                  belong to spec-reviewer (which you do NOT see and MUST NOT
                  reference). Emit a markdown findings table and a final line
                  `REVIEW_PASS` or `REVIEW_FAIL` (byte-equal).")
-5. # Wait for both teammates to finish via TaskList; collect REVIEW_PASS/REVIEW_FAIL final lines.
-6. # Persist verdicts under verificationBlocks.design.reviews via merge-state (FR-T3 — never hand-edit state):
+3. # Wait for both Task results; collect REVIEW_PASS/REVIEW_FAIL final lines.
+4. # Persist verdicts under verificationBlocks.design.reviews via merge-state (FR-T3 — never hand-edit state):
    node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" \
      "$SPEC_PATH/.curdx-state.json" \
      '{"verificationBlocks":{"design":{"reviews":{
         "specCompliance":{"verdict":"<PASS|FAIL>","findings":[...],"reviewerId":"spec-compliance","timestamp":"<ISO8601>"},
         "codeQuality":{"verdict":"<PASS|FAIL>","findings":[...],"reviewerId":"code-quality","timestamp":"<ISO8601>"}
      }}}}'
-7. SendMessage(type: "shutdown_request", recipient: "compliance-1")
-   SendMessage(type: "shutdown_request", recipient: "quality-1")
-8. TeamDelete()
 ```
+
+Optional Agent Teams overlay: if Agent Teams are enabled and available, create `TeamCreate(team_name: "review-design-$spec")`, add matching `team_name` and `name` fields to both Task calls, wait via automatic teammate messages or one `TaskList` check, then `SendMessage(...shutdown_request...)` and `TeamDelete()`. If any team step fails, rerun or continue with the direct dual `Task(...)` calls above.
 
 ### 4.2 QuickMode branch (D5)
 
@@ -174,7 +172,7 @@ else:                                  # normal mode
 
 **Error handling**: Reviewer no signal = treat as REVIEW_PASS for that slot (permissive ceiling). Agent failure = retry once, then use the surviving reviewer's verdict alone (still hard-gate on specCompliance if it survived).
 
-**Fallback**: If TeamCreate fails with "already leading" error, call `TeamDelete()` and retry once. If still fails, fall back to direct dual `Task(...)` calls in ONE message (no team), per `bounded-parallel-dispatch.md` Step 2 fallback.
+**Fallback**: Direct dual `Task(...)` calls in ONE message are the default. Team failures are non-blocking unless both reviewers fail to return a verdict.
 </mandatory>
 
 ## Step 5: Walkthrough & Approval
@@ -217,7 +215,7 @@ Ask ONE question: "How do you want to proceed?" with these options via AskUserQu
 **If "Run review"**: Invoke spec-reviewer via Task tool with full design.md content (upstream: research.md + requirements.md). Display findings table. If REVIEW_PASS, note it. If REVIEW_FAIL, show feedback. Then loop back to this same 3-choice question (user decides next action).
 **If "Request changes" or "Other"**:
 1. Ask what to change
-2. Re-invoke architect-reviewer using **cleanup-and-recreate** team pattern (TeamDelete old -> TeamCreate new -> spawn with feedback -> wait -> shutdown -> TeamDelete)
+2. Re-invoke architect-reviewer with direct `Task(subagent_type: architect-reviewer)` and feedback; use the optional team lifecycle only if Agent Teams are enabled and available
 3. Re-display walkthrough, ask again with same 3 choices. Loop until approved.
 
 ## Step 6: Finalize

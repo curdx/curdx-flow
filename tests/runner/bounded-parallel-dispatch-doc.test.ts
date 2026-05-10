@@ -175,8 +175,11 @@ describe('bounded-parallel-dispatch.md drift detection', () => {
 
   test('5-step-pattern-preserved: doc retains the dispatch-pattern heading and all 5 step markers', () => {
     const doc = readDoc();
-    // Verbatim section heading from the original parallel-research.md.
-    expect(doc).toContain('## Dispatch Pattern (Team-Based)');
+    // Direct Task dispatch is the stable default; Agent Teams are optional
+    // because Claude Code currently gates them behind an experimental flag.
+    expect(doc).toContain('## Dispatch Pattern (Direct Task Default, Teams Optional)');
+    expect(doc).toContain('Agent Teams are experimental and disabled by default');
+    expect(doc).toContain('Direct `Task(...)` dispatch is the baseline contract');
     // All 5 step markers must remain — drift in step ordering or count
     // breaks downstream commands that read the doc procedurally.
     for (let i = 1; i <= 5; i++) {

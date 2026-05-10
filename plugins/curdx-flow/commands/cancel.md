@@ -1,7 +1,7 @@
 ---
 description: Cancel active execution loop, cleanup state, and remove spec
-argument-hint: [spec-name-or-path]
-allowed-tools: [Read, Bash, Task]
+argument-hint: "[spec-name-or-path]"
+allowed-tools: "Read Bash Task"
 ---
 
 # Cancel Execution

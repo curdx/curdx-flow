@@ -1,6 +1,6 @@
 ---
 description: Run or re-run research phase for current spec
-argument-hint: [spec-name]
+argument-hint: "[spec-name]"
 allowed-tools: "*"
 ---
 
@@ -70,7 +70,7 @@ Append to `.progress.md` under "Interview Responses":
 
 Pass combined context to subagent delegation as "Interview Context".
 
-## Step 3: Execute Parallel Research (Team-Based)
+## Step 3: Execute Parallel Research (Direct Task, Teams Optional)
 
 <mandatory>
 **PARALLEL EXECUTION IS MANDATORY - NO EXCEPTIONS.**
@@ -91,9 +91,17 @@ Research topics identified for parallel execution:
 ...
 ```
 
-Follow the full team lifecycle: Clean up stale team (MANDATORY TeamDelete first) -> Create team -> Create tasks -> Spawn teammates (ALL in ONE message) -> Wait -> Shutdown -> Collect results -> Clean up team.
+Default to direct `Task(...)` calls. Agent Teams are experimental and disabled by default in Claude Code; use the team lifecycle only when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set and the `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` tools are visible. If team tools are unavailable or fail, continue with direct Task dispatch; this is normal, not degraded.
 
-**Fallback**: If TeamCreate fails with "already leading" error, call `TeamDelete()` and retry `TeamCreate` once. If still fails, fall back to direct Task calls without a team.
+Direct path:
+- Optional `TaskCreate` for each research topic. If unavailable or failing, continue without it.
+- Spawn ALL research-analyst and Explore `Task(...)` calls in ONE message, without `team_name`.
+- Wait for Task results, collect partial files, then continue to Step 4.
+
+Optional Agent Teams path:
+- `TeamDelete()` once -> `TeamCreate(team_name: "research-$spec")` -> optional `TaskCreate` per topic.
+- Spawn ALL teammates in ONE message with `team_name: "research-$spec"` and unique `name` values.
+- Wait via automatic teammate messages or one `TaskList` check, send `shutdown_request` to teammates, collect results, then `TeamDelete()`.
 </mandatory>
 
 ## Step 4: Merge Results

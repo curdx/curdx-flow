@@ -1,7 +1,7 @@
 ---
 description: Show all specs and their current status
-argument-hint: [--update-index]
-allowed-tools: [Read, Bash, Glob, Task]
+argument-hint: "[--update-index]"
+allowed-tools: "Read Bash Glob Task"
 ---
 
 # Spec Status

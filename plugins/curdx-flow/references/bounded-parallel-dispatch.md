@@ -104,23 +104,13 @@ Before invoking any subagents, analyze the goal and break it into independent re
 - Example: "Add OAuth with rate limiting" becomes 3 research-analyst agents (OAuth patterns, rate limiting strategies, security best practices)
 - When NOT to split: topics are tightly coupled and depend on each other, or splitting would create redundant searches
 
-## Dispatch Pattern (Team-Based)
+## Dispatch Pattern (Direct Task Default, Teams Optional)
 
-### Step 1: Clean Up Stale Team (MANDATORY FIRST ACTION)
+Agent Teams are experimental and disabled by default in Claude Code. Direct `Task(...)` dispatch is the baseline contract. Use `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` only when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set and those tools are visible in the current session. If any team step fails, continue with the direct Task path; the outputs and merge contract stay the same.
 
-Call `TeamDelete()` before anything else. This releases whatever team the session is currently leading (could be from any prior phase or interrupted run). Errors mean no team was active -- harmless, proceed.
+### Step 1: Optional Progress Tasks
 
-### Step 2: Create Team
-
-```
-TeamCreate(team_name: "research-$spec", description: "Parallel research for $spec")
-```
-
-**Fallback**: If TeamCreate fails with "already leading" error, call `TeamDelete()` and retry `TeamCreate` once. If still fails, fall back to direct `Task(subagent_type: ...)` calls without a team. The research output is the same either way.
-
-### Step 3: Create Tasks
-
-One `TaskCreate` per topic. Output file naming: `.research-[topic-slug].md` (e.g., `.research-oauth-patterns.md`, `.research-codebase.md`, `.research-quality.md`).
+Create one visible native task per topic when `TaskCreate` is available. This is for UI progress only and never gates the research output.
 
 ```
 TaskCreate(
@@ -130,12 +120,22 @@ TaskCreate(
 )
 ```
 
-### Step 4: Spawn Teammates (ALL in ONE Message)
+If `TaskCreate` is unavailable or returns an error, log a short warning and proceed.
+
+### Step 2: Optional Team Setup
+
+Skip this step unless Agent Teams are enabled and available.
+
+1. `TeamDelete()` once to release any stale team; errors are harmless.
+2. `TeamCreate(team_name: "research-$spec", description: "Parallel research for $spec")`
+3. If setup fails, continue with direct Task dispatch and omit `team_name` / `name` fields in Step 3.
+
+### Step 3: Spawn Agents (ALL in ONE Message)
 
 ALL Task calls MUST be in ONE message to ensure true parallel execution. Spawning one at a time across separate messages runs them sequentially.
 
 ```
-Task(subagent_type: research-analyst, team_name: "research-$spec", name: "researcher-1",
+Task(subagent_type: research-analyst,
   prompt: "You are a research teammate.
     Topic: [External best practices for topic]
     Spec: $spec | Path: ./specs/$spec/
@@ -150,21 +150,25 @@ Task(subagent_type: research-analyst, team_name: "research-$spec", name: "resear
     Do NOT explore codebase -- Explore teammates handle that.
     When done, mark your task complete via TaskUpdate.")
 
-Task(subagent_type: Explore, team_name: "research-$spec", name: "explorer-1",
+Task(subagent_type: Explore,
   prompt: "Analyze codebase for spec: $spec
     Output: ./specs/$spec/.research-codebase.md
     Find existing patterns, dependencies, constraints related to [goal].
     Write findings to output file with sections: Existing Patterns, Dependencies, Constraints, Recommendations.")
 ```
 
+When Agent Teams are enabled, add `team_name: "research-$spec"` and unique `name` fields (`researcher-1`, `explorer-1`, etc.) to the same Task calls. Without Agent Teams, omit both fields.
+
 For more topics, add more `researcher-N` and `explorer-N` teammates in the same message.
 
-### Step 5: Wait and Shutdown
+### Step 4: Wait and Collect
 
-- Wait for automatic teammate messages. Use `TaskList` to check progress.
+- Wait for Task results. If using Agent Teams, wait for automatic teammate messages and use `TaskList` at most once to check progress.
 - Timeout: If a teammate stalls, proceed with partial results and note incomplete topics.
-- Send `shutdown_request` to each teammate after all tasks complete.
-- Call `TeamDelete()` to clean up.
+
+### Step 5: Optional Team Shutdown
+
+If Agent Teams were used, send `shutdown_request` to each teammate after all tasks complete, then call `TeamDelete()` to clean up. If shutdown fails, the next team setup can clean up stale state.
 
 ## Merging Results
 

@@ -1,6 +1,6 @@
 ---
 description: Smart entry point that detects if you need a new spec or should resume existing
-argument-hint: [name] [goal] [--fresh] [--quick] [--commit-spec] [--no-commit-spec] [--specs-dir <path>] [--tasks-size fine|coarse]
+argument-hint: "[name] [goal] [--fresh] [--quick] [--commit-spec] [--no-commit-spec] [--specs-dir <path>] [--tasks-size fine|coarse]"
 allowed-tools: "*"
 ---
 

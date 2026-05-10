@@ -9,7 +9,8 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/quick-mode-guard.mjs\"",
             "shell": "bash",
-            "timeout": 10
+            "timeout": 10,
+            "statusMessage": "Checking quick-mode question policy"
           }
         ]
       }
@@ -21,7 +22,9 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-watcher.mjs\"",
-            "shell": "bash"
+            "shell": "bash",
+            "timeout": 30,
+            "statusMessage": "Checking curdx-flow execution state"
           }
         ]
       }
@@ -34,7 +37,9 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/load-spec-context.mjs\"",
             "shell": "bash",
-            "async": true
+            "timeout": 15,
+            "async": true,
+            "statusMessage": "Loading active spec context"
           }
         ]
       }
@@ -45,7 +50,9 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/subagent-context-injector.mjs\"",
-            "shell": "bash"
+            "shell": "bash",
+            "timeout": 15,
+            "statusMessage": "Preparing subagent spec context"
           }
         ]
       }
@@ -56,7 +63,9 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/task-completed-verifier.mjs\"",
-            "shell": "bash"
+            "shell": "bash",
+            "timeout": 20,
+            "statusMessage": "Verifying completed task evidence"
           }
         ]
       }
@@ -67,7 +76,9 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-failure-handler.mjs\"",
-            "shell": "bash"
+            "shell": "bash",
+            "timeout": 15,
+            "statusMessage": "Recording stop failure context"
           }
         ]
       }

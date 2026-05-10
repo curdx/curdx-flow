@@ -2,6 +2,20 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.9 — 2026-05-10
+
+### Changed
+
+- **Claude Code plugin API alignment.** `plugins/curdx-flow/.claude-plugin/plugin.json` now declares repository/homepage metadata and explicit official component paths for `skills`, `commands`, `agents`, and `hooks`. This keeps auto-discovery deterministic while preserving the existing command and skill layout.
+- **Agent Teams are now an optional experimental enhancement, not the default execution contract.** Research, requirements, design, tasks, two-stage review, bounded parallel dispatch, quick mode, and parallel execution coordinator docs now default to ordinary `Task(subagent_type: ...)` dispatch. `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` flows are only used when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and the team tools are available; failures fall back to direct Task dispatch without treating the run as degraded.
+- **Plugin agents now use official runtime frontmatter.** All shipped agents declare `model`, `effort`, and `maxTurns`; read-only reviewer agents have explicit read-only tool allowlists. This makes model/turn budgeting and reviewer write boundaries visible to Claude Code.
+- **Hook UX and safety bounds improved.** Every command hook in `hooks/hooks.json` now declares a `statusMessage` and bounded timeout, matching current Claude Code hook configuration fields while preserving fail-open hook behavior.
+- **Slash-command frontmatter now passes `claude plugin validate`.** Command `argument-hint` values are quoted where they contain bracket syntax, and `allowed-tools` declarations use validator-friendly space-separated strings instead of inline YAML arrays.
+
+### Added
+
+- **Runner tests for plugin metadata drift.** `manifest-integrity.test.ts` now validates plugin manifest paths, hook status/timeout fields, agent runtime frontmatter, and reviewer read-only tool boundaries. Existing dispatch drift tests now lock the new direct-Task-first Agent Teams contract.
+
 ## 7.1.8 — 2026-05-07
 
 ### Fixed

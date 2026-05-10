@@ -239,21 +239,19 @@ Instructions:
 
 Wait for spec-executor to complete. It will output TASK_COMPLETE on success.
 
-### Parallel Execution (parallelGroup.isParallel = true, Team-Based)
+### Parallel Execution (parallelGroup.isParallel = true, Direct Task, Teams Optional)
 
-Use team lifecycle for parallel batches.
+Use direct `Task(...)` calls for parallel batches by default. Agent Teams are experimental and disabled by default in Claude Code. Use team lifecycle only when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set and the `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` tools are visible in the current session. If any team step fails, continue with direct Task dispatch.
 
-**Step 1: Clean Up Stale Team (MANDATORY FIRST ACTION)**
-Call `TeamDelete()` before anything else. This releases whatever team the session is currently leading (could be from any prior phase). Errors mean no team was active -- harmless, proceed.
+**Step 1: Optional Team Setup**
+Skip unless Agent Teams are enabled and available. If using teams, call `TeamDelete()` once to release stale team state, then `TeamCreate(team_name: "exec-$spec", description: "Parallel execution batch")`. Errors mean no team path is active; continue directly.
 
-**Step 2: Create Team**
-`TeamCreate(team_name: "exec-$spec", description: "Parallel execution batch")`
+**Step 2: Optional Progress Tasks**
+For each taskIndex in parallelGroup.taskIndices, create a visible native task if `TaskCreate` is available:
 
-**Fallback**: If TeamCreate fails with "already leading" error, call `TeamDelete()` and retry `TeamCreate` once. If still fails, fall back to direct `Task(subagent_type: spec-executor)` calls in one message (skip Steps 3, 6, 7).
-
-**Step 3: Create Tasks**
-For each taskIndex in parallelGroup.taskIndices:
 `TaskCreate(subject: "Execute task $taskIndex", description: "Task $taskIndex for $spec. progressFile: .progress-task-$taskIndex.md", activeForm: "Executing task $taskIndex")`
+
+If `TaskCreate` is unavailable or failing, log warning and continue without native progress tasks.
 
 ## Native Task Sync - Parallel
 
@@ -268,21 +266,23 @@ When parallel [P] group starts:
 4. If any TaskUpdate fails: log warning, continue
 5. As each executor completes: `TaskUpdate(taskId: nativeTaskMap[taskIndex], status: "completed")`
 
-**Step 4: Spawn Teammates**
+**Step 3: Spawn Agents**
 ALL Task calls in ONE message for true parallelism:
-`Task(subagent_type: spec-executor, team_name: "exec-$spec", name: "executor-$taskIndex", prompt: "Execute task $taskIndex for spec $spec\nprogressFile: .progress-task-$taskIndex.md\n[full task block and context]")`
+`Task(subagent_type: spec-executor, prompt: "Execute task $taskIndex for spec $spec\nprogressFile: .progress-task-$taskIndex.md\n[full task block and context]")`
 
-**Step 5: Wait for Completion**
-Wait for automatic teammate idle notifications. Use TaskList ONCE to verify all tasks complete. Do NOT poll TaskList in a loop. After spawning teammates, wait for their messages -- they will notify you when done.
+When Agent Teams are enabled, add `team_name: "exec-$spec"` and `name: "executor-$taskIndex"` to each Task call. Without teams, omit both fields.
 
-**Step 6: Shutdown Teammates**
-`SendMessage(type: "shutdown_request", recipient: "executor-$taskIndex", content: "Execution complete, shutting down")` for each teammate.
+**Step 4: Wait for Completion**
+Wait for Task results. If using Agent Teams, wait for automatic teammate idle notifications and use `TaskList` ONCE to verify all tasks complete. Do NOT poll TaskList in a loop.
 
-**Step 7: Collect Results**
+**Step 5: Optional Team Shutdown**
+If Agent Teams were used, call `SendMessage(type: "shutdown_request", recipient: "executor-$taskIndex", content: "Execution complete, shutting down")` for each teammate.
+
+**Step 6: Collect Results**
 Proceed to Progress Merge and State Update.
 
-**Step 8: Clean Up Team**
-`TeamDelete()`. If fails, cleaned up on next invocation via Step 1.
+**Step 7: Optional Team Cleanup**
+If Agent Teams were used, call `TeamDelete()`. If it fails, the next team setup can clean up stale state.
 
 ### After Delegation
 

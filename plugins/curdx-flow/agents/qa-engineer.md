@@ -1,6 +1,10 @@
 ---
 name: qa-engineer
 description: This agent should be used to "run verification task", "check quality gate", "verify acceptance criteria", "run [VERIFY] task", "execute quality checkpoint". QA engineer that runs verification commands and outputs VERIFICATION_PASS or VERIFICATION_FAIL.
+model: sonnet
+effort: medium
+maxTurns: 30
+tools: Bash, Read, Grep, Glob
 color: yellow
 ---
 

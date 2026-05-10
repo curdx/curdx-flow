@@ -24,10 +24,12 @@ const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const PLUGIN_ROOT = path.join(REPO_ROOT, "plugins", "curdx-flow");
 
+const PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".claude-plugin", "plugin.json");
 const COMMANDS_DIR = path.join(PLUGIN_ROOT, "commands");
 const AGENTS_DIR = path.join(PLUGIN_ROOT, "agents");
 const SKILLS_DIR = path.join(PLUGIN_ROOT, "skills");
 const REFERENCES_DIR = path.join(PLUGIN_ROOT, "references");
+const HOOKS_CONFIG = path.join(PLUGIN_ROOT, "hooks", "hooks.json");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -92,6 +94,40 @@ const SKILL_FILES = listSkillManifests(SKILLS_DIR);
 // ---------------------------------------------------------------------------
 
 describe("manifest discovery", () => {
+  it("plugin.json declares official metadata and component paths", () => {
+    const manifest = JSON.parse(readFileSync(PLUGIN_MANIFEST, "utf8")) as {
+      name?: string;
+      version?: string;
+      homepage?: string;
+      repository?: string;
+      license?: string;
+      skills?: string | string[];
+      commands?: string | string[];
+      agents?: string | string[];
+      hooks?: string | string[];
+    };
+
+    expect(manifest.name).toBe("curdx-flow");
+    expect(manifest.version).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
+    expect(manifest.homepage).toMatch(/^https:\/\/github\.com\/curdx\/curdx-flow/);
+    expect(manifest.repository).toBe("https://github.com/curdx/curdx-flow");
+    expect(manifest.license).toBe("MIT");
+
+    for (const key of ["skills", "commands", "agents", "hooks"] as const) {
+      const value = manifest[key];
+      expect(value, `plugin.json: missing ${key}`).toBeDefined();
+      const paths = Array.isArray(value) ? value : [value!];
+      expect(paths.length, `plugin.json: ${key} path list must be non-empty`).toBeGreaterThan(0);
+      for (const relPath of paths) {
+        expect(relPath, `plugin.json: ${key} path must start with ./`).toMatch(/^\.\//);
+        expect(
+          existsSync(path.join(PLUGIN_ROOT, relPath)),
+          `plugin.json: ${key} path does not exist: ${relPath}`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it("finds at least 10 commands, 5 agents, 3 skills", () => {
     // Lower bounds rather than exact counts so adding new manifests
     // doesn't break this test, but mass-deletion is caught.
@@ -163,6 +199,66 @@ describe("agents frontmatter integrity", () => {
         name,
         `${file}: name field "${name}" does not match filename "${expectedName}.md"`,
       ).toBe(expectedName);
+    }
+  });
+
+  it("agents declare official runtime frontmatter fields", () => {
+    const allowedModels = new Set(["inherit", "haiku", "sonnet", "opus"]);
+    const allowedEffort = new Set(["low", "medium", "high", "xhigh", "max"]);
+
+    for (const file of AGENT_FILES) {
+      const fm = extractFrontmatter(readFileSync(file, "utf8"));
+      const fields = parseFrontmatterFields(fm!);
+      const model = fields.get("model");
+      const effort = fields.get("effort");
+      const maxTurns = fields.get("maxTurns");
+
+      expect(model, `${file}: missing model`).toBeDefined();
+      expect(allowedModels.has(model!), `${file}: unsupported model ${model}`).toBe(true);
+      expect(effort, `${file}: missing effort`).toBeDefined();
+      expect(allowedEffort.has(effort!), `${file}: unsupported effort ${effort}`).toBe(true);
+      expect(maxTurns, `${file}: missing maxTurns`).toMatch(/^[1-9]\d*$/);
+    }
+  });
+
+  it("read-only reviewer agents do not allow write tools", () => {
+    for (const filename of ["spec-reviewer.md", "code-quality-reviewer.md"]) {
+      const file = path.join(AGENTS_DIR, filename);
+      const fm = extractFrontmatter(readFileSync(file, "utf8"));
+      const fields = parseFrontmatterFields(fm!);
+      const tools = fields.get("tools");
+      expect(tools, `${file}: missing tools allowlist`).toBeDefined();
+      expect(tools).not.toMatch(/\b(Write|Edit|MultiEdit)\b/);
+    }
+  });
+});
+
+describe("hooks config integrity", () => {
+  it("command hooks declare statusMessage and bounded timeout", () => {
+    const config = JSON.parse(readFileSync(HOOKS_CONFIG, "utf8")) as {
+      hooks?: Record<string, Array<{ hooks?: Array<Record<string, unknown>> }>>;
+    };
+    expect(config.hooks).toBeDefined();
+
+    for (const [event, matchers] of Object.entries(config.hooks ?? {})) {
+      for (const matcher of matchers) {
+        for (const hook of matcher.hooks ?? []) {
+          if (hook.type !== "command") continue;
+          expect(hook.command, `${event}: command hook missing command`).toEqual(
+            expect.any(String),
+          );
+          expect(hook.statusMessage, `${event}: command hook missing statusMessage`).toEqual(
+            expect.any(String),
+          );
+          expect(hook.timeout, `${event}: command hook missing timeout`).toEqual(
+            expect.any(Number),
+          );
+          expect(
+            Number(hook.timeout) > 0 && Number(hook.timeout) <= 60,
+            `${event}: timeout must be in 1..60 seconds`,
+          ).toBe(true);
+        }
+      }
     }
   });
 });

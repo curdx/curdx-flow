@@ -1,6 +1,6 @@
 ---
 description: Decompose a large feature into multiple dependency-aware specs (epic triage)
-argument-hint: [epic-name] [goal]
+argument-hint: "[epic-name] [goal]"
 allowed-tools: "*"
 ---
 

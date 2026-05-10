@@ -1,7 +1,7 @@
 ---
 description: Index codebase components and external resources into searchable specs
-argument-hint: [--path=dir] [--type=types] [--exclude=patterns] [--dry-run] [--force] [--changed] [--quick]
-allowed-tools: [Read, Write, Task, Bash, AskUserQuestion, Glob, Grep, WebFetch, ListMcpResourcesTool]
+argument-hint: "[--path=dir] [--type=types] [--exclude=patterns] [--dry-run] [--force] [--changed] [--quick]"
+allowed-tools: "Read Write Task Bash AskUserQuestion Glob Grep WebFetch ListMcpResourcesTool"
 ---
 
 # Index Command
