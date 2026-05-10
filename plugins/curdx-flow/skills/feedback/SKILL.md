@@ -1,6 +1,6 @@
 ---
 name: feedback
-description: Submit feedback or report an issue for curdx-flow plugin.
+description: Use when submitting curdx-flow feedback, bug reports, or feature requests.
 arguments:
   - name: message
     description: Your feedback or issue description

@@ -1,6 +1,6 @@
 ---
 name: switch
-description: Switch active spec
+description: Use when changing the active spec by name or path.
 argument-hint: <spec-name-or-path>
 allowed-tools: "Read Write Bash Glob Task"
 disable-model-invocation: true

@@ -281,6 +281,19 @@ describe("skills frontmatter integrity", () => {
     }
   });
 
+  it("public entrypoint descriptions are trigger-focused", () => {
+    for (const name of LEGACY_ENTRYPOINT_SKILLS) {
+      const file = path.join(SKILLS_DIR, name, "SKILL.md");
+      const fm = extractFrontmatter(readFileSync(file, "utf8"));
+      const desc = parseFrontmatterFields(fm!).get("description") ?? "";
+
+      expect(desc, `${file}: description must describe when to use the skill`).toMatch(
+        /^Use when\b/,
+      );
+      expect(desc.length, `${file}: public entrypoint description should stay terse`).toBeLessThanOrEqual(120);
+    }
+  });
+
   it("help lists every public slash skill entrypoint", () => {
     const body = readFileSync(path.join(SKILLS_DIR, "help", "SKILL.md"), "utf8");
 
@@ -334,6 +347,7 @@ describe("skills frontmatter integrity", () => {
     expect(body).toContain("skills-only at the plugin surface");
     expect(body).toContain("skills/<name>/SKILL.md");
     expect(body).toContain("references/entrypoints.md");
+    expect(body).toContain("references/skill-quality-patterns.md");
   });
 });
 

@@ -1,6 +1,6 @@
 ---
 name: start
-description: Smart entry point that detects if you need a new spec or should resume existing
+description: Use when starting curdx-flow, creating a spec, resuming work, or routing intent.
 argument-hint: "[name] [goal] [--fresh] [--quick] [--commit-spec] [--no-commit-spec] [--specs-dir <path>] [--tasks-size fine|coarse]"
 allowed-tools: "*"
 disable-model-invocation: true

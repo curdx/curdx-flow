@@ -1,6 +1,6 @@
 ---
 name: new
-description: Create new spec and start research phase
+description: Use when creating a new curdx-flow spec from a name and goal.
 argument-hint: "<spec-name> [goal description] [--skip-research] [--specs-dir <path>]"
 allowed-tools: "Bash Write Task AskUserQuestion"
 disable-model-invocation: true

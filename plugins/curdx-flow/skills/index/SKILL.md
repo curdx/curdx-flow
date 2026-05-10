@@ -1,6 +1,6 @@
 ---
 name: index
-description: Index codebase components and external resources into searchable specs
+description: Use when indexing codebase components or external resources for future specs.
 argument-hint: "[--path=dir] [--type=types] [--exclude=patterns] [--dry-run] [--force] [--changed] [--quick]"
 allowed-tools: "Read Write Task Bash AskUserQuestion Glob Grep WebFetch ListMcpResourcesTool"
 disable-model-invocation: true

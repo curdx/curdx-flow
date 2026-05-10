@@ -18,6 +18,7 @@ This skill is the canonical workflow guidance. curdx-flow is now skills-only at 
 - Keep direct workflow entry points user-invocable and explicit; shared/background rules live in support skills such as `curdx-core` and `interview-framework`.
 - Put long procedures in skill-local `references/` or plugin-global `${CLAUDE_PLUGIN_ROOT}/references/` files instead of bloating frontmatter descriptions.
 - See `references/entrypoints.md` for the skills-only entry point policy.
+- See `references/skill-quality-patterns.md` before adding or changing curdx-flow skills.
 
 ## Decision Tree: Where to Start
 

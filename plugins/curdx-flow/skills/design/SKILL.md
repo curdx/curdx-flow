@@ -1,6 +1,6 @@
 ---
 name: design
-description: Generate technical design from requirements
+description: Use when a spec has requirements.md and needs technical design.
 argument-hint: "[spec-name]"
 allowed-tools: "*"
 disable-model-invocation: true

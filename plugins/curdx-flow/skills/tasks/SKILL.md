@@ -1,6 +1,6 @@
 ---
 name: tasks
-description: Generate implementation tasks from design
+description: Use when a spec has design.md and needs implementation tasks.
 argument-hint: "[spec-name] [--tasks-size fine|coarse]"
 allowed-tools: "*"
 disable-model-invocation: true

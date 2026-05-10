@@ -42,3 +42,14 @@ For new curdx-flow behavior:
 2. Put long reference material under `skills/<name>/references/`.
 3. Put executable helpers under `skills/<name>/scripts/`.
 4. Add a new public slash entry only when users need a stable explicit `/curdx-flow:<name>` action.
+
+## Description Rule
+
+Public entrypoint descriptions are trigger text:
+
+- Start with `Use when`.
+- Name the user situation or artifact state.
+- Do not summarize the workflow steps.
+- Keep detailed procedure in the body or references.
+
+See `references/skill-quality-patterns.md` for the maintenance checklist.

@@ -1,6 +1,6 @@
 ---
 name: requirements
-description: Generate requirements from goal and research
+description: Use when a spec has research or goal context and needs requirements.
 argument-hint: "[spec-name]"
 allowed-tools: "*"
 disable-model-invocation: true

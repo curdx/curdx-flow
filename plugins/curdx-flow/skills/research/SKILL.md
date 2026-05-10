@@ -1,6 +1,6 @@
 ---
 name: research
-description: Run or re-run research phase for current spec
+description: Use when running or re-running discovery research for the active spec.
 argument-hint: "[spec-name]"
 allowed-tools: "*"
 disable-model-invocation: true

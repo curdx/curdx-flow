@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Decompose a large feature into multiple dependency-aware specs (epic triage)
+description: Use when a large feature should be decomposed into dependency-aware specs.
 argument-hint: "[epic-name] [goal]"
 allowed-tools: "*"
 disable-model-invocation: true

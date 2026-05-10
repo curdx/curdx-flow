@@ -1,6 +1,6 @@
 ---
 name: status
-description: Show all specs and their current status
+description: Use when inspecting curdx-flow specs, active state, progress, or index status.
 argument-hint: "[--update-index]"
 allowed-tools: "Read Bash Glob Task"
 disable-model-invocation: true

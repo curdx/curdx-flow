@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Start task execution loop
+description: Use when a spec has tasks.md and should enter autonomous task execution.
 argument-hint: "[--max-task-iterations 5] [--max-global-iterations 30] [--recovery-mode]"
 allowed-tools: "Read Write Edit Task Bash Skill"
 disable-model-invocation: true

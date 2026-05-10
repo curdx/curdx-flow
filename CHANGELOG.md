@@ -2,6 +2,17 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.13 — 2026-05-10
+
+### Changed
+
+- **Public skill descriptions are now trigger-focused.** All 15 `/curdx-flow:*` entrypoint skills now use concise `Use when...` descriptions so Claude Code surfaces user situations instead of workflow summaries.
+- **Skill maintenance policy captures the adopted reference-project patterns.** Added `skills/spec-workflow/references/skill-quality-patterns.md`, distilling the useful parts of the official Claude Code skills docs, `gstack`, and `superpowers`: trigger-only descriptions, deliberate manual entrypoints, progressive disclosure, coordinator posture, and verification gates.
+
+### Added
+
+- **Runner guard for skill description quality.** Manifest integrity tests now require public entrypoint descriptions to be trigger-focused and terse, and assert the new skill-quality reference is linked from `spec-workflow`.
+
 ## 7.1.12 — 2026-05-10
 
 ### Fixed

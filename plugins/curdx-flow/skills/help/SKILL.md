@@ -1,6 +1,6 @@
 ---
 name: help
-description: Show help for curdx-flow plugin slash skills and workflow.
+description: Use when showing curdx-flow slash skills, options, workflow, or troubleshooting.
 disable-model-invocation: true
 ---
 
