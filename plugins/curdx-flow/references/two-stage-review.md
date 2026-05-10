@@ -1,9 +1,9 @@
 # Two-Stage Review: Domain Boundary + Anti-Rationalization + SLSA Verdict Shape
 
 > Single source of truth for the curdx-flow two-stage review protocol. This file is intentionally
-> compaction-resilient — every other surface (agent prompts, command files, drift test) points back here.
+> compaction-resilient — every other surface (agent prompts, entrypoint skills, drift test) points back here.
 > Used by: `agents/spec-reviewer.md`, `agents/code-quality-reviewer.md`,
-> `commands/design.md`, `commands/tasks.md`, `tests/runner/two-stage-review.test.ts`.
+> `skills/design/SKILL.md`, `skills/tasks/SKILL.md`, `tests/runner/two-stage-review.test.ts`.
 
 ## Why two reviewers
 
@@ -118,8 +118,8 @@ and leaves `codeQuality` undefined. Schema validation in `plugins/curdx-flow/sch
 treats both sub-keys as optional with `additionalProperties: false` to prevent silent drift.
 
 **Write path** (FR-T3): Verdict objects are merged into state via `merge-state.mjs` — never
-hand-written into `.curdx-state.json`. The coordinator command file (`commands/design.md`,
-`commands/tasks.md`) constructs the `reviews` patch and pipes it through merge-state for atomicity.
+hand-written into `.curdx-state.json`. The coordinator command file (`skills/design/SKILL.md`,
+`skills/tasks/SKILL.md`) constructs the `reviews` patch and pipes it through merge-state for atomicity.
 
 ## Section 4: 3-Layer Drift Defense Implementation Details
 
@@ -137,7 +137,7 @@ This means:
   internally accumulated.
 - The reviewer's own context window is bounded; it cannot grow into territory adjacent to
   `specCompliance` simply by sitting in a long-running coordinator turn.
-- Implementation: see `commands/design.md` Step 4 and `commands/tasks.md` Step 4 — both follow the
+- Implementation: see `skills/design/SKILL.md` Step 4 and `skills/tasks/SKILL.md` Step 4 — both follow the
   ONE-message dual-Task dispatch pattern from [`bounded-parallel-dispatch.md`](./bounded-parallel-dispatch.md).
 
 ### Layer 2 — Isolated context (no cross-pollination)
@@ -222,9 +222,9 @@ do NOT satisfy the gate. This rigidity is the price of compaction resilience.
 - `plugins/curdx-flow/agents/spec-reviewer.md` — narrowed reviewer covering `specCompliance`
 - `plugins/curdx-flow/agents/code-quality-reviewer.md` — independent reviewer covering `codeQuality`
 
-**Coordinator command files** (where parallel dispatch lives):
-- `plugins/curdx-flow/commands/design.md` — Step 4 Artifact Review, dual-Task dispatch
-- `plugins/curdx-flow/commands/tasks.md` — Step 4 Artifact Review, dual-Task dispatch
+**Coordinator entrypoint skills** (where parallel dispatch lives):
+- `plugins/curdx-flow/skills/design/SKILL.md` — Step 4 Artifact Review, dual-Task dispatch
+- `plugins/curdx-flow/skills/tasks/SKILL.md` — Step 4 Artifact Review, dual-Task dispatch
 
 **Schema and types**:
 - `src/hooks/_shared/types.ts` — `VerificationBlock.reviews` field + `ReviewVerdict` interface

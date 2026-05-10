@@ -196,7 +196,7 @@ describe("CLI `check` subcommand (Task 3.9)", () => {
  *
  * The flag has no top-level CLI parser (no `node dist/index.mjs --max-global-
  * iterations <N>` subcommand) — it is parsed inside the `/curdx-flow:implement`
- * slash command, which lives in `plugins/curdx-flow/commands/implement.md`.
+ * slash command, which lives in `plugins/curdx-flow/skills/implement/SKILL.md`.
  * design.md learning #6 makes this a hard constraint: "CLI flag 设计无 top-
  * level subcommand — 沿用 implement.md 现有 flag-parsing pattern, src/index.ts
  * 不动".

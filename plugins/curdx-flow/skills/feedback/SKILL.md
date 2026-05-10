@@ -1,10 +1,13 @@
 ---
+name: feedback
 description: Submit feedback or report an issue for curdx-flow plugin.
 arguments:
   - name: message
     description: Your feedback or issue description
     required: false
+disable-model-invocation: true
 ---
+
 
 <example>
 user: /curdx-flow:feedback The task verification system sometimes misses TASK_COMPLETE markers

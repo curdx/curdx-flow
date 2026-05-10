@@ -21,7 +21,7 @@ the LOC half of the bar (≥31 code lines each).
 and (b) its internal schema `{count, depth, fixes:[{id,reason}]}`
 diverged from the canonical `spec.schema.json::fixTaskMap` shape
 `{attempts, fixTaskIds, lastError}` documented in `references/failure-recovery.md`,
-`references/coordinator-pattern.md`, and `commands/implement.md`. Keeping
+`references/coordinator-pattern.md`, and `skills/implement/SKILL.md`. Keeping
 the lib risked a future caller picking up the wrong shape and writing
 state that violates the schema. The inline `node -e` pattern shown in
 `references/failure-recovery.md:250-260` already mutates `fixTaskMap`
@@ -38,14 +38,14 @@ to recreate later.
 
 | Lib | LOC | Callers | Purpose |
 | --- | --- | --- | --- |
-| `cleanup-files` | 185 | 0 (designed for `commands/implement.md` cleanup phase) | glob + delete with safety guards (refuses to delete outside repo, refuses dotfiles unless explicit) |
+| `cleanup-files` | 185 | 0 (designed for `skills/implement/SKILL.md` cleanup phase) | glob + delete with safety guards (refuses to delete outside repo, refuses dotfiles unless explicit) |
 | `count-mocks` | 107 | 0 (designed for `templates/tasks.md` verification-before-completion VE2) | walks tests/, counts `vi.mock` / `jest.mock` / `mock.fn` occurrences, prints mock-vs-real ratio JSON |
-| `count-tasks` | 54 | 0 (designed for `templates/tasks.md`, `commands/status.md`) | parse `tasks.md` → `{total, completed, pending}` JSON via `_shared/markdown-task-parser` |
-| `ensure-gitignore` | 64 | 0 (designed for `commands/implement.md`, `templates/tasks.md`) | idempotent: append `<entry>` to `.gitignore` only if missing |
-| `get-default-branch` | 105 | 0 (designed for native sync + `commands/start.md`) | cross-platform git default branch detection (origin/HEAD → main → master fallback chain) |
-| `init-execution-state` | 88 | 0 (designed for `commands/start.md`) | copy `.curdx-state.json` template into spec dir with atomic write |
+| `count-tasks` | 54 | 0 (designed for `templates/tasks.md`, `skills/status/SKILL.md`) | parse `tasks.md` → `{total, completed, pending}` JSON via `_shared/markdown-task-parser` |
+| `ensure-gitignore` | 64 | 0 (designed for `skills/implement/SKILL.md`, `templates/tasks.md`) | idempotent: append `<entry>` to `.gitignore` only if missing |
+| `get-default-branch` | 105 | 0 (designed for native sync + `skills/start/SKILL.md`) | cross-platform git default branch detection (origin/HEAD → main → master fallback chain) |
+| `init-execution-state` | 88 | 0 (designed for `skills/start/SKILL.md`) | copy `.curdx-state.json` template into spec dir with atomic write |
 | `kill-port` | 129 | 0 (designed for `templates/tasks.md` cleanup + dev-server reset) | cross-platform port killer (replaces `lsof -ti:PORT \| xargs kill`); uses `netstat`/`ss`/`lsof` per OS |
-| `merge-state` | 106 | **9** (`commands/{requirements,design,research,implement}.md`, `agents/{product-manager,research-analyst,task-planner,architect-reviewer}.md`, `references/coordinator-pattern.md`) | JSON deep-merge + atomic write — the **load-bearing** lib that replaces every `jq '.field=val' s.json > tmp && mv` in the markdown sweep |
+| `merge-state` | 106 | **9** (`skills/{requirements,design,research,implement}/SKILL.md`, `agents/{product-manager,research-analyst,task-planner,architect-reviewer}.md`, `references/coordinator-pattern.md`) | JSON deep-merge + atomic write — the **load-bearing** lib that replaces every `jq '.field=val' s.json > tmp && mv` in the markdown sweep |
 | `search-files` | 154 | 0 (designed for complex grep cases in skill prompts) | cross-platform recursive content search (replaces `grep -rn` for non-trivial patterns); supports include/exclude globs |
 | `update-modification-map` | 61 | 0 (designed for `agents/task-planner.md` modification tracking) | maintain `<spec-dir>/.file-modifications.json` (taskId → unique file list); separate sidecar from `.curdx-state.json::modificationMap` |
 

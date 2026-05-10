@@ -155,7 +155,7 @@ To opt into a tighter cap for a one-off loop:
 npx curdx-flow:implement --max-global-iterations 10
 ```
 
-The CLI flag is parsed in `plugins/curdx-flow/commands/implement.md` (Step 2
+The CLI flag is parsed in `plugins/curdx-flow/skills/implement/SKILL.md` (Step 2
 of the coordinator flow) and enforced both at the **coordinator pre-dispatch
 check** (`implement.md` "Pre-Dispatch Cap Check" subsection) and at the
 **Stop hook last-mile gate** (`stop-watcher.mjs` `buildCostRunawayBlock`).
@@ -185,7 +185,7 @@ loop breaks, but the global loop continues to the next task (US-2, AC-2.2).
 - `src/hooks/init-execution-state.ts` — EMBEDDED_TEMPLATE init defaults
 
 **Coordinator (CLI flag + pre-dispatch check)**:
-- `plugins/curdx-flow/commands/implement.md` — `--max-global-iterations`,
+- `plugins/curdx-flow/skills/implement/SKILL.md` — `--max-global-iterations`,
   `--max-task-iterations`, "Pre-Dispatch Cap Check" subsection
 
 **CHANGELOG**:

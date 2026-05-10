@@ -12,16 +12,16 @@ Spec-driven development transforms feature requests into structured specs throug
 
 ## Skills-First Architecture
 
-This skill is the canonical workflow guidance. curdx-flow is commands-compatible: `commands/` remains as the stable public slash-command layer for existing users.
+This skill is the canonical workflow guidance. curdx-flow is now skills-only at the plugin surface: every `/curdx-flow:*` entry point is a namespaced skill under `skills/<name>/SKILL.md`.
 
-- Prefer adding new reusable behavior under `skills/<name>/SKILL.md` with supporting `references/` or `scripts/`.
-- Keep existing `/curdx-flow:*` commands unless there is a deliberate migration plan; they are user-facing API.
-- Avoid adding a skill with the same name as an existing command until migration time because same-name skills take precedence over commands.
-- See `references/commands-vs-skills.md` for the migration policy.
+- Keep public invocation names stable (`/curdx-flow:start`, `/curdx-flow:tasks`, `/curdx-flow:implement`, etc.).
+- Keep direct workflow entry points user-invocable and explicit; shared/background rules live in support skills such as `curdx-core` and `interview-framework`.
+- Put long procedures in skill-local `references/` or plugin-global `${CLAUDE_PLUGIN_ROOT}/references/` files instead of bloating frontmatter descriptions.
+- See `references/entrypoints.md` for the skills-only entry point policy.
 
 ## Decision Tree: Where to Start
 
-| Situation | Command |
+| Situation | Slash Skill |
 |-----------|---------|
 | New feature, want guidance | `/curdx-flow:start <name> <goal>` |
 | New feature, skip interviews | `/curdx-flow:start <name> <goal> --quick` |
@@ -37,9 +37,9 @@ start/new -> research -> requirements -> design -> tasks -> implement
 
 Each phase produces a markdown artifact in `./specs/<name>/`. Normal mode pauses for approval between phases. Quick mode runs all phases then auto-starts execution.
 
-### Phase Commands
+### Phase Skills
 
-| Command | Agent | Output | Purpose |
+| Slash Skill | Agent | Output | Purpose |
 |---------|-------|--------|---------|
 | `/curdx-flow:research` | research-analyst | research.md | Explore feasibility, patterns, context |
 | `/curdx-flow:requirements` | product-manager | requirements.md | User stories, acceptance criteria |
@@ -69,9 +69,9 @@ specs/
     .progress.md       # Learnings and decisions
 ```
 
-## Management Commands
+## Management Skills
 
-| Command | Purpose |
+| Slash Skill | Purpose |
 |---------|---------|
 | `/curdx-flow:status` | Show all specs and progress |
 | `/curdx-flow:switch <name>` | Change active spec |
@@ -104,4 +104,4 @@ specs/
 ## References
 
 - **`references/phase-transitions.md`** -- Detailed phase flow, state transitions, quick mode behavior, phase skipping
-- **`references/commands-vs-skills.md`** -- Skills-first architecture and command compatibility policy
+- **`references/entrypoints.md`** -- Skills-only public entry point policy

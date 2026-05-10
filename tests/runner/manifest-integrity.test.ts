@@ -1,18 +1,12 @@
 // tests/runner/manifest-integrity.test.ts
 //
-// Structural validation for the 3 manifest types under plugins/curdx-flow/:
+// Structural validation for plugin manifests under plugins/curdx-flow/:
 //
-//   - commands/*.md      — slash-command markdown
 //   - agents/*.md        — subagent prompt markdown
-//   - skills/*/SKILL.md  — skill markdown
+//   - skills/*/SKILL.md  — user-facing slash skills and support skills
 //
-// Today there is ZERO automated check that these files have valid frontmatter
-// or that their inline `references/<file>.md` links resolve. A typo'd YAML
-// key, a renamed reference, or a missing description can ship to users with
-// no CI guard. This test closes that gap.
-//
-// Approach: regex parsing only — same convention as claudeMd.test.ts and
-// iron-law-doc.test.ts (no gray-matter dependency in this repo).
+// This catches invalid frontmatter, missing migrated entrypoint skills, stale
+// plugin.json paths, and broken reference links before a release ships.
 
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -25,25 +19,38 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const PLUGIN_ROOT = path.join(REPO_ROOT, "plugins", "curdx-flow");
 
 const PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".claude-plugin", "plugin.json");
-const COMMANDS_DIR = path.join(PLUGIN_ROOT, "commands");
 const AGENTS_DIR = path.join(PLUGIN_ROOT, "agents");
 const SKILLS_DIR = path.join(PLUGIN_ROOT, "skills");
 const REFERENCES_DIR = path.join(PLUGIN_ROOT, "references");
 const HOOKS_CONFIG = path.join(PLUGIN_ROOT, "hooks", "hooks.json");
 
+const LEGACY_ENTRYPOINT_SKILLS = [
+  "cancel",
+  "design",
+  "feedback",
+  "help",
+  "implement",
+  "index",
+  "new",
+  "refactor",
+  "requirements",
+  "research",
+  "start",
+  "status",
+  "switch",
+  "tasks",
+  "triage",
+] as const;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Extract YAML frontmatter as a raw string, or null if missing. */
 function extractFrontmatter(body: string): string | null {
   const m = body.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   return m && m[1] !== undefined ? m[1] : null;
 }
 
-/** Parse simple `key: value` pairs from frontmatter. Multi-line values are
- *  not supported because no manifest in this repo uses them; keeping the
- *  parser tight matches the claudeMd.test.ts precedent. */
 function parseFrontmatterFields(fm: string): Map<string, string> {
   const fields = new Map<string, string>();
   for (const rawLine of fm.split(/\r?\n/)) {
@@ -57,9 +64,7 @@ function parseFrontmatterFields(fm: string): Map<string, string> {
   return fields;
 }
 
-/** All `references/<name>.md` mentions in markdown body (anywhere, regardless
- *  of leading prefix like ${CLAUDE_PLUGIN_ROOT}). */
-function findReferenceLinks(body: string): string[] {
+function findReferenceNames(body: string): string[] {
   const matches = [...body.matchAll(/references\/([A-Za-z0-9_-]+)\.md/g)];
   return [...new Set(matches.map((m) => m[1] as string))];
 }
@@ -82,19 +87,14 @@ function listSkillManifests(dir: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Discovery (run once at module load so the `it()` count reflects reality)
+// Discovery
 // ---------------------------------------------------------------------------
 
-const COMMAND_FILES = listMarkdown(COMMANDS_DIR);
 const AGENT_FILES = listMarkdown(AGENTS_DIR);
 const SKILL_FILES = listSkillManifests(SKILLS_DIR);
 
-// ---------------------------------------------------------------------------
-// Discovery sanity (locks the count so accidental file deletion fails CI)
-// ---------------------------------------------------------------------------
-
 describe("manifest discovery", () => {
-  it("plugin.json declares official metadata and component paths", () => {
+  it("plugin.json declares official metadata and skills-only component paths", () => {
     const manifest = JSON.parse(readFileSync(PLUGIN_MANIFEST, "utf8")) as {
       name?: string;
       version?: string;
@@ -112,8 +112,9 @@ describe("manifest discovery", () => {
     expect(manifest.homepage).toMatch(/^https:\/\/github\.com\/curdx\/curdx-flow/);
     expect(manifest.repository).toBe("https://github.com/curdx/curdx-flow");
     expect(manifest.license).toBe("MIT");
+    expect(manifest.commands, "commands must not be declared after skills-only migration").toBeUndefined();
 
-    for (const key of ["skills", "commands", "agents", "hooks"] as const) {
+    for (const key of ["skills", "agents", "hooks"] as const) {
       const value = manifest[key];
       expect(value, `plugin.json: missing ${key}`).toBeDefined();
       const paths = Array.isArray(value) ? value : [value!];
@@ -128,12 +129,17 @@ describe("manifest discovery", () => {
     }
   });
 
-  it("finds at least 10 commands, 5 agents, 3 skills", () => {
-    // Lower bounds rather than exact counts so adding new manifests
-    // doesn't break this test, but mass-deletion is caught.
-    expect(COMMAND_FILES.length).toBeGreaterThanOrEqual(10);
+  it("has no commands directory and includes all migrated slash skills", () => {
+    expect(existsSync(path.join(PLUGIN_ROOT, "commands"))).toBe(false);
     expect(AGENT_FILES.length).toBeGreaterThanOrEqual(5);
-    expect(SKILL_FILES.length).toBeGreaterThanOrEqual(3);
+    expect(SKILL_FILES.length).toBeGreaterThanOrEqual(LEGACY_ENTRYPOINT_SKILLS.length + 3);
+
+    for (const name of LEGACY_ENTRYPOINT_SKILLS) {
+      expect(
+        existsSync(path.join(SKILLS_DIR, name, "SKILL.md")),
+        `missing migrated slash skill: ${name}`,
+      ).toBe(true);
+    }
   });
 
   it("references/ directory exists and contains at least 5 .md files", () => {
@@ -143,33 +149,7 @@ describe("manifest discovery", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Frontmatter validation per manifest type
-// ---------------------------------------------------------------------------
-
-describe("commands frontmatter integrity", () => {
-  // Commands don't have a `name` field — the filename is the command name.
-  // Required: `description`. Optional but recommended: `argument-hint`,
-  // `allowed-tools`.
-  it.each(COMMAND_FILES.map((f) => [path.basename(f), f]))(
-    "%s has frontmatter with non-empty `description`",
-    (_label, file) => {
-      const body = readFileSync(file, "utf8");
-      const fm = extractFrontmatter(body);
-      expect(fm, `${file}: missing frontmatter`).not.toBeNull();
-      const fields = parseFrontmatterFields(fm!);
-      const desc = fields.get("description");
-      expect(
-        desc !== undefined && desc.length > 0,
-        `${file}: missing/empty 'description' in frontmatter`,
-      ).toBe(true);
-    },
-  );
-});
-
 describe("agents frontmatter integrity", () => {
-  // Required: `name`, `description`. The `name` field is the canonical id
-  // the Task tool uses to spawn the subagent.
   it.each(AGENT_FILES.map((f) => [path.basename(f), f]))(
     "%s has non-empty `name` and `description`",
     (_label, file) => {
@@ -177,16 +157,8 @@ describe("agents frontmatter integrity", () => {
       const fm = extractFrontmatter(body);
       expect(fm, `${file}: missing frontmatter`).not.toBeNull();
       const fields = parseFrontmatterFields(fm!);
-      const name = fields.get("name");
-      const desc = fields.get("description");
-      expect(
-        name !== undefined && name.length > 0,
-        `${file}: missing/empty 'name' in frontmatter`,
-      ).toBe(true);
-      expect(
-        desc !== undefined && desc.length > 0,
-        `${file}: missing/empty 'description' in frontmatter`,
-      ).toBe(true);
+      expect(fields.get("name"), `${file}: missing/empty 'name'`).toBeTruthy();
+      expect(fields.get("description"), `${file}: missing/empty 'description'`).toBeTruthy();
     },
   );
 
@@ -195,10 +167,7 @@ describe("agents frontmatter integrity", () => {
       const expectedName = path.basename(file, ".md");
       const fm = extractFrontmatter(readFileSync(file, "utf8"));
       const name = parseFrontmatterFields(fm!).get("name");
-      expect(
-        name,
-        `${file}: name field "${name}" does not match filename "${expectedName}.md"`,
-      ).toBe(expectedName);
+      expect(name, `${file}: name must match filename`).toBe(expectedName);
     }
   });
 
@@ -264,7 +233,6 @@ describe("hooks config integrity", () => {
 });
 
 describe("skills frontmatter integrity", () => {
-  // Required: `name`, `description`. Optional: `version`.
   it.each(SKILL_FILES.map((f) => [path.relative(SKILLS_DIR, f), f]))(
     "%s has non-empty `name` and `description`",
     (_label, file) => {
@@ -272,16 +240,8 @@ describe("skills frontmatter integrity", () => {
       const fm = extractFrontmatter(body);
       expect(fm, `${file}: missing frontmatter`).not.toBeNull();
       const fields = parseFrontmatterFields(fm!);
-      const name = fields.get("name");
-      const desc = fields.get("description");
-      expect(
-        name !== undefined && name.length > 0,
-        `${file}: missing/empty 'name' in frontmatter`,
-      ).toBe(true);
-      expect(
-        desc !== undefined && desc.length > 0,
-        `${file}: missing/empty 'description' in frontmatter`,
-      ).toBe(true);
+      expect(fields.get("name"), `${file}: missing/empty 'name'`).toBeTruthy();
+      expect(fields.get("description"), `${file}: missing/empty 'description'`).toBeTruthy();
     },
   );
 
@@ -290,10 +250,7 @@ describe("skills frontmatter integrity", () => {
       const expectedName = path.basename(path.dirname(file));
       const fm = extractFrontmatter(readFileSync(file, "utf8"));
       const name = parseFrontmatterFields(fm!).get("name");
-      expect(
-        name,
-        `${file}: name field "${name}" does not match dir "${expectedName}"`,
-      ).toBe(expectedName);
+      expect(name, `${file}: name must match parent dir`).toBe(expectedName);
     }
   });
 
@@ -312,16 +269,16 @@ describe("skills frontmatter integrity", () => {
     }
   });
 
-  it("skills do not shadow existing commands unless explicitly migrated", () => {
-    const commandNames = new Set(COMMAND_FILES.map((f) => path.basename(f, ".md")));
-    const shadowing = SKILL_FILES
-      .map((file) => path.basename(path.dirname(file)))
-      .filter((name) => commandNames.has(name));
+  it("migrated public entrypoint skills are explicit user-invoked tasks", () => {
+    for (const name of LEGACY_ENTRYPOINT_SKILLS) {
+      const file = path.join(SKILLS_DIR, name, "SKILL.md");
+      const fm = extractFrontmatter(readFileSync(file, "utf8"));
+      const fields = parseFrontmatterFields(fm!);
 
-    expect(
-      shadowing,
-      `Same-name skills take precedence over commands; migrate intentionally before adding: ${shadowing.join(", ")}`,
-    ).toEqual([]);
+      expect(fields.get("name")).toBe(name);
+      expect(fields.get("description"), `${file}: missing slash menu description`).toBeDefined();
+      expect(fields.get("disable-model-invocation")).toBe("true");
+    }
   });
 
   it("deprecated skill aliases are hidden from model invocation", () => {
@@ -333,35 +290,23 @@ describe("skills frontmatter integrity", () => {
     expect(fields.get("disable-model-invocation")).toBe("true");
   });
 
-  it("spec-workflow documents the skills-first command compatibility policy", () => {
+  it("spec-workflow documents the skills-only entrypoint policy", () => {
     const file = path.join(SKILLS_DIR, "spec-workflow", "SKILL.md");
     const body = readFileSync(file, "utf8");
 
     expect(body).toContain("Skills-First Architecture");
-    expect(body).toContain("commands-compatible");
-    expect(body).toContain("same-name skills take precedence over commands");
-    expect(body).toContain("references/commands-vs-skills.md");
+    expect(body).toContain("skills-only at the plugin surface");
+    expect(body).toContain("skills/<name>/SKILL.md");
+    expect(body).toContain("references/entrypoints.md");
   });
 });
 
-// ---------------------------------------------------------------------------
-// references/ link integrity — every "references/foo.md" mention must resolve
-// ---------------------------------------------------------------------------
-
 describe("references/ link integrity", () => {
-  // Commands + agents use the GLOBAL plugin references at
-  // plugins/curdx-flow/references/. Skills use their LOCAL
-  // skills/<name>/references/ subdirectory (each skill is self-contained
-  // per the Claude Code skills convention). The test must differentiate
-  // these two scopes — a skill saying `references/foo.md` resolves to
-  // its own folder, not to the global one.
-  const globalScopeManifests = [...COMMAND_FILES, ...AGENT_FILES];
-
-  it("every references/<name>.md in commands/agents resolves under plugin/references/", () => {
+  it("every references/<name>.md in agents resolves under plugin/references/", () => {
     const broken: Array<{ source: string; target: string }> = [];
-    for (const file of globalScopeManifests) {
+    for (const file of AGENT_FILES) {
       const body = readFileSync(file, "utf8");
-      for (const refName of findReferenceLinks(body)) {
+      for (const refName of findReferenceNames(body)) {
         const refPath = path.join(REFERENCES_DIR, `${refName}.md`);
         if (!existsSync(refPath)) {
           broken.push({
@@ -373,31 +318,31 @@ describe("references/ link integrity", () => {
     }
     expect(
       broken,
-      `Broken reference links found:\n${broken
+      `Broken agent reference links found:\n${broken
         .map((b) => `  ${b.source} -> ${b.target}`)
         .join("\n")}`,
     ).toEqual([]);
   });
 
-  it("every references/<name>.md in a skill resolves under skills/<skill>/references/", () => {
+  it("every references/<name>.md in a skill resolves locally or via plugin global references", () => {
     const broken: Array<{ source: string; target: string }> = [];
     for (const file of SKILL_FILES) {
       const body = readFileSync(file, "utf8");
-      const skillDir = path.dirname(file);
-      const skillRefDir = path.join(skillDir, "references");
-      for (const refName of findReferenceLinks(body)) {
-        const refPath = path.join(skillRefDir, `${refName}.md`);
-        if (!existsSync(refPath)) {
+      const skillRefDir = path.join(path.dirname(file), "references");
+      for (const refName of findReferenceNames(body)) {
+        const localPath = path.join(skillRefDir, `${refName}.md`);
+        const pluginPath = path.join(REFERENCES_DIR, `${refName}.md`);
+        if (!existsSync(localPath) && !existsSync(pluginPath)) {
           broken.push({
             source: path.relative(REPO_ROOT, file),
-            target: path.relative(REPO_ROOT, refPath),
+            target: `references/${refName}.md`,
           });
         }
       }
     }
     expect(
       broken,
-      `Broken skill-local reference links found:\n${broken
+      `Broken skill reference links found:\n${broken
         .map((b) => `  ${b.source} -> ${b.target}`)
         .join("\n")}`,
     ).toEqual([]);

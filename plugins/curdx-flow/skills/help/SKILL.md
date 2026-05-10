@@ -1,6 +1,9 @@
 ---
-description: Show help for curdx-flow plugin commands and workflow.
+name: help
+description: Show help for curdx-flow plugin slash skills and workflow.
+disable-model-invocation: true
 ---
+
 
 # curdx-flow Help
 
@@ -8,11 +11,11 @@ description: Show help for curdx-flow plugin commands and workflow.
 
 curdx-flow is a spec-driven development plugin that guides you through research, requirements, design, and task generation phases, then executes tasks autonomously with fresh context per task.
 
-curdx-flow is **skills-first, commands-compatible**: skills carry the canonical reusable workflow guidance, while `/curdx-flow:*` commands remain stable public entry points for existing users.
+curdx-flow is **skills-only at the plugin surface**: skills carry both canonical reusable workflow guidance and stable `/curdx-flow:*` public entry points.
 
-## Commands
+## Slash Skills
 
-| Command | Description |
+| Skill | Description |
 |---------|-------------|
 | `/curdx-flow:start [name] [goal]` | Smart entry point: resume or create new |
 | `/curdx-flow:new <name> [goal]` | Create new spec and start research |
@@ -63,7 +66,7 @@ Done!
 # Or resume an existing spec
 /curdx-flow:start
 
-# Manual workflow with individual commands:
+# Manual workflow with individual slash skills:
 /curdx-flow:new user-auth Add JWT authentication
 /curdx-flow:requirements
 /curdx-flow:design
@@ -73,7 +76,7 @@ Done!
 
 ## Options
 
-### start command
+### start skill
 ```
 /curdx-flow:start [name] [goal] [--fresh] [--quick] [--commit-spec] [--no-commit-spec]
 ```
@@ -84,19 +87,19 @@ Done!
 
 The `--commit-spec` setting is stored in `.curdx-state.json` and applies to all subsequent phases (research, requirements, design, tasks).
 
-### new command
+### new skill
 ```
 /curdx-flow:new <name> [goal] [--skip-research]
 ```
 - `--skip-research`: Skip research phase, start with requirements
 
-### phase commands (research, requirements, design, tasks)
+### phase skills (research, requirements, design, tasks)
 ```
 /curdx-flow:<phase> [spec-name]
 ```
-Phase commands use the `commitSpec` setting from `.curdx-state.json` (set during `/curdx-flow:start`).
+Phase skills use the `commitSpec` setting from `.curdx-state.json` (set during `/curdx-flow:start`).
 
-### implement command
+### implement skill
 ```
 /curdx-flow:implement [--max-task-iterations 5]
 ```
@@ -138,7 +141,7 @@ If not configured, defaults to `["./specs"]` for backward compatibility.
 
 ### Using --specs-dir Flag
 
-The `start` and `new` commands accept `--specs-dir` to specify where to create a spec:
+The `start` and `new` skills accept `--specs-dir` to specify where to create a spec:
 
 ```bash
 # Create spec in default directory (./specs/)
@@ -182,7 +185,7 @@ specs_dirs:
 
 ### Disambiguation
 
-When the same spec name exists in multiple directories, commands will prompt for disambiguation:
+When the same spec name exists in multiple directories, slash skills will prompt for disambiguation:
 
 ```
 Multiple specs named "auth-feature" found:
@@ -197,7 +200,7 @@ Use the full path to target a specific spec when names are ambiguous.
 
 ## Execution Loop
 
-The implement command runs tasks one at a time:
+The implement skill runs tasks one at a time:
 1. Execute task from tasks.md
 2. Verify completion
 3. Commit changes

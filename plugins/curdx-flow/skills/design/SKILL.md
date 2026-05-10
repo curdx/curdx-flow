@@ -1,8 +1,11 @@
 ---
+name: design
 description: Generate technical design from requirements
 argument-hint: "[spec-name]"
 allowed-tools: "*"
+disable-model-invocation: true
 ---
+
 
 # Design Phase
 
@@ -100,8 +103,8 @@ Optional Agent Teams path:
 This step runs the **two-stage review protocol** at the design phase boundary: `spec-reviewer` (specCompliance) and `code-quality-reviewer` (codeQuality) are dispatched **in parallel**, in ONE message, against the frozen `design.md` artifact. Both reviewers must complete before reconciliation.
 
 **Required reading before dispatch** (read once at top of step, do not skip):
-- [`references/bounded-parallel-dispatch.md`](../references/bounded-parallel-dispatch.md) — independence criteria + the Review-domain "ALL Task calls in ONE message" rule (anti-pattern #3 + #5–#8). Both reviewers must be spawned in the SAME message.
-- [`references/two-stage-review.md`](../references/two-stage-review.md) — domain boundary table (specCompliance vs codeQuality), 3-layer drift defense, anti-rationalization rule, SLSA-shape verdict glossary, QuickMode behavior contract.
+- [`bounded-parallel-dispatch.md`](${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md) — independence criteria + the Review-domain "ALL Task calls in ONE message" rule (anti-pattern #3 + #5–#8). Both reviewers must be spawned in the SAME message.
+- [`two-stage-review.md`](${CLAUDE_PLUGIN_ROOT}/references/two-stage-review.md) — domain boundary table (specCompliance vs codeQuality), 3-layer drift defense, anti-rationalization rule, SLSA-shape verdict glossary, QuickMode behavior contract.
 
 The two reviewers do **not** see each other's output (Layer 2 isolation). The coordinator never arbitrates findings across domains.
 
@@ -166,7 +169,7 @@ else:                                  # normal mode
     proceed to Step 5.
 ```
 
-**Anti-rationalization**: the coordinator MUST NOT pass spec-reviewer's findings into the code-quality-reviewer prompt (or vice versa). Both verdicts are stored verbatim under `verificationBlocks.design.reviews`. See [`references/two-stage-review.md`](../references/two-stage-review.md) §2.
+**Anti-rationalization**: the coordinator MUST NOT pass spec-reviewer's findings into the code-quality-reviewer prompt (or vice versa). Both verdicts are stored verbatim under `verificationBlocks.design.reviews`. See [`two-stage-review.md`](${CLAUDE_PLUGIN_ROOT}/references/two-stage-review.md) §2.
 
 **Revision delegation**: Re-invoke architect-reviewer with the merged feedback (both reviewers' findings concatenated, attributed by `reviewerId`) and requirements.md upstream context. Focus on the union of issues.
 

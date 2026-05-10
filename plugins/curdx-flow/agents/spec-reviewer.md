@@ -66,7 +66,7 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 **Examples**:
 - Completeness PASS: All three sections present, Executive Summary has 2+ paragraphs, Codebase Analysis lists specific files, Feasibility Assessment evaluates risks.
 - Completeness FAIL: "## Feasibility Assessment" heading exists but body is "TBD" or empty.
-- Grounding PASS: "The plugin uses frontmatter-based commands (see `commands/research.md` lines 1-5)."
+- Grounding PASS: "The plugin uses frontmatter-based slash skills (see `skills/research/SKILL.md` lines 1-5)."
 - Grounding FAIL: "The codebase already supports this pattern" with no file path or line reference.
 - Scope PASS: Goal is "add auth" and all sections discuss authentication. A brief "Related: rate limiting" note is clearly marked as out-of-scope.
 - Scope FAIL: Goal is "add auth" but two sections discuss unrelated UI redesign.
@@ -83,7 +83,7 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 **Examples**:
 - Completeness PASS: "US-1 ... AC-1.1: grep -q 'REVIEW_PASS' agents/spec-reviewer.md exits 0" and "FR-1 (Must): Create reviewer agent".
 - Completeness FAIL: "US-1: As a developer I want reviews" with no AC-* items listed, or "FR-1: Add reviewer" with no priority.
-- Testability PASS: "AC-2.1: Running `grep -q 'Layer 5' commands/implement.md` exits 0."
+- Testability PASS: "AC-2.1: Running `grep -q 'Layer 5' skills/implement/SKILL.md` exits 0."
 - Testability FAIL: "AC-2.1: The implementation should work correctly and be high quality."
 - Traceability PASS: "FR-3 traces to US-1 (phase reviews)" with explicit reference.
 - Traceability FAIL: "FR-7: Support dark mode" appears with no corresponding user story.
@@ -103,7 +103,7 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 - Completeness FAIL: "## Data Flow" section exists but is empty or says "TODO".
 - Consistency PASS: "Component A handles FR-1, FR-5; Component B handles FR-2, FR-3" with all FRs covered.
 - Consistency FAIL: "Component X: handles caching" but no FR mentions caching; or FR-4 has no corresponding component.
-- Feasibility PASS: "Modify `commands/research.md` (existing)" and "Create `agents/spec-reviewer.md` (new)".
+- Feasibility PASS: "Modify `skills/research/SKILL.md` (existing)" and "Create `agents/spec-reviewer.md` (new)".
 - Feasibility FAIL: "Import from `utils/validator.ts`" but file doesn't exist and isn't listed as a creation target.
 - Patterns PASS: Agent omits `model` field in frontmatter (inherits parent model automatically), matching existing agents like spec-executor.md.
 - Patterns FAIL: Agent hardcodes a specific model like `model: claude-3-opus` when all other agents omit it to inherit dynamically.
@@ -126,14 +126,14 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 - Completeness FAIL: Task has `Do` and `Files` but no `Verify` command.
 - Traceability PASS: Task footer says "_Requirements: FR-1_ / _Design: Component A_".
 - Traceability FAIL: Task has no FR-* or design section references.
-- Actionability PASS: "Add `## Artifact Review` section after line 45 in `commands/research.md` with iteration counter starting at 1."
+- Actionability PASS: "Add `## Artifact Review` section after line 45 in `skills/research/SKILL.md` with iteration counter starting at 1."
 - Actionability FAIL: "Implement the review feature in the appropriate files."
 - Structure PASS: Phase 1 is POC (minimal wiring), Phase 2 is full integration, Phase 3 is testing, Phase 4 is quality gates.
 - Structure FAIL: Phase 1 jumps straight to testing; or Phase 2 is labeled "POC" but Phase 1 already exists.
 - Quality Gates PASS: At least one [VERIFY] task exists in the plan.
 - Quality Gates FAIL: No [VERIFY] tasks anywhere in the plan.
-- Holistic Awareness PASS: Task notes "Modifying the phase command template affects research, requirements, design, and tasks commands. Verify all four after change."
-- Holistic Awareness FAIL: Task says "Edit commands/research.md" with no mention that the same pattern exists in 3 other command files that may need the same change.
+- Holistic Awareness PASS: Task notes "Modifying the phase entrypoint template affects research, requirements, design, and tasks skills. Verify all four after change."
+- Holistic Awareness FAIL: Task says "Edit skills/research/SKILL.md" with no mention that the same pattern exists in 3 other entrypoint skills that may need the same change.
 
 ## Iteration Awareness
 

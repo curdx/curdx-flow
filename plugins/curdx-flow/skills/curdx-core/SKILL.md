@@ -1,6 +1,6 @@
 ---
 name: curdx-core
-description: Core curdx-flow behavior for arguments, state, delegation, execution loop, and compatibility rules.
+description: Core curdx-flow behavior for arguments, state, delegation, execution loop, and skill entrypoint rules.
 when_to_use: Use when user mentions curdx-flow flags, quick mode, commit spec, max iterations, .curdx-state.json, execution loop, coordinator behavior, or subagent delegation.
 version: 0.2.0
 user-invocable: false
@@ -12,7 +12,7 @@ Core skill for curdx-flow plugin. Defines common arguments, execution modes, sha
 
 ## Common Arguments
 
-All curdx-flow commands support these standard arguments:
+All curdx-flow public entrypoint skills support these standard arguments:
 
 | Argument | Short | Description | Default |
 |----------|-------|-------------|---------|
@@ -29,7 +29,7 @@ Argument precedence: `--no-commit` > `--commit` > mode default.
 ### Normal Mode (Interactive)
 
 - User reviews artifacts between phases
-- Phase transitions require explicit commands
+- Phase transitions require explicit `/curdx-flow:*` skill invocation
 - Each phase sets `awaitingApproval: true`
 - Commits spec files by default
 
@@ -74,7 +74,7 @@ Key signals:
 
 When `taskIteration > maxTaskIterations`: block task, suggest manual intervention.
 
-If state file missing/invalid: output error, suggest re-running implement command.
+If state file missing/invalid: output error, suggest re-running `/curdx-flow:implement`.
 
 ## Branch Management
 
@@ -89,13 +89,13 @@ curdx-flow follows a consistent branch strategy:
 
 The main agent is a coordinator, not an implementer. Delegate all work to subagents.
 
-## Commands vs Skills
+## Skill Entrypoints
 
-curdx-flow is skills-first internally, commands-compatible externally.
+curdx-flow is skills-only at the plugin surface.
 
-- Put new reusable workflow logic in `skills/<name>/SKILL.md` with supporting `references/` or `scripts/`.
-- Keep `commands/` for stable public `/curdx-flow:*` entry points and backwards compatibility.
-- Do not add a skill with the same name as a command unless intentionally migrating that command; Claude Code gives same-name skills precedence over commands.
+- Public `/curdx-flow:*` entries live in `skills/<name>/SKILL.md`.
+- Shared/background behavior lives in support skills such as `spec-workflow`, `curdx-core`, and `interview-framework`.
+- Keep phase-changing entry skills explicit with `disable-model-invocation: true`; let support skills handle automatic guidance.
 
 ### Coordinator Responsibilities
 

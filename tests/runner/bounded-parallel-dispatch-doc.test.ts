@@ -6,7 +6,7 @@
 // and any future debug-domain consumer.
 //
 // If wording, anti-pattern counts, or path references drift between the doc,
-// the consumer commands, or the stub redirect, downstream consumers silently
+// the consumer skills, or the stub redirect, downstream consumers silently
 // degrade — coordinators fan out under wrong assumptions, or readers chase
 // dead links through the old `parallel-research.md` path.
 //
@@ -35,20 +35,20 @@ const OLD_STUB_PATH = join(
   'references',
   'parallel-research.md',
 );
-const COMMANDS_DIR = join(REPO_ROOT, 'plugins', 'curdx-flow', 'commands');
+const SKILLS_DIR = join(REPO_ROOT, 'plugins', 'curdx-flow', 'skills');
 
-// Subset of `commands/*.md` that the design (E1) classifies as inbound
+// Subset of `skills/*/SKILL.md` that the design (E1) classifies as inbound
 // consumers — both hard refs (research, start, triage) and soft consumers
 // (requirements, design, tasks). The drift test enforces zero `parallel-
 // research.md` matches across this set, regardless of whether the file
 // currently links to the new doc.
-const INBOUND_COMMAND_FILES = [
-  'research.md',
-  'start.md',
-  'triage.md',
-  'requirements.md',
-  'design.md',
-  'tasks.md',
+const INBOUND_SKILL_NAMES = [
+  'research',
+  'start',
+  'triage',
+  'requirements',
+  'design',
+  'tasks',
 ] as const;
 
 function readDoc(): string {
@@ -151,18 +151,18 @@ describe('bounded-parallel-dispatch.md drift detection', () => {
     expect(doc).toContain('Independent context');
   });
 
-  test('path-consistency-commands: zero parallel-research.md refs across inbound commands; new path present where doc was previously referenced', () => {
+  test('path-consistency-skills: zero parallel-research.md refs across inbound skills; new path present where doc was previously referenced', () => {
     let staleCount = 0;
     let newPathHits = 0;
-    for (const filename of INBOUND_COMMAND_FILES) {
-      const content = readFileSync(join(COMMANDS_DIR, filename), 'utf8');
-      // The stub itself is in references/, not commands/, so any match in
-      // commands/ is a stale ref by definition.
+    for (const name of INBOUND_SKILL_NAMES) {
+      const content = readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8');
+      // The stub itself is in references/, not entrypoint skills, so any match
+      // in these skills is a stale ref by definition.
       if (content.includes('parallel-research.md')) staleCount += 1;
       if (content.includes('bounded-parallel-dispatch.md')) newPathHits += 1;
     }
     expect(staleCount).toBe(0);
-    // At least one inbound command must now reference the new path —
+    // At least one inbound skill must now reference the new path —
     // otherwise the rename hasn't propagated. (research.md and start.md
     // are the canonical hard-ref consumers per design E1.)
     expect(newPathHits).toBeGreaterThanOrEqual(1);
@@ -181,7 +181,7 @@ describe('bounded-parallel-dispatch.md drift detection', () => {
     expect(doc).toContain('Agent Teams are experimental and disabled by default');
     expect(doc).toContain('Direct `Task(...)` dispatch is the baseline contract');
     // All 5 step markers must remain — drift in step ordering or count
-    // breaks downstream commands that read the doc procedurally.
+    // breaks downstream skills that read the doc procedurally.
     for (let i = 1; i <= 5; i++) {
       expect(doc).toMatch(new RegExp(`### Step ${i}:`));
     }

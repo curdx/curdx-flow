@@ -12,7 +12,7 @@ new/start -> research -> requirements -> design -> tasks -> implement
 
 ### 1. Research Phase
 
-**Command**: `/curdx-flow:research`
+**Slash skill**: `/curdx-flow:research`
 **Agent**: research-analyst
 **Output**: `./specs/<name>/research.md`
 
@@ -27,7 +27,7 @@ Ends with: `awaitingApproval: true`
 
 ### 2. Requirements Phase
 
-**Command**: `/curdx-flow:requirements`
+**Slash skill**: `/curdx-flow:requirements`
 **Agent**: product-manager
 **Output**: `./specs/<name>/requirements.md`
 
@@ -42,7 +42,7 @@ Ends with: `awaitingApproval: true`
 
 ### 3. Design Phase
 
-**Command**: `/curdx-flow:design`
+**Slash skill**: `/curdx-flow:design`
 **Agent**: architect-reviewer
 **Output**: `./specs/<name>/design.md`
 
@@ -58,7 +58,7 @@ Ends with: `awaitingApproval: true`
 
 ### 4. Tasks Phase
 
-**Command**: `/curdx-flow:tasks`
+**Slash skill**: `/curdx-flow:tasks`
 **Agent**: task-planner
 **Output**: `./specs/<name>/tasks.md`
 
@@ -73,7 +73,7 @@ Ends with: `awaitingApproval: true`
 
 ### 5. Execution Phase
 
-**Command**: `/curdx-flow:implement`
+**Slash skill**: `/curdx-flow:implement`
 **Agent**: spec-executor (via Loop)
 **State**: `phase: "execution"`
 

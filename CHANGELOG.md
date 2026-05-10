@@ -2,6 +2,18 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.11 — 2026-05-10
+
+### Changed
+
+- **Plugin surface migrated to skills-only.** The legacy `plugins/curdx-flow/commands/` directory has been removed. All former `/curdx-flow:*` entries now live as same-name user-invocable skills under `plugins/curdx-flow/skills/<name>/SKILL.md`, preserving public invocation names while using the current Claude Code skill layout.
+- **Entrypoint skills are explicit task skills.** Migrated workflow entrypoints set `disable-model-invocation: true` so phase-changing actions are invoked deliberately; model-invoked guidance remains in support skills such as `spec-workflow`, `curdx-core`, and `interview-framework`.
+- **Skills-only architecture docs.** `spec-workflow`, `curdx-core`, `help`, and `spec-workflow/references/entrypoints.md` now describe the skills-only entrypoint policy, global reference usage, and stable `/curdx-flow:*` slash-skill surface.
+
+### Added
+
+- **Runner guard for skills-only migration.** Manifest integrity tests now assert there is no `commands/` directory, `plugin.json` does not declare `commands`, all 15 former slash commands exist as skills, and migrated entrypoint skills are explicit user-invoked tasks.
+
 ## 7.1.10 — 2026-05-10
 
 ### Changed

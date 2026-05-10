@@ -36,19 +36,21 @@ const CODE_QUALITY_REVIEWER_PATH = join(
   'agents',
   'code-quality-reviewer.md',
 );
-const DESIGN_COMMAND_PATH = join(
+const DESIGN_SKILL_PATH = join(
   REPO_ROOT,
   'plugins',
   'curdx-flow',
-  'commands',
-  'design.md',
+  'skills',
+  'design',
+  'SKILL.md',
 );
-const TASKS_COMMAND_PATH = join(
+const TASKS_SKILL_PATH = join(
   REPO_ROOT,
   'plugins',
   'curdx-flow',
-  'commands',
-  'tasks.md',
+  'skills',
+  'tasks',
+  'SKILL.md',
 );
 
 function readFile(path: string): string {
@@ -115,8 +117,8 @@ describe('two-stage-review drift detection', () => {
     expect(cqDoc).toContain('REVIEW_FAIL');
   });
 
-  test('commands/design.md wires bounded-parallel-dispatch + dual reviewer Task calls (FR-D1, AC-8.1)', () => {
-    const doc = readFile(DESIGN_COMMAND_PATH);
+  test('skills/design/SKILL.md wires bounded-parallel-dispatch + dual reviewer Task calls (FR-D1, AC-8.1)', () => {
+    const doc = readFile(DESIGN_SKILL_PATH);
 
     // Phase boundary review must reference the bounded-parallel-dispatch
     // contract — that's the only place "ALL Task calls in ONE message" is
@@ -134,12 +136,12 @@ describe('two-stage-review drift detection', () => {
     expect(doc).toMatch(/subagent_type:\s*code-quality-reviewer/);
   });
 
-  test('commands/tasks.md wires bounded-parallel-dispatch + dual reviewer Task calls (FR-D1, AC-8.2)', () => {
-    const doc = readFile(TASKS_COMMAND_PATH);
+  test('skills/tasks/SKILL.md wires bounded-parallel-dispatch + dual reviewer Task calls (FR-D1, AC-8.2)', () => {
+    const doc = readFile(TASKS_SKILL_PATH);
 
-    // Mirror of the design.md contract — tasks.md phase boundary uses the
+    // Mirror of the design skill contract — tasks skill phase boundary uses the
     // exact same parallel two-stage review protocol. Drift between the two
-    // command files (e.g. tasks.md forgets one reviewer) silently breaks
+    // skill files (e.g. tasks forgets one reviewer) silently breaks
     // the post-tasks gate while post-design still passes.
     expect(doc).toContain('bounded-parallel-dispatch');
     expect(doc).toContain('direct `Task(subagent_type: task-planner)`');

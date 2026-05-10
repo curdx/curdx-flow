@@ -68,8 +68,8 @@ describe("quick-mode-guard (PreToolUse hook for AskUserQuestion)", () => {
 });
 
 // QuickMode bypass contract for two-stage review (spec-two-stage-review D5,
-// FR-M1 + FR-M2). The coordinator branch lives in commands/{design,tasks}.md
-// (not in hook code) — these tests are fixture-shaped: they read the command
+// FR-M1 + FR-M2). The coordinator branch lives in skills/design/SKILL.md and skills/tasks/SKILL.md
+// (not in hook code) — these tests are fixture-shaped: they read the skill
 // markdown and assert both phases encode the asymmetric gate:
 //   (a) state.quickMode === true + codeQuality.verdict FAIL  → advisory:true,
 //       coordinator continues (downgrade, do NOT block).
@@ -83,8 +83,9 @@ describe("QuickMode bypass contract — two-stage review D5 (FR-M1, FR-M2)", () 
       REPO_ROOT,
       "plugins",
       "curdx-flow",
-      "commands",
-      "design.md",
+      "skills",
+      "design",
+      "SKILL.md",
     ),
     "utf8",
   );
@@ -93,14 +94,15 @@ describe("QuickMode bypass contract — two-stage review D5 (FR-M1, FR-M2)", () 
       REPO_ROOT,
       "plugins",
       "curdx-flow",
-      "commands",
-      "tasks.md",
+      "skills",
+      "tasks",
+      "SKILL.md",
     ),
     "utf8",
   );
   const phaseFiles: Array<[string, string]> = [
-    ["design.md", designMd],
-    ["tasks.md", tasksMd],
+    ["skills/design/SKILL.md", designMd],
+    ["skills/tasks/SKILL.md", tasksMd],
   ];
 
   it.each(phaseFiles)(
