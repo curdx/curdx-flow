@@ -1,6 +1,7 @@
 ---
 name: curdx-core
-description: Core behavioral skill for curdx-flow plugin. Use proactively when user mentions curdx-flow arguments, quick mode, commit spec, max iterations, state file, execution loop, coordinator behavior, delegate to subagent, or needs guidance on plugin arguments, state management, delegation patterns, or execution loop behavior.
+description: Core curdx-flow behavior for arguments, state, delegation, execution loop, and compatibility rules.
+when_to_use: Use when user mentions curdx-flow flags, quick mode, commit spec, max iterations, .curdx-state.json, execution loop, coordinator behavior, or subagent delegation.
 version: 0.2.0
 user-invocable: false
 ---
@@ -87,6 +88,14 @@ curdx-flow follows a consistent branch strategy:
 ## Coordinator Behavior
 
 The main agent is a coordinator, not an implementer. Delegate all work to subagents.
+
+## Commands vs Skills
+
+curdx-flow is skills-first internally, commands-compatible externally.
+
+- Put new reusable workflow logic in `skills/<name>/SKILL.md` with supporting `references/` or `scripts/`.
+- Keep `commands/` for stable public `/curdx-flow:*` entry points and backwards compatibility.
+- Do not add a skill with the same name as a command unless intentionally migrating that command; Claude Code gives same-name skills precedence over commands.
 
 ### Coordinator Responsibilities
 

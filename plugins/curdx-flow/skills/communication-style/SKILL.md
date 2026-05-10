@@ -1,6 +1,7 @@
 ---
 name: communication-style
-description: This skill should be used when generating spec artifacts (research.md, requirements.md, design.md, tasks.md), formatting agent output, structuring phase results, or when any agent needs guidance on concise, scannable output formatting. Applies to all spec phase agents.
+description: Concise output rules for curdx-flow artifacts and phase summaries.
+when_to_use: Use when writing research.md, requirements.md, design.md, tasks.md, reviews, walkthroughs, progress summaries, or subagent phase output.
 version: 0.2.0
 user-invocable: false
 ---

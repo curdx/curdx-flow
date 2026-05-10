@@ -2,6 +2,20 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.10 — 2026-05-10
+
+### Changed
+
+- **Skills-first plugin posture.** curdx-flow now documents a clear skills-first, commands-compatible architecture: reusable workflow logic belongs in `skills/`, while `commands/` stays as the stable public `/curdx-flow:*` compatibility surface.
+- **Skill invocation metadata tightened.** Core skills now use concise `description` values plus `when_to_use` trigger detail, matching Claude Code's current skill listing behavior and reducing trigger noise.
+- **Deprecated verification alias hidden from model invocation.** `reality-verification` now explicitly sets `disable-model-invocation: true`; `verification-before-completion` remains the canonical skill.
+- **Help output clarifies the split between skills and commands.** `/curdx-flow:help` now explains that skills carry canonical reusable guidance and commands remain stable user entry points.
+
+### Added
+
+- **`skills/spec-workflow/references/commands-vs-skills.md`.** New policy reference explaining why curdx-flow should not delete commands yet, when a command should become a thin wrapper, and how to avoid accidental same-name skill precedence changes.
+- **Runner tests for skills-first regressions.** Manifest integrity checks now enforce concise skill descriptions, deprecated alias hiding, no accidental skill/command name shadowing, and presence of the commands-vs-skills policy.
+
 ## 7.1.9 — 2026-05-10
 
 ### Changed

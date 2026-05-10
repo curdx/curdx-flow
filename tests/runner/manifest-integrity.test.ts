@@ -296,6 +296,52 @@ describe("skills frontmatter integrity", () => {
       ).toBe(expectedName);
     }
   });
+
+  it("skill descriptions stay concise and use when_to_use for trigger detail", () => {
+    for (const file of SKILL_FILES) {
+      const fm = extractFrontmatter(readFileSync(file, "utf8"));
+      const fields = parseFrontmatterFields(fm!);
+      const desc = fields.get("description") ?? "";
+      const whenToUse = fields.get("when_to_use") ?? "";
+
+      expect(desc.length, `${file}: description should stay concise`).toBeLessThanOrEqual(220);
+      expect(
+        desc.length + whenToUse.length,
+        `${file}: description + when_to_use exceeds Claude Code listing cap`,
+      ).toBeLessThanOrEqual(1536);
+    }
+  });
+
+  it("skills do not shadow existing commands unless explicitly migrated", () => {
+    const commandNames = new Set(COMMAND_FILES.map((f) => path.basename(f, ".md")));
+    const shadowing = SKILL_FILES
+      .map((file) => path.basename(path.dirname(file)))
+      .filter((name) => commandNames.has(name));
+
+    expect(
+      shadowing,
+      `Same-name skills take precedence over commands; migrate intentionally before adding: ${shadowing.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  it("deprecated skill aliases are hidden from model invocation", () => {
+    const file = path.join(SKILLS_DIR, "reality-verification", "SKILL.md");
+    const fm = extractFrontmatter(readFileSync(file, "utf8"));
+    const fields = parseFrontmatterFields(fm!);
+
+    expect(fields.get("user-invocable")).toBe("false");
+    expect(fields.get("disable-model-invocation")).toBe("true");
+  });
+
+  it("spec-workflow documents the skills-first command compatibility policy", () => {
+    const file = path.join(SKILLS_DIR, "spec-workflow", "SKILL.md");
+    const body = readFileSync(file, "utf8");
+
+    expect(body).toContain("Skills-First Architecture");
+    expect(body).toContain("commands-compatible");
+    expect(body).toContain("same-name skills take precedence over commands");
+    expect(body).toContain("references/commands-vs-skills.md");
+  });
 });
 
 // ---------------------------------------------------------------------------

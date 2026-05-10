@@ -8,6 +8,8 @@ description: Show help for curdx-flow plugin commands and workflow.
 
 curdx-flow is a spec-driven development plugin that guides you through research, requirements, design, and task generation phases, then executes tasks autonomously with fresh context per task.
 
+curdx-flow is **skills-first, commands-compatible**: skills carry the canonical reusable workflow guidance, while `/curdx-flow:*` commands remain stable public entry points for existing users.
+
 ## Commands
 
 | Command | Description |

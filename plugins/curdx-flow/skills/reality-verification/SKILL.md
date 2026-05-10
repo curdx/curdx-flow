@@ -1,7 +1,8 @@
 ---
 name: reality-verification
-description: DEPRECATED ALIAS — this skill was renamed to verification-before-completion in v7.x. The old name is retained for backwards compatibility but redirects to the new skill. See skills/verification-before-completion/SKILL.md for the canonical content.
+description: DEPRECATED ALIAS for verification-before-completion. Kept only for backwards compatibility.
 user-invocable: false
+disable-model-invocation: true
 ---
 
 # DEPRECATED ALIAS — `reality-verification` → `verification-before-completion`

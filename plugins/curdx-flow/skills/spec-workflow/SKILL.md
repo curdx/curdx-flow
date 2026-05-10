@@ -1,12 +1,23 @@
 ---
 name: spec-workflow
-description: This skill should be used when the user asks to "build a feature", "create a spec", "start spec-driven development", "run research phase", "generate requirements", "create design", "plan tasks", "implement spec", "check spec status", "triage a feature", "create an epic", "decompose a large feature", or needs guidance on spec-driven development workflow, phase ordering, or epic orchestration.
+description: Primary curdx-flow skill for spec-driven development workflows and phase orchestration.
+when_to_use: Use when user asks to build, implement, plan, triage, decompose, resume, inspect status, or run any curdx-flow research/requirements/design/tasks/implementation phase.
+argument-hint: "[intent-or-spec]"
 version: 0.2.0
 ---
 
 # Spec Workflow
 
 Spec-driven development transforms feature requests into structured specs through sequential phases, then executes them task-by-task.
+
+## Skills-First Architecture
+
+This skill is the canonical workflow guidance. curdx-flow is commands-compatible: `commands/` remains as the stable public slash-command layer for existing users.
+
+- Prefer adding new reusable behavior under `skills/<name>/SKILL.md` with supporting `references/` or `scripts/`.
+- Keep existing `/curdx-flow:*` commands unless there is a deliberate migration plan; they are user-facing API.
+- Avoid adding a skill with the same name as an existing command until migration time because same-name skills take precedence over commands.
+- See `references/commands-vs-skills.md` for the migration policy.
 
 ## Decision Tree: Where to Start
 
@@ -93,3 +104,4 @@ specs/
 ## References
 
 - **`references/phase-transitions.md`** -- Detailed phase flow, state transitions, quick mode behavior, phase skipping
+- **`references/commands-vs-skills.md`** -- Skills-first architecture and command compatibility policy

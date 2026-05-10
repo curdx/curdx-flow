@@ -1,6 +1,7 @@
 ---
 name: interview-framework
-description: This skill should be used when running an interactive interview before a spec phase, gathering requirements through dialogue, asking the user clarifying questions before delegating to a subagent, or when any phase command (research, requirements, design, tasks) needs adaptive brainstorming dialogue. Covers the 3-phase algorithm (Understand, Propose Approaches, Confirm and Store).
+description: Adaptive interview pattern for curdx-flow phase planning and requirements discovery.
+when_to_use: Use before research, requirements, design, tasks, or triage when user decisions are needed and codebase facts must be discovered before asking.
 version: 0.2.0
 user-invocable: false
 ---

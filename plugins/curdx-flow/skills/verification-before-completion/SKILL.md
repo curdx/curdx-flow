@@ -1,6 +1,7 @@
 ---
 name: verification-before-completion
-description: This skill should be used when the user asks to "verify a fix", "reproduce failure", "diagnose issue", "check BEFORE/AFTER state", "VF task", "reality check", "check test quality", "mock-only tests", or needs guidance on verifying fixes by reproducing failures before and after implementation, or detecting mock-heavy test anti-patterns.
+description: Verification rules for fixes, phase exits, completion claims, and mock-heavy test risk.
+when_to_use: Use when reproducing failures, verifying BEFORE/AFTER state, handling VF tasks, checking verificationBlocks, validating completion evidence, or auditing mock-only tests.
 version: 0.2.0
 user-invocable: false
 ---
