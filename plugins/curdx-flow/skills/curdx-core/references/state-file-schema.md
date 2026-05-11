@@ -38,8 +38,11 @@ curdx-flow uses `.curdx-state.json` to track execution state.
   "recommendedCapabilities": [
     {
       "id": "context7",
+      "name": "Context7",
+      "type": "mcp",
       "phase": "before-coding",
       "invocation": "Context7 MCP",
+      "availability": "core-required",
       "reason": "external documentation or current API behavior is likely relevant",
       "instruction": "Use Context7 before editing so version-specific behavior is grounded in current docs."
     }
@@ -62,7 +65,7 @@ curdx-flow uses `.curdx-state.json` to track execution state.
 | `maxGlobalIterations` | number | Max execution loop iterations before blocking |
 | `autoPolicy` | object | Deterministic policy controlling sizing, review, verification, subagents, and stop-hook behavior |
 | `projectTopology` | object | Compact multi-root project facts returned by `smart-route` |
-| `recommendedCapabilities` | array | Tool-use hints returned by `smart-route`; use only when the capability is installed and relevant |
+| `recommendedCapabilities` | array | Tool-use hints returned by `smart-route`; core-required capabilities are expected from the default bundle and still must be used only when relevant |
 | `awaitingApproval` | boolean | Waiting for user to proceed |
 | `completed` | boolean | Spec fully complete (all tasks done, terminal state) |
 | `completedAt` | string (date-time) | ISO 8601 UTC timestamp when spec entered completed phase |

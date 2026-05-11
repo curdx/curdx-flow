@@ -106,9 +106,21 @@ try {
   ]);
   const capabilityParsed = JSON.parse(capabilityRoute);
   const capabilityIds = capabilityParsed.recommendedCapabilities?.map((rec) => rec.id) ?? [];
-  for (const expected of ['context7', 'frontend-design', 'chrome-devtools-mcp', 'sequential-thinking']) {
+  for (const expected of [
+    'context7',
+    'claude-mem',
+    'frontend-design',
+    'chrome-devtools-mcp',
+    'sequential-thinking',
+    'pua',
+  ]) {
     if (!capabilityIds.includes(expected)) {
       throw new Error(`missing capability recommendation ${expected}: ${capabilityRoute}`);
+    }
+  }
+  for (const rec of capabilityParsed.recommendedCapabilities ?? []) {
+    if (rec.availability !== 'core-required') {
+      throw new Error(`expected core-required capability ${rec.id}: ${capabilityRoute}`);
     }
   }
 

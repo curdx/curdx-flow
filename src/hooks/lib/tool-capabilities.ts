@@ -27,6 +27,11 @@ export type CapabilityPhase =
   | "verification"
   | "recovery";
 
+export type CapabilityAvailability =
+  | "core-required"
+  | "known-available"
+  | "check-if-installed";
+
 export interface ToolCapability {
   id: ToolCapabilityId;
   name: string;
@@ -53,6 +58,7 @@ export interface CapabilityRecommendation {
   type: CapabilityToolType;
   invocation: string;
   phase: CapabilityPhase;
+  availability: CapabilityAvailability;
   reason: string;
   instruction: string;
 }
@@ -123,8 +129,17 @@ const ORDER: ToolCapabilityId[] = [
   "pua",
 ];
 
-const DOCS_RE =
-  /\b(api|sdk|library|libraries|framework|docs?|documentation|version|upgrade|dependency|dependencies|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node)\b|最新|文档|依赖|框架|插件|官方|联网|搜索/i;
+const CORE_REQUIRED: ReadonlySet<ToolCapabilityId> = new Set([
+  "context7",
+  "claude-mem",
+  "frontend-design",
+  "chrome-devtools-mcp",
+  "sequential-thinking",
+  "pua",
+]);
+
+const EXTERNAL_DOCS_RE =
+  /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node)\b|最新|依赖|框架|插件|官方|联网|搜索|文档.*(最新|官方|API|SDK|框架|插件|依赖)/i;
 
 const MEMORY_RE =
   /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
@@ -156,8 +171,13 @@ function hasAny(values: string[] | undefined, candidates: string[]): boolean {
   return candidates.some((candidate) => set.has(candidate.toLowerCase()));
 }
 
-function capabilityAllowed(id: ToolCapabilityId, available: Set<string> | null): boolean {
-  return available === null || available.has(id);
+function capabilityAvailability(
+  id: ToolCapabilityId,
+  available: Set<string> | null,
+): CapabilityAvailability | null {
+  if (CORE_REQUIRED.has(id)) return "core-required";
+  if (available === null) return "check-if-installed";
+  return available.has(id) ? "known-available" : null;
 }
 
 function pushRecommendation(
@@ -168,7 +188,8 @@ function pushRecommendation(
   reason: string,
   instruction: string,
 ): void {
-  if (!capabilityAllowed(id, available)) return;
+  const availability = capabilityAvailability(id, available);
+  if (availability === null) return;
   if (out.some((rec) => rec.id === id)) return;
   const cap = CAPABILITIES[id];
   out.push({
@@ -177,6 +198,7 @@ function pushRecommendation(
     type: cap.type,
     invocation: cap.invocation,
     phase,
+    availability,
     reason,
     instruction,
   });
@@ -211,7 +233,9 @@ export function recommendToolCapabilities(
     return recs;
   }
 
-  const localLowRisk = LOW_RISK_LOCAL_RE.test(goal) && route === "direct-change";
+  const externalDocsRelevant = EXTERNAL_DOCS_RE.test(goal);
+  const localLowRisk =
+    LOW_RISK_LOCAL_RE.test(goal) && route === "direct-change" && !externalDocsRelevant;
   if (localLowRisk) {
     return recs;
   }
@@ -222,7 +246,7 @@ export function recommendToolCapabilities(
     hasAny(topologyFrameworks, ["react", "vue", "next.js", "vite"]);
   const browserRuntime = BROWSER_VERIFY_RE.test(goal) || hasFrontend;
   const complex =
-    COMPLEX_RE.test(goal) ||
+    (COMPLEX_RE.test(goal) && route !== "direct-change") ||
     risk === "high" ||
     risk === "critical" ||
     route === "full-spec" ||
@@ -230,7 +254,7 @@ export function recommendToolCapabilities(
   const stuck = STUCK_RE.test(goal);
   const parallel = PARALLEL_RE.test(goal) || route === "epic-split";
 
-  if (DOCS_RE.test(goal)) {
+  if (externalDocsRelevant) {
     pushRecommendation(
       recs,
       available,
@@ -320,25 +344,25 @@ export function renderInstalledCapabilityRules(availableCapabilities: string[]):
 
 export function renderCapabilityDecisionTree(availableCapabilities: string[]): string[] {
   const available = new Set(availableCapabilities);
-  const lines: string[] = [
-    "1. Can the edit be finished safely from local code in 1-2 steps? -> Do it directly.",
+  const rules: string[] = [
+    "Can the edit be finished safely from local code in 1-2 steps? -> Do it directly.",
   ];
   if (available.has("context7")) {
-    lines.push("2. Does correctness depend on external docs, SDKs, APIs, or Claude Code behavior? -> use the Context7 MCP before editing.");
+    rules.push("Does correctness depend on external docs, SDKs, APIs, or Claude Code behavior? -> use the Context7 MCP before editing.");
   }
   if (available.has("claude-mem")) {
-    lines.push("3. Might similar work, a prior decision, or a repeated failure exist? -> Start with `/claude-mem:mem-search`.");
+    rules.push("Might similar work, a prior decision, or a repeated failure exist? -> Start with `/claude-mem:mem-search`.");
   }
   if (available.has("frontend-design") || available.has("chrome-devtools-mcp")) {
-    lines.push("4. Is visible frontend behavior in scope? -> Use frontend-design for UI decisions and Chrome DevTools MCP for runtime proof when installed.");
+    rules.push("Is visible frontend behavior in scope? -> Use frontend-design for UI decisions and Chrome DevTools MCP for runtime proof when installed.");
   }
   if (available.has("sequential-thinking")) {
-    lines.push("5. Is the work high-risk, architectural, or assumption-heavy? -> Use sequential-thinking after reading the relevant code.");
+    rules.push("Is the work high-risk, architectural, or assumption-heavy? -> Use sequential-thinking after reading the relevant code.");
   }
   if (available.has("pua")) {
-    lines.push("6. Are there multiple failed attempts or truly independent parallel slices? -> Use `/pua:pua-loop` for recovery or `/pua:p9` for bounded parallel planning.");
+    rules.push("Are there multiple failed attempts or truly independent parallel slices? -> Use `/pua:pua-loop` for recovery or `/pua:p9` for bounded parallel planning.");
   }
-  return lines;
+  return rules.map((rule, idx) => `${idx + 1}. ${rule}`);
 }
 
 function parseList(value: string | undefined): string[] {

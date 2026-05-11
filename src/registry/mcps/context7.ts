@@ -11,6 +11,7 @@ const context7: Pkg = {
   name: 'context7',
   description: 'upstash/context7 — up-to-date docs from any library (HTTP MCP, optional API key)',
   type: 'mcp',
+  required: true,
   whenToUse:
     'for any library / SDK / framework / API / Claude Code docs lookup. Use instead of web search.',
   isInstalled: () => isMcpInstalled(MCP_NAME),

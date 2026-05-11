@@ -2,6 +2,18 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.20 — 2026-05-11
+
+### Changed
+
+- **Companion capabilities are now the default required bundle.** `pua`, `claude-mem`, `chrome-devtools-mcp`, `frontend-design`, `sequential-thinking`, and `context7` are marked `required` in the installer alongside `curdx-flow`, so interactive installs show them as always installed and `--ids` installs auto-include missing required companions.
+- **Official plugin dependency metadata added.** `curdx-flow` now declares plugin dependencies for `pua`, `claude-mem`, `chrome-devtools-mcp`, and `frontend-design`, and the root marketplace explicitly allows those cross-marketplace dependencies.
+- **Capability routing marks bundled companions as `core-required`.** Smart-route recommendations still trigger only when relevant, but recommended bundled capabilities are no longer suppressed by narrow availability filters.
+
+### Tests
+
+- Added registry and manifest regression coverage for the required bundle, expanded capability-router expectations, rebuilt hook bundles, and tightened `claudecc` smoke checks for `core-required` recommendations.
+
 ## 7.1.19 — 2026-05-11
 
 ### Added

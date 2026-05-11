@@ -19,6 +19,7 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const PLUGIN_ROOT = path.join(REPO_ROOT, "plugins", "curdx-flow");
 
 const PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".claude-plugin", "plugin.json");
+const MARKETPLACE_MANIFEST = path.join(REPO_ROOT, ".claude-plugin", "marketplace.json");
 const AGENTS_DIR = path.join(PLUGIN_ROOT, "agents");
 const SKILLS_DIR = path.join(PLUGIN_ROOT, "skills");
 const REFERENCES_DIR = path.join(PLUGIN_ROOT, "references");
@@ -113,6 +114,7 @@ describe("manifest discovery", () => {
       commands?: string | string[];
       agents?: string | string[];
       hooks?: string | string[];
+      dependencies?: Array<{ name?: string; marketplace?: string }>;
     };
 
     expect(manifest.name).toBe("curdx-flow");
@@ -144,6 +146,30 @@ describe("manifest discovery", () => {
       existsSync(HOOKS_CONFIG),
       "standard hooks/hooks.json must exist for automatic hook discovery",
     ).toBe(true);
+  });
+
+  it("declares required plugin dependencies through the official dependency model", () => {
+    const manifest = JSON.parse(readFileSync(PLUGIN_MANIFEST, "utf8")) as {
+      dependencies?: Array<{ name?: string; marketplace?: string }>;
+    };
+    const marketplace = JSON.parse(readFileSync(MARKETPLACE_MANIFEST, "utf8")) as {
+      allowCrossMarketplaceDependenciesOn?: string[];
+    };
+
+    expect(manifest.dependencies).toEqual([
+      { name: "pua", marketplace: "pua-skills" },
+      { name: "claude-mem", marketplace: "thedotmack" },
+      { name: "chrome-devtools-mcp", marketplace: "chrome-devtools-plugins" },
+      { name: "frontend-design", marketplace: "claude-plugins-official" },
+    ]);
+    expect(marketplace.allowCrossMarketplaceDependenciesOn).toEqual(
+      expect.arrayContaining([
+        "pua-skills",
+        "thedotmack",
+        "chrome-devtools-plugins",
+        "claude-plugins-official",
+      ]),
+    );
   });
 
   it("has no commands directory and includes all migrated slash skills", () => {

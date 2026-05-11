@@ -38,6 +38,15 @@ describe('renderBlock', () => {
     expect(block).toContain('use the Context7 MCP');
     expect(block).not.toContain('Run `npx @curdx/flow` to install / update / uninstall.');
   });
+
+  test('decision tree numbering is contiguous for minimal installs', () => {
+    setLang('en');
+    const block = renderBlock([{ id: 'curdx-flow', name: 'curdx-flow', type: 'plugin' }]);
+
+    expect(block).toContain('1. Can the edit be finished safely');
+    expect(block).toContain('2. Is the request ambiguous');
+    expect(block).not.toContain('7. Is the request ambiguous');
+  });
 });
 
 describe('skill alias resolution: reality-verification → verification-before-completion', () => {

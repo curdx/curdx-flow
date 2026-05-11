@@ -57,6 +57,7 @@ const chromeDevtoolsMcp: Pkg = {
   name: 'chrome-devtools-mcp',
   description: 'ChromeDevTools/chrome-devtools-mcp — drive a real Chrome from Claude Code',
   type: 'plugin',
+  required: true,
   whenToUse:
     'when debugging code that runs in a browser: perf traces, network / console inspection, DOM / CSS issues. Prefer snapshot over screenshot.',
   prereqCheck: async (t): Promise<PrereqResult> => {

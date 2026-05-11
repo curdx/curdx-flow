@@ -6,11 +6,17 @@
   "metadata": {
     "description": "Claude Code plugins curated and bundled by curdx-flow"
   },
+  "allowCrossMarketplaceDependenciesOn": [
+    "pua-skills",
+    "thedotmack",
+    "chrome-devtools-plugins",
+    "claude-plugins-official"
+  ],
   "plugins": [
     {
       "name": "curdx-flow",
       "description": "Spec-driven development with research, requirements, design, tasks, autonomous execution, and epic triage. Fresh context per task.",
-      "version": "7.1.19",
+      "version": "7.1.20",
       "author": {
         "name": "curdx"
       },

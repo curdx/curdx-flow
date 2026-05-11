@@ -381,7 +381,7 @@
         },
         "recommendedCapabilities": {
           "type": "array",
-          "description": "Tool-use hints returned by smart-route; phases may use them when the capability is installed and relevant",
+          "description": "Tool-use hints returned by smart-route; core-required capabilities are expected from the default bundle and phases should still use them only when relevant",
           "items": {
             "type": "object",
             "properties": {
@@ -403,10 +403,14 @@
                 "type": "string",
                 "enum": ["before-coding", "planning", "implementation", "verification", "recovery"]
               },
+              "availability": {
+                "type": "string",
+                "enum": ["core-required", "known-available", "check-if-installed"]
+              },
               "reason": { "type": "string" },
               "instruction": { "type": "string" }
             },
-            "required": ["id", "name", "type", "invocation", "phase", "reason", "instruction"],
+            "required": ["id", "name", "type", "invocation", "phase", "availability", "reason", "instruction"],
             "additionalProperties": false
           }
         },

@@ -69,7 +69,7 @@ function buildSkipRules(ids: Set<string>): string[] {
 function buildDecisionTree(ids: Set<string>): string[] {
   const out = renderCapabilityDecisionTree([...ids]);
   if (ids.has('curdx-flow')) {
-    out.push('7. Is the request ambiguous, cross-cutting, phase-based, or multi-root? -> Run /curdx-flow:start.');
+    out.push(`${out.length + 1}. Is the request ambiguous, cross-cutting, phase-based, or multi-root? -> Run /curdx-flow:start.`);
   }
   return out;
 }

@@ -247,6 +247,7 @@ export interface CurdxState {
     type?: "plugin" | "mcp";
     invocation?: string;
     phase?: "before-coding" | "planning" | "implementation" | "verification" | "recovery";
+    availability?: "core-required" | "known-available" | "check-if-installed";
     reason?: string;
     instruction?: string;
   }>;

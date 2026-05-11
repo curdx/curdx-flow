@@ -123,7 +123,7 @@ The same npm package delivers both products. The installer reads its descriptor 
 
 - **Node.js** ≥ 20.12 ([download](https://nodejs.org))
 - **Claude Code CLI** installed and on `PATH` ([install instructions](https://docs.anthropic.com/en/docs/claude-code))
-- *(Optional)* **Bun** ≥ 1.0 — auto-detected; the installer offers to install it if you choose `claude-mem`
+- *(Optional)* **Bun** ≥ 1.0 — auto-detected; the installer offers to install it for the default `claude-mem` companion
 
 ### Install
 
@@ -131,7 +131,7 @@ The same npm package delivers both products. The installer reads its descriptor 
 npx @curdx/flow
 ```
 
-On first run, you pick a language (中文 / English), then select what to install. The bundled `curdx-flow` plugin (the spec workflow itself) is always installed. Everything else is opt-in.
+On first run, you pick a language (中文 / English). The full curdx-flow bundle is installed by default: `curdx-flow`, `pua`, `claude-mem`, `chrome-devtools-mcp`, `frontend-design`, `sequential-thinking`, and `context7`. If a companion has a local prerequisite that is missing, the installer reports the skip reason and continues so the core workflow remains usable.
 
 That language choice also controls the managed `~/.claude/CLAUDE.md` block that flow writes. The block is rendered in the selected language, and when you choose `zh` it additionally injects a language policy telling Claude to keep tool/model interaction in English while replying to the user in Simplified Chinese.
 
@@ -428,9 +428,9 @@ Most workflow frameworks address this by adding more agents, more orchestration,
 
 No. flow runs **inside** Claude Code as a plugin. You still use the Claude Code CLI / IDE extension to chat; flow adds the `/curdx-flow:*` commands, subagents, hooks, and the bundled marketplace.
 
-#### Can I use flow without installing the marketplace plugins?
+#### Can I use flow without the companion capabilities?
 
-Yes. The bundled `curdx-flow` plugin is the spec workflow itself; everything else (claude-mem, chrome-devtools-mcp, …) is opt-in. `npx @curdx/flow install` lets you pick.
+The default installer treats the companion capabilities as required because routing depends on them for memory, current docs, frontend design, browser verification, structured reasoning, and retry/parallel recovery. If a local prerequisite is missing, that item may be skipped with a visible reason, but the next `npx @curdx/flow install` run will try to restore it.
 
 #### Do I need to commit the spec files?
 

@@ -140,6 +140,22 @@ describe("smart-route classifier", () => {
     expect(result.stdout).not.toMatch(/\b(XS|XL)\b/);
   });
 
+  it("keeps direct docs work direct while still recommending current docs lookup", () => {
+    const route = classifySmartRoute({
+      goal: "Update README with latest Claude Code plugin docs",
+      changedFiles: ["README.md"],
+    });
+
+    expect(route.route).toBe("direct-change");
+    expect(route.shouldCreateSpec).toBe(false);
+    expect(route.recommendedCapabilities).toEqual([
+      expect.objectContaining({
+        id: "context7",
+        availability: "core-required",
+      }),
+    ]);
+  });
+
   it("accepts available capability filters for tool recommendations", () => {
     const route = classifySmartRoute({
       goal: "Debug React network error in Chrome using latest docs",
@@ -149,8 +165,18 @@ describe("smart-route classifier", () => {
 
     expect(route.recommendedCapabilities.map((rec) => rec.id)).toEqual([
       "context7",
+      "claude-mem",
+      "frontend-design",
       "chrome-devtools-mcp",
+      "sequential-thinking",
+      "pua",
     ]);
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "context7")?.availability).toBe("core-required");
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "claude-mem")?.availability).toBe("core-required");
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "frontend-design")?.availability).toBe("core-required");
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "chrome-devtools-mcp")?.availability).toBe("core-required");
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "sequential-thinking")?.availability).toBe("core-required");
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "pua")?.availability).toBe("core-required");
   });
 
   it("blocks UI work when CLAUDE.md declares a frontend root outside current access", () => {

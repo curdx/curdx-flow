@@ -86,7 +86,7 @@ When `commitSpec` is false:
 
 ## Task Execution Loop
 
-curdx-flow v3.0.0+ has a self-contained execution loop via the stop-hook. No external dependencies required.
+curdx-flow v3.0.0+ has a self-contained execution loop via the stop-hook. Companion plugins and MCPs improve routing, memory, docs, UI, browser proof, reasoning, and recovery, but the stop-hook loop itself does not delegate to an external orchestrator.
 
 Key signals:
 - `TASK_COMPLETE` - executor finished task

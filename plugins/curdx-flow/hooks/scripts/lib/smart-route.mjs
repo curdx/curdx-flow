@@ -1046,7 +1046,15 @@ var ORDER = [
   "sequential-thinking",
   "pua"
 ];
-var DOCS_RE = /\b(api|sdk|library|libraries|framework|docs?|documentation|version|upgrade|dependency|dependencies|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node)\b|最新|文档|依赖|框架|插件|官方|联网|搜索/i;
+var CORE_REQUIRED = /* @__PURE__ */ new Set([
+  "context7",
+  "claude-mem",
+  "frontend-design",
+  "chrome-devtools-mcp",
+  "sequential-thinking",
+  "pua"
+]);
+var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node)\b|最新|依赖|框架|插件|官方|联网|搜索|文档.*(最新|官方|API|SDK|框架|插件|依赖)/i;
 var MEMORY_RE = /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
 var UI_RE = /\b(ui|ux|frontend|front-end|browser|chrome|dom|css|html|layout|component|page|form|modal|responsive|visual|render|react|vue|vite|next\.?js|screenshot|interaction)\b|前端|页面|浏览器|样式|交互|组件|布局|视觉|截图/i;
 var BROWSER_VERIFY_RE = /\b(browser|chrome|dom|css|network|console|performance|render|screenshot|e2e|playwright|visual regression|interaction)\b|浏览器|控制台|网络|性能|渲染|截图|端到端/i;
@@ -1061,11 +1069,14 @@ function hasAny(values, candidates) {
   const set = new Set((values ?? []).map((v) => v.toLowerCase()));
   return candidates.some((candidate) => set.has(candidate.toLowerCase()));
 }
-function capabilityAllowed(id, available) {
-  return available === null || available.has(id);
+function capabilityAvailability(id, available) {
+  if (CORE_REQUIRED.has(id)) return "core-required";
+  if (available === null) return "check-if-installed";
+  return available.has(id) ? "known-available" : null;
 }
 function pushRecommendation(out, available, id, phase, reason, instruction) {
-  if (!capabilityAllowed(id, available)) return;
+  const availability = capabilityAvailability(id, available);
+  if (availability === null) return;
   if (out.some((rec) => rec.id === id)) return;
   const cap = CAPABILITIES[id];
   out.push({
@@ -1074,6 +1085,7 @@ function pushRecommendation(out, available, id, phase, reason, instruction) {
     type: cap.type,
     invocation: cap.invocation,
     phase,
+    availability,
     reason,
     instruction
   });
@@ -1093,16 +1105,17 @@ function recommendToolCapabilities(input) {
   if (missingRoots > 0) {
     return recs;
   }
-  const localLowRisk = LOW_RISK_LOCAL_RE.test(goal) && route === "direct-change";
+  const externalDocsRelevant = EXTERNAL_DOCS_RE.test(goal);
+  const localLowRisk = LOW_RISK_LOCAL_RE.test(goal) && route === "direct-change" && !externalDocsRelevant;
   if (localLowRisk) {
     return recs;
   }
   const hasFrontend = UI_RE.test(goal) || hasAny(topologyKinds2, ["frontend-app"]) || hasAny(topologyFrameworks2, ["react", "vue", "next.js", "vite"]);
   const browserRuntime = BROWSER_VERIFY_RE.test(goal) || hasFrontend;
-  const complex = COMPLEX_RE.test(goal) || risk === "high" || risk === "critical" || route === "full-spec" || route === "epic-split";
+  const complex = COMPLEX_RE.test(goal) && route !== "direct-change" || risk === "high" || risk === "critical" || route === "full-spec" || route === "epic-split";
   const stuck = STUCK_RE.test(goal);
   const parallel = PARALLEL_RE.test(goal) || route === "epic-split";
-  if (DOCS_RE.test(goal)) {
+  if (externalDocsRelevant) {
     pushRecommendation(
       recs,
       available,
