@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { classifyAutoPolicy, type AutoPolicy } from "./auto-policy.js";
+import { discoverProjectTopology, type ProjectTopology } from "./project-topology.js";
 import { findSpec, resolveCurrent } from "../_shared/path-resolver.js";
 
 export type SmartRouteName =
@@ -46,6 +47,10 @@ export interface SmartRoute {
     phase: string;
     completed: boolean;
   };
+  topology?: Pick<
+    ProjectTopology,
+    "devContextFound" | "roots" | "requiredRoots" | "missingRoots" | "accessFix" | "warnings"
+  >;
   blockedReason?: string;
   policy: {
     mode: AutoPolicy["mode"];
@@ -257,10 +262,22 @@ function routeDefaults(route: SmartRouteName): Pick<
   }
 }
 
+function publicTopology(topology: ProjectTopology): SmartRoute["topology"] {
+  return {
+    devContextFound: topology.devContextFound,
+    roots: topology.roots,
+    requiredRoots: topology.requiredRoots,
+    missingRoots: topology.missingRoots,
+    ...(topology.accessFix ? { accessFix: topology.accessFix } : {}),
+    warnings: topology.warnings,
+  };
+}
+
 export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
   const goal = normalizeText(input.goal);
   const cwd = input.cwd ?? process.cwd();
   const activeSpec = findActiveSpec({ ...input, cwd });
+  const topology = discoverProjectTopology({ cwd, goal });
   const policy = classifyAutoPolicy({
     goal,
     flags: input.flags,
@@ -277,6 +294,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
       activeSpec,
       ...routeDefaults("resume-current"),
       nextAction: nextActionForActiveSpec(activeSpec),
+      topology: publicTopology(topology),
       policy: publicPolicy(policy),
       reasons: ["active unfinished spec"],
     };
@@ -296,6 +314,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
       blockedReason:
         "Ask whether to resume the existing spec or rerun with --fresh for new work.",
       ...routeDefaults("blocked-ask-user"),
+      topology: publicTopology(topology),
       policy: publicPolicy(policy),
       reasons: ["existing unfinished spec with new goal text"],
     };
@@ -311,6 +330,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
         reason: "multiple specs match the requested name",
         blockedReason: `Ambiguous spec '${explicitName}': ${found.matches.join(", ")}`,
         ...routeDefaults("blocked-ask-user"),
+        topology: publicTopology(topology),
         policy: publicPolicy(policy),
         reasons: ["ambiguous spec name"],
       };
@@ -324,8 +344,27 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
       reason: "no goal and no resumable active spec",
       blockedReason: "Ask for the goal or a spec name.",
       ...routeDefaults("blocked-ask-user"),
+      topology: publicTopology(topology),
       policy: publicPolicy(policy),
       reasons: ["missing goal"],
+    };
+  }
+
+  if (topology.missingRoots.length > 0) {
+    const missing = topology.missingRoots
+      .map((root) => `${root.name} (${root.path})`)
+      .join(", ");
+    return {
+      version: 1,
+      route: "blocked-ask-user",
+      reason: "related code root is not accessible",
+      blockedReason:
+        `Goal requires ${missing}. ${topology.accessFix ?? "Add the missing root before continuing."}`,
+      ...routeDefaults("blocked-ask-user"),
+      nextAction: topology.accessFix ?? "Add the missing code root, then rerun /curdx-flow:start.",
+      topology: publicTopology(topology),
+      policy: publicPolicy(policy),
+      reasons: ["related code root is outside current Claude Code access"],
     };
   }
 
@@ -336,6 +375,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
     route,
     reason: policy.reasons[0] ?? "deterministic policy classification",
     ...defaults,
+    topology: publicTopology(topology),
     policy: publicPolicy(policy),
     reasons: policy.reasons,
   };

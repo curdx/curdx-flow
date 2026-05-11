@@ -10,6 +10,12 @@ disable-model-invocation: true
 
 Act as the curdx-flow router. Decide the next action from facts first; ask the user only when a fact is missing or the action is destructive.
 
+## Dev Context
+
+Before routing, assume the current project may be frontend-only, backend-only, full-stack monorepo, split frontend/backend repos, a CLI/library, or a Claude Code plugin. The deterministic router reads project `CLAUDE.md` Dev sections, `.claude/curdx-flow.local.md`, and cheap manifests to infer code roots.
+
+Users do not need to know `--add-dir`. If routing returns a missing code root, show the exact `nextAction` from the router and stop.
+
 ## Route First
 
 1. Parse `$ARGUMENTS` into optional spec name, goal text, and flags.
@@ -32,6 +38,8 @@ Act as the curdx-flow router. Decide the next action from facts first; ask the u
 | `full-spec` | Run the normal research -> requirements -> design -> tasks -> implement workflow. |
 | `epic-split` | Invoke `/curdx-flow:triage` with the same goal. Do not force the work into one spec. |
 | `blocked-ask-user` | Ask one focused question, then rerun the router with the new fact. |
+
+If `blocked-ask-user` includes `topology.missingRoots`, do not ask an open-ended question. Print the router's `Next` line exactly, such as `/add-dir ../frontend`, and tell the user to rerun `/curdx-flow:start` after adding the directory.
 
 ## Hard Rules
 
@@ -82,6 +90,8 @@ If policy computation fails, use this fallback cap:
 ```
 
 For `lite-spec`, keep interviews minimal and generate only 1-3 value-slice tasks. For `full-spec`, continue with research and the normal phase flow.
+
+When a spec state is created and router output includes `topology`, store a compact copy of that object in `.curdx-state.json` as `projectTopology`.
 
 ## Skill Discovery
 

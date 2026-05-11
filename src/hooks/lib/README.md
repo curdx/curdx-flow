@@ -1,6 +1,6 @@
 # lib/ — cross-platform Node CLI utilities
 
-This directory holds 10 single-purpose Node CLIs that replace the v6
+This directory holds 11 single-purpose Node CLIs that replace the v6
 `bash + jq + grep + find + lsof` toolchain so the curdx-flow plugin runs
 on Windows, Linux, and macOS without a POSIX shell. Sources are TypeScript
 in `src/hooks/lib/*.ts`; esbuild bundles them to
@@ -8,13 +8,15 @@ in `src/hooks/lib/*.ts`; esbuild bundles them to
 `scripts/build-hooks.mjs`). Skill prompts and command markdown invoke
 them as `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/<name>.mjs" <args>`.
 
-## Convergence rationale (why 10, not more)
+## Convergence rationale
 
 The catalog converged from an initial 11 to **10** during Phase 2.5
 (`specs/cross-platform-support/tasks.md` task 2.5). Convergence bar:
 **a lib stays only if it has ≥2 distinct callers OR ≥30 lines of
 non-trivial impl** (the disjunction means a "future-use" lib with
-substantive code stays even before adoption). All 10 surviving libs pass
+substantive code stays even before adoption). The later `project-topology`
+lib follows the same bar: it is non-trivial, CLI-callable, and used by
+routing/indexing surfaces. All surviving libs pass
 the LOC half of the bar (≥31 code lines each).
 
 `update-fix-task-map.ts` was **dropped** because (a) it had zero callers
@@ -27,7 +29,7 @@ state that violates the schema. The inline `node -e` pattern shown in
 `references/failure-recovery.md:250-260` already mutates `fixTaskMap`
 correctly with the canonical shape — no replacement lib is needed.
 
-The 10 surviving libs are deliberately **infrastructure ahead of
+The surviving libs are deliberately **infrastructure ahead of
 adoption**: most have zero markdown callers today because Phase 1's
 markdown sweep (tasks 1.34-1.36) chose inline `node -e` for many
 single-shot replacements. The libs are the right home for any future
@@ -47,6 +49,7 @@ to recreate later.
 | `init-execution-state` | 88 | 0 (designed for `skills/start/SKILL.md`) | copy `.curdx-state.json` template into spec dir with atomic write |
 | `kill-port` | 129 | 0 (designed for `templates/tasks.md` cleanup + dev-server reset) | cross-platform port killer (replaces `lsof -ti:PORT \| xargs kill`); uses `netstat`/`ss`/`lsof` per OS |
 | `merge-state` | 106 | **9** (`skills/{requirements,design,research,implement}/SKILL.md`, `agents/{product-manager,research-analyst,task-planner,architect-reviewer}.md`, `references/coordinator-pattern.md`) | JSON deep-merge + atomic write — the **load-bearing** lib that replaces every `jq '.field=val' s.json > tmp && mv` in the markdown sweep |
+| `project-topology` | 600+ | 2 (`skills/start/SKILL.md`, `skills/index/SKILL.md`) | cheap CLAUDE.md/settings/manifest scanner that identifies code roots, Vue/React/Spring/plugin stacks, and missing cross-root access |
 | `search-files` | 154 | 0 (designed for complex grep cases in skill prompts) | cross-platform recursive content search (replaces `grep -rn` for non-trivial patterns); supports include/exclude globs |
 | `update-modification-map` | 61 | 0 (designed for `agents/task-planner.md` modification tracking) | maintain `<spec-dir>/.file-modifications.json` (taskId → unique file list); separate sidecar from `.curdx-state.json::modificationMap` |
 

@@ -4,7 +4,7 @@
 // The commands that may invoke slash skills run in an isolated temp directory
 // so smoke validation never creates specs or state files in this repository.
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -90,6 +90,29 @@ try {
   const parsed = JSON.parse(route);
   if (parsed.route !== 'direct-change' || parsed.shouldCreateSpec !== false) {
     throw new Error(`unexpected smart-route output: ${route}`);
+  }
+
+  const splitParent = mkdtempSync(join(tmpdir(), 'curdx-flow-split-smoke-'));
+  try {
+    const backend = join(splitParent, 'backend');
+    const frontend = join(splitParent, 'frontend');
+    mkdirSync(join(backend, '.git'), { recursive: true });
+    mkdirSync(frontend, { recursive: true });
+    writeFileSync(join(backend, 'CLAUDE.md'), '## Dev\n- frontend: ../frontend\n- backend: .\n');
+    writeFileSync(join(frontend, 'package.json'), JSON.stringify({ dependencies: { react: '^19.0.0' } }));
+    const splitRoute = runNode('smart-route split missing frontend', [
+      join(pluginRoot, 'hooks', 'scripts', 'lib', 'smart-route.mjs'),
+      '--cwd',
+      backend,
+      '--goal',
+      'Update the React login page',
+    ]);
+    const splitParsed = JSON.parse(splitRoute);
+    if (splitParsed.route !== 'blocked-ask-user' || !String(splitParsed.nextAction).includes('/add-dir ../frontend')) {
+      throw new Error(`unexpected split-route output: ${splitRoute}`);
+    }
+  } finally {
+    rmSync(splitParent, { recursive: true, force: true });
   }
 
   console.log('[claudecc-smoke] OK');

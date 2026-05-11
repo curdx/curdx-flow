@@ -16,6 +16,7 @@ You are running the codebase indexing command. This scans the repository to gene
 Use native task UI tracking if `TaskCreate` is available; otherwise keep this checklist inline:
 
 - [ ] Parse arguments and validate
+- [ ] Generate project topology snapshot
 - [ ] Pre-scan interview (skip if --quick)
 - [ ] Scan codebase components
 - [ ] Fetch external resources (URLs, MCP, skills)
@@ -41,7 +42,22 @@ Parse from `$ARGUMENTS`:
 
 **Validation**: `--force` + `--changed` together is an error. `--path` must exist. `--type` values must be valid. `--changed` requires git (`git rev-parse --git-dir`).
 
-## Step 2: Pre-Scan Interview
+## Step 2: Project Topology Snapshot
+
+Generate the cheap topology cache before component scanning:
+
+```bash
+mkdir -p specs/.index
+node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/project-topology.mjs" \
+  --goal "$ARGUMENTS" > specs/.index/project-topology.json
+node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/project-topology.mjs" \
+  --goal "$ARGUMENTS" \
+  --format context-map > specs/.index/context-map.md
+```
+
+Use this snapshot to decide which roots are relevant. If `project-topology.json` contains `missingRoots`, stop indexing and show the `accessFix` value exactly.
+
+## Step 3: Pre-Scan Interview
 
 <mandatory>
 **Skip if --quick flag is detected.**
@@ -58,7 +74,7 @@ Ask via AskUserQuestion:
 
 Store responses in `./specs/.index/.index-state.json` under `interviewResponses`.
 
-## Step 3: Component Scanner
+## Step 4: Component Scanner
 
 ### Detection Patterns
 
@@ -72,7 +88,7 @@ Store responses in `./specs/.index/.index-state.json` under `interviewResponses`
 
 ### Scanning Process
 
-1. For each category (filtered by `--type` if set), run Glob with `--path` as base, filter out excludes
+1. For each category (filtered by `--type` if set), run Glob with `--path` as base. If no `--path` is provided, scan each accessible code root from `project-topology.json`. Filter out excludes.
 2. If `--changed`: filter to `git diff --name-only HEAD` results only
 3. If not `--force` and spec exists: compare SHA-256 hash (first 8 chars via `shasum -a 256`), skip if unchanged
 4. For each matched file, extract metadata using language-appropriate Grep patterns:
@@ -81,7 +97,7 @@ Store responses in `./specs/.index/.index-state.json` under `interviewResponses`
    - **Dependencies**: import/require/from statements per language
 5. For large codebases (>100 files): process in batches of 50, update state after each batch
 
-## Step 4: External Resource Fetcher
+## Step 5: External Resource Fetcher
 
 Process resources from interview responses. Classify each: URL (`http(s)://`), MCP server (`mcp-*`/`mcp_*`), or Skill (`/` prefix or contains "skill").
 
@@ -111,7 +127,7 @@ For each skill in `externalTools`:
 
 Pattern: `<type>-<sanitized-name>.md`. Sanitize: lowercase, replace non-alphanumeric with hyphens, collapse consecutive hyphens, max 50 chars.
 
-## Step 5: Generate Specs
+## Step 6: Generate Specs
 
 Ensure directories: `mkdir -p specs/.index/components specs/.index/external`
 
@@ -147,7 +163,7 @@ Dry Run - Would generate:
 Total: N files
 ```
 
-## Step 6: Post-Scan Review
+## Step 7: Post-Scan Review
 
 <mandatory>
 **Skip if --quick flag is detected.**
@@ -163,7 +179,7 @@ Ask via AskUserQuestion:
 
 Handle feedback: re-scan missing areas, re-filter if too many, re-process changed externals.
 
-## Step 7: Update State and Output
+## Step 8: Update State and Output
 
 Update `specs/.index/.index-state.json` with `lastIndexed`, `componentCount`, `externalCount`, `categories`, `hashes`.
 

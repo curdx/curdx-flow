@@ -2,6 +2,23 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.18 — 2026-05-11
+
+### Added
+
+- **Dev-context project topology detection.** New `hooks/scripts/lib/project-topology.mjs` reads short `CLAUDE.md` Dev sections, optional `.claude/curdx-flow.local.md` `code_roots`, cheap manifests, and obvious sibling repo names to classify roots such as Vue/React frontends, Spring Boot/Spring Cloud backends, shared libraries, CLIs, infra, and Claude Code plugins.
+- **Topology-aware smart routing.** `/curdx-flow:start` now blocks early when a goal needs a related code root outside current Claude Code access and returns an exact `/add-dir <path>` fix instead of asking users to understand `--add-dir`.
+- **Topology cache guidance for indexing.** `/curdx-flow:index` now generates `specs/.index/project-topology.json` and `specs/.index/context-map.md` before component scanning, and stops with the access fix when related roots are missing.
+
+### Changed
+
+- **Settings and start guidance now favor user-friendly Dev context.** The settings template documents the recommended minimal `CLAUDE.md` form (`frontend`, `backend`, `database`) while keeping structured `code_roots` as an optional advanced override.
+- **Sensitive local-service data is omitted from topology output.** Database and credential-looking lines in Dev context produce only a generic warning; real passwords, tokens, and production URLs are not copied into topology JSON or context maps.
+
+### Tests
+
+- Added split-repo topology tests for Vue/React frontends, Spring Boot/Spring Cloud backends, missing frontend access, configured `additionalDirectories`, context-map redaction, and the bundled `project-topology` CLI.
+
 ## 7.1.17 — 2026-05-11
 
 ### Added

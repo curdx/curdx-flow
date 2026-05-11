@@ -135,4 +135,73 @@ describe("smart-route classifier", () => {
     expect(result.stdout).not.toMatch(/"size"\s*:/);
     expect(result.stdout).not.toMatch(/\b(XS|XL)\b/);
   });
+
+  it("blocks UI work when CLAUDE.md declares a frontend root outside current access", () => {
+    const parent = makeTmpDir("smart-route-topology");
+    const backend = path.join(parent, "backend");
+    const frontend = path.join(parent, "frontend");
+    try {
+      mkdirSync(path.join(backend, ".git"), { recursive: true });
+      mkdirSync(frontend, { recursive: true });
+      writeFileSync(path.join(backend, "CLAUDE.md"), "## Dev\n- frontend: ../frontend\n- backend: .\n");
+      writeFileSync(
+        path.join(frontend, "package.json"),
+        JSON.stringify({ dependencies: { react: "^19.0.0" } }),
+      );
+
+      const route = classifySmartRoute({
+        cwd: backend,
+        goal: "Update the React login page",
+      });
+
+      expect(route.route).toBe("blocked-ask-user");
+      expect(route.blockedReason).toContain("frontend");
+      expect(route.nextAction).toContain("/add-dir ../frontend");
+      expect(route.topology?.missingRoots).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "frontend", access: "outside-working-directory" }),
+        ]),
+      );
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+  it("does not block split frontend work when additionalDirectories covers the root", () => {
+    const parent = makeTmpDir("smart-route-topology-access");
+    const backend = path.join(parent, "backend");
+    const frontend = path.join(parent, "frontend");
+    try {
+      mkdirSync(path.join(backend, ".git"), { recursive: true });
+      mkdirSync(path.join(backend, ".claude"), { recursive: true });
+      mkdirSync(frontend, { recursive: true });
+      writeFileSync(path.join(backend, "CLAUDE.md"), "## Dev\n- frontend: ../frontend\n- backend: .\n");
+      writeFileSync(
+        path.join(backend, ".claude", "settings.json"),
+        JSON.stringify({ additionalDirectories: ["../frontend"] }),
+      );
+      writeFileSync(
+        path.join(frontend, "package.json"),
+        JSON.stringify({ dependencies: { vue: "^3.5.0" } }),
+      );
+
+      const route = classifySmartRoute({
+        cwd: backend,
+        goal: "Update the Vue login page",
+        changedFiles: ["src/Login.vue"],
+      });
+
+      expect(route.route).not.toBe("blocked-ask-user");
+      expect(route.topology?.requiredRoots).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "frontend",
+            access: "configured-additional-directory",
+          }),
+        ]),
+      );
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
 });

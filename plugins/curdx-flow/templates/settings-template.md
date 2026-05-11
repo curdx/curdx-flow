@@ -4,6 +4,14 @@ default_max_iterations: 5
 auto_commit_spec: true
 quick_mode_default: false
 specs_dirs: ["./specs"]
+code_roots:
+  - name: current
+    path: "."
+    role: auto
+context_policy:
+  auto_discover_from_claude_md: true
+  auto_discover_sibling_roots: true
+  require_related_roots_accessible: true
 ---
 
 # curdx-flow Configuration
@@ -34,6 +42,20 @@ This enables organizing specs across multiple directories, useful for:
 
 When a spec name exists in multiple directories, commands will prompt for disambiguation.
 
+### code_roots
+Optional list of source-code roots. Users do not need to maintain this if the project `CLAUDE.md` has a short Dev section, but it is useful when local paths differ by machine.
+
+Each root supports:
+- `name`: Stable short name for the root
+- `path`: Path relative to this project root, or an absolute path
+- `role`: `auto`, `frontend`, `backend`, `shared`, `plugin`, `infra`, or `mobile`
+
+### context_policy
+Controls how curdx-flow discovers and validates project topology:
+- `auto_discover_from_claude_md`: Read project `CLAUDE.md` Dev sections
+- `auto_discover_sibling_roots`: Detect obvious sibling frontend/backend repos
+- `require_related_roots_accessible`: Block routing when a goal needs a root outside Claude Code access
+
 ## Usage
 
 Create this file at `.claude/curdx-flow.local.md` in your project root to customize plugin behavior.
@@ -52,6 +74,20 @@ quick_mode_default: true
 
 Custom settings for this project.
 ```
+
+## CLAUDE.md Dev Section Example
+
+Most teams should keep topology in the development project's `CLAUDE.md` and let curdx-flow infer the rest:
+
+```markdown
+# Dev
+
+- frontend: ../frontend
+- backend: .
+- database: use local dev env only; see .env.example
+```
+
+Do not write real database passwords, tokens, or production URLs in `CLAUDE.md`.
 
 ## Monorepo Example
 
