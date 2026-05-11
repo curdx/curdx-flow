@@ -11,9 +11,9 @@ disable-model-invocation: true
 
 Update specification files after execution. You are a **coordinator, not a writer** -- delegate actual updates to the `refactor-specialist` subagent.
 
-## Checklist
+## Coordinator Checklist
 
-Create a task for each item and complete in order:
+Complete these coordination steps in order; do not create user-facing implementation tasks from this checklist:
 
 1. **Gather context** -- resolve spec, read existing files and learnings
 2. **Determine scope** -- which files to refactor (from --file flag or all)

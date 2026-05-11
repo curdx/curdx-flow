@@ -6,353 +6,95 @@ allowed-tools: "Read Write Edit Bash Task Skill AskUserQuestion"
 disable-model-invocation: true
 ---
 
-
 # Smart Start
 
-Smart entry point for curdx-flow. Detects whether to create a new spec or resume an existing one.
+Act as the curdx-flow router. Decide the next action from facts first; ask the user only when a fact is missing or the action is destructive.
 
-## Checklist
+## Route First
 
-Create a task for each item and complete in order:
-
-1. **Handle branch** -- check git branch, create/switch if needed
-2. **Parse input** -- extract name, goal, flags from $ARGUMENTS
-3. **Skill Discovery (Pass 1)** -- detect required skills and capabilities
-4. **Classify intent** -- determine what user wants (new spec, resume, quick mode)
-5. **Scan existing specs** -- find matching or related specs
-6. **Route to action** -- invoke appropriate flow (new, resume, or quick mode)
-
-## Step 1: Branch Management (FIRST STEP)
-
-<mandatory>
-Before creating any files or directories, check the current git branch and handle appropriately.
-</mandatory>
-
-Read `${CLAUDE_PLUGIN_ROOT}/references/branch-management.md` and follow the full branch decision logic.
-
-**Summary**: Checks current branch, determines if on default branch (main/master), and prompts user for branch strategy (new branch, worktree, or continue). In quick mode, auto-creates branch on default or stays on current. If worktree chosen, STOP here -- user must cd to worktree first.
-
-## Step 2: Parse Input and Classify Intent
-
-Read `${CLAUDE_PLUGIN_ROOT}/references/intent-classification.md` and follow the detection logic.
-
-**Summary**: Extracts name, goal, and flags (--fresh, --quick, --commit-spec, --no-commit-spec, --specs-dir, --tasks-size) from $ARGUMENTS. Classifies whether this is a new spec, resume, or quick mode. Determines commit spec behavior. Routes to the appropriate flow below.
-
-### Quick Mode Check
-
-If `--quick` flag detected in $ARGUMENTS, skip to **Step 5: Quick Mode Flow**.
-
-## Step 3: Scan Existing Specs
-
-Read `${CLAUDE_PLUGIN_ROOT}/references/spec-scanner.md` and follow the scanning algorithm and index hint logic.
-
-<mandatory>
-**Skip spec scanner and index hint if --quick flag detected in $ARGUMENTS.**
-</mandatory>
-
-**Summary**: Scans ./specs/ directory (and all configured specs_dirs) for related specs using keyword matching. Displays related specs with relevance scores. Shows index hint if codebase indexing not yet done. Stores relatedSpecs in .curdx-state.json for use during interview.
-
-## Step 3.5: Epic Detection
-
-Check if there is an active epic:
-
-```bash
-EPIC_FILE="./specs/.current-epic"
-if [ -f "$EPIC_FILE" ]; then
-  EPIC_NAME=$(cat "$EPIC_FILE" | tr -d '[:space:]')
-  # Validate kebab-case to prevent path injection
-  if [[ "$EPIC_NAME" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
-    EPIC_STATE="./specs/_epics/$EPIC_NAME/.epic-state.json"
-  else
-    echo "Warning: Invalid epic name '$EPIC_NAME' in .current-epic, ignoring"
-    EPIC_NAME=""
-    EPIC_STATE=""
-  fi
-fi
-```
-
-**If active epic exists AND no specific spec name was provided in $ARGUMENTS**:
-1. Read `.epic-state.json`
-2. First check for any spec with status "in_progress" -- if found, suggest resuming it
-3. Otherwise find specs with status "pending" whose dependencies are all "completed"
-4. Display brief epic status:
-   ```text
-   Active epic: $EPIC_NAME (N/M specs complete)
-   Next unblocked: <spec-name> -- <goal>
-   ```
-5. Ask user: "Start this spec, or work on something else?"
-   - If user accepts: set `name` and `goal` from the epic's spec definition, set `epicName` in context, continue to Step 4 (New Flow) with pre-populated values
-   - If user declines: continue normal Step 4 routing
-
-**If no active epic AND goal appears complex** (multiple distinct components, cross-cutting concerns, user mentions "big" or "large"):
-- Suggest: "This looks like it might need multiple specs. Want to run `/curdx-flow:triage` instead?"
-- If user accepts: invoke `/curdx-flow:triage` with no positional args and let triage collect epic-name + goal interactively. STOP.
-- If user declines: continue normal Step 4 routing.
-
-## Step 4: Route to Action
-
-Based on detection logic from Step 2:
-
-### Resume Flow
-
-1. Read `$specPath/.curdx-state.json`
-2. If no state file -- check which files exist, determine last phase, ask "Continue or restart?"
-3. If state file exists and state.completed === true -- Output "This spec is completed (<completedAt>). Use /curdx-flow:refactor to reopen or /curdx-flow:new for a new spec." STOP. Do not resume.
-4. If state file exists -- read phase/taskIndex, show brief status, continue from current phase
-
-**Status Display:**
-```text
-Resuming: $name
-Phase: $phase
-Progress: $completed/$total tasks complete
-Current: $currentTask
-
-Continuing...
-```
-
-**Resume by Phase:**
-
-| Phase | Action |
-|-------|--------|
-| research | Dispatch bounded parallel research via direct `Task(...)`, merge results |
-| requirements | Invoke product-manager agent |
-| design | Invoke architect-reviewer agent |
-| tasks | Invoke task-planner agent |
-| execution | Invoke spec-executor for current task |
-
-### New Flow
-
-1. If no name provided, ask: "What should we call this spec?" (validates kebab-case)
-2. If no goal provided, ask: "What is the goal? Describe what you want to build."
-3. Determine spec directory:
-   ```text
-   specsDir = (--specs-dir if valid) OR (interview response) OR curdx_get_default_dir()
-   basePath = "$specsDir/$name"
-   ```
-4. Create spec directory: `mkdir -p "$basePath"`
-5. Update .current-spec (bare name for default dir, full path for non-default)
-6. Ensure gitignore entries for specs/.current-spec, specs/.current-epic, and **/.progress.md:
+1. Parse `$ARGUMENTS` into optional spec name, goal text, and flags.
+2. Run the deterministic router:
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/ensure-gitignore.mjs" specs/.current-spec
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/ensure-gitignore.mjs" specs/.current-epic
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/ensure-gitignore.mjs" '**/.progress.md'
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/smart-route.mjs" \
+     --name "$name" \
+     --goal "$goal" \
+     --flags "$ARGUMENTS"
    ```
-7. Initialize `.curdx-state.json`:
-   First compute AutoPolicy:
+3. Treat the returned `route` as the source of truth. Do not invent a different workflow unless the router says `blocked-ask-user` and the user's answer changes the facts.
+
+## Route Actions
+
+| Route | Action |
+|---|---|
+| `resume-current` | Resume the active spec at `nextAction`. Do not create a new spec. |
+| `direct-change` | Handle the change directly in the current turn. Do not create a spec or `tasks.md`. |
+| `lite-spec` | Create a lightweight spec, then generate 1-3 value-slice tasks. |
+| `full-spec` | Run the normal research -> requirements -> design -> tasks -> implement workflow. |
+| `epic-split` | Invoke `/curdx-flow:triage` with the same goal. Do not force the work into one spec. |
+| `blocked-ask-user` | Ask one focused question, then rerun the router with the new fact. |
+
+## Hard Rules
+
+- Use behavior route names exactly as returned: `direct-change`, `lite-spec`, `full-spec`, `epic-split`, `resume-current`, `blocked-ask-user`.
+- Top-level tasks are value slices. Never split a slice into separate "write test", "write implementation", "run test", or "commit" tasks.
+- If the route says `direct-change`, skip branch prompts, spec creation, phase documents, task planning, and subagents unless the user explicitly asks for them.
+- If the route says `epic-split`, stop single-spec creation and run triage.
+- If a spec state is created, store `autoPolicy` for compatibility and set `maxGlobalIterations` from policy, defaulting to 30 if the helper fails.
+
+## New Spec Creation
+
+For `lite-spec` and `full-spec`:
+
+1. Ensure the current branch is appropriate using `${CLAUDE_PLUGIN_ROOT}/references/branch-management.md`.
+2. Validate or ask for a kebab-case spec name only if missing.
+3. Validate or ask for the goal only if missing.
+4. Resolve the spec directory from `--specs-dir` or the default specs dir.
+5. Create the spec directory, update `.current-spec`, and ensure `.gitignore` covers `.current-spec`, `.current-epic`, and `**/.progress.md`.
+6. Compute compatibility policy:
    ```bash
    POLICY_JSON=$(node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/auto-policy.mjs" --goal "$goal" --flags "$ARGUMENTS")
    ```
-   Use `POLICY_JSON` as the source of truth for task sizing, review cadence, verification level, subagent usage, and Stop-hook behavior.
-   If `POLICY_JSON.executionMode == "epic-triage"` or `POLICY_JSON.shouldSplitSpec == true`, stop the single-spec flow and route to `/curdx-flow:triage` with the same goal. Do not create a bloated one-spec task list.
-
+7. Initialize `.curdx-state.json` with:
    ```json
    {
-     "source": "spec", "name": "$name", "basePath": "$basePath",
-     "phase": "research", "taskIndex": 0, "totalTasks": 0,
-     "taskIteration": 1, "maxTaskIterations": "<POLICY_JSON.maxTaskIterations or 5>",
-     "globalIteration": 1, "maxGlobalIterations": "<POLICY_JSON.maxGlobalIterations or 30>",
-     "commitSpec": true, "quickMode": false,
-     "discoveredSkills": [],
+     "source": "spec",
+     "name": "$name",
+     "basePath": "$basePath",
+     "phase": "research",
+     "taskIndex": 0,
+     "totalTasks": 0,
+     "taskIteration": 1,
+     "maxTaskIterations": "<POLICY_JSON.maxTaskIterations or 5>",
+     "globalIteration": 1,
+     "maxGlobalIterations": "<POLICY_JSON.maxGlobalIterations or 30>",
+     "commitSpec": true,
+     "quickMode": false,
      "autoPolicy": "<POLICY_JSON object>",
-     "granularity": "<POLICY_JSON.taskGranularity>",
      "completed": false
    }
    ```
-   Set `maxTaskIterations` and `maxGlobalIterations` from `POLICY_JSON` when present.
-   If AutoPolicy cannot be computed, fall back to `"maxGlobalIterations": 30`.
-   If this spec was suggested by an active epic, also include:
-   ```json
-   "epicName": "$EPIC_NAME"
-   ```
-   in the initial state, and pre-populate the goal and acceptance criteria from `epic.md`.
-8. Create `.progress.md` with goal
-9. **Skill Discovery Pass 1** -- Scan all skill files and match against the goal text:
-   1. Scan SKILL.md files from all skill paths (collect all skills before matching):
-      - **Plugin skills**: `${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md` → invoked as `Skill({ skill: "curdx-flow:<name>" })`
-      - **Project skills**: `.agents/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
-      - **Claude skills**: `.claude/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
+8. Create `.progress.md` with the original goal and the selected behavior route.
 
-      For each file found, read its YAML frontmatter (`name`, `description` fields):
-      - If a SKILL.md is unreadable (file error, permissions): skip that skill, log warning
-      - If a SKILL.md has no `description` field in frontmatter: skip that skill, log "no description"
-   2. Determine **context text**: the goal text only (from Step 2)
-   3. For each skill, determine relevance using **semantic judgment**:
-      - Read the skill's `name` and `description`
-      - Ask: is this skill conceptually relevant to the goal?
-      - Use domain knowledge — e.g., "building a UI" relates to React/CSS/component skills even without those words appearing; "authentication" relates to JWT/OAuth skills; "data persistence" relates to database skills
-      - **Err on the side of invoking**: if there is a reasonable conceptual connection, treat as a match
-      - Skip only when there is clearly no plausible relationship to the goal's domain
-   4. If skill is relevant AND not already in `discoveredSkills` with `invoked: true`:
-      - Invoke using the format for the source path (plugin vs project/claude)
-      - On success: add `{ name, source: "<path>", matchedAt: "start", invoked: true }` to `discoveredSkills`
-      - On failure: set `invoked: false` -- add `{ name, source: "<path>", matchedAt: "start", invoked: false }`, log warning, continue
-   5. If no skills match across all scanned skills: log `- No skills matched`
-   6. Update `.curdx-state.json` with updated `discoveredSkills` array
-   7. Append a `## Skill Discovery` section to `.progress.md` with match details per skill:
-      ```markdown
-      ## Skill Discovery
-      - **<skill-name>** (<source>): matched (reason: <brief rationale>)
-      - **<skill-name>** (<source>): no match
-      - **<skill-name>** (<source>): skipped (unreadable)
-      - **<skill-name>** (<source>): skipped (no description)
-      ```
-      If no skills match: `- No skills matched`
-10. Update Spec Index: `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet`
-11. **Goal Interview** -- Read `${CLAUDE_PLUGIN_ROOT}/references/goal-interview.md` and follow brainstorming dialogue
-12. **Parallel Research Phase** -- Read `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md` and follow the direct Task dispatch pattern; Agent Teams are optional only when enabled and available
-13. **Skill Discovery Pass 2 (Post-Research Retry)** -- Re-scan skills with enriched context after research completes:
+If policy computation fails, use this fallback cap:
 
-    ### Skill Discovery Pass 2
-
-    Scan all skill files and match against goal + research context:
-
-    1. Scan SKILL.md files from all skill paths (collect all skills before matching):
-       - **Plugin skills**: `${CLAUDE_PLUGIN_ROOT}/skills/*/SKILL.md` → invoked as `Skill({ skill: "curdx-flow:<name>" })`
-       - **Project skills**: `.agents/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
-       - **Claude skills**: `.claude/skills/*/SKILL.md` → invoked as `Skill({ skill: "<name>" })`
-
-       For each file found, read its YAML frontmatter (`name`, `description` fields):
-       - If a SKILL.md is unreadable (file error, permissions): skip that skill, log warning
-       - If a SKILL.md has no `description` field in frontmatter: skip that skill, log "no description"
-    2. Determine **context text**: goal text + the **Executive Summary** section from `research.md`
-    3. For each skill not already invoked, determine relevance using **semantic judgment**:
-       - Read the skill's `name` and `description`
-       - Ask: is this skill conceptually relevant to the goal or the research findings?
-       - Use domain knowledge — e.g., research mentioning "real-time updates" relates to WebSocket/SSE skills; "performance bottlenecks" relates to caching/optimization skills
-       - **Err on the side of invoking**: if there is a reasonable conceptual connection, treat as a match
-       - Skip only when there is clearly no plausible relationship to the goal's domain
-    4. If skill is relevant AND not already in `discoveredSkills` with `invoked: true`:
-       - Invoke using the format for the source path (plugin vs project/claude)
-       - On success: add `{ name, source: "<path>", matchedAt: "post-research", invoked: true }` to `discoveredSkills`
-       - On failure: set `invoked: false` -- add `{ name, source: "<path>", matchedAt: "post-research", invoked: false }`, log warning, continue
-    5. If no skills match across all scanned skills: log `- No new skills matched`
-    6. Update `.curdx-state.json` with updated `discoveredSkills` array
-    7. Append a `### Post-Research Retry` subsection to `.progress.md` under `## Skill Discovery`:
-       ```markdown
-       ### Post-Research Retry
-       - **<skill-name>** (<source>): matched (reason: <brief rationale>)
-       - **<skill-name>** (<source>): no match (already invoked)
-       - **<skill-name>** (<source>): skipped (unreadable)
-       - **<skill-name>** (<source>): skipped (no description)
-       ```
-       If no new skills match: `- No new skills matched`
-
-14. **STOP** -- After merge and state update (awaitingApproval=true), display walkthrough and wait for user
-
-### Research Walkthrough (Normal Mode Only)
-
-<mandatory>
-**WALKTHROUGH IS REQUIRED IN NORMAL MODE - DO NOT SKIP.**
-
-After research.md is created, display:
-
-```text
-Research complete for '$name'.
-Output: $basePath/research.md
-
-## What I Found
-
-**Summary**: [1-2 sentences from Executive Summary]
-
-**Key Recommendations**:
-1. [First recommendation]
-2. [Second recommendation]
-3. [Third recommendation]
-
-**Feasibility**: [High/Medium/Low] | **Risk**: [High/Medium/Low] | **Effort**: [S/M/L/XL]
+```json
+{ "maxGlobalIterations": 30 }
 ```
 
-Then STOP. Output: `-> Next: Run /curdx-flow:requirements`
-End response immediately.
-</mandatory>
+For `lite-spec`, keep interviews minimal and generate only 1-3 value-slice tasks. For `full-spec`, continue with research and the normal phase flow.
 
-## Step 5: Quick Mode Flow
+## Skill Discovery
 
-Read `${CLAUDE_PLUGIN_ROOT}/references/quick-mode.md` and follow the full quick mode execution sequence.
+Only scan and invoke additional skills when the route is `lite-spec` or `full-spec`. Match skills by semantic relevance to the goal. Skip discovery for `direct-change` unless the user explicitly asks to use a skill.
 
-**Summary**: Validates input, infers name, creates spec directory, initializes state with quickMode=true, then runs all phases sequentially (research, requirements, design, tasks) delegating to subagents with Quick Mode Directive. Each artifact gets a review loop (max 3 iterations). After all artifacts generated, transitions to execution and invokes spec-executor for task 1.
+## Output
 
-**IMPORTANT**: If native task UI tools are available, track each phase via `TaskCreate` / `TaskUpdate` for visible progress. If unavailable, continue without native task tracking; phase artifacts and state updates remain the source of truth. See quick-mode.md steps 11-15 for the exact optional pattern.
+Always start with a short routing summary:
 
-<mandatory>
-## CRITICAL: Delegation Requirement
-
-**YOU ARE A COORDINATOR, NOT AN IMPLEMENTER.**
-
-You MUST delegate ALL substantive work to subagents. This is NON-NEGOTIABLE regardless of mode.
-
-**NEVER do any of these yourself:**
-- Write code or modify source files
-- Perform research or analysis
-- Generate spec artifacts (research.md, requirements.md, design.md, tasks.md)
-- Execute task steps
-- Run verification commands as part of task execution
-
-**ALWAYS delegate to the appropriate subagent:**
-
-| Work Type | Subagent |
-|-----------|----------|
-| Research | `research-analyst` and Explore-style research subagents via direct Task dispatch |
-| Requirements | `product-manager` |
-| Design | `architect-reviewer` |
-| Task Planning | `task-planner` |
-| Artifact Review | `spec-reviewer` |
-| Task Execution | `spec-executor` |
-
-Quick mode does NOT exempt you from delegation -- it only skips interactive phases.
-</mandatory>
-
-<mandatory>
-## CRITICAL: Stop After Each Subagent (Normal Mode)
-
-After ANY subagent returns in normal mode (no `--quick` flag):
-
-1. Wait for subagent to return
-2. Read `$basePath/.curdx-state.json`
-3. If `awaitingApproval: true`: STOP IMMEDIATELY
-4. Output a brief status message
-5. **END YOUR RESPONSE**
-
-**DO NOT:**
-- Invoke another subagent in the same response
-- Continue to the next phase automatically
-- Ask if the user wants to continue
-
-**The user must explicitly run the next command.** This gives them time to review artifacts.
-
-Exception: `--quick` mode runs all phases without stopping.
-</mandatory>
-
-## Quick Mode Execution (Stop-Hook)
-
-In quick mode, after generating spec artifacts, execution uses the self-contained stop-hook loop for autonomous task completion. The stop-hook automatically continues by delegating tasks to spec-executor until `ALL_TASKS_COMPLETE` is output.
-
-## Output Examples
-
-**New spec:**
 ```text
-Created spec 'user-auth' at ./specs/user-auth/
-
-Starting research phase...
+Route: <route>
+Reason: <reason>
+Next: <nextAction>
 ```
 
-**Resume:**
-```text
-Resuming 'user-auth' at execution phase, task 4/8
-
-Continuing task: 2.2 Extract retry logic
-```
-
-**Quick mode:**
-```text
-Quick mode: Created 'build-auth-with' at ./specs/build-auth-with/
-Generated 4 artifacts from goal.
-Starting task 1/N...
-```
-
-**Quick mode with --specs-dir:**
-```text
-Quick mode: Created 'api-auth' at ./packages/api/specs/api-auth/
-Generated 4 artifacts from goal.
-Starting task 1/N...
-```
+Then perform the next action. If the route is `blocked-ask-user`, ask exactly one focused question.

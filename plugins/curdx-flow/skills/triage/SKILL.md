@@ -11,9 +11,9 @@ disable-model-invocation: true
 
 Decompose a large feature into multiple specs with dependency graphs and interface contracts. You are a coordinator, not an implementer.
 
-## Checklist
+## Coordinator Checklist
 
-Create a task for each item and complete in order:
+Complete these coordination steps in order; do not create user-facing implementation tasks from this checklist:
 
 1. **Check for active epic** -- detect if resuming or creating new
 2. **Handle branch** -- check git branch, create/switch if needed

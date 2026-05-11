@@ -11,9 +11,9 @@ disable-model-invocation: true
 
 You are starting the task execution loop.
 
-## Checklist
+## Coordinator Checklist
 
-Create a task for each item and complete in order:
+Complete these coordination steps in order; do not create user-facing implementation tasks from this checklist:
 
 1. **Validate prerequisites** -- check spec and tasks.md exist
 2. **Parse arguments** -- extract flags and options

@@ -193,7 +193,7 @@ Same as POC Phase 5. Autonomous PR management loop.
 
 ## TDD Target Task Count
 
-- Standard spec: follow `.curdx-state.json::autoPolicy.taskTargetRange` (M: 3-7, L: 5-12). If more than 12 top-level tasks are needed, split specs.
+- Standard spec: follow `.curdx-state.json::autoPolicy.taskTargetRange`. If more than 12 top-level tasks are needed, split specs.
 - Phase distribution: Phase 1 (TDD cycles) = 60-70%, Phase 2 (Additional tests) = 10-15%, Phase 3-4 (Quality/PR) = 15-25%
 
 ## TDD Behaviors Per Phase
@@ -375,7 +375,7 @@ Read research.md for actual project commands. Do NOT assume `pnpm lint` or `npm 
 
 ## POC Target Task Count
 
-- Standard spec: follow `.curdx-state.json::autoPolicy.taskTargetRange` (M: 3-7, L: 5-12). If more than 12 top-level tasks are needed, split specs.
+- Standard spec: follow `.curdx-state.json::autoPolicy.taskTargetRange`. If more than 12 top-level tasks are needed, split specs.
 - Phase distribution: Phase 1 = 50-60%, Phase 2 = 15-20%, Phase 3 = 15-20%, Phase 4-5 = 10-15%
 
 ## POC Behaviors Per Phase

@@ -412,7 +412,38 @@ describe("skills frontmatter integrity", () => {
     expect(body).toContain(
       "/curdx-flow:implement [--max-task-iterations 5] [--max-global-iterations 30]",
     );
-    expect(body).toContain("`--max-global-iterations`: Max whole-spec loop iterations");
+    expect(body).toContain("/curdx-flow:implement --max-global-iterations <n>");
+  });
+
+  it("high-frequency entrypoints expose recommended next action behavior", () => {
+    const help = readFileSync(path.join(SKILLS_DIR, "help", "SKILL.md"), "utf8");
+    const status = readFileSync(path.join(SKILLS_DIR, "status", "SKILL.md"), "utf8");
+
+    expect(help).toContain("Recommended Next Action");
+    expect(status).toContain("Recommended next action");
+  });
+
+  it("public skills avoid mechanical checklist and human-size label traps", () => {
+    const offenders: Array<{ file: string; reason: string }> = [];
+    const sizeLabelRe = /\b(?:XS|XL)\b|XS\/S\/M\/L\/XL|S\/M\/L\/XL/;
+
+    for (const name of LEGACY_ENTRYPOINT_SKILLS) {
+      const file = path.join(SKILLS_DIR, name, "SKILL.md");
+      const body = readFileSync(file, "utf8");
+      if (body.includes("Create a task for each item")) {
+        offenders.push({ file: path.relative(REPO_ROOT, file), reason: "mechanical checklist" });
+      }
+      if (sizeLabelRe.test(body)) {
+        offenders.push({ file: path.relative(REPO_ROOT, file), reason: "human size label" });
+      }
+    }
+
+    expect(
+      offenders,
+      `Skill anti-patterns found:\n${offenders
+        .map((o) => `  ${o.file}: ${o.reason}`)
+        .join("\n")}`,
+    ).toEqual([]);
   });
 
   it("public entrypoint docs do not suggest un-namespaced legacy slash commands", () => {

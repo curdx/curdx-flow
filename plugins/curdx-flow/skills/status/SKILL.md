@@ -6,138 +6,54 @@ allowed-tools: "Read Bash Glob Task"
 disable-model-invocation: true
 ---
 
-
 # Spec Status
 
-You are showing the status of all specifications across all configured specs directories.
+Show current curdx-flow state and recommend one next action.
 
-## Parse Arguments
+## Steps
 
-From `$ARGUMENTS`:
-- **--update-index**: Regenerate the spec index files before showing status
-
-### Update Index Flag
-
-If `--update-index` is present in `$ARGUMENTS`:
-
-```bash
-# Regenerate spec index files
-node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs"
-```
-
-This updates:
-- `./specs/.index/index-state.json` - Machine-readable state
-- `./specs/.index/index.md` - Human-readable summary
-
-The index is also updated automatically when specs are created, completed, or deleted.
-
-## Multi-Directory Resolution
-
-This command uses the path resolver to discover specs from all configured directories.
-
-**Path Resolver Functions**:
-- `curdx_list_specs()` - Returns all specs as `name|path` pairs
-- `curdx_resolve_current()` - Resolves .current-spec to full path
-
-**Configuration**: Specs directories are configured in `.claude/curdx-flow.local.md`:
-```yaml
-specs_dirs: ["./specs", "./packages/api/specs", "./packages/web/specs"]
-```
-
-## Gather Information
-
-1. Use `curdx_list_specs()` to enumerate all specs from all configured directories
-2. Use `curdx_resolve_current()` to identify the active spec path
-3. Group specs by their root directory
-
-## For Each Spec
-
-For each spec directory found:
-
-1. Read `.curdx-state.json` if exists to get:
-   - Current phase
-   - Task progress (taskIndex/totalTasks)
-   - Iteration count
-   - Completion marker: when `state.completed === true`, render `completed (<completedAt>)` in place of the phase label (use literal `unknown` if `completedAt` is missing). See §15 in design.md.
-
-2. Check which files exist:
-   - research.md
-   - requirements.md
-   - design.md
-   - tasks.md
-
-3. If tasks.md exists, count completed tasks:
-   - Count lines matching `- [x]` pattern
-   - Count lines matching `- [ ]` pattern
-
-4. If `.curdx-state.json` has `relatedSpecs`:
-   - List related specs with relevance
-   - Mark those with `mayNeedUpdate: true` with asterisk
+1. If `$ARGUMENTS` contains `--update-index`, run:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet
+   ```
+2. Resolve specs across configured dirs with the path resolver behavior:
+   - current spec from `.current-spec`
+   - all spec directories under configured `specs_dirs`
+3. For each spec, read `.curdx-state.json` when present and count checked/unchecked task boxes in `tasks.md`.
+4. Run the smart router without a new goal:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/smart-route.mjs"
+   ```
+5. Use the router's `nextAction` as the recommended next action. If the router returns `blocked-ask-user`, recommend `/curdx-flow:start <name> <goal>`.
 
 ## Output Format
 
-Group specs by their root directory. Show `[dir-path]` suffix for specs NOT in the default `./specs` directory.
-
-```
+```text
 # curdx-flow Status
 
-Active spec: <name from .current-spec> (or "none")
+Active spec: <name or none>
+
+Recommended next action: <router nextAction>
 
 ## Specs
 
-### <spec-name-1> [ACTIVE]
-Phase: <phase>
-Progress: <completed>/<total> tasks (<percentage>%)
-Files: [research] [requirements] [design] [tasks]
-Related: auth-system (HIGH*), api-middleware (MEDIUM)
-         * = may need update
-
-### <spec-name-2>
-Phase: <phase>
+### <spec-name> [ACTIVE]
+Phase: <phase or completed timestamp>
 Progress: <completed>/<total> tasks
-Files: [research] [requirements] [design] [tasks]
-Related: <none or list>
-
-### api-auth [packages/api/specs]
-Phase: design
-Progress: 0/0 tasks
-Files: [x] research [x] requirements [x] design [ ] tasks
-
-### web-login [packages/web/specs]
-Phase: research
-Progress: 0/0 tasks
-Files: [x] research [ ] requirements [ ] design [ ] tasks
+Files: [x] research [x] requirements [ ] design [ ] tasks
 
 ---
 
-Index: ./specs/.index/index.md (run with --update-index to refresh)
-
 Commands:
-- /curdx-flow:switch <name> - Switch active spec
-- /curdx-flow:new <name> - Create new spec
-- /curdx-flow:<phase> - Run phase for active spec
-- /curdx-flow:status --update-index - Refresh spec index
+- /curdx-flow:start [name] [goal]
+- /curdx-flow:switch <name>
+- /curdx-flow:status --update-index
 ```
 
-**Directory Context Rules**:
-- Specs in default `./specs/` directory: No suffix
-- Specs in other directories: Show `[dir-path]` suffix (e.g., `[packages/api/specs]`)
-- Active spec: Always shows `[ACTIVE]` tag regardless of directory
+## Phase to Action Mapping
 
-## Phase Display
-
-Show phase status with indicators:
-- research: "Research"
-- requirements: "Requirements"
-- design: "Design"
-- tasks: "Tasks"
-- execution: "Executing" with task progress
-- completed: "completed (<completedAt>)" — shown when `state.completed === true` (overrides phase label)
-
-## File Indicators
-
-For each file, show:
-- [x] if file exists
-- [ ] if file does not exist
-
-Example: `Files: [x] research [x] requirements [ ] design [ ] tasks`
+- `research` -> `/curdx-flow:requirements`
+- `requirements` -> `/curdx-flow:design`
+- `design` -> `/curdx-flow:tasks`
+- `tasks` or `execution` -> `/curdx-flow:implement`
+- `completed` -> `/curdx-flow:refactor` for changes, or `/curdx-flow:start` for new work

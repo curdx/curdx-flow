@@ -33,8 +33,8 @@ describe("AutoPolicy workflow docs", () => {
     const combined = `${sizing}\n${planner}`;
 
     expect(combined).toContain("vertical slice");
-    expect(combined).toContain("M: 3-7");
-    expect(combined).toContain("L: 5-12");
+    expect(combined).toContain("`lite-spec` | 1-3");
+    expect(combined).toContain("`full-spec` | 3-7");
     expect(combined).toContain("If a single spec would exceed 12 top-level tasks");
     expect(combined).not.toContain("Target task count (POC) | 40-60+");
     expect(combined).not.toContain("Fine: Total task count is 40+");

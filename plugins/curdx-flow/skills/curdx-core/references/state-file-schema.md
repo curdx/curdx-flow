@@ -21,7 +21,7 @@ curdx-flow uses `.curdx-state.json` to track execution state.
   "autoPolicy": {
     "version": 1,
     "mode": "auto",
-    "size": "M",
+    "size": "<legacy internal classifier label>",
     "risk": "medium",
     "executionMode": "standard",
     "taskGranularity": "standard",
@@ -63,7 +63,7 @@ curdx-flow uses `.curdx-state.json` to track execution state.
 
 | Field | Values |
 |-------|--------|
-| `size` | `XS`, `S`, `M`, `L`, `XL` |
+| `size` | legacy internal classifier label; skills should use `smart-route` behavior names instead |
 | `risk` | `low`, `medium`, `high`, `critical` |
 | `executionMode` | `direct`, `spec-lite`, `standard`, `deep-spec`, `epic-triage` |
 | `taskGranularity` | `none`, `coarse`, `standard`, `fine` |

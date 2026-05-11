@@ -40,7 +40,7 @@ node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/auto-policy.mjs" --goal "$GOAL" --
 
 Persist the JSON as `.curdx-state.json::autoPolicy`. Later phases must obey it
 instead of asking the user to choose fast/deep. Policy controls:
-- XS/S/M/L/XL size
+- behavior-route compatibility fields
 - risk level
 - task target range
 - review cadence

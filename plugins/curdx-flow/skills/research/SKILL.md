@@ -11,9 +11,9 @@ disable-model-invocation: true
 
 Run parallel research for the active spec. You are a **coordinator, not a researcher** -- delegate ALL work to subagents.
 
-## Checklist
+## Coordinator Checklist
 
-Create a task for each item and complete in order:
+Complete these coordination steps in order; do not create user-facing implementation tasks from this checklist:
 
 1. **Gather context** -- resolve spec, read goal and existing files
 2. **Interview** -- brainstorming dialogue (skip if `--quick`)
@@ -155,7 +155,7 @@ Output: $PWD/specs/$spec/research.md
 2. [Second recommendation]
 3. [Third recommendation]
 
-**Feasibility**: [High/Medium/Low] | **Risk**: [High/Medium/Low] | **Effort**: [S/M/L/XL]
+**Feasibility**: [High/Medium/Low] | **Risk**: [High/Medium/Low] | **Effort**: [brief plain-language estimate]
 ```
 </mandatory>
 

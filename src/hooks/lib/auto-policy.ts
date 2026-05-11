@@ -8,6 +8,7 @@
 // in `.curdx-state.json::autoPolicy`.
 
 import { fileURLToPath } from "node:url";
+import { basename } from "node:path";
 
 export type AutoPolicyMode = "auto" | "fast" | "deep";
 export type AutoPolicySize = "XS" | "S" | "M" | "L" | "XL";
@@ -358,7 +359,8 @@ function main(): void {
 
 function isDirectRun(): boolean {
   try {
-    return process.argv[1] === fileURLToPath(import.meta.url);
+    const entry = fileURLToPath(import.meta.url);
+    return process.argv[1] === entry && basename(entry).startsWith("auto-policy.");
   } catch {
     return false;
   }

@@ -7,6 +7,7 @@ const __dirname = __ccd(__filename);
 
 // src/hooks/lib/auto-policy.ts
 import { fileURLToPath } from "node:url";
+import { basename } from "node:path";
 var LOW_RISK_RE = /\b(readme|docs?|documentation|typo|copy|wording|comment|comments|changelog|license|format text|rename label|css copy|style text)\b/i;
 var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|npm|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|delete|remove|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
 var CRITICAL_RISK_RE = /\b(payment|billing|security|secret|secrets|password|token|oauth|authorization|permission|migration|data loss|release|publish|npm|tag|hooks?\.json|plugin\.json|claude-plugin)\b/i;
@@ -246,7 +247,8 @@ function main() {
 }
 function isDirectRun() {
   try {
-    return process.argv[1] === fileURLToPath(import.meta.url);
+    const entry = fileURLToPath(import.meta.url);
+    return process.argv[1] === entry && basename(entry).startsWith("auto-policy.");
   } catch {
     return false;
   }

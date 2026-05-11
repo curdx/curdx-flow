@@ -2,114 +2,76 @@
 
 > Used by: task-planner agent
 
-Determine the active granularity from `.curdx-state.json::autoPolicy.taskGranularity`.
-If no `autoPolicy` exists, fall back to `granularity`, then `standard`.
+Use behavior routes and value slices. Avoid abstract size labels in prompts or task files.
 
-## AutoPolicy Size Targets
+## Route Targets
 
-| Size | Execution mode | Target top-level tasks | Rule |
-|------|----------------|------------------------|------|
-| XS | direct | 0-1 | No tasks.md unless user explicitly asks |
-| S | spec-lite | 1-3 | One task per bounded vertical slice |
-| M | standard | 3-7 | Default for normal feature work |
-| L | deep-spec | 5-12 | High-risk or publish-critical work |
-| XL | epic-triage | 5-10 per spec | Split into multiple specs first |
+| Route | Target top-level tasks | Rule |
+|---|---:|---|
+| `direct-change` | 0 | No spec and no `tasks.md` unless explicitly requested |
+| `lite-spec` | 1-3 | One task per bounded value slice |
+| `full-spec` | 3-7 | Default for normal product or code behavior changes |
+| high-risk `full-spec` | 5-12 | Publish-critical, security, data, plugin, or cross-module work |
+| `epic-split` | 5-10 per child spec | Split before generating implementation tasks |
 
-If a single spec would exceed 12 top-level tasks, do not keep splitting the same
-spec. Route to epic triage or split into multiple specs.
+If a single spec would exceed 12 top-level tasks, do not keep splitting the same spec. Route to epic triage.
 
-## Standard (default)
+## Standard Constraints
 
 | Constraint | Value |
-|-----------|-------|
-| Target task count | AutoPolicy range, usually 3-7 or 5-12 |
+|---|---|
 | Max Do steps | 8 |
 | Max files per task | 5 |
-| Intermediate [VERIFY] | Phase boundary or high-risk slice only |
-| [P] markers | Yes, only with zero file overlap |
+| Intermediate `[VERIFY]` | Phase boundary or high-risk slice only |
+| `[P]` markers | Yes, only with zero file overlap |
 | Final verification | Always |
-| VE tasks | Only when policy verificationLevel is strict or E2E risk is explicit |
+| E2E verification tasks | Only when policy verification is strict or E2E risk is explicit |
 
-### Standard Split/Combine Rules
-
-**Split if:**
-- Task mixes unrelated logical concerns
-- Task crosses an API/data/security boundary
-- Files section exceeds 5 files
-- Verify command cannot prove the whole slice
-
-**Combine if:**
-- "write test", "implement", "run test", and "commit" are separate tasks
-- Multiple tasks touch the same component for the same behavior
-- A task is only setup for the immediately following usage task
-
-## Fine (explicit only)
+## Coarse Constraints
 
 | Constraint | Value |
-|-----------|-------|
-| Target task count | AutoPolicy range; never exceed 12 within one spec |
-| Max Do steps | 4 |
-| Max files per task | 3 |
-| Intermediate [VERIFY] | Every 2-3 tasks only when verificationLevel is strict |
-| [P] markers | Yes |
-| Final V4-V6 | Always |
-| VE tasks | Per project type |
-
-### Fine Split/Combine Rules
-
-**Split if:**
-- Do section > 4 steps
-- Files section > 3 files
-- Task mixes creation + testing
-- Task mixes > 1 logical concern
-- Verification requires > 1 unrelated command
-
-**Combine if:**
-- Task 1 creates a file, Task 2 adds a single import to that file
-- Both tasks touch the same file with trivially related changes
-- Neither task is meaningful alone
-
-## Coarse
-
-| Constraint | Value |
-|-----------|-------|
-| Target task count | 1-3 for S, 3-5 for M |
+|---|---|
+| Target task count | 1-3 for local work, 3-5 for normal work |
 | Max Do steps | 8-10 |
 | Max files per task | 5-6 |
-| Intermediate [VERIFY] | Phase boundary or high-risk slice only |
-| [P] markers | Yes |
-| Final V4-V6 | Always |
-| VE tasks | Only when policy verificationLevel is strict or E2E risk is explicit |
+| Intermediate `[VERIFY]` | Phase boundary or high-risk slice only |
+| Final verification | Always |
 
-### Coarse Split/Combine Rules
+## Fine Constraints
 
-**Split if:**
-- Do section > 10 steps
-- Files section > 6 files
-- Task mixes unrelated logical concerns
-- Task crosses phase boundaries
+Use fine granularity only when explicitly requested.
 
-**Combine if:**
-- Multiple fine tasks touch the same component for the same concern
-- Error handling + happy path are in the same component
-- Setup + first usage are tightly coupled
+| Constraint | Value |
+|---|---|
+| Target task count | Still capped at 12 in one spec |
+| Max Do steps | 4 |
+| Max files per task | 3 |
+| Intermediate `[VERIFY]` | Every 2-3 tasks only when verification is strict |
+| Final verification | Always |
 
-### Coarse Guidance
+## Split Rules
 
-- Each task remains a single logical concern (no bundling unrelated changes)
-- Each task should be completable in a single focused session
-- Combine what fine mode splits when they share a component and concern
+Split a task only when:
+- It mixes unrelated user-visible behaviors.
+- It crosses an API, data, auth, security, or deployment boundary.
+- The files section exceeds the active file limit.
+- One verify command cannot prove the slice.
 
-## Shared Rules (all levels)
+## Combine Rules
 
-- 1 logical concern per task (always)
-- A task is a vertical slice: test/reproduce + implementation + verification + commit
-- Never split "write test", "write implementation", "run verification", and "commit" into separate top-level tasks
-- Phase distribution ratios preserved proportionally
-- [P] eligibility: zero file overlap, no output deps, not [VERIFY], no shared config
-- Final verification sequence (V4-V6) always generated
-- VE tasks follow `autoPolicy.verificationLevel`, not project type alone
-- POC-first or TDD workflow selection unchanged by granularity
-- Clarity test: each task executable without clarifying questions
-- Simplicity principle: minimum code to achieve goal
-- Surgical principle: touch only what the task requires
+Combine tasks when:
+- One task writes a test and the next implements the same behavior.
+- One task implements and the next only runs verification or commits.
+- Multiple tasks touch the same component for the same behavior.
+- Setup exists only for the immediately following usage task.
+
+## Shared Rules
+
+- One logical concern per task.
+- A task is a vertical slice: test/reproduce + implementation + verification + commit.
+- Never split "write test", "write implementation", "run verification", and "commit" into separate top-level tasks.
+- `[P]` eligibility requires zero file overlap, no output dependency, no `[VERIFY]` tag, and no shared config writes.
+- Verification depth follows `autoPolicy.verificationLevel`.
+- Review cadence follows `autoPolicy.reviewCadence`.
+- Simplicity: minimum code to achieve the task.
+- Surgical scope: touch only files required by the task.

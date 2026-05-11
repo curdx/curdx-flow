@@ -304,7 +304,7 @@ created: <timestamp>
 | Aspect | Assessment | Notes |
 |--------|------------|-------|
 | Technical Viability | High/Medium/Low | [Why] |
-| Effort Estimate | S/M/L/XL | [Basis] |
+| Effort Estimate | Plain-language estimate | [Basis] |
 | Risk Level | High/Medium/Low | [Key risks] |
 
 ## Recommendations for Requirements

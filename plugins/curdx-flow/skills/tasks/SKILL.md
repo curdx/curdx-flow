@@ -11,9 +11,9 @@ disable-model-invocation: true
 
 Generate implementation tasks for the active spec. Running this command implicitly approves design. You are a **coordinator, not a task planner** -- delegate ALL work to the `task-planner` subagent.
 
-## Checklist
+## Coordinator Checklist
 
-Create a task for each item and complete in order:
+Complete these coordination steps in order; do not create user-facing implementation tasks from this checklist:
 
 1. **Gather context** -- resolve spec, read design, requirements, research
 2. **Interview** -- brainstorming dialogue (skip if `--quick`)
@@ -100,9 +100,9 @@ Direct path:
 
 1. Optionally create a visible native task with `TaskCreate(subject: "Generate implementation tasks for $spec", activeForm: "Generating tasks")`. If unavailable or failing, continue without it.
 2. Dispatch `Task(subagent_type: task-planner)` with requirements, design, interview context, and the Delegation Context below. Instruct it to:
-   - Break implementation into POC-first phases (Phase 1-5 per phase-rules.md)
-   - Create vertical-slice tasks with Do/Files/Done when/Verify/Commit fields
-   - Keep top-level task count inside `autoPolicy.taskTargetRange`; if this requires >12 tasks, stop and recommend `/curdx-flow:triage`
+   - Break implementation into value-slice tasks, using POC-first or TDD phases only as structure
+   - Create tasks with Do/Files/Done when/Verify/Commit fields
+   - Keep top-level task count inside `autoPolicy.taskTargetRange`; if this requires more than 12 tasks, stop and recommend `/curdx-flow:triage`
    - Insert quality checkpoints according to `autoPolicy.reviewCadence` and `autoPolicy.verificationLevel`
    - Each task = one commit, tasks must be executable without human interaction
    - Count total tasks, output to `./specs/$spec/tasks.md`
@@ -125,7 +125,7 @@ Optional Agent Teams path:
 > - **Task Target**: `autoPolicy.taskTargetRange`
 > - **Review Cadence**: `autoPolicy.reviewCadence`
 > - **Verification Level**: `autoPolicy.verificationLevel`
-> - **Vertical Slice Rule**: test/reproduce + implementation + verification + commit stay inside one top-level task
+> - **Value Slice Rule**: test/reproduce + implementation + verification + commit stay inside one top-level task
 >
 > For VE Tasks — VE1 (startup), VE2 (check), VE3 (cleanup) — generation:
 > - **E2E Verification**: enabled or disabled (from interview response, or auto-enabled in quick mode)

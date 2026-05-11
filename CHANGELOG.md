@@ -2,6 +2,20 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.17 — 2026-05-11
+
+### Added
+
+- **Behavior-first smart routing for `/curdx-flow:start`.** New `hooks/scripts/lib/smart-route.mjs` classifies work into action routes (`direct-change`, `lite-spec`, `full-spec`, `epic-split`, `resume-current`, `blocked-ask-user`) so skills can choose the next action without exposing human size labels to the model.
+- **Claude Code smoke gate.** Added `npm run test:claudecc`, which validates the plugin with the user's `claudecc` command, runs help/status in an isolated temp directory, and checks `smart-route` output without polluting the repository.
+- **Route and skill quality regression tests.** New tests lock direct/lite/full/epic/resume/block routing behavior and prevent public skills from reintroducing mechanical checklist wording or human-size label traps.
+
+### Changed
+
+- **High-frequency skills are shorter and action-oriented.** `/curdx-flow:start`, `/curdx-flow:help`, and `/curdx-flow:status` now focus on route, next action, and recovery instead of loading long manuals into the session.
+- **Task planning now speaks value slices.** `task-planner` was compressed from a large rulebook into a focused contract: top-level tasks must be autonomous value slices with automated verification, and oversized work routes to triage instead of inflating one spec.
+- **Sizing references no longer ask the AI to reason in abstract shirt sizes.** Planning docs now use route names and concrete task-count limits; legacy `autoPolicy.size` remains only as a compatibility field for existing state and hook behavior.
+
 ## 7.1.16 — 2026-05-11
 
 ### Fixed

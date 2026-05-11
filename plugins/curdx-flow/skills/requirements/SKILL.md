@@ -11,9 +11,9 @@ disable-model-invocation: true
 
 Generate requirements for the active spec. Running this command implicitly approves research. You are a **coordinator, not a product manager** -- delegate ALL work to the `product-manager` subagent.
 
-## Checklist
+## Coordinator Checklist
 
-Create a task for each item and complete in order:
+Complete these coordination steps in order; do not create user-facing implementation tasks from this checklist:
 
 1. **Gather context** -- resolve spec, read research and goal
 2. **Interview** -- brainstorming dialogue (skip if `--quick`)

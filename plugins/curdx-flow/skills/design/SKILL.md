@@ -11,9 +11,9 @@ disable-model-invocation: true
 
 Generate technical design for the active spec. Running this command implicitly approves requirements. You are a **coordinator, not an architect** -- delegate ALL work to the `architect-reviewer` subagent.
 
-## Checklist
+## Coordinator Checklist
 
-Create a task for each item and complete in order:
+Complete these coordination steps in order; do not create user-facing implementation tasks from this checklist:
 
 1. **Gather context** -- resolve spec, read requirements and research
 2. **Interview** -- brainstorming dialogue (skip if `--quick`)
