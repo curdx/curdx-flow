@@ -91,6 +91,26 @@ try {
   if (parsed.route !== 'direct-change' || parsed.shouldCreateSpec !== false) {
     throw new Error(`unexpected smart-route output: ${route}`);
   }
+  if (!Array.isArray(parsed.recommendedCapabilities) || parsed.recommendedCapabilities.length !== 0) {
+    throw new Error(`direct-change should not recommend third-party tools: ${route}`);
+  }
+
+  const capabilityRoute = runNode('smart-route capability recommendations', [
+    join(pluginRoot, 'hooks', 'scripts', 'lib', 'smart-route.mjs'),
+    '--goal',
+    'Debug React network error in Chrome using latest docs',
+    '--files',
+    'src/Login.tsx,tests/login.test.ts',
+    '--available-capabilities',
+    'context7,frontend-design,chrome-devtools-mcp,sequential-thinking',
+  ]);
+  const capabilityParsed = JSON.parse(capabilityRoute);
+  const capabilityIds = capabilityParsed.recommendedCapabilities?.map((rec) => rec.id) ?? [];
+  for (const expected of ['context7', 'frontend-design', 'chrome-devtools-mcp', 'sequential-thinking']) {
+    if (!capabilityIds.includes(expected)) {
+      throw new Error(`missing capability recommendation ${expected}: ${capabilityRoute}`);
+    }
+  }
 
   const splitParent = mkdtempSync(join(tmpdir(), 'curdx-flow-split-smoke-'));
   try {

@@ -374,6 +374,42 @@
           "$ref": "#/definitions/autoPolicy",
           "description": "Policy selected by hooks/scripts/lib/auto-policy.mjs and persisted for all later phases"
         },
+        "projectTopology": {
+          "type": "object",
+          "description": "Compact topology facts returned by hooks/scripts/lib/smart-route.mjs for multi-root project routing",
+          "additionalProperties": true
+        },
+        "recommendedCapabilities": {
+          "type": "array",
+          "description": "Tool-use hints returned by smart-route; phases may use them when the capability is installed and relevant",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "enum": [
+                  "claude-mem",
+                  "context7",
+                  "sequential-thinking",
+                  "chrome-devtools-mcp",
+                  "frontend-design",
+                  "pua"
+                ]
+              },
+              "name": { "type": "string" },
+              "type": { "type": "string", "enum": ["plugin", "mcp"] },
+              "invocation": { "type": "string" },
+              "phase": {
+                "type": "string",
+                "enum": ["before-coding", "planning", "implementation", "verification", "recovery"]
+              },
+              "reason": { "type": "string" },
+              "instruction": { "type": "string" }
+            },
+            "required": ["id", "name", "type", "invocation", "phase", "reason", "instruction"],
+            "additionalProperties": false
+          }
+        },
         "completed": {
           "type": "boolean",
           "default": false,

@@ -2,6 +2,22 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.19 — 2026-05-11
+
+### Added
+
+- **Third-party capability graph for smart routing.** New `hooks/scripts/lib/tool-capabilities.mjs` maps installed companion capabilities (`claude-mem`, `context7`, `sequential-thinking`, `chrome-devtools-mcp`, `frontend-design`, and `pua`) to concrete AI-facing triggers, phases, skip rules, and invocations.
+- **Capability recommendations in `smart-route`.** Route output now includes `recommendedCapabilities` so `/curdx-flow:start` can choose docs lookup, memory search, UI design, browser verification, structured reasoning, or retry tooling from goal/topology facts without forcing every task through every tool.
+
+### Changed
+
+- **Global CLAUDE.md guidance is generated from the capability graph.** The managed block now emits concise installed-tool routing rules and a decision tree instead of hand-maintained duplicated plugin/MCP prose.
+- **Start workflow stores tool hints with spec state.** New specs can persist compact `recommendedCapabilities` next to `projectTopology`, and the state schema/reference docs now declare both fields so later phases can reuse the original routing context without re-deriving it.
+
+### Tests
+
+- Added capability-router unit coverage, smart-route capability filtering checks, CLAUDE.md rendering regression coverage, and claudecc smoke assertions for empty direct-change hints and frontend/browser/docs recommendations.
+
 ## 7.1.18 — 2026-05-11
 
 ### Added

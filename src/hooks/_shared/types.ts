@@ -240,6 +240,16 @@ export interface CurdxState {
     shouldSplitSpec?: boolean;
     reasons?: string[];
   };
+  projectTopology?: Record<string, unknown>;
+  recommendedCapabilities?: Array<{
+    id?: "claude-mem" | "context7" | "sequential-thinking" | "chrome-devtools-mcp" | "frontend-design" | "pua";
+    name?: string;
+    type?: "plugin" | "mcp";
+    invocation?: string;
+    phase?: "before-coding" | "planning" | "implementation" | "verification" | "recovery";
+    reason?: string;
+    instruction?: string;
+  }>;
   epicName?: string;
   // verification iron-law (design D2): per-phase Verify command outcomes
   verificationBlocks?: Partial<Record<VerificationPhase, VerificationBlock>>;

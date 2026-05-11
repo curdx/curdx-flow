@@ -17,6 +17,7 @@ describe("smart-route classifier", () => {
     expect(route.shouldUseSubagent).toBe(false);
     expect(route.taskCountLimit).toBe(1);
     expect(route.nextAction).toContain("do not create a spec");
+    expect(route.recommendedCapabilities).toEqual([]);
   });
 
   it("routes a bounded local feature to lite-spec with a small value-slice cap", () => {
@@ -48,6 +49,9 @@ describe("smart-route classifier", () => {
     expect(route.shouldCreateTasks).toBe(true);
     expect(route.shouldUseSubagent).toBe(true);
     expect(route.taskCountLimit).toBe(12);
+    expect(route.recommendedCapabilities.map((rec) => rec.id)).toEqual(
+      expect.arrayContaining(["claude-mem", "frontend-design", "chrome-devtools-mcp", "sequential-thinking"]),
+    );
   });
 
   it("routes oversized work to epic-split", () => {
@@ -136,6 +140,19 @@ describe("smart-route classifier", () => {
     expect(result.stdout).not.toMatch(/\b(XS|XL)\b/);
   });
 
+  it("accepts available capability filters for tool recommendations", () => {
+    const route = classifySmartRoute({
+      goal: "Debug React network error in Chrome using latest docs",
+      changedFiles: ["src/Login.tsx", "tests/login.test.ts"],
+      availableCapabilities: ["context7", "chrome-devtools-mcp"],
+    });
+
+    expect(route.recommendedCapabilities.map((rec) => rec.id)).toEqual([
+      "context7",
+      "chrome-devtools-mcp",
+    ]);
+  });
+
   it("blocks UI work when CLAUDE.md declares a frontend root outside current access", () => {
     const parent = makeTmpDir("smart-route-topology");
     const backend = path.join(parent, "backend");
@@ -157,6 +174,7 @@ describe("smart-route classifier", () => {
       expect(route.route).toBe("blocked-ask-user");
       expect(route.blockedReason).toContain("frontend");
       expect(route.nextAction).toContain("/add-dir ../frontend");
+      expect(route.recommendedCapabilities).toEqual([]);
       expect(route.topology?.missingRoots).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "frontend", access: "outside-working-directory" }),

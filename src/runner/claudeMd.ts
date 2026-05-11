@@ -7,6 +7,10 @@ import { PKGS } from '../registry/index.ts';
 import type { Pkg } from '../registry/types.ts';
 import { t } from '../i18n/index.ts';
 import { getLang } from '../i18n/index.ts';
+import {
+  renderCapabilityDecisionTree,
+  renderInstalledCapabilityRules,
+} from '../hooks/lib/tool-capabilities.ts';
 
 const BEGIN_MARKER = '<!-- BEGIN @curdx/flow v1 -->';
 const END_MARKER = '<!-- END @curdx/flow v1 -->';
@@ -37,68 +41,11 @@ export function claudeMdPath(): string {
 // ---------- pure rendering ----------
 
 function buildCombinationPatterns(ids: Set<string>): string[] {
-  const has = (k: string) => ids.has(k);
-  const out: string[] = [
-    'Combine tools by capability. Keep slash commands, MCP tools, and plugin skills distinct.',
-    '',
-  ];
-
-  if (has('context7') || has('curdx-flow') || has('claude-mem')) {
-    out.push('- **Starting a new feature**');
-    let step = 1;
-    if (has('context7')) {
-      out.push(`  ${step++}. If external libraries, SDKs, frameworks, or APIs are involved, use the Context7 MCP to pull current official docs.`);
-    }
-    const planners: string[] = [];
-    if (has('claude-mem')) planners.push('`/claude-mem:make-plan` for a phased plan');
-    if (has('curdx-flow')) planners.push('`/curdx-flow:new` or the spec flow for a full specification');
-    if (planners.length > 0) {
-      out.push(`  ${step++}. Only move into ${planners.join(' or ')} when the work is multi-step, cross-cutting, or uncertain.`);
-    }
-    out.push(`  ${step++}. For small, clear one-shot changes, implement directly instead of forcing the full workflow.`);
-    out.push('');
+  const out = renderInstalledCapabilityRules([...ids]);
+  if (ids.has('curdx-flow')) {
+    out.push('- /curdx-flow:start: Use for ambiguous, cross-cutting, phase-based, or multi-root work; skip for small direct edits.');
+    out.push('- /curdx-flow:triage: Use when one request is too large for a single coherent spec.');
   }
-
-  const stuckLines: string[] = [];
-  let s = 1;
-  if (has('chrome-devtools-mcp')) {
-    stuckLines.push(`  ${s++}. For browser-side issues, use the Chrome DevTools MCP for network, console, performance, and DOM snapshots.`);
-  }
-  if (has('context7')) {
-    stuckLines.push(`  ${s++}. If the issue may come from library or API behavior, use the Context7 MCP instead of relying on memory.`);
-  }
-  const stillStuck: string[] = [];
-  if (has('sequential-thinking')) stillStuck.push('switch to the sequential-thinking MCP to break down hypotheses');
-  if (has('pua')) stillStuck.push('enter `/pua:pua-loop` for structured retries');
-  if (stillStuck.length > 0) {
-    stuckLines.push(`  ${s++}. If you are still stuck after multiple attempts, ${stillStuck.join(' or ')}.`);
-  }
-  if (stuckLines.length > 0) {
-    out.push('- **Debugging and repeated failures**', ...stuckLines, '');
-  }
-
-  if (has('frontend-design') || has('chrome-devtools-mcp')) {
-    out.push('- **UI and frontend work**');
-    if (has('frontend-design')) {
-      out.push('  - Prioritize the `frontend-design` plugin skills for UI work; if they do not trigger automatically, invoke the relevant skill explicitly.');
-    }
-    if (has('chrome-devtools-mcp')) {
-      out.push('  - For rendering issues, interaction bugs, or visual regressions, verify with the Chrome DevTools MCP instead of relying on visual guesswork alone.');
-    }
-    out.push('');
-  }
-
-  if (has('pua') || has('curdx-flow')) {
-    out.push('- **Large, cross-cutting, or multi-agent work**');
-    if (has('pua')) {
-      out.push('  - Use `/pua:p9` for parallel task decomposition and team coordination; reserve `/pua:p10` for higher-level strategy work.');
-    }
-    if (has('curdx-flow')) {
-      out.push('  - Use `/curdx-flow:triage` when one large feature needs to be split into multiple dependent specs.');
-    }
-  }
-
-  while (out.length > 0 && out[out.length - 1] === '') out.pop();
   return out;
 }
 
@@ -120,18 +67,9 @@ function buildSkipRules(ids: Set<string>): string[] {
 }
 
 function buildDecisionTree(ids: Set<string>): string[] {
-  const has = (k: string) => ids.has(k);
-  const out: string[] = [];
-  out.push('1. Can it be finished in 1-2 steps? -> Do it directly.');
-  out.push('2. Is it multi-step but still clear? -> Break it into a short task list and execute without defaulting to the full spec flow.');
-  const planners: string[] = [];
-  if (has('curdx-flow')) planners.push('`/curdx-flow:new`');
-  if (has('claude-mem')) planners.push('`/claude-mem:make-plan`');
-  if (planners.length > 0) {
-    out.push(`3. Is the request ambiguous, cross-cutting, or phase-based? -> ${planners.join(' or ')}.`);
-  }
-  if (has('claude-mem')) {
-    out.push('4. Might this work have been done before? -> Start with `/claude-mem:mem-search`.');
+  const out = renderCapabilityDecisionTree([...ids]);
+  if (ids.has('curdx-flow')) {
+    out.push('7. Is the request ambiguous, cross-cutting, phase-based, or multi-root? -> Run /curdx-flow:start.');
   }
   return out;
 }

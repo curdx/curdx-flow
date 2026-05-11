@@ -27,6 +27,7 @@ Users do not need to know `--add-dir`. If routing returns a missing code root, s
      --flags "$ARGUMENTS"
    ```
 3. Treat the returned `route` as the source of truth. Do not invent a different workflow unless the router says `blocked-ask-user` and the user's answer changes the facts.
+4. If the router returns `recommendedCapabilities`, treat them as tool-use hints, not mandatory steps. Invoke only capabilities that are actually available in the current Claude Code tool/skill surface.
 
 ## Route Actions
 
@@ -46,6 +47,7 @@ If `blocked-ask-user` includes `topology.missingRoots`, do not ask an open-ended
 - Use behavior route names exactly as returned: `direct-change`, `lite-spec`, `full-spec`, `epic-split`, `resume-current`, `blocked-ask-user`.
 - Top-level tasks are value slices. Never split a slice into separate "write test", "write implementation", "run test", or "commit" tasks.
 - If the route says `direct-change`, skip branch prompts, spec creation, phase documents, task planning, and subagents unless the user explicitly asks for them.
+- If `recommendedCapabilities` includes `context7`, `claude-mem`, `frontend-design`, `chrome-devtools-mcp`, `sequential-thinking`, or `pua`, use the recommendation only at its listed phase and only when it materially reduces uncertainty or verifies real behavior.
 - If the route says `epic-split`, stop single-spec creation and run triage.
 - If a spec state is created, store `autoPolicy` for compatibility and set `maxGlobalIterations` from policy, defaulting to 30 if the helper fails.
 
@@ -91,7 +93,7 @@ If policy computation fails, use this fallback cap:
 
 For `lite-spec`, keep interviews minimal and generate only 1-3 value-slice tasks. For `full-spec`, continue with research and the normal phase flow.
 
-When a spec state is created and router output includes `topology`, store a compact copy of that object in `.curdx-state.json` as `projectTopology`.
+When a spec state is created and router output includes `topology` or `recommendedCapabilities`, store compact copies in `.curdx-state.json` as `projectTopology` and `recommendedCapabilities`.
 
 ## Skill Discovery
 

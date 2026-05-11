@@ -31,6 +31,19 @@ curdx-flow uses `.curdx-state.json` to track execution state.
     "subagentPolicy": "on-demand",
     "stopHookPolicy": "short-continuation"
   },
+  "projectTopology": {
+    "devContextFound": true,
+    "roots": []
+  },
+  "recommendedCapabilities": [
+    {
+      "id": "context7",
+      "phase": "before-coding",
+      "invocation": "Context7 MCP",
+      "reason": "external documentation or current API behavior is likely relevant",
+      "instruction": "Use Context7 before editing so version-specific behavior is grounded in current docs."
+    }
+  ],
   "awaitingApproval": false,
   "completed": false,
   "completedAt": "2026-05-04T12:00:00.000Z"
@@ -48,6 +61,8 @@ curdx-flow uses `.curdx-state.json` to track execution state.
 | `maxTaskIterations` | number | Max retries before blocking |
 | `maxGlobalIterations` | number | Max execution loop iterations before blocking |
 | `autoPolicy` | object | Deterministic policy controlling sizing, review, verification, subagents, and stop-hook behavior |
+| `projectTopology` | object | Compact multi-root project facts returned by `smart-route` |
+| `recommendedCapabilities` | array | Tool-use hints returned by `smart-route`; use only when the capability is installed and relevant |
 | `awaitingApproval` | boolean | Waiting for user to proceed |
 | `completed` | boolean | Spec fully complete (all tasks done, terminal state) |
 | `completedAt` | string (date-time) | ISO 8601 UTC timestamp when spec entered completed phase |

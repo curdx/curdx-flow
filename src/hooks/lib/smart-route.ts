@@ -12,6 +12,10 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { classifyAutoPolicy, type AutoPolicy } from "./auto-policy.js";
 import { discoverProjectTopology, type ProjectTopology } from "./project-topology.js";
+import {
+  recommendToolCapabilities,
+  type CapabilityRecommendation,
+} from "./tool-capabilities.js";
 import { findSpec, resolveCurrent } from "../_shared/path-resolver.js";
 
 export type SmartRouteName =
@@ -30,6 +34,7 @@ export interface SmartRouteInput {
   estimatedFiles?: number;
   taskCount?: number;
   cwd?: string;
+  availableCapabilities?: string[];
 }
 
 export interface SmartRoute {
@@ -52,6 +57,7 @@ export interface SmartRoute {
     "devContextFound" | "roots" | "requiredRoots" | "missingRoots" | "accessFix" | "warnings"
   >;
   blockedReason?: string;
+  recommendedCapabilities: CapabilityRecommendation[];
   policy: {
     mode: AutoPolicy["mode"];
     risk: AutoPolicy["risk"];
@@ -273,6 +279,14 @@ function publicTopology(topology: ProjectTopology): SmartRoute["topology"] {
   };
 }
 
+function topologyKinds(topology: ProjectTopology): string[] {
+  return [...new Set(topology.roots.flatMap((root) => root.kinds))];
+}
+
+function topologyFrameworks(topology: ProjectTopology): string[] {
+  return [...new Set(topology.roots.flatMap((root) => root.frameworks))];
+}
+
 export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
   const goal = normalizeText(input.goal);
   const cwd = input.cwd ?? process.cwd();
@@ -285,6 +299,15 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
     estimatedFiles: input.estimatedFiles,
     taskCount: input.taskCount,
   });
+  const recommendations = recommendToolCapabilities({
+    goal,
+    route: routeFromPolicy(policy),
+    risk: policy.risk,
+    topologyKinds: topologyKinds(topology),
+    topologyFrameworks: topologyFrameworks(topology),
+    missingRoots: topology.missingRoots.length,
+    availableCapabilities: input.availableCapabilities,
+  });
 
   if (activeSpec !== undefined && !activeSpec.completed && goal.length === 0) {
     return {
@@ -295,6 +318,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
       ...routeDefaults("resume-current"),
       nextAction: nextActionForActiveSpec(activeSpec),
       topology: publicTopology(topology),
+      recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["active unfinished spec"],
     };
@@ -315,6 +339,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
         "Ask whether to resume the existing spec or rerun with --fresh for new work.",
       ...routeDefaults("blocked-ask-user"),
       topology: publicTopology(topology),
+      recommendedCapabilities: recommendations,
       policy: publicPolicy(policy),
       reasons: ["existing unfinished spec with new goal text"],
     };
@@ -331,6 +356,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
         blockedReason: `Ambiguous spec '${explicitName}': ${found.matches.join(", ")}`,
         ...routeDefaults("blocked-ask-user"),
         topology: publicTopology(topology),
+        recommendedCapabilities: recommendations,
         policy: publicPolicy(policy),
         reasons: ["ambiguous spec name"],
       };
@@ -345,6 +371,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
       blockedReason: "Ask for the goal or a spec name.",
       ...routeDefaults("blocked-ask-user"),
       topology: publicTopology(topology),
+      recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["missing goal"],
     };
@@ -363,6 +390,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
       ...routeDefaults("blocked-ask-user"),
       nextAction: topology.accessFix ?? "Add the missing code root, then rerun /curdx-flow:start.",
       topology: publicTopology(topology),
+      recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["related code root is outside current Claude Code access"],
     };
@@ -376,6 +404,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
     reason: policy.reasons[0] ?? "deterministic policy classification",
     ...defaults,
     topology: publicTopology(topology),
+    recommendedCapabilities: recommendations,
     policy: publicPolicy(policy),
     reasons: policy.reasons,
   };
@@ -388,6 +417,7 @@ function main(): void {
   const flags = readArg("--flags", argv) ?? "";
   const cwd = readArg("--cwd", argv);
   const files = parseList(readArg("--files", argv));
+  const availableCapabilities = parseList(readArg("--available-capabilities", argv));
   const estimatedRaw = readArg("--estimated-files", argv);
   const taskRaw = readArg("--task-count", argv);
   const route = classifySmartRoute({
@@ -396,6 +426,8 @@ function main(): void {
     flags,
     cwd,
     changedFiles: files,
+    availableCapabilities:
+      availableCapabilities.length > 0 ? availableCapabilities : undefined,
     estimatedFiles: estimatedRaw === undefined ? undefined : Number(estimatedRaw),
     taskCount: taskRaw === undefined ? undefined : Number(taskRaw),
   });

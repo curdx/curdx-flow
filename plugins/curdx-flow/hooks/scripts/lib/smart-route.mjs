@@ -7,8 +7,8 @@ const __dirname = __ccd(__filename);
 
 // src/hooks/lib/smart-route.ts
 import { existsSync as existsSync3, readFileSync as readFileSync3 } from "node:fs";
-import { basename as basename4, join as join2 } from "node:path";
-import { fileURLToPath as fileURLToPath3 } from "node:url";
+import { basename as basename5, join as join2 } from "node:path";
+import { fileURLToPath as fileURLToPath4 } from "node:url";
 
 // src/hooks/lib/auto-policy.ts
 import { fileURLToPath } from "node:url";
@@ -979,6 +979,225 @@ if (isDirectRun2()) {
   main2();
 }
 
+// src/hooks/lib/tool-capabilities.ts
+import { basename as basename4 } from "node:path";
+import { fileURLToPath as fileURLToPath3 } from "node:url";
+var CAPABILITIES = {
+  "context7": {
+    id: "context7",
+    name: "Context7",
+    type: "mcp",
+    invocation: "Context7 MCP",
+    summary: "current official docs for libraries, SDKs, APIs, and Claude Code",
+    useWhen: "use the Context7 MCP before implementation when external library, SDK, API, framework, or Claude Code behavior matters.",
+    skipWhen: "Skip for pure local logic, typos, and code paths fully understood from this repository."
+  },
+  "claude-mem": {
+    id: "claude-mem",
+    name: "claude-mem",
+    type: "plugin",
+    invocation: "/claude-mem:mem-search",
+    summary: "cross-session memory search and phased plan/execution commands",
+    useWhen: "Use /claude-mem:mem-search when similar work, prior decisions, or repeated failures may exist; use /claude-mem:make-plan only for genuinely phased work.",
+    skipWhen: "Skip when the task is new, obvious, and smaller than a short local edit."
+  },
+  "sequential-thinking": {
+    id: "sequential-thinking",
+    name: "sequential-thinking",
+    type: "mcp",
+    invocation: "sequential-thinking MCP",
+    summary: "structured hypothesis breakdown for hard architecture and debugging problems",
+    useWhen: "Use for architecture tradeoffs, migrations, security/data/release risk, or debugging where assumptions may change.",
+    skipWhen: "Skip for direct edits, simple lookups, and deterministic fixes."
+  },
+  "chrome-devtools-mcp": {
+    id: "chrome-devtools-mcp",
+    name: "Chrome DevTools MCP",
+    type: "plugin",
+    invocation: "Chrome DevTools MCP",
+    summary: "real browser console, network, DOM, performance, and screenshot/snapshot verification",
+    useWhen: "Use for browser runtime behavior, UI regressions, DOM/CSS issues, network failures, and frontend verification.",
+    skipWhen: "Skip for backend-only code with no browser-facing behavior."
+  },
+  "frontend-design": {
+    id: "frontend-design",
+    name: "frontend-design",
+    type: "plugin",
+    invocation: "frontend-design plugin skills",
+    summary: "frontend UX/design guidance for UI pages, components, and interaction polish",
+    useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
+    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work."
+  },
+  "pua": {
+    id: "pua",
+    name: "pua",
+    type: "plugin",
+    invocation: "/pua:pua-loop or /pua:p9",
+    summary: "structured retries and parallel task decomposition",
+    useWhen: "Use after multiple failed attempts or for truly independent parallel work slices.",
+    skipWhen: "Skip on first-attempt failures, known fixes, and work that is sequential by dependency."
+  }
+};
+var ORDER = [
+  "context7",
+  "claude-mem",
+  "frontend-design",
+  "chrome-devtools-mcp",
+  "sequential-thinking",
+  "pua"
+];
+var DOCS_RE = /\b(api|sdk|library|libraries|framework|docs?|documentation|version|upgrade|dependency|dependencies|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node)\b|最新|文档|依赖|框架|插件|官方|联网|搜索/i;
+var MEMORY_RE = /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
+var UI_RE = /\b(ui|ux|frontend|front-end|browser|chrome|dom|css|html|layout|component|page|form|modal|responsive|visual|render|react|vue|vite|next\.?js|screenshot|interaction)\b|前端|页面|浏览器|样式|交互|组件|布局|视觉|截图/i;
+var BROWSER_VERIFY_RE = /\b(browser|chrome|dom|css|network|console|performance|render|screenshot|e2e|playwright|visual regression|interaction)\b|浏览器|控制台|网络|性能|渲染|截图|端到端/i;
+var COMPLEX_RE = /\b(architecture|architect|migration|migrate|security|auth|authentication|authorization|permission|oauth|payment|billing|database|schema|release|publish|npm|tag|hook|subagent|multi[- ]?repo|monorepo|cross[- ]?system|concurrency|race|cache|rewrite|refactor)\b|架构|迁移|安全|权限|认证|数据库|发布|重写|并发|跨仓库|多仓库/i;
+var STUCK_RE = /\b(stuck|failed|failure|fails|flaky|retry|debug|investigate|root cause|not working|broken|regression)\b|卡住|失败|报错|不行|修不好|定位|排查/i;
+var PARALLEL_RE = /\b(parallel|multi-agent|team|decompose|split|epic|multiple subsystems|large refactor)\b|并行|多智能体|拆分|史诗|多模块/i;
+var LOW_RISK_LOCAL_RE = /\b(typo|readme|docs?|comment|comments|copy|wording|rename label|format text)\b|错别字|注释|文案/i;
+function normalize(input) {
+  return (input ?? "").trim().replace(/\s+/g, " ");
+}
+function hasAny(values, candidates) {
+  const set = new Set((values ?? []).map((v) => v.toLowerCase()));
+  return candidates.some((candidate) => set.has(candidate.toLowerCase()));
+}
+function capabilityAllowed(id, available) {
+  return available === null || available.has(id);
+}
+function pushRecommendation(out, available, id, phase, reason, instruction) {
+  if (!capabilityAllowed(id, available)) return;
+  if (out.some((rec) => rec.id === id)) return;
+  const cap = CAPABILITIES[id];
+  out.push({
+    id,
+    name: cap.name,
+    type: cap.type,
+    invocation: cap.invocation,
+    phase,
+    reason,
+    instruction
+  });
+}
+function sortRecommendations(recs) {
+  return [...recs].sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
+}
+function recommendToolCapabilities(input) {
+  const goal = normalize(input.goal);
+  const route = normalize(input.route);
+  const risk = normalize(input.risk);
+  const topologyKinds2 = input.topologyKinds ?? [];
+  const topologyFrameworks2 = input.topologyFrameworks ?? [];
+  const missingRoots = input.missingRoots ?? 0;
+  const available = input.availableCapabilities === void 0 ? null : new Set(input.availableCapabilities.filter(Boolean));
+  const recs = [];
+  if (missingRoots > 0) {
+    return recs;
+  }
+  const localLowRisk = LOW_RISK_LOCAL_RE.test(goal) && route === "direct-change";
+  if (localLowRisk) {
+    return recs;
+  }
+  const hasFrontend = UI_RE.test(goal) || hasAny(topologyKinds2, ["frontend-app"]) || hasAny(topologyFrameworks2, ["react", "vue", "next.js", "vite"]);
+  const browserRuntime = BROWSER_VERIFY_RE.test(goal) || hasFrontend;
+  const complex = COMPLEX_RE.test(goal) || risk === "high" || risk === "critical" || route === "full-spec" || route === "epic-split";
+  const stuck = STUCK_RE.test(goal);
+  const parallel = PARALLEL_RE.test(goal) || route === "epic-split";
+  if (DOCS_RE.test(goal)) {
+    pushRecommendation(
+      recs,
+      available,
+      "context7",
+      "before-coding",
+      "external documentation or current API behavior is likely relevant",
+      "Use Context7 before editing so version-specific behavior is grounded in current docs."
+    );
+  }
+  if (MEMORY_RE.test(goal) || stuck || route === "full-spec" || route === "epic-split") {
+    pushRecommendation(
+      recs,
+      available,
+      "claude-mem",
+      "planning",
+      "similar prior work or longer-running plan may exist",
+      "Search memory before planning; use make-plan only when the work is genuinely phased."
+    );
+  }
+  if (hasFrontend) {
+    pushRecommendation(
+      recs,
+      available,
+      "frontend-design",
+      "implementation",
+      "visible frontend behavior or UI quality is in scope",
+      "Use frontend-design guidance for UI structure, interaction, responsive behavior, and visual polish."
+    );
+  }
+  if (browserRuntime) {
+    pushRecommendation(
+      recs,
+      available,
+      "chrome-devtools-mcp",
+      "verification",
+      "browser runtime behavior should be verified in a real browser",
+      "Use Chrome DevTools MCP for console, network, DOM, performance, or visual proof after implementation."
+    );
+  }
+  if (complex || stuck) {
+    pushRecommendation(
+      recs,
+      available,
+      "sequential-thinking",
+      "planning",
+      "risk or uncertainty requires explicit hypothesis management",
+      "Use sequential-thinking to break assumptions before choosing the implementation path."
+    );
+  }
+  if (stuck || parallel) {
+    pushRecommendation(
+      recs,
+      available,
+      "pua",
+      stuck ? "recovery" : "planning",
+      stuck ? "the goal indicates repeated failure or debugging difficulty" : "large work may contain independent parallel slices",
+      stuck ? "Use /pua:pua-loop only after local triage confirms the first fix path is not working." : "Use /pua:p9 only after dependencies prove the slices can run independently."
+    );
+  }
+  return sortRecommendations(recs);
+}
+function parseList2(value) {
+  if (!value) return [];
+  return value.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
+}
+function readArg3(name, argv) {
+  const idx = argv.indexOf(name);
+  if (idx === -1) return void 0;
+  return argv[idx + 1];
+}
+function main3() {
+  const argv = process.argv.slice(2);
+  const recommendations = recommendToolCapabilities({
+    goal: readArg3("--goal", argv),
+    route: readArg3("--route", argv),
+    risk: readArg3("--risk", argv),
+    topologyKinds: parseList2(readArg3("--topology-kinds", argv)),
+    topologyFrameworks: parseList2(readArg3("--topology-frameworks", argv)),
+    missingRoots: Number(readArg3("--missing-roots", argv) ?? 0),
+    availableCapabilities: readArg3("--available-capabilities", argv) ? parseList2(readArg3("--available-capabilities", argv)) : void 0
+  });
+  process.stdout.write(JSON.stringify(recommendations, null, 2) + "\n");
+}
+function isDirectRun3() {
+  try {
+    const entry = fileURLToPath3(import.meta.url);
+    return process.argv[1] === entry && basename4(entry).startsWith("tool-capabilities.");
+  } catch {
+    return false;
+  }
+}
+if (isDirectRun3()) {
+  main3();
+}
+
 // src/hooks/lib/smart-route.ts
 function normalizeText(input) {
   return (input ?? "").trim().replace(/\s+/g, " ");
@@ -988,11 +1207,11 @@ function hasFlag(flags, flag) {
     flags ?? ""
   );
 }
-function parseList2(value) {
+function parseList3(value) {
   if (!value) return [];
   return value.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
 }
-function readArg3(name, argv) {
+function readArg4(name, argv) {
   const idx = argv.indexOf(name);
   if (idx === -1) return void 0;
   return argv[idx + 1];
@@ -1150,6 +1369,12 @@ function publicTopology(topology) {
     warnings: topology.warnings
   };
 }
+function topologyKinds(topology) {
+  return [...new Set(topology.roots.flatMap((root) => root.kinds))];
+}
+function topologyFrameworks(topology) {
+  return [...new Set(topology.roots.flatMap((root) => root.frameworks))];
+}
 function classifySmartRoute(input) {
   const goal = normalizeText(input.goal);
   const cwd = input.cwd ?? process.cwd();
@@ -1162,6 +1387,15 @@ function classifySmartRoute(input) {
     estimatedFiles: input.estimatedFiles,
     taskCount: input.taskCount
   });
+  const recommendations = recommendToolCapabilities({
+    goal,
+    route: routeFromPolicy(policy),
+    risk: policy.risk,
+    topologyKinds: topologyKinds(topology),
+    topologyFrameworks: topologyFrameworks(topology),
+    missingRoots: topology.missingRoots.length,
+    availableCapabilities: input.availableCapabilities
+  });
   if (activeSpec !== void 0 && !activeSpec.completed && goal.length === 0) {
     return {
       version: 1,
@@ -1171,6 +1405,7 @@ function classifySmartRoute(input) {
       ...routeDefaults("resume-current"),
       nextAction: nextActionForActiveSpec(activeSpec),
       topology: publicTopology(topology),
+      recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["active unfinished spec"]
     };
@@ -1184,6 +1419,7 @@ function classifySmartRoute(input) {
       blockedReason: "Ask whether to resume the existing spec or rerun with --fresh for new work.",
       ...routeDefaults("blocked-ask-user"),
       topology: publicTopology(topology),
+      recommendedCapabilities: recommendations,
       policy: publicPolicy(policy),
       reasons: ["existing unfinished spec with new goal text"]
     };
@@ -1199,6 +1435,7 @@ function classifySmartRoute(input) {
         blockedReason: `Ambiguous spec '${explicitName}': ${found.matches.join(", ")}`,
         ...routeDefaults("blocked-ask-user"),
         topology: publicTopology(topology),
+        recommendedCapabilities: recommendations,
         policy: publicPolicy(policy),
         reasons: ["ambiguous spec name"]
       };
@@ -1212,6 +1449,7 @@ function classifySmartRoute(input) {
       blockedReason: "Ask for the goal or a spec name.",
       ...routeDefaults("blocked-ask-user"),
       topology: publicTopology(topology),
+      recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["missing goal"]
     };
@@ -1226,6 +1464,7 @@ function classifySmartRoute(input) {
       ...routeDefaults("blocked-ask-user"),
       nextAction: topology.accessFix ?? "Add the missing code root, then rerun /curdx-flow:start.",
       topology: publicTopology(topology),
+      recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["related code root is outside current Claude Code access"]
     };
@@ -1238,40 +1477,43 @@ function classifySmartRoute(input) {
     reason: policy.reasons[0] ?? "deterministic policy classification",
     ...defaults,
     topology: publicTopology(topology),
+    recommendedCapabilities: recommendations,
     policy: publicPolicy(policy),
     reasons: policy.reasons
   };
 }
-function main3() {
+function main4() {
   const argv = process.argv.slice(2);
-  const goal = readArg3("--goal", argv) ?? "";
-  const name = readArg3("--name", argv);
-  const flags = readArg3("--flags", argv) ?? "";
-  const cwd = readArg3("--cwd", argv);
-  const files = parseList2(readArg3("--files", argv));
-  const estimatedRaw = readArg3("--estimated-files", argv);
-  const taskRaw = readArg3("--task-count", argv);
+  const goal = readArg4("--goal", argv) ?? "";
+  const name = readArg4("--name", argv);
+  const flags = readArg4("--flags", argv) ?? "";
+  const cwd = readArg4("--cwd", argv);
+  const files = parseList3(readArg4("--files", argv));
+  const availableCapabilities = parseList3(readArg4("--available-capabilities", argv));
+  const estimatedRaw = readArg4("--estimated-files", argv);
+  const taskRaw = readArg4("--task-count", argv);
   const route = classifySmartRoute({
     goal,
     name,
     flags,
     cwd,
     changedFiles: files,
+    availableCapabilities: availableCapabilities.length > 0 ? availableCapabilities : void 0,
     estimatedFiles: estimatedRaw === void 0 ? void 0 : Number(estimatedRaw),
     taskCount: taskRaw === void 0 ? void 0 : Number(taskRaw)
   });
   process.stdout.write(JSON.stringify(route, null, 2) + "\n");
 }
-function isDirectRun3() {
+function isDirectRun4() {
   try {
-    const entry = fileURLToPath3(import.meta.url);
-    return process.argv[1] === entry && basename4(entry).startsWith("smart-route.");
+    const entry = fileURLToPath4(import.meta.url);
+    return process.argv[1] === entry && basename5(entry).startsWith("smart-route.");
   } catch {
     return false;
   }
 }
-if (isDirectRun3()) {
-  main3();
+if (isDirectRun4()) {
+  main4();
 }
 export {
   classifySmartRoute
