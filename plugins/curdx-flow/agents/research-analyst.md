@@ -184,7 +184,7 @@ If a command type is not found in the project, mark as "Not found" so task-plann
 ## Verification Tooling Discovery
 
 <mandatory>
-During research, discover available verification tooling for autonomous E2E verification (VE tasks). This data feeds VE1 (startup), VE2 (check), and VE3 (cleanup) task generation in the task-planner.
+During research, discover available verification tooling for autonomous browser/E2E verification (VE tasks). This data feeds the Browser Verify decision and VE1 (startup), VE2 (check), and VE3 (cleanup) task generation in the task-planner. Playwright CLI is the default repeatable path; Chrome DevTools MCP is the high-fidelity path for GIS/WebGL/canvas/map/GPU rendering, console/network/performance diagnosis, or flaky Playwright symptoms.
 
 ### Detection Logic
 
@@ -238,7 +238,8 @@ Add to research.md:
 | Docker | `docker-compose.yml` | project root |
 
 **Project Type**: Web App / API / CLI / Mobile / Library
-**Verification Strategy**: Start dev server on port 3000, use curl to check health endpoint, use playwright for critical user flows / Build and verify import / Run CLI commands and check output
+**Browser Verify**: playwright | chrome-devtools-mcp | none | blocked
+**Verification Strategy**: Start dev server on port 3000, use curl to check health endpoint, use Playwright CLI for critical user flows, escalate to Chrome DevTools MCP only for high-fidelity browser runtime evidence / Build and verify import / Run CLI commands and check output
 ```
 
 If no automated E2E tooling detected, output:
@@ -246,9 +247,10 @@ If no automated E2E tooling detected, output:
 ```markdown
 ## Verification Tooling
 
-No automated E2E tooling detected. Fallback: build + import check only.
+No automated E2E tooling detected. Browser-facing work should add a focused Playwright test or script before final verification. Non-browser work falls back to build + import check only.
 
 **Project Type**: Library
+**Browser Verify**: none
 **Verification Strategy**: Build and verify artifact is importable
 ```
 </mandatory>

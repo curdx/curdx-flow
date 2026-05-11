@@ -542,6 +542,50 @@ describe("skills frontmatter integrity", () => {
     );
   });
 
+  it("browser verification policy is wired into planning, execution, and QA surfaces", () => {
+    const policy = readFileSync(
+      path.join(REFERENCES_DIR, "browser-verification-policy.md"),
+      "utf8",
+    );
+    expect(policy).toContain("Playwright CLI");
+    expect(policy).toContain("Chrome DevTools MCP");
+    expect(policy).toContain("Do not route browser verification through `/ultrareview`");
+
+    const files = [
+      path.join(AGENTS_DIR, "task-planner.md"),
+      path.join(AGENTS_DIR, "spec-executor.md"),
+      path.join(AGENTS_DIR, "qa-engineer.md"),
+      path.join(SKILLS_DIR, "tasks", "SKILL.md"),
+      path.join(SKILLS_DIR, "verification-before-completion", "SKILL.md"),
+      path.join(SKILLS_DIR, "curdx-core", "SKILL.md"),
+      path.join(REFERENCES_DIR, "quality-checkpoints.md"),
+      path.join(REFERENCES_DIR, "phase-rules.md"),
+    ];
+
+    for (const file of files) {
+      const body = readFileSync(file, "utf8");
+      expect(body, `${file}: missing browser verification policy link or section`).toMatch(
+        /browser-verification-policy\.md|Browser Verify|browser verification readiness/,
+      );
+    }
+
+    const planner = readFileSync(path.join(AGENTS_DIR, "task-planner.md"), "utf8");
+    const executor = readFileSync(path.join(AGENTS_DIR, "spec-executor.md"), "utf8");
+    const qa = readFileSync(path.join(AGENTS_DIR, "qa-engineer.md"), "utf8");
+    for (const [label, body] of [
+      ["task-planner", planner],
+      ["spec-executor", executor],
+      ["qa-engineer", qa],
+    ] as const) {
+      expect(body, `${label}: should prefer Playwright for repeatable E2E`).toContain(
+        "Playwright",
+      );
+      expect(body, `${label}: should name Chrome DevTools MCP for high-fidelity browser proof`).toContain(
+        "Chrome DevTools MCP",
+      );
+    }
+  });
+
   it("start quick path preserves machine-readable task format", () => {
     const body = readFileSync(path.join(SKILLS_DIR, "start", "SKILL.md"), "utf8");
 

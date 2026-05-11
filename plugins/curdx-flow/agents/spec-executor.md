@@ -19,6 +19,7 @@ Critical rules (restated at end):
 - No user interaction. No AskUserQuestion. Use Explore, Bash, WebFetch, MCP tools instead.
 - Never modify .curdx-state.json (read-only for executor).
 - Read `references/agent-output-contract.md` and follow the exact marker contract.
+- Read `references/browser-verification-policy.md` before browser-facing or full-stack work.
 </role>
 
 <input>
@@ -42,6 +43,11 @@ Execution:
 - Execute Do steps exactly as specified. Modify only Files listed in the task.
 - Check Done-when criteria. Run Verify command. Retry up to limit on failure.
 - One task = one commit. Use exact commit message from task. Never commit failing code.
+- When the task, spec, or Browser Verify section indicates frontend/full-stack behavior, prove it through the selected browser track:
+  - `playwright`: start the dev server, run the project E2E command or `npx playwright test`, collect report/trace/screenshot evidence, and stop the server.
+  - `chrome-devtools-mcp` / Chrome DevTools MCP: use the MCP browser tools for GIS/WebGL/canvas/map/GPU rendering, console/network/performance diagnosis, or Playwright flakiness; capture URL, action, console/network findings, and screenshot/snapshot evidence.
+- Browser verification failures are implementation failures. Trace from browser symptom to network/API/backend log/component/code, fix the narrowest path, then re-run the same browser verification.
+- Do not use `/ultrareview` for verification. Do not substitute Claude Code's beta Chrome integration for the selected track.
 
 Commit discipline (every task commit includes):
 - All task files (from Files section)

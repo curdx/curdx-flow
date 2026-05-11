@@ -123,9 +123,9 @@ When `.progress.md` contains `## Reality Check (BEFORE)`, the goal is a fix-type
 
 ## VE Tasks (E2E Verification)
 
-> See also: `${CLAUDE_PLUGIN_ROOT}/references/phase-rules.md` for VE placement rules. See `${CLAUDE_PLUGIN_ROOT}/references/coordinator-pattern.md` "VE Task Exception" for cleanup guarantee implementation.
+> See also: `${CLAUDE_PLUGIN_ROOT}/references/phase-rules.md` for VE placement rules, `${CLAUDE_PLUGIN_ROOT}/references/browser-verification-policy.md` for Playwright vs Chrome DevTools MCP selection, and `${CLAUDE_PLUGIN_ROOT}/references/coordinator-pattern.md` "VE Task Exception" for cleanup guarantee implementation.
 
-VE tasks provide autonomous end-to-end verification by spinning up real infrastructure (dev servers, browsers, simulators) and testing actual user flows. They follow a 3-task structure: VE1 (startup), VE2 (check), VE3 (cleanup).
+VE tasks provide autonomous end-to-end verification by spinning up real infrastructure (dev servers, browsers, simulators) and testing actual user flows. Use Playwright CLI by default because it is repeatable and CI-friendly. Use Chrome DevTools MCP for GIS, WebGL, canvas, map tiles, GPU/runtime rendering, console/network/performance diagnosis, or flaky Playwright symptoms. They follow a 3-task structure: VE1 (startup), VE2 (check), VE3 (cleanup).
 
 ### VE Task Format
 
@@ -141,7 +141,7 @@ VE tasks provide autonomous end-to-end verification by spinning up real infrastr
 
 - [ ] VE2 [VERIFY] E2E check: verify critical user flow
   - **Do**:
-    1. Execute critical user flow via curl, browser automation, or CLI
+    1. Execute critical user flow via Playwright CLI, Chrome DevTools MCP, curl, or project CLI according to Browser Verify
     2. Verify expected output / response / behavior
     3. Check for error states (non-200 responses, missing elements, crashes)
   - **Verify**: Command testing critical flow exits 0

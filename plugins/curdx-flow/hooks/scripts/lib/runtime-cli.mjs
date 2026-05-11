@@ -7,7 +7,7 @@ const __dirname = __ccd(__filename);
 
 // src/hooks/lib/runtime-cli.ts
 import { spawnSync } from "node:child_process";
-import { existsSync as existsSync6, statSync as statSync5 } from "node:fs";
+import { existsSync as existsSync6, readFileSync as readFileSync6, statSync as statSync5 } from "node:fs";
 import { basename as basename7, dirname, isAbsolute as isAbsolute4, join as join4, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath6 } from "node:url";
 
@@ -2138,6 +2138,9 @@ function usage(exitCode = 1) {
 function scriptRoot() {
   return dirname(fileURLToPath6(import.meta.url));
 }
+function pluginRoot() {
+  return process.env.CLAUDE_PLUGIN_ROOT || resolve2(scriptRoot(), "..", "..", "..");
+}
 function runBundled(scriptName, args, cwd) {
   const script = join4(scriptRoot(), `${scriptName}.mjs`);
   const result = spawnSync(process.execPath, [script, ...args], {
@@ -2197,6 +2200,163 @@ function isDirectory(path3) {
   } catch {
     return false;
   }
+}
+function readJsonFile2(path3) {
+  try {
+    return JSON.parse(readFileSync6(path3, "utf8"));
+  } catch {
+    return null;
+  }
+}
+function detectPackageManager2(cwd) {
+  if (existsSync6(join4(cwd, "pnpm-lock.yaml"))) return "pnpm";
+  if (existsSync6(join4(cwd, "bun.lockb")) || existsSync6(join4(cwd, "bun.lock"))) return "bun";
+  if (existsSync6(join4(cwd, "yarn.lock"))) return "yarn";
+  if (existsSync6(join4(cwd, "package-lock.json"))) return "npm";
+  if (existsSync6(join4(cwd, "package.json"))) return "npm";
+  return null;
+}
+function scriptCommand(packageManager, scriptName) {
+  switch (packageManager) {
+    case "pnpm":
+      return `pnpm run ${scriptName}`;
+    case "yarn":
+      return `yarn ${scriptName}`;
+    case "bun":
+      return `bun run ${scriptName}`;
+    default:
+      return `npm run ${scriptName}`;
+  }
+}
+function detectProjectScripts(cwd) {
+  const pkg = readJsonFile2(join4(cwd, "package.json"));
+  const packageManager = detectPackageManager2(cwd);
+  const scripts = pkg?.scripts ?? {};
+  const allDependencies = { ...pkg?.dependencies ?? {}, ...pkg?.devDependencies ?? {} };
+  const dependencyNames = Object.keys(allDependencies).filter(
+    (name) => /playwright|puppeteer|cypress|selenium|webdriver/i.test(name)
+  );
+  const entries = Object.entries(scripts);
+  const e2e = entries.filter(
+    ([name, command]) => /(^|:|-)(e2e|browser|ui|acceptance)(:|-|$)|playwright|cypress|puppeteer|selenium/i.test(
+      `${name} ${command}`
+    )
+  ).map(([name]) => name);
+  const devServer = entries.filter(([name]) => /^(dev|start|serve|preview)$|(^|:|-)(dev|serve|preview)(:|-|$)/i.test(name)).map(([name]) => name);
+  const playwrightScripts = entries.filter(([name, command]) => /playwright/i.test(`${name} ${command}`)).map(([name]) => name);
+  return {
+    packageJson: pkg !== null,
+    packageManager,
+    e2e,
+    devServer,
+    playwrightScripts,
+    dependencies: dependencyNames
+  };
+}
+function detectConfigFiles(cwd, filenames) {
+  return filenames.filter((name) => existsSync6(join4(cwd, name)));
+}
+function detectChrome() {
+  const envPath = process.env.CHROME_PATH;
+  if (envPath && existsSync6(envPath)) {
+    return { installed: true, path: envPath, source: "CHROME_PATH" };
+  }
+  if (process.platform === "darwin") {
+    const path3 = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+    return existsSync6(path3) ? { installed: true, path: path3, source: "macos-default" } : { installed: false, path: null, source: null };
+  }
+  if (process.platform === "win32") {
+    const suffixes = [
+      join4("Google", "Chrome SxS", "Application", "chrome.exe"),
+      join4("Google", "Chrome", "Application", "chrome.exe")
+    ];
+    const prefixes = [
+      process.env.LOCALAPPDATA,
+      process.env.PROGRAMFILES,
+      process.env["PROGRAMFILES(X86)"]
+    ].filter((value) => Boolean(value));
+    for (const prefix of prefixes) {
+      for (const suffix of suffixes) {
+        const candidate = join4(prefix, suffix);
+        if (existsSync6(candidate)) {
+          return { installed: true, path: candidate, source: "windows-default" };
+        }
+      }
+    }
+    return { installed: false, path: null, source: null };
+  }
+  for (const bin of ["google-chrome", "chromium", "chromium-browser"]) {
+    const found = spawnSync("which", [bin], { encoding: "utf8" });
+    if (found.status === 0) {
+      return { installed: true, path: found.stdout.trim() || bin, source: "PATH" };
+    }
+  }
+  return { installed: false, path: null, source: null };
+}
+function detectChromeDevtoolsDependency() {
+  const manifest = readJsonFile2(join4(pluginRoot(), ".claude-plugin", "plugin.json"));
+  const dependency = manifest?.dependencies?.find((item) => item.name === "chrome-devtools-mcp");
+  return {
+    declared: dependency !== void 0,
+    marketplace: dependency?.marketplace ?? null
+  };
+}
+function browserVerificationDoctor(cwd) {
+  const scripts = detectProjectScripts(cwd);
+  const playwrightConfigFiles = detectConfigFiles(cwd, [
+    "playwright.config.ts",
+    "playwright.config.js",
+    "playwright.config.mjs",
+    "playwright.config.cjs",
+    "playwright.config.mts",
+    "playwright.config.cts"
+  ]);
+  const e2eConfigFiles = detectConfigFiles(cwd, [
+    ...playwrightConfigFiles,
+    "cypress.config.ts",
+    "cypress.config.js",
+    "cypress.json",
+    ".cypressrc",
+    "wdio.conf.ts",
+    "wdio.conf.js"
+  ]);
+  const hasPlaywrightDependency = scripts.dependencies.some((name) => /(^@playwright\/test$|^playwright$|playwright-core)/i.test(name));
+  const playwrightScriptCandidates = [.../* @__PURE__ */ new Set([...scripts.playwrightScripts, ...scripts.e2e])];
+  const recommendedPlaywrightCommand = playwrightScriptCandidates[0] !== void 0 ? scriptCommand(scripts.packageManager, playwrightScriptCandidates[0]) : hasPlaywrightDependency || playwrightConfigFiles.length > 0 ? "npx playwright test" : null;
+  const chrome = detectChrome();
+  const chromeDevtools = detectChromeDevtoolsDependency();
+  return {
+    policy: "Playwright CLI by default; Chrome DevTools MCP for GIS/WebGL/canvas/map/GPU, console/network/performance, or flaky Playwright.",
+    project: {
+      packageJson: scripts.packageJson,
+      packageManager: scripts.packageManager,
+      devServerScripts: scripts.devServer,
+      e2eScripts: scripts.e2e,
+      browserAutomationDependencies: scripts.dependencies,
+      e2eConfigFiles
+    },
+    playwright: {
+      ready: recommendedPlaywrightCommand !== null || scripts.e2e.length > 0 || playwrightConfigFiles.length > 0,
+      dependency: hasPlaywrightDependency,
+      configFiles: playwrightConfigFiles,
+      scripts: playwrightScriptCandidates,
+      recommendedCommand: recommendedPlaywrightCommand
+    },
+    chromeDevtoolsMcp: {
+      ready: chromeDevtools.declared && chrome.installed,
+      dependencyDeclared: chromeDevtools.declared,
+      marketplace: chromeDevtools.marketplace,
+      chromeInstalled: chrome.installed,
+      chromePath: chrome.path,
+      chromeSource: chrome.source
+    },
+    highFidelityUseCases: [
+      "GIS/map tiles",
+      "WebGL/canvas/GPU rendering",
+      "console/network/performance diagnosis",
+      "Playwright flaky or insufficient evidence"
+    ]
+  };
 }
 function resolveSpecPathForOutput(cwd, path3) {
   const fsPath = isAbsolute4(path3) ? path3 : join4(cwd, path3);
@@ -2298,6 +2458,7 @@ function doctor(argv) {
     ok: expected.every((p) => existsSync6(p)),
     cwd,
     scripts: Object.fromEntries(expected.map((p) => [basename7(p), existsSync6(p)])),
+    browserVerification: browserVerificationDoctor(cwd),
     active: snap.active,
     spec: snap.spec,
     gates: snap.gates,

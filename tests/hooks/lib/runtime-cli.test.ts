@@ -93,4 +93,69 @@ describe("runtime-cli lib", () => {
       rmSync(cwd, { recursive: true, force: true });
     }
   });
+
+  it("reports browser verification readiness in doctor output", () => {
+    const cwd = makeTmpDir("runtime-doctor-browser");
+    try {
+      const fakeChrome = path.join(cwd, "fake-chrome");
+      writeFileSync(
+        path.join(cwd, "package.json"),
+        JSON.stringify(
+          {
+            scripts: {
+              dev: "vite --host 0.0.0.0 --port 5173",
+              "test:e2e": "playwright test",
+              test: "vitest",
+            },
+            devDependencies: {
+              "@playwright/test": "^1.0.0",
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      writeFileSync(path.join(cwd, "playwright.config.ts"), "export default {};\n");
+      writeFileSync(fakeChrome, "");
+
+      const result = runLib("runtime-cli", ["doctor", "--cwd", cwd], {
+        env: { CHROME_PATH: fakeChrome },
+      });
+      expect(result.exitCode).toBe(0);
+      const json = result.json as {
+        browserVerification?: {
+          project?: {
+            devServerScripts?: string[];
+            e2eScripts?: string[];
+            e2eConfigFiles?: string[];
+          };
+          playwright?: {
+            ready?: boolean;
+            dependency?: boolean;
+            recommendedCommand?: string | null;
+          };
+          chromeDevtoolsMcp?: {
+            ready?: boolean;
+            dependencyDeclared?: boolean;
+            chromeInstalled?: boolean;
+          };
+        };
+      };
+      expect(json.browserVerification?.project?.devServerScripts).toContain("dev");
+      expect(json.browserVerification?.project?.e2eScripts).toContain("test:e2e");
+      expect(json.browserVerification?.project?.e2eConfigFiles).toContain("playwright.config.ts");
+      expect(json.browserVerification?.playwright).toMatchObject({
+        ready: true,
+        dependency: true,
+        recommendedCommand: "npm run test:e2e",
+      });
+      expect(json.browserVerification?.chromeDevtoolsMcp).toMatchObject({
+        ready: true,
+        dependencyDeclared: true,
+        chromeInstalled: true,
+      });
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
 });

@@ -66,7 +66,7 @@ Apply adaptive dialogue from `${CLAUDE_PLUGIN_ROOT}/skills/interview-framework/S
 - **Execution priority** -- ship fast with shortcuts, balanced pace, or quality-first from the start?
 - **Dependency ordering** -- are there tasks that must complete before others can begin?
 - **Team workflow constraints** -- PR review process, CI pipeline requirements, branch strategy?
-- **E2E verification** -- ask only when `autoPolicy.verificationLevel` is `strict` or the design has explicit UI/deployment risk.
+- **Browser verification** -- ask only when `autoPolicy.verificationLevel` is `strict` or the design has explicit UI/deployment risk; prefer Playwright CLI, but select Chrome DevTools MCP for GIS/WebGL/canvas/map/GPU or console/network/performance debugging.
 - **Task granularity** -- do not ask by default. AutoPolicy selects the task target range. Ask only if the user explicitly requests manual sizing.
 
 ### Tasks Approach Proposals
@@ -82,7 +82,7 @@ Append to `.progress.md` under "Interview Responses":
 ```markdown
 ### Tasks Interview (from tasks.md)
 - [Topic 1]: [response]
-- E2E verification: YES/NO -- [strategy or "auto"]
+- Browser verification: playwright/chrome-devtools-mcp/none/blocked -- [strategy or "auto"]
 - Chosen approach: [name] -- [brief description]
 ```
 
@@ -103,8 +103,8 @@ Direct path:
 
 1. Optionally create a visible native task with `TaskCreate(subject: "Generate implementation tasks for $spec", activeForm: "Generating tasks")`. If unavailable or failing, continue without it.
 2. Dispatch `Task(subagent_type: task-planner)` with requirements, design, interview context, and the Delegation Context below. Instruct it to:
-   - Read `references/workflow-contract.md`, `references/source-coverage-audit.md`, and `references/agent-output-contract.md`
-   - Start `tasks.md` with `## Source Coverage Audit`
+   - Read `references/workflow-contract.md`, `references/source-coverage-audit.md`, `references/browser-verification-policy.md`, and `references/agent-output-contract.md`
+   - Start `tasks.md` with `## Source Coverage Audit`, then `## Browser Verify`
    - Cover every source item; if coverage cannot be complete, stop with `TASKS_BLOCKED`
    - Break implementation into value-slice tasks, using POC-first or TDD phases only as structure
    - Create tasks with Do/Files/Done when/Verify/Commit fields
@@ -112,7 +112,7 @@ Direct path:
    - Insert quality checkpoints according to `autoPolicy.reviewCadence` and `autoPolicy.verificationLevel`
    - Each task = one commit, tasks must be executable without human interaction
    - Count total tasks, output to `./specs/$spec/tasks.md`
-   - If quick mode and policy verification is strict: auto-enable VE tasks. Otherwise keep VE tasks risk-triggered.
+   - If quick mode and policy verification is strict: auto-enable VE tasks. Otherwise keep VE tasks risk-triggered. For UI/full-stack work, Browser Verify must select Playwright CLI or Chrome DevTools MCP.
 3. Wait for the Task result. Require `TASKS_READY` before proceeding; if `TASKS_BLOCKED`, surface the blocking source items and stop.
 4. Read `$SPEC_PATH/tasks.md`.
 
@@ -135,7 +135,7 @@ Optional Agent Teams path:
 > - **Value Slice Rule**: test/reproduce + implementation + verification + commit stay inside one top-level task
 >
 > For VE Tasks — VE1 (startup), VE2 (check), VE3 (cleanup) — generation:
-> - **E2E Verification**: enabled or disabled (from interview response, or auto-enabled in quick mode)
+> - **Browser Verification**: Playwright CLI by default, Chrome DevTools MCP for GIS/WebGL/canvas/map/GPU/rendering or console/network/performance diagnosis, none only for non-browser work
 > - **Verification Tooling**: the Verification Tooling section from research.md (dev server commands, browser deps, ports, health endpoints)
 > - **Strategy**: the user's chosen verification strategy, or "auto" in quick mode
 </mandatory>

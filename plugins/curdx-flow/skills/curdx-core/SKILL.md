@@ -27,6 +27,9 @@ curdx-flow doctor
 The CLI is a thin wrapper around bundled TypeScript helpers under
 `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/`. It is the default source of truth
 for route facts, active spec facts, task counts, and state merge operations.
+`curdx-flow doctor` also reports browser verification readiness: detected E2E
+scripts, Playwright dependencies/config files, chrome-devtools-mcp dependency
+declaration, and local Chrome availability.
 
 ## Common Arguments
 

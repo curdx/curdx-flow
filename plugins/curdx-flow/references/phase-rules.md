@@ -275,9 +275,9 @@ When `.progress.md` contains `## Reality Check (BEFORE)` OR Intent Classificatio
 
 ## VE Tasks (E2E Verification)
 
-> See also: `${CLAUDE_PLUGIN_ROOT}/references/quality-checkpoints.md` for VE format details and verify-fix-reverify loop. See `${CLAUDE_PLUGIN_ROOT}/agents/task-planner.md` "VE Task Generation" for VE templates and generation rules.
+> See also: `${CLAUDE_PLUGIN_ROOT}/references/quality-checkpoints.md` for VE format details and verify-fix-reverify loop, `${CLAUDE_PLUGIN_ROOT}/references/browser-verification-policy.md` for Playwright vs Chrome DevTools MCP selection, and `${CLAUDE_PLUGIN_ROOT}/agents/task-planner.md` "VE Task Generation" for VE templates and generation rules.
 
-VE tasks provide autonomous end-to-end verification by spinning up real infrastructure and testing built features against it.
+VE tasks provide autonomous end-to-end verification by spinning up real infrastructure and testing built features against it. Use Playwright CLI by default for repeatable UI/full-stack checks. Use Chrome DevTools MCP for GIS, WebGL, canvas, map tiles, GPU/runtime rendering, console/network/performance diagnosis, or flaky Playwright symptoms.
 
 ### Placement
 
@@ -292,7 +292,7 @@ V4 (Full local CI) -> V5 (CI pipeline) -> V6 (AC checklist) -> VE1 -> VE2 -> VE3
 VE tasks follow a 3-part structure:
 
 1. **VE1 (Startup)** — Start dev server/infrastructure in background, record PID, wait for ready
-2. **VE2 (Check)** — Test critical user flows via curl/browser/CLI, verify expected output
+2. **VE2 (Check)** — Test critical user flows via Playwright CLI, Chrome DevTools MCP, curl, or project CLI according to Browser Verify
 3. **VE3 (Cleanup)** — Kill by PID, kill by port fallback, remove PID file, verify port free
 
 ### Rules
@@ -301,6 +301,7 @@ VE tasks follow a 3-part structure:
 - **[VERIFY] tagged**: All VE tasks use `[VERIFY]` and are delegated to qa-engineer.
 - **Cleanup guaranteed**: VE3 (cleanup) MUST run even if VE1 or VE2 fail. Coordinator skips to VE3 on max retries.
 - **Commands from research.md**: All commands (dev server, port, health endpoint) come from research.md Verification Tooling section. Never hardcoded.
+- **Browser track from policy**: UI/full-stack VE tasks must declare Browser Verify as `playwright` or `chrome-devtools-mcp`; backend/API-only VE may use curl/WebFetch.
 - **Recovery mode always enabled**: VE failures trigger fix task generation via existing recovery mode, regardless of state file recoveryMode flag.
 - **Max 3 retries per VE task**: After 3 failed attempts, skip to VE-cleanup and report error.
 

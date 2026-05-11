@@ -32,10 +32,10 @@ Classify user goals to determine if diagnosis is needed. See `references/goal-de
 | type, typescript | `pnpm check-types` or `tsc --noEmit` |
 | lint | `pnpm lint` |
 | build | `pnpm build` |
-| E2E, UI | Playwright MCP browser tools |
+| E2E, UI | project Playwright CLI / `@playwright/test`; Chrome DevTools MCP for high-fidelity runtime issues |
 | API, endpoint | WebFetch tool |
 
-For E2E/deployment verification, use MCP tools (Playwright MCP browser tools for UI, WebFetch tool for APIs).
+For E2E/deployment verification, use the policy in `${CLAUDE_PLUGIN_ROOT}/references/browser-verification-policy.md`: Playwright CLI by default; Chrome DevTools MCP for GIS/WebGL/canvas/map/GPU rendering, console/network/performance diagnosis, or flaky Playwright behavior. Use WebFetch/curl for API-only verification.
 
 ## BEFORE/AFTER Documentation
 
@@ -102,6 +102,19 @@ When verifying test-related fixes, check for mock-only test anti-patterns. See `
 - All assertions are mock interaction checks (toHaveBeenCalled)
 - No integration tests
 - Missing mock cleanup (afterEach)
+
+## Browser Verification
+
+Before claiming frontend, full-stack, browser, or deployment behavior is complete:
+
+1. Read the spec's `## Browser Verify` section or choose a track from `references/browser-verification-policy.md`.
+2. Run the selected track fresh in this session:
+   - `playwright`: dev server + project E2E command or `npx playwright test`.
+   - `chrome-devtools-mcp`: real Chrome observation for console, network, DOM/screenshot/snapshot, performance, or rendering evidence.
+3. Record the command/tool, URL, checked flow, result, and artifact/observation.
+4. Treat missing browser evidence as not verified.
+
+Never use `/ultrareview` as a substitute for browser verification.
 
 ## Why This Matters
 

@@ -4,6 +4,13 @@
 
 Total tasks: {{N}}
 
+## Browser Verify
+
+- **Decision**: playwright | chrome-devtools-mcp | none | blocked
+- **Reason**: {{why this feature does or does not need browser verification}}
+- **Command/Tool**: {{E2E command, Chrome DevTools MCP actions, or none}}
+- **Dev Server**: {{command + URL, or none}}
+
 <!-- Select workflow based on Intent Classification in .progress.md -->
 <!-- GREENFIELD → POC-first workflow | TRIVIAL/REFACTOR/MID_SIZED → TDD workflow -->
 
@@ -200,9 +207,9 @@ Focus: Validate the idea works end-to-end. Skip tests, accept hardcoded values.
   - **Commit**: `feat(scope): {{description}}`
 
 - [ ] 1.5 POC Checkpoint
-  - **Do**: Verify feature works end-to-end using automated tools (WebFetch, curl, browser automation, test runner)
+  - **Do**: Verify feature works end-to-end using automated tools (WebFetch, curl, Playwright CLI, Chrome DevTools MCP, or test runner)
   - **Done when**: Feature can be demonstrated working via automated verification
-  - **Verify**: Run automated end-to-end verification (e.g., `curl API`, browser automation script, or test command)
+  - **Verify**: Run automated end-to-end verification (e.g., `curl API`, Playwright CLI, Chrome DevTools MCP observation, or test command)
   - **Commit**: `feat(scope): complete POC`
 
 ## Phase 2: Refactoring
@@ -345,8 +352,8 @@ After POC validated, clean up code.
 
 - [ ] VE2 [VERIFY] E2E check: run critical flow verification
   - **Do**:
-    1. Run critical flow check: `{{critical_flow_cmd}}`
-    2. Verify output matches expected behavior
+    1. Run critical flow check with Browser Verify track: `{{critical_flow_cmd}}`
+    2. Verify output, browser state, console/network health, or rendering behavior matches expected behavior
   - **Verify**: `{{critical_flow_cmd}} && echo PASS`
   - **Done when**: Critical user flow completes successfully against running server
   - **Commit**: None
@@ -557,8 +564,8 @@ Focus: Integration and E2E tests beyond the unit tests written in Phase 1.
 
 - [ ] VE2 [VERIFY] E2E check: run critical flow verification
   - **Do**:
-    1. Run critical flow check: `{{critical_flow_cmd}}`
-    2. Verify output matches expected behavior
+    1. Run critical flow check with Browser Verify track: `{{critical_flow_cmd}}`
+    2. Verify output, browser state, console/network health, or rendering behavior matches expected behavior
   - **Verify**: `{{critical_flow_cmd}} && echo PASS`
   - **Done when**: Critical user flow completes successfully against running server
   - **Commit**: None

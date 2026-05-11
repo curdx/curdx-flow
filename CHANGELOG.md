@@ -2,6 +2,24 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.22 — 2026-05-11
+
+### Added
+
+- **Browser verification policy for full-stack delivery.** Added a plugin reference that standardizes Playwright CLI as the default repeatable E2E path and Chrome DevTools MCP as the high-fidelity path for GIS, WebGL, canvas, map, GPU, console, network, performance, and flaky Playwright cases.
+- **Browser readiness in `curdx-flow doctor`.** Doctor output now reports detected dev-server scripts, E2E scripts, browser automation dependencies, Playwright config files, chrome-devtools-mcp dependency declaration, and local Chrome availability.
+
+### Changed
+
+- **Task planning now requires an explicit Browser Verify decision.** `task-planner`, `/curdx-flow:tasks`, VE references, and task templates now require `playwright`, `chrome-devtools-mcp`, `none`, or `blocked` before implementation tasks.
+- **Executor and QA prompts enforce browser evidence.** `spec-executor`, `qa-engineer`, and `verification-before-completion` now reject browser-facing completion claims without fresh Playwright or Chrome DevTools MCP evidence, and explicitly avoid `/ultrareview` as a verification path.
+- **Research output feeds browser verification.** `research-analyst` now records Browser Verify strategy alongside dev server, E2E config, browser dependency, port, and health endpoint discovery.
+
+### Tests
+
+- Added runtime CLI coverage for browser readiness in `doctor` output and manifest-integrity coverage that keeps the browser verification policy linked into planning, execution, QA, and skill surfaces.
+- Verified with `npm run verify`.
+
 ## 7.1.21 — 2026-05-11
 
 ### Added
