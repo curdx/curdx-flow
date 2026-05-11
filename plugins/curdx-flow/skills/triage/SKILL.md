@@ -56,6 +56,17 @@ Extract from $ARGUMENTS:
 - **epic-name**: First argument (kebab-case). If not provided, ask user.
 - **goal**: Remaining arguments. If not provided, ask user: "Describe the large feature you want to build."
 
+Before creating the epic, run:
+
+```bash
+curdx-flow route --name "$EPIC_NAME" --goal "$GOAL" --flags "$ARGUMENTS"
+curdx-flow snapshot --goal "$GOAL"
+```
+
+Use the route's topology and recommended capabilities as triage input. Read
+`references/workflow-contract.md`, `references/agent-output-contract.md`, and
+`references/context-and-dispatch-policy.md`.
+
 Create epic directory:
 ```bash
 mkdir -p "./specs/_epics/$EPIC_NAME"

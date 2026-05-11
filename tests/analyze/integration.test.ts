@@ -274,6 +274,70 @@ describe('analyze integration', () => {
       }
     `);
   });
+
+  it('--out writes the markdown report to disk instead of stdout', async () => {
+    const outPath = path.join(FAKE_HOME, 'reports', 'curdx-flow-analyze.md');
+
+    const stdout = await captureStdout(() => runAnalyze({ out: outPath }));
+
+    expect(stdout).toBe('');
+    expect(existsSync(outPath)).toBe(true);
+    const body = readFileSync(outPath, 'utf8');
+    expect(body).toContain('## Hook Failures');
+    expect(body).toContain('## Slash Commands');
+  });
+
+  it('scopes global errors.jsonl rows to the analyzed cwd or transcript', async () => {
+    const cwdSandbox = path.join(tmpdir(), 'curdx-flow-integration-cwd-errors');
+    if (existsSync(cwdSandbox)) rmSync(cwdSandbox, { recursive: true, force: true });
+    mkdirSync(cwdSandbox, { recursive: true });
+    const fixturePath = path.join(cwdSandbox, 'session.jsonl');
+    writeFileSync(
+      fixturePath,
+      JSON.stringify({
+        type: 'user',
+        timestamp: '2026-05-04T10:00:00.000Z',
+        uuid: 'scope-user-0001',
+        sessionId: 'scope-sess-001',
+        message: { role: 'user', content: [{ type: 'text', text: 'hello' }] },
+      }) + '\n',
+      'utf8',
+    );
+
+    const errorsPath = path.join(STATE_DIR, 'errors.jsonl');
+    writeFileSync(
+      errorsPath,
+      [
+        { ts: '2026-05-04T10:00:01.000Z', hook: 'in-scope-cwd', msg: 'cwd scoped', cwd: cwdSandbox },
+        { ts: '2026-05-04T10:00:02.000Z', hook: 'in-scope-transcript', msg: 'transcript scoped', transcript_path: fixturePath },
+        { ts: '2026-05-04T10:00:03.000Z', hook: 'other-cwd', msg: 'other project', cwd: path.join(tmpdir(), 'other-project') },
+        { ts: '2026-05-04T10:00:04.000Z', hook: 'unscoped', msg: 'legacy unscoped' },
+      ].map((row) => JSON.stringify(row)).join('\n') + '\n',
+      'utf8',
+    );
+
+    const previousFixtureEnv = process.env.CURDX_TRANSCRIPT_FIXTURE;
+    process.env.CURDX_TRANSCRIPT_FIXTURE = fixturePath;
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(cwdSandbox);
+    try {
+      const out = await captureStdout(() => runAnalyze({ json: true }));
+      const parsed = JSON.parse(out) as { hookFailures: Array<{ hook: string }> };
+      const hooks = new Set(parsed.hookFailures.map((row) => row.hook));
+
+      expect(hooks.has('in-scope-cwd')).toBe(true);
+      expect(hooks.has('in-scope-transcript')).toBe(true);
+      expect(hooks.has('other-cwd')).toBe(false);
+      expect(hooks.has('unscoped')).toBe(false);
+    } finally {
+      cwdSpy.mockRestore();
+      if (previousFixtureEnv === undefined) {
+        delete process.env.CURDX_TRANSCRIPT_FIXTURE;
+      } else {
+        process.env.CURDX_TRANSCRIPT_FIXTURE = previousFixtureEnv;
+      }
+      if (existsSync(cwdSandbox)) rmSync(cwdSandbox, { recursive: true, force: true });
+    }
+  });
 });
 
 // OB-3 cost pipeline (Task 3.10) — assert the cost branch wires through

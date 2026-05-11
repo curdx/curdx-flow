@@ -370,8 +370,11 @@ function resolveCurrent(opts) {
   const cwd = resolveCwd(opts);
   if (!isDir(cwd)) return null;
   const defaultDir = getDefaultDir(opts);
-  const markerFs = join(cwd, defaultDir, ".current-spec");
-  if (!existsSync(markerFs)) return null;
+  const markerFs = [
+    join(cwd, defaultDir, ".current-spec"),
+    join(cwd, ".current-spec")
+  ].find((candidate) => existsSync(candidate));
+  if (!markerFs) return null;
   let content;
   try {
     content = readFileSync2(markerFs, "utf8");
@@ -384,7 +387,7 @@ function resolveCurrent(opts) {
     return null;
   }
   const normalized = normalizePath(content);
-  if (normalized.startsWith("./") || isAbsolute(normalized)) {
+  if (normalized.startsWith("./") || normalized.startsWith("../") || normalized.includes("/") || isAbsolute(normalized)) {
     return normalized;
   }
   return posix.join(defaultDir, normalized);

@@ -248,7 +248,9 @@ export function findSpec(name: string, opts?: ResolverOptions): FindSpecResult {
 
 /**
  * Read `<defaultDir>/.current-spec` and resolve it to a full (serialized)
- * spec path. Returns `null` when the marker file is missing or empty —
+ * spec path. A project-root `.current-spec` is accepted as a defensive
+ * fallback because older/ambiguous quick-mode instructions occasionally wrote
+ * the marker there. Returns `null` when the marker file is missing or empty —
  * v6 used exit code 1 for that case; TS callers branch on `=== null`.
  */
 export function resolveCurrent(opts?: ResolverOptions): string | null {
@@ -256,8 +258,11 @@ export function resolveCurrent(opts?: ResolverOptions): string | null {
   if (!isDir(cwd)) return null;
 
   const defaultDir = getDefaultDir(opts);
-  const markerFs = join(cwd, defaultDir, ".current-spec");
-  if (!existsSync(markerFs)) return null;
+  const markerFs = [
+    join(cwd, defaultDir, ".current-spec"),
+    join(cwd, ".current-spec"),
+  ].find((candidate) => existsSync(candidate));
+  if (!markerFs) return null;
 
   let content: string;
   try {
@@ -273,7 +278,7 @@ export function resolveCurrent(opts?: ResolverOptions): string | null {
   }
 
   const normalized = normalizePath(content);
-  if (normalized.startsWith("./") || isAbsolute(normalized)) {
+  if (normalized.startsWith("./") || normalized.startsWith("../") || normalized.includes("/") || isAbsolute(normalized)) {
     return normalized;
   }
   // Bare name → prepend default dir using POSIX separators (serialized form).

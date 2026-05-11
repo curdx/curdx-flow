@@ -34,9 +34,13 @@ afterEach(() => {
   rmSync(fakeHome, { recursive: true, force: true });
 });
 
+function encodeProjectDir(cwd: string): string {
+  return cwd.replace(/[^A-Za-z0-9]/g, '-');
+}
+
 /** Build the encoded project dir under fakeHome and seed it with N .jsonl files. */
 function seedProject(cwd: string, sessionUuids: string[]): string {
-  const encoded = cwd.replace(/\//g, '-');
+  const encoded = encodeProjectDir(cwd);
   const projectDir = path.join(fakeHome, '.claude', 'projects', encoded);
   mkdirSync(projectDir, { recursive: true });
   for (const uuid of sessionUuids) {
@@ -70,6 +74,19 @@ describe('resolveTranscriptSource', () => {
     expect(src.paths).toHaveLength(3);
     const names = src.paths.map((p) => path.basename(p)).sort();
     expect(names).toEqual(['aaa-1.jsonl', 'bbb-2.jsonl', 'ccc-3.jsonl']);
+  });
+
+  it('matches Claude Code project dirs that hyphenate underscores and dots', () => {
+    const cwd = '/private/var/folders/lz/qrm51q_d7fd1f26/T/curdx.flow-e2e';
+    seedProject(cwd, ['session-a']);
+
+    const src = resolveTranscriptSource({ cwd, homedir: fakeHome });
+
+    expect(src.kind).toBe('real');
+    if (src.kind !== 'real') throw new Error('unreachable');
+    expect(src.encodedDir).toContain('qrm51q-d7fd1f26');
+    expect(src.encodedDir).toContain('curdx-flow-e2e');
+    expect(src.paths).toHaveLength(1);
   });
 
   it('throws TranscriptNotFoundError with path + hint when project dir is missing', () => {

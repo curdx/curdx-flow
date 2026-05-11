@@ -63,10 +63,10 @@ Validation Sequence:
 1. Validate input (non-empty goal/plan)
 2. Infer name from goal (if not provided)
 3. Determine spec directory using path resolver:
-   specsDir = (--specs-dir value if valid) OR curdx_get_default_dir()
+   specsDir = (--specs-dir value if valid) OR runtime defaultDir from `curdx-flow specs dirs`
    basePath = "$specsDir/$name"
 4. Create spec directory: mkdir -p "$basePath"
-4a. Ensure gitignore entries exist (.current-spec, .progress.md)
+4a. Ensure gitignore entries exist (`$specsDir/.current-spec`, `$specsDir/.current-epic`, `**/.progress.md`)
 5. Write .curdx-state.json:
    { source: "plan", name, basePath, phase: "research",
      taskIndex: 0, totalTasks: 0, taskIteration: 1,
@@ -74,7 +74,7 @@ Validation Sequence:
      maxGlobalIterations: 30, commitSpec: $commitSpec,
      quickMode: true, discoveredSkills: [] }
 6. Write .progress.md with original goal
-7. Update .current-spec (bare name or full path)
+7. Update `$specsDir/.current-spec` (bare name for default-root specs, full relative path for non-default roots; never write project-root `.current-spec`)
 8. Update Spec Index: node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet
 9. Skill Discovery Pass 1: scan skills, match against goal text, invoke matches
 10. Goal Type Detection (BUG_FIX BEFORE state capture):
@@ -226,7 +226,7 @@ On generation failure after spec directory created:
 Rollback Procedure:
 1. CAPTURE FAILURE - Phase agent returns error or times out
 2. DELETE SPEC DIRECTORY - rm -rf "$basePath"
-3. RESTORE .current-spec - If previous spec was set, restore it
+3. RESTORE `$specsDir/.current-spec` - If previous spec was set, restore it
 4. DISPLAY ERROR - "Generation failed: $errorReason. No spec created."
 ```
 

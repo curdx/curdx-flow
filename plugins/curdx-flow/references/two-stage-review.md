@@ -117,7 +117,7 @@ spec-reviewer (research / requirements / execution per D4) writes only the `spec
 and leaves `codeQuality` undefined. Schema validation in `plugins/curdx-flow/schemas/spec.schema.json`
 treats both sub-keys as optional with `additionalProperties: false` to prevent silent drift.
 
-**Write path** (FR-T3): Verdict objects are merged into state via `merge-state.mjs` — never
+**Write path** (FR-T3): Verdict objects are merged into state via `curdx-flow state merge` — never
 hand-written into `.curdx-state.json`. The coordinator command file (`skills/design/SKILL.md`,
 `skills/tasks/SKILL.md`) constructs the `reviews` patch and pipes it through merge-state for atomicity.
 

@@ -33,6 +33,19 @@ describe("smart-route classifier", () => {
     expect(route.taskCountLimit).toBe(3);
   });
 
+  it("keeps a tiny npm-test implementation on the lite-spec path", () => {
+    const route = classifySmartRoute({
+      goal: "Implement src/greet.js so npm test passes",
+      flags: "--mode fast --review minimal --tasks-size coarse",
+      changedFiles: ["src/greet.js", "test/greet.test.js"],
+    });
+
+    expect(route.route).toBe("lite-spec");
+    expect(route.policy.risk).toBe("medium");
+    expect(route.shouldUseSubagent).toBe(false);
+    expect(route.taskCountLimit).toBe(3);
+  });
+
   it("routes cross-module product behavior to full-spec", () => {
     const route = classifySmartRoute({
       goal: "Add authenticated billing dashboard with API and UI behavior",

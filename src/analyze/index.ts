@@ -5,7 +5,7 @@
 // ~/.claude/curdx-flow/errors.jsonl (R-9 fuzzy join with jsonl hook failures).
 // Task 2.3 will layer redact.ts in front of the renderer.
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -51,6 +51,16 @@ function readState(): StateFile {
 function writeState(state: StateFile): void {
   if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
   writeFileSync(STATE_PATH, JSON.stringify(state, null, 2), 'utf8');
+}
+
+function emitReport(bytes: string, out?: string): void {
+  if (!out) {
+    process.stdout.write(bytes);
+    return;
+  }
+  const target = path.resolve(out);
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, bytes, 'utf8');
 }
 
 /**
@@ -159,7 +169,30 @@ function loadSpecStates(): SpecStateInfo[] {
  * is structurally compatible with `renderReport`'s `ErrorLogEntry[]` param so
  * existing consumers remain untouched.
  */
-function loadErrorEntries(): EventLogRow[] {
+function normalizePathForScope(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return path.resolve(p);
+  }
+}
+
+function isErrorEntryInScope(entry: EventLogRow, source: ReturnType<typeof resolveTranscriptSource>): boolean {
+  const transcriptPaths = new Set(source.paths.map((p) => normalizePathForScope(p)));
+  if (entry.transcript_path) {
+    if (transcriptPaths.has(normalizePathForScope(entry.transcript_path))) return true;
+  }
+
+  if (entry.cwd) {
+    const sourceCwds = new Set<string>([normalizePathForScope(source.cwd)]);
+    if (source.kind === 'real') sourceCwds.add(normalizePathForScope(source.realCwd));
+    if (sourceCwds.has(normalizePathForScope(entry.cwd))) return true;
+  }
+
+  return false;
+}
+
+function loadErrorEntries(source: ReturnType<typeof resolveTranscriptSource>): EventLogRow[] {
   if (!existsSync(ERRORS_LOG_PATH)) return [];
   let raw: string;
   try {
@@ -186,7 +219,7 @@ function loadErrorEntries(): EventLogRow[] {
           : undefined;
       const correlationId =
         typeof parsed.correlationId === 'string' ? parsed.correlationId : undefined;
-      out.push({
+      const entry: EventLogRow = {
         ts: typeof parsed.ts === 'string' ? parsed.ts : '',
         ...(typeof parsed.hook === 'string' ? { hook: parsed.hook } : {}),
         ...(typeof parsed.event === 'string' ? { event: parsed.event } : {}),
@@ -197,7 +230,8 @@ function loadErrorEntries(): EventLogRow[] {
         kind,
         ...(payload !== undefined ? { payload } : {}),
         ...(correlationId !== undefined ? { correlationId } : {}),
-      });
+      };
+      if (isErrorEntryInScope(entry, source)) out.push(entry);
     } catch {
       continue;
     }
@@ -261,12 +295,12 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
     (state.lastReportJson || state.lastReportMarkdown)
   ) {
     if (opts.json && state.lastReportJson) {
-      process.stdout.write(state.lastReportJson);
+      emitReport(state.lastReportJson, opts.out);
       writeState(state);
       return;
     }
     if (!opts.json && state.lastReportMarkdown) {
-      process.stdout.write(state.lastReportMarkdown);
+      emitReport(state.lastReportMarkdown, opts.out);
       writeState(state);
       return;
     }
@@ -295,7 +329,7 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
     }
 
     const filtered = filterEvents(redacted, { ...opts, limit });
-    const errorEntries = loadErrorEntries();
+    const errorEntries = loadErrorEntries(source);
     const specStates = loadSpecStates();
 
     // OB-3 cost branch — Phase 4 Task 4.6 wires `recommend()` + recommendations
@@ -418,8 +452,6 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
     // that might surface a new path-shaped value).
     const safeJson = redactReportFields(json, { includePrompts });
 
-    void opts.out;
-
     const markdownStr = markdown;
     let jsonObj: Record<string, unknown> = safeJson as unknown as Record<string, unknown>;
     if (opts.costSummary === true && costBreakdown) {
@@ -443,9 +475,9 @@ async function runAnalyzeInner(opts: RunAnalyzeOptions): Promise<void> {
     state.lastCostSummary = costSummary;
 
     if (opts.json) {
-      process.stdout.write(jsonStr);
+      emitReport(jsonStr, opts.out);
     } else {
-      process.stdout.write(markdownStr);
+      emitReport(markdownStr, opts.out);
     }
     void safeJson;
 

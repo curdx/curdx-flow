@@ -13,21 +13,20 @@ You are canceling the active execution loop, cleaning up state files, and removi
 
 ## Multi-Directory Resolution
 
-This command uses the path resolver for multi-root spec discovery:
+This command uses the plugin runtime for multi-root spec discovery:
 
 ```bash
-# Source the path resolver (conceptual - commands use these patterns)
-# curdx_find_spec(name)   - Find spec by name across all roots
-# curdx_resolve_current() - Get current spec's full path
+curdx-flow specs resolve [name-or-path]
+curdx-flow specs find <name>
 ```
 
 ## Determine Target Spec
 
 1. If `$ARGUMENTS` contains input:
    - If starts with `./` or `/`: treat as full path, validate it exists
-   - Otherwise: treat as spec name, use `curdx_find_spec()` pattern to search
+   - Otherwise: treat as spec name, use `curdx-flow specs find "$input"` to search
 2. If no argument provided:
-   - Use `curdx_resolve_current()` pattern to get active spec path from `.current-spec`
+   - Use `curdx-flow specs resolve` to get active spec path from `.current-spec`
 3. If no active spec and no argument, inform user there's nothing to cancel
 
 ### Handle Disambiguation

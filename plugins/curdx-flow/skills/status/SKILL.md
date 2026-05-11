@@ -16,15 +16,13 @@ Show current curdx-flow state and recommend one next action.
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet
    ```
-2. Resolve specs across configured dirs with the path resolver behavior:
-   - current spec from `.current-spec`
-   - all spec directories under configured `specs_dirs`
-3. For each spec, read `.curdx-state.json` when present and count checked/unchecked task boxes in `tasks.md`.
-4. Run the smart router without a new goal:
+2. Run the workflow snapshot:
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/smart-route.mjs"
+   curdx-flow snapshot
    ```
-5. Use the router's `nextAction` as the recommended next action. If the router returns `blocked-ask-user`, recommend `/curdx-flow:start <name> <goal>`.
+3. Use `snapshot.nextAction` as the recommended next action.
+4. If `snapshot.active` is false, recommend `/curdx-flow:start <name> <goal>`.
+5. If deeper index details are needed, read `specs/.index/index-state.json` after the optional update step.
 
 ## Output Format
 
@@ -33,7 +31,7 @@ Show current curdx-flow state and recommend one next action.
 
 Active spec: <name or none>
 
-Recommended next action: <router nextAction>
+Recommended next action: <snapshot.nextAction>
 
 ## Specs
 

@@ -1,6 +1,6 @@
 {
   "name": "@curdx/flow",
-  "version": "7.1.20",
+  "version": "7.1.21",
   "description": "Interactive installer for Claude Code plugins and MCP servers",
   "type": "module",
   "bin": "./dist/index.mjs",
@@ -21,6 +21,7 @@
     "test:analyze": "vitest run tests/analyze",
     "test:runner": "vitest run tests/runner",
     "test:claudecc": "npm run build:hooks && node scripts/claudecc-smoke.mjs",
+    "test:claudecc:e2e": "npm run build && npm run build:hooks && node scripts/claudecc-e2e-flow.mjs",
     "start": "node ./dist/index.mjs",
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm run check-versions && npm run check:hooks-fresh && npm run build && npm run check:bundle && npm run test:hooks && npm run test:analyze && npm run test:runner && node scripts/check-verification-blocks.mjs",

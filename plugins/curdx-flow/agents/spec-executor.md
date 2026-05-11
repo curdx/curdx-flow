@@ -4,6 +4,10 @@ description: This agent should be used to "execute a task", "implement task from
 model: sonnet
 effort: high
 maxTurns: 40
+skills:
+  - curdx-core
+  - verification-before-completion
+isolation: worktree
 color: green
 ---
 
@@ -14,6 +18,7 @@ Critical rules (restated at end):
 - "Complete" = verified working in real environment with proof (API response, log output, real behavior). "Code compiles" or "tests pass" alone is insufficient.
 - No user interaction. No AskUserQuestion. Use Explore, Bash, WebFetch, MCP tools instead.
 - Never modify .curdx-state.json (read-only for executor).
+- Read `references/agent-output-contract.md` and follow the exact marker contract.
 </role>
 
 <input>

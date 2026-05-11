@@ -23,23 +23,14 @@ Complete these coordination steps in order; do not create user-facing implementa
 
 ## Step 1: Determine Active Spec and Validate
 
-**Multi-Directory Resolution**: This command uses the path resolver for dynamic spec path resolution.
-- `curdx_resolve_current()` -- resolves .current-spec to full path (bare name = ./specs/$name, full path = as-is)
-- `curdx_find_spec(name)` -- find spec by name across all configured roots
-
-**Configuration**: Specs directories are configured in `.claude/curdx-flow.local.md`:
-```yaml
-specs_dirs: ["./specs", "./packages/api/specs", "./packages/web/specs"]
-```
-
 **Resolve**:
-1. If `$ARGUMENTS` contains a spec name, use `curdx_find_spec()` to resolve it
-2. Otherwise, use `curdx_resolve_current()` to get the active spec path
-3. If no active spec, error: "No active spec. Run /curdx-flow:new <name> first."
+1. Run `curdx-flow snapshot --spec "$ARGUMENTS"` when `$ARGUMENTS` begins with a spec name; otherwise run `curdx-flow snapshot`.
+2. If `snapshot.active` is false, error: "No active spec. Run /curdx-flow:new <name> first."
+3. Set `$SPEC_PATH` to `snapshot.spec.fsPath`.
 
 **Validate**:
 1. Check the resolved spec directory exists
-2. Check the spec's tasks.md exists. If not: error "Tasks not found. Run /curdx-flow:tasks first."
+2. Check `snapshot.artifacts.tasks.exists`. If false: error "Tasks not found. Run /curdx-flow:tasks first."
 3. Set `$SPEC_PATH` to the resolved spec directory path. All references use this variable.
 
 ## Step 2: Parse Arguments
@@ -56,15 +47,14 @@ Read existing `.curdx-state.json::autoPolicy` before applying defaults:
 
 ## Step 3: Initialize Execution State
 
-Count tasks using these exact commands:
+Count tasks using the runtime CLI:
 
 ```bash
-TOTAL=$(grep -c -e '- \[.\]' "$SPEC_PATH/tasks.md" 2>/dev/null || echo 0)
-COMPLETED=$(grep -c -e '- \[x\]' "$SPEC_PATH/tasks.md" 2>/dev/null || echo 0)
+TASKS_JSON=$(curdx-flow tasks count "$SPEC_PATH/tasks.md")
+TOTAL=$(printf '%s' "$TASKS_JSON" | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(String(JSON.parse(s).total)))')
+COMPLETED=$(printf '%s' "$TASKS_JSON" | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(String(JSON.parse(s).completed)))')
 FIRST_INCOMPLETE=$((COMPLETED))
 ```
-
-Key: Use `-e` flag so grep doesn't interpret the pattern's leading hyphen as an option.
 
 **CRITICAL: Merge into existing state -- do NOT overwrite the file.**
 
@@ -98,7 +88,7 @@ Update `.curdx-state.json` by merging these fields into the existing object:
 Use the merge-state lib to preserve existing fields (atomic deep-merge, cross-platform):
 ```bash
 PATCH=$(node -e "console.log(JSON.stringify({phase:'execution',taskIndex:$FIRST_INCOMPLETE,totalTasks:$TOTAL,taskIteration:1,maxTaskIterations:$MAX_TASK_ITER,recoveryMode:$RECOVERY_MODE,maxFixTasksPerOriginal:3,maxFixTaskDepth:3,globalIteration:1,maxGlobalIterations:$MAX_GLOBAL_ITER,fixTaskMap:{},modificationMap:{},maxModificationsPerTask:3,maxModificationDepth:2,awaitingApproval:false,nativeTaskMap:{},nativeSyncEnabled:true,nativeSyncFailureCount:0}))")
-node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "$PATCH"
+curdx-flow state merge "$SPEC_PATH/.curdx-state.json" "$PATCH"
 ```
 
 Where `$MAX_TASK_ITER`, `$RECOVERY_MODE`, `$MAX_GLOBAL_ITER` come from parsed arguments (Step 2). The merge-state lib handles atomic write internally — no tmp+mv needed.
@@ -106,7 +96,7 @@ Where `$MAX_TASK_ITER`, `$RECOVERY_MODE`, `$MAX_GLOBAL_ITER` come from parsed ar
 **Preserved fields** (set by earlier phases, must NOT be removed):
 - `source`, `name`, `basePath`, `commitSpec`, `relatedSpecs`
 
-**Backwards Compatibility**: State files from earlier versions may lack new fields. The system handles missing fields gracefully with defaults (globalIteration: 1, maxGlobalIterations: 30 for new init per FR-D1; legacy state files storing 100 are preserved as-is per FR-C1, maxFixTaskDepth: 3, modificationMap: {}, maxModificationsPerTask: 3, maxModificationDepth: 2, nativeTaskMap: {}, nativeSyncEnabled: true, nativeSyncFailureCount: 0).
+**State v2 policy**: New execution state uses `version: 2`. If a legacy state blocks execution, reinitialize with `/curdx-flow:start --fresh` or rerun this skill after replacing the state file; do not silently migrate malformed state.
 
 ## Step 4: Execute Task Loop
 
@@ -226,7 +216,7 @@ When all tasks complete (taskIndex >= totalTasks):
 2. Mark state as completed (preserve audit fields):
    ```bash
    COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
+   curdx-flow state merge "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
    ```
 3. Keep .progress.md (preserve learnings and history)
 4. Cleanup orphaned temp progress files: `find "$SPEC_PATH" -name ".progress-task-*.md" -mmin +60 -delete 2>/dev/null || true`

@@ -24,6 +24,7 @@ const AGENTS_DIR = path.join(PLUGIN_ROOT, "agents");
 const SKILLS_DIR = path.join(PLUGIN_ROOT, "skills");
 const REFERENCES_DIR = path.join(PLUGIN_ROOT, "references");
 const HOOKS_CONFIG = path.join(PLUGIN_ROOT, "hooks", "hooks.json");
+const BIN_DIR = path.join(PLUGIN_ROOT, "bin");
 
 const LEGACY_ENTRYPOINT_SKILLS = [
   "cancel",
@@ -146,6 +147,9 @@ describe("manifest discovery", () => {
       existsSync(HOOKS_CONFIG),
       "standard hooks/hooks.json must exist for automatic hook discovery",
     ).toBe(true);
+    expect(existsSync(path.join(BIN_DIR, "curdx-flow")), "plugin bin/curdx-flow must exist").toBe(
+      true,
+    );
   });
 
   it("declares required plugin dependencies through the official dependency model", () => {
@@ -518,6 +522,80 @@ describe("skills frontmatter integrity", () => {
     expect(body).toContain("skills/<name>/SKILL.md");
     expect(body).toContain("references/entrypoints.md");
     expect(body).toContain("references/skill-quality-patterns.md");
+  });
+
+  it("workflow skills use the runtime CLI and snapshot contract", () => {
+    const files = [
+      path.join(SKILLS_DIR, "start", "SKILL.md"),
+      path.join(SKILLS_DIR, "status", "SKILL.md"),
+      path.join(SKILLS_DIR, "tasks", "SKILL.md"),
+      path.join(SKILLS_DIR, "implement", "SKILL.md"),
+      path.join(SKILLS_DIR, "curdx-core", "SKILL.md"),
+    ];
+
+    for (const file of files) {
+      const body = readFileSync(file, "utf8");
+      expect(body, `${file}: expected curdx-flow runtime CLI`).toContain("curdx-flow");
+    }
+    expect(readFileSync(path.join(SKILLS_DIR, "tasks", "SKILL.md"), "utf8")).toContain(
+      "Source Coverage Audit",
+    );
+  });
+
+  it("start quick path preserves machine-readable task format", () => {
+    const body = readFileSync(path.join(SKILLS_DIR, "start", "SKILL.md"), "utf8");
+
+    expect(body).toContain("Quick Artifact Contract");
+    expect(body).toContain("## Source Coverage Audit");
+    expect(body).toContain("- [ ] 1.1");
+    expect(body).toContain("Do not create heading-only task sections");
+    expect(body).toContain("empty-tasks");
+  });
+
+  it("start writes the active spec marker under the default specs directory", () => {
+    const body = readFileSync(path.join(SKILLS_DIR, "start", "SKILL.md"), "utf8");
+
+    expect(body).toContain("$defaultDir/.current-spec");
+    expect(body).toContain('> "$defaultDir/.current-spec"');
+    expect(body).toContain("Do not write a project-root `.current-spec`");
+  });
+
+  it("plugin-facing workflow docs do not expose legacy helper entrypoints", () => {
+    const legacyPatterns = [
+      /\bcurdx_find_spec\b/,
+      /\bcurdx_resolve_current\b/,
+      /\bcurdx_get_specs_dirs\b/,
+      /\bcurdx_get_default_dir\b/,
+      /\bcurdx_list_specs\b/,
+      /hooks\/scripts\/lib\/(?:smart-route|auto-policy|merge-state|count-tasks)\.mjs/,
+      /\b(?:smart-route|auto-policy|merge-state|count-tasks)\.mjs\b/,
+    ];
+    const files = [
+      ...SKILL_FILES,
+      ...AGENT_FILES,
+      ...listMarkdown(REFERENCES_DIR),
+    ];
+    const offenders: Array<{ file: string; match: string }> = [];
+
+    for (const file of files) {
+      const body = readFileSync(file, "utf8");
+      for (const pattern of legacyPatterns) {
+        const match = body.match(pattern);
+        if (match) {
+          offenders.push({
+            file: path.relative(REPO_ROOT, file),
+            match: match[0],
+          });
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `Legacy workflow helper references found:\n${offenders
+        .map((o) => `  ${o.file}: ${o.match}`)
+        .join("\n")}`,
+    ).toEqual([]);
   });
 });
 

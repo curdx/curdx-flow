@@ -14,8 +14,8 @@ import { fileURLToPath as fileURLToPath4 } from "node:url";
 import { fileURLToPath } from "node:url";
 import { basename } from "node:path";
 var LOW_RISK_RE = /\b(readme|docs?|documentation|typo|copy|wording|comment|comments|changelog|license|format text|rename label|css copy|style text)\b/i;
-var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|npm|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|delete|remove|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
-var CRITICAL_RISK_RE = /\b(payment|billing|security|secret|secrets|password|token|oauth|authorization|permission|migration|data loss|release|publish|npm|tag|hooks?\.json|plugin\.json|claude-plugin)\b/i;
+var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|delete|remove|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
+var CRITICAL_RISK_RE = /\b(payment|billing|security|secret|secrets|password|token|oauth|authorization|permission|migration|data loss|release|publish|tag|hooks?\.json|plugin\.json|claude-plugin)\b/i;
 var XL_RE = /\b(epic|multi-spec|multiple specs|multiple subsystems|cross-system|whole app|entire app|rewrite|rebuild|platform|framework migration|全量|重写|多个子系统|史诗)\b/i;
 var ADD_OR_FIX_RE = /\b(add|build|create|implement|support|fix|debug|repair|resolve|refactor|change|modify|update)\b/i;
 function normalizeWords(input) {
@@ -395,8 +395,11 @@ function resolveCurrent(opts) {
   const cwd = resolveCwd(opts);
   if (!isDir(cwd)) return null;
   const defaultDir = getDefaultDir(opts);
-  const markerFs = join(cwd, defaultDir, ".current-spec");
-  if (!existsSync(markerFs)) return null;
+  const markerFs = [
+    join(cwd, defaultDir, ".current-spec"),
+    join(cwd, ".current-spec")
+  ].find((candidate) => existsSync(candidate));
+  if (!markerFs) return null;
   let content;
   try {
     content = readFileSync(markerFs, "utf8");
@@ -409,7 +412,7 @@ function resolveCurrent(opts) {
     return null;
   }
   const normalized = normalizePath(content);
-  if (normalized.startsWith("./") || isAbsolute(normalized)) {
+  if (normalized.startsWith("./") || normalized.startsWith("../") || normalized.includes("/") || isAbsolute(normalized)) {
     return normalized;
   }
   return posix.join(defaultDir, normalized);

@@ -27,23 +27,19 @@ Examples:
 
 ## Multi-Directory Resolution
 
-This command uses the path resolver for multi-directory support:
+This command uses the plugin runtime for multi-directory support:
 
 ```text
-# Multi-directory resolution is provided via the _shared/path-resolver module
-# bundled into each hook (.mjs). The functions exposed are:
-
-curdx_get_specs_dirs()    # Returns all configured spec directories
-curdx_get_default_dir()   # Returns first specs_dir (default for new specs)
-curdx_find_spec(name)     # Find spec by name, returns full path
-curdx_list_specs()        # List all specs as "name|path" pairs
-curdx_resolve_current()   # Resolve .current-spec to full path
+curdx-flow specs dirs             # Returns defaultDir and all configured spec directories
+curdx-flow specs find <name>      # Find spec by name across configured roots
+curdx-flow specs list             # List specs as {name,path} objects
+curdx-flow specs resolve [input]  # Resolve current spec, name, or path
 ```
 
 ## --specs-dir Validation
 
 When `--specs-dir` is provided:
-1. Call `curdx_get_specs_dirs()` to get configured directories
+1. Run `curdx-flow specs dirs` to get configured directories
 2. Check if provided path matches one of the configured directories
 3. If NOT in configured list: Error "Invalid --specs-dir: '$path' is not in configured specs_dirs"
 4. If valid: Use this path as the spec root instead of default
@@ -52,7 +48,7 @@ When `--specs-dir` is provided:
 --specs-dir Validation Logic:
 
 1. Extract --specs-dir value from $ARGUMENTS
-2. Get configured dirs: dirs = curdx_get_specs_dirs()
+2. Get configured dirs: `curdx-flow specs dirs`
 3. Normalize paths (remove trailing slashes)
 4. Check: specsDir in dirs?
    - YES: Use specsDir for spec creation
@@ -66,10 +62,10 @@ Spec Directory Logic:
 
 1. Check if --specs-dir in $ARGUMENTS
    - YES: Validate against configured specs_dirs, use if valid
-   - NO: Use curdx_get_default_dir() (first configured dir, defaults to ./specs)
+   - NO: Use `defaultDir` from `curdx-flow specs dirs` (defaults to ./specs)
 
 2. Determine spec base path:
-   specsDir = validated --specs-dir OR curdx_get_default_dir()
+   specsDir = validated --specs-dir OR runtime defaultDir
    basePath = "$specsDir/$name"
 
 3. For .current-spec:
@@ -93,16 +89,16 @@ The goal MUST be captured before proceeding:
 1. Verify spec name is provided
 2. Verify spec name is kebab-case (lowercase, hyphens only)
 3. If --specs-dir provided, validate against configured specs_dirs
-4. Determine target directory: specsDir = (validated --specs-dir) OR curdx_get_default_dir()
+4. Determine target directory: specsDir = (validated --specs-dir) OR runtime defaultDir
 5. Check if `$specsDir/$name/` already exists. If so, ask user if they want to resume or overwrite
 
 ## Initialize
 
 1. Determine spec directory and base path:
    ```text
-   specsDir = (validated --specs-dir) OR curdx_get_default_dir()
+   specsDir = (validated --specs-dir) OR runtime defaultDir
    basePath = "$specsDir/$name"
-   defaultDir = curdx_get_default_dir()
+   defaultDir = runtime defaultDir
    ```
 
 2. Create directory structure:
@@ -120,6 +116,8 @@ The goal MUST be captured before proceeding:
    fi
    ```
 
+   For default-root specs, never write `specs/$name` to `.current-spec`; write the bare name only.
+
 4. Ensure gitignore entries exist for spec state files:
    ```bash
    # Add .current-spec and .progress.md to .gitignore if not already present
@@ -135,15 +133,18 @@ The goal MUST be captured before proceeding:
 5. Create `.curdx-state.json` in the spec directory (note: basePath uses resolved path):
    First compute deterministic AutoPolicy:
    ```bash
-   POLICY_JSON=$(node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/auto-policy.mjs" --goal "$goal" --flags "$ARGUMENTS")
+   ROUTE_JSON=$(curdx-flow route --name "$name" --goal "$goal" --flags "$ARGUMENTS")
+   POLICY_JSON=$(printf '%s' "$ROUTE_JSON" | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(JSON.stringify(JSON.parse(s).policy)))')
    ```
    If `POLICY_JSON.executionMode == "epic-triage"` or `POLICY_JSON.shouldSplitSpec == true`, stop and route to `/curdx-flow:triage` with the same goal.
 
    ```json
    {
+     "version": 2,
      "source": "spec",
      "name": "$name",
      "basePath": "$basePath",
+     "identity": { "name": "$name", "basePath": "$basePath", "goal": "$goal" },
      "phase": "research",
      "taskIndex": 0,
      "totalTasks": 0,
@@ -152,6 +153,7 @@ The goal MUST be captured before proceeding:
      "globalIteration": 1,
      "maxGlobalIterations": "<POLICY_JSON.maxGlobalIterations>",
      "autoPolicy": "<POLICY_JSON object>",
+     "route": "<ROUTE_JSON compact object>",
      "granularity": "<POLICY_JSON.taskGranularity>"
    }
    ```

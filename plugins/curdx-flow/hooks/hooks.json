@@ -1,6 +1,20 @@
 {
   "description": "curdx-flow hooks for spec execution validation, session context loading, and quick mode enforcement",
   "hooks": {
+    "UserPromptExpansion": [
+      {
+        "matcher": "curdx-flow:.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/user-prompt-expansion-guard.mjs\"",
+            "shell": "bash",
+            "timeout": 10,
+            "statusMessage": "Checking curdx-flow slash context"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "AskUserQuestion",
@@ -66,6 +80,19 @@
             "shell": "bash",
             "timeout": 20,
             "statusMessage": "Verifying completed task evidence"
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-tool-batch-snapshot.mjs\"",
+            "shell": "bash",
+            "timeout": 10,
+            "statusMessage": "Checking curdx-flow batch state"
           }
         ]
       }

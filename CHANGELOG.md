@@ -2,6 +2,33 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.21 — 2026-05-11
+
+### Added
+
+- **Plugin-local runtime CLI and workflow snapshot surface.** `plugins/curdx-flow/bin/curdx-flow` now exposes deterministic `route`, `snapshot`, `specs`, `state`, `tasks`, `verify-blocks`, and `doctor` commands that skills and smoke tests can call without reaching into bundled hook internals.
+- **True Claude Code end-to-end flow test.** New `npm run test:claudecc:e2e` creates a temporary failing Node project, runs `/curdx-flow:start` through the real Claude Code CLI with the local plugin, verifies `npm test`, validates spec/task/snapshot invariants, captures `--debug-file`, and writes an `analyze` report.
+- **Prompt/batch runtime context hooks.** Added generated hook entrypoints for user-prompt expansion and post-tool-batch snapshots so Claude sees active-spec gates and next actions while a real session is running.
+
+### Changed
+
+- **Quick lite-spec is now a first-class completed workflow.** Runtime snapshots accept completed `spec-lite` quick specs with `tasks.md`, `.progress.md`, and `.curdx-state.json` without requiring full-spec `research.md` / `requirements.md` / `design.md` artifacts.
+- **Active spec marker contract is explicit.** `/curdx-flow:start` now instructs Claude to write `$defaultDir/.current-spec` with a bare name for default-root specs, and never to write a project-root `.current-spec`.
+- **Hook freshness checking is dirty-worktree friendly.** `check-hooks-fresh` now compares generated hook tree hashes before/after rebuild, preserving CI stale-bundle detection without failing merely because fresh bundles are already uncommitted.
+
+### Fixed
+
+- **`.current-spec` path resolution.** Runtime resolvers now treat relative marker values containing `/` as paths rather than double-prefixing them under `specs/`, and defensively accept a project-root marker if an older run wrote one.
+- **Small `npm test` implementation goals no longer route as publish-critical work.** Auto-policy no longer treats the word `npm` itself as high/critical release risk, while release/publish/tag/plugin/hook surfaces remain protected.
+- **Claude Code transcript lookup follows current project-dir encoding.** `analyze` now resolves `~/.claude/projects` directories where Claude Code hyphenates non-alphanumeric path characters, with legacy slash-only encoding retained as fallback.
+- **`analyze --out` writes the report file.** Markdown/JSON report output now respects `--out` in both fresh and cached-report paths.
+- **`analyze` scopes sidecar hook errors to the active project.** Global `~/.claude/curdx-flow/errors.jsonl` rows are now included only when their `cwd` or `transcript_path` matches the analyzed source, preventing stale errors from other sessions from polluting E2E reports.
+
+### Tests
+
+- Added regression coverage for quick lite-spec snapshots, active-spec marker placement, transcript encoding, scoped sidecar hook errors, `analyze --out`, route classification for `npm test`, and the new real Claude Code E2E script.
+- Verified with `npm run verify`, `npm run test:claudecc`, and `CURDX_FLOW_E2E_KEEP_TMP=1 npm run test:claudecc:e2e`.
+
 ## 7.1.20 — 2026-05-11
 
 ### Changed

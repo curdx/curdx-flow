@@ -15,7 +15,7 @@ Generate implementation tasks for the active spec. Running this command implicit
 
 Complete these coordination steps in order; do not create user-facing implementation tasks from this checklist:
 
-1. **Gather context** -- resolve spec, read design, requirements, research
+1. **Gather context** -- run workflow snapshot, read design, requirements, research
 2. **Interview** -- brainstorming dialogue (skip if `--quick`)
 3. **Execute task generation** -- dispatch task-planner via direct Task; Agent Teams optional
 4. **Artifact review** -- parallel two-stage review (`spec-reviewer` + `code-quality-reviewer`); QuickMode bypass per D5
@@ -24,20 +24,23 @@ Complete these coordination steps in order; do not create user-facing implementa
 
 ## Step 1: Gather Context
 
-1. If `$ARGUMENTS` contains a spec name, use `curdx_find_spec()` to resolve it; otherwise use `curdx_resolve_current()`
-2. If no active spec, error: "No active spec. Run /curdx-flow:new <name> first."
-3. Check the resolved spec directory exists
-4. Check `design.md` exists. If not, error: "Design not found. Run /curdx-flow:design first."
-5. Check `requirements.md` exists
-6. Read `.curdx-state.json`; clear approval flag: `awaitingApproval: false`
+1. Run `curdx-flow snapshot --spec "$ARGUMENTS"` when `$ARGUMENTS` begins with a spec name; otherwise run `curdx-flow snapshot`.
+2. If `snapshot.active` is false, error: "No active spec. Run /curdx-flow:new <name> first."
+3. Use `snapshot.spec.fsPath` as `$SPEC_PATH`.
+4. If `snapshot.artifacts.design.exists` is false, error: "Design not found. Run /curdx-flow:design first."
+5. If `snapshot.artifacts.requirements.exists` is false, error: "Requirements not found. Run /curdx-flow:requirements first."
+6. Clear approval flag:
+   ```bash
+   curdx-flow state merge "$SPEC_PATH/.curdx-state.json" '{"awaitingApproval":false}'
+   ```
 7. **`--tasks-size` flag handling**: Check `$ARGUMENTS` for `--tasks-size` flag:
    - Valid values: `auto`, `coarse`, `standard`, `fine`
    - If valid: update `granularity` in `.curdx-state.json` and treat it as an explicit override of `autoPolicy.taskGranularity`
    - If invalid: warn the user (`Invalid --tasks-size value "<value>", using autoPolicy/default standard`) and set `"granularity": "auto"`
    - If `--tasks-size` flag is absent: leave `granularity` unchanged in `.curdx-state.json` (preserve any value set by `/curdx-flow:start`)
-8. **AutoPolicy default**: If no `autoPolicy` exists, run:
+8. **AutoPolicy default**: If no `autoPolicy` exists in the snapshot, run:
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/auto-policy.mjs" --goal "$GOAL" --flags "$ARGUMENTS"
+   curdx-flow route --goal "$GOAL" --flags "$ARGUMENTS"
    ```
    Merge the JSON into `.curdx-state.json` as `{ "autoPolicy": <policy>, "granularity": <policy.taskGranularity> }`.
 9. Read context: `requirements.md`, `design.md`, `research.md` (if exists), `.progress.md`
@@ -100,6 +103,9 @@ Direct path:
 
 1. Optionally create a visible native task with `TaskCreate(subject: "Generate implementation tasks for $spec", activeForm: "Generating tasks")`. If unavailable or failing, continue without it.
 2. Dispatch `Task(subagent_type: task-planner)` with requirements, design, interview context, and the Delegation Context below. Instruct it to:
+   - Read `references/workflow-contract.md`, `references/source-coverage-audit.md`, and `references/agent-output-contract.md`
+   - Start `tasks.md` with `## Source Coverage Audit`
+   - Cover every source item; if coverage cannot be complete, stop with `TASKS_BLOCKED`
    - Break implementation into value-slice tasks, using POC-first or TDD phases only as structure
    - Create tasks with Do/Files/Done when/Verify/Commit fields
    - Keep top-level task count inside `autoPolicy.taskTargetRange`; if this requires more than 12 tasks, stop and recommend `/curdx-flow:triage`
@@ -107,7 +113,8 @@ Direct path:
    - Each task = one commit, tasks must be executable without human interaction
    - Count total tasks, output to `./specs/$spec/tasks.md`
    - If quick mode and policy verification is strict: auto-enable VE tasks. Otherwise keep VE tasks risk-triggered.
-3. Wait for the Task result, then read `./specs/$spec/tasks.md`.
+3. Wait for the Task result. Require `TASKS_READY` before proceeding; if `TASKS_BLOCKED`, surface the blocking source items and stop.
+4. Read `$SPEC_PATH/tasks.md`.
 
 Optional Agent Teams path:
 
@@ -178,7 +185,7 @@ The two reviewers do **not** see each other's output (Layer 2 isolation). The co
                  `REVIEW_PASS` or `REVIEW_FAIL` (byte-equal).")
 3. # Wait for both Task results; collect REVIEW_PASS/REVIEW_FAIL final lines.
 4. # Persist verdicts under verificationBlocks.tasks.reviews via merge-state (FR-T3 — never hand-edit state):
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" \
+   curdx-flow state merge \
      "$SPEC_PATH/.curdx-state.json" \
      '{"verificationBlocks":{"tasks":{"reviews":{
         "specCompliance":{"verdict":"<PASS|FAIL>","findings":[...],"reviewerId":"spec-compliance","timestamp":"<ISO8601>"},

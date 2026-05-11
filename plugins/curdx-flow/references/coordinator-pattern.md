@@ -79,7 +79,7 @@ If taskIndex >= totalTasks:
 2. Mark state as completed (preserve audit fields):
    ```bash
    COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
+   curdx-flow state merge "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
    ```
 3. Output: ALL_TASKS_COMPLETE
 4. STOP - do not delegate any task
@@ -416,7 +416,7 @@ After all 3 verification layers pass:
 
 After successful completion (TASK_COMPLETE for sequential or all parallel tasks complete):
 
-**CRITICAL: Always use the deep-merge pattern (via `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs`) to preserve all existing fields (source, name, basePath, commitSpec, relatedSpecs, etc.). Never write a new object from scratch.**
+**CRITICAL: Always use the deep-merge pattern (via `curdx-flow state merge`) to preserve all existing fields (source, name, basePath, commitSpec, relatedSpecs, etc.). Never write a new object from scratch.**
 
 **Sequential Update**:
 1. Read current .curdx-state.json
@@ -545,7 +545,7 @@ Before outputting:
 2. Write completion marker to `.curdx-state.json` (preserve execution state for audit):
    ```bash
    COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
+   curdx-flow state merge "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
    ```
    > Note: This write is idempotent with the Check Completion write — coordinator may invoke either path; both produce the same final state.
 3. Keep .progress.md (preserve learnings and history)
@@ -770,7 +770,7 @@ When all Step 4 criteria met:
 2. Mark spec completed in `.curdx-state.json`:
    ```bash
    COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
+   curdx-flow state merge "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
    ```
 3. Get PR URL: `gh pr view --json url -q .url`
 4. Output: ALL_TASKS_COMPLETE

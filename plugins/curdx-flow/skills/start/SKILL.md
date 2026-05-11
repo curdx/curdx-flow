@@ -21,7 +21,7 @@ Users do not need to know `--add-dir`. If routing returns a missing code root, s
 1. Parse `$ARGUMENTS` into optional spec name, goal text, and flags.
 2. Run the deterministic router:
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/smart-route.mjs" \
+   curdx-flow route \
      --name "$name" \
      --goal "$goal" \
      --flags "$ARGUMENTS"
@@ -59,17 +59,33 @@ For `lite-spec` and `full-spec`:
 2. Validate or ask for a kebab-case spec name only if missing.
 3. Validate or ask for the goal only if missing.
 4. Resolve the spec directory from `--specs-dir` or the default specs dir.
-5. Create the spec directory, update `.current-spec`, and ensure `.gitignore` covers `.current-spec`, `.current-epic`, and `**/.progress.md`.
+5. Create the spec directory, update `$defaultDir/.current-spec`, and ensure `.gitignore` covers `$defaultDir/.current-spec`, `$defaultDir/.current-epic`, and `**/.progress.md`.
+   - If writing the marker under the default specs dir, write only the bare spec name, e.g. `greet-helper`.
+   - If writing a non-default spec root, write the relative path, e.g. `packages/api/specs/auth-flow`.
+   - Do not write `specs/<name>` for default-root specs; that can be interpreted as a path by newer runtime resolvers.
+   - Do not write a project-root `.current-spec`; runtime state lives under the configured specs root.
+   - Preferred write pattern:
+     ```bash
+     mkdir -p "$defaultDir"
+     if [ "$basePath" = "$defaultDir/$name" ]; then
+       printf '%s\n' "$name" > "$defaultDir/.current-spec"
+     else
+       printf '%s\n' "$basePath" > "$defaultDir/.current-spec"
+     fi
+     ```
 6. Compute compatibility policy:
    ```bash
-   POLICY_JSON=$(node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/auto-policy.mjs" --goal "$goal" --flags "$ARGUMENTS")
+   ROUTE_JSON=$(curdx-flow route --name "$name" --goal "$goal" --flags "$ARGUMENTS")
+   POLICY_JSON=$(printf '%s' "$ROUTE_JSON" | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(JSON.stringify(JSON.parse(s).policy)))')
    ```
 7. Initialize `.curdx-state.json` with:
    ```json
    {
+     "version": 2,
      "source": "spec",
      "name": "$name",
      "basePath": "$basePath",
+     "identity": { "name": "$name", "basePath": "$basePath", "goal": "$goal" },
      "phase": "research",
      "taskIndex": 0,
      "totalTasks": 0,
@@ -80,6 +96,7 @@ For `lite-spec` and `full-spec`:
      "commitSpec": true,
      "quickMode": false,
      "autoPolicy": "<POLICY_JSON object>",
+     "route": "<ROUTE_JSON compact object>",
      "completed": false
    }
    ```
@@ -94,6 +111,29 @@ If policy computation fails, use this fallback cap:
 For `lite-spec`, keep interviews minimal and generate only 1-3 value-slice tasks. For `full-spec`, continue with research and the normal phase flow.
 
 When a spec state is created and router output includes `topology` or `recommendedCapabilities`, store compact copies in `.curdx-state.json` as `projectTopology` and `recommendedCapabilities`.
+
+## Quick Artifact Contract
+
+When `--quick` causes this skill to generate phase artifacts inline instead of delegating through each phase command:
+
+- `tasks.md` must still use the task-planner format contract.
+- Start `tasks.md` with `## Source Coverage Audit`.
+- Every executable top-level task must be a checkbox list item, not a heading:
+
+```markdown
+- [ ] 1.1 Implement greet helper
+  - **Do**:
+    1. Edit `src/greet.js`
+    2. Run `npm test`
+  - **Files**: `src/greet.js`, `test/greet.test.js`
+  - **Done when**: `greet(" Ada ")` and empty-name fallback pass
+  - **Verify**: `npm test`
+  - **Commit**: `feat(greet): implement greeting helper`
+  - _Requirements: FR-1, AC-1_
+```
+
+- Do not create heading-only task sections such as `## T1`; runtime task parsing ignores them and `/curdx-flow:status` will report `empty-tasks`.
+- If implementation is completed in the same quick run, mark the checkbox `[x]`, set `completed: true`, and leave `taskIndex` equal to the number of top-level checkbox tasks.
 
 ## Skill Discovery
 

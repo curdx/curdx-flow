@@ -28,6 +28,19 @@ describe("auto-policy classifier", () => {
     expect(policy.taskTargetRange).toEqual({ min: 1, max: 3 });
   });
 
+  it("does not treat npm test as publish-critical release work", () => {
+    const policy = classifyAutoPolicy({
+      goal: "Implement src/greet.js so npm test passes",
+      flags: "--mode fast --review minimal --tasks-size coarse",
+      changedFiles: ["src/greet.js", "test/greet.test.js"],
+    });
+
+    expect(policy.size).toBe("S");
+    expect(policy.risk).toBe("medium");
+    expect(policy.executionMode).toBe("spec-lite");
+    expect(policy.taskTargetRange).toEqual({ min: 1, max: 3 });
+  });
+
   it("upgrades plugin hooks and manifest work to L strict execution", () => {
     const policy = classifyAutoPolicy({
       goal: "Optimize Claude Code plugin hooks and plugin manifest release behavior",

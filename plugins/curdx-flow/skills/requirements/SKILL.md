@@ -24,11 +24,15 @@ Complete these coordination steps in order; do not create user-facing implementa
 
 ## Step 1: Gather Context
 
-1. If `$ARGUMENTS` contains a spec name, use `curdx_find_spec()` to resolve it; otherwise use `curdx_resolve_current()`
-2. If no active spec, error: "No active spec. Run /curdx-flow:new <name> first."
-3. Check the resolved spec directory exists
-4. Read `.curdx-state.json`; clear approval flag: `awaitingApproval: false`
-5. Read context: `research.md` (if exists), `.progress.md`, original goal
+1. Run `curdx-flow snapshot --spec "$ARGUMENTS"` when `$ARGUMENTS` begins with a spec name; otherwise run `curdx-flow snapshot`.
+2. If `snapshot.active` is false, error: "No active spec. Run /curdx-flow:new <name> first."
+3. Use `snapshot.spec.fsPath` as `$SPEC_PATH`.
+4. Clear approval flag:
+   ```bash
+   curdx-flow state merge "$SPEC_PATH/.curdx-state.json" '{"awaitingApproval":false}'
+   ```
+5. Read context: `research.md` (if exists), `.progress.md`, `snapshot.state`, `snapshot.topology`, original goal.
+6. Read `references/workflow-contract.md` and `references/agent-output-contract.md`.
 
 ## Step 2: Interview (skip if --quick)
 
@@ -161,7 +165,7 @@ Ask ONE question: "How do you want to proceed?" with these options via AskUserQu
 
 1. **Merge** into `.curdx-state.json` (preserve all existing fields):
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" \
+   curdx-flow state merge \
      "$SPEC_PATH/.curdx-state.json" '{"phase":"requirements","awaitingApproval":true}'
    ```
 2. Update `.progress.md`: mark research as implicitly approved, set current phase

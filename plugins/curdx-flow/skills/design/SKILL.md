@@ -24,12 +24,16 @@ Complete these coordination steps in order; do not create user-facing implementa
 
 ## Step 1: Gather Context
 
-1. If `$ARGUMENTS` contains a spec name, use `curdx_find_spec()` to resolve it; otherwise use `curdx_resolve_current()`
-2. If no active spec, error: "No active spec. Run /curdx-flow:new <name> first."
-3. Check the resolved spec directory exists
-4. Check `requirements.md` exists. If not, error: "Requirements not found. Run /curdx-flow:requirements first."
-5. Read `.curdx-state.json`; clear approval flag: `awaitingApproval: false`
-6. Read context: `requirements.md` (required), `research.md` (if exists), `.progress.md`
+1. Run `curdx-flow snapshot --spec "$ARGUMENTS"` when `$ARGUMENTS` begins with a spec name; otherwise run `curdx-flow snapshot`.
+2. If `snapshot.active` is false, error: "No active spec. Run /curdx-flow:new <name> first."
+3. Use `snapshot.spec.fsPath` as `$SPEC_PATH`.
+4. If `snapshot.artifacts.requirements.exists` is false, error: "Requirements not found. Run /curdx-flow:requirements first."
+5. Clear approval flag:
+   ```bash
+   curdx-flow state merge "$SPEC_PATH/.curdx-state.json" '{"awaitingApproval":false}'
+   ```
+6. Read context: `requirements.md` (required), `research.md` (if exists), `.progress.md`, `snapshot.topology`.
+7. Read `references/workflow-contract.md`, `references/agent-output-contract.md`, and `references/context-and-dispatch-policy.md`.
 
 ## Step 2: Interview (skip if --quick)
 
@@ -136,7 +140,7 @@ The two reviewers do **not** see each other's output (Layer 2 isolation). The co
                  `REVIEW_PASS` or `REVIEW_FAIL` (byte-equal).")
 3. # Wait for both Task results; collect REVIEW_PASS/REVIEW_FAIL final lines.
 4. # Persist verdicts under verificationBlocks.design.reviews via merge-state (FR-T3 — never hand-edit state):
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" \
+   curdx-flow state merge \
      "$SPEC_PATH/.curdx-state.json" \
      '{"verificationBlocks":{"design":{"reviews":{
         "specCompliance":{"verdict":"<PASS|FAIL>","findings":[...],"reviewerId":"spec-compliance","timestamp":"<ISO8601>"},
@@ -227,7 +231,7 @@ Ask ONE question: "How do you want to proceed?" with these options via AskUserQu
 
 1. **Merge** into `.curdx-state.json` (preserve all existing fields):
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" \
+   curdx-flow state merge \
      "$SPEC_PATH/.curdx-state.json" '{"phase":"design","awaitingApproval":true}'
    ```
 2. Update `.progress.md`: mark requirements as implicitly approved, set current phase

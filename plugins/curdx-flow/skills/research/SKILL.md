@@ -25,11 +25,11 @@ Complete these coordination steps in order; do not create user-facing implementa
 
 ## Step 1: Gather Context
 
-1. If `$ARGUMENTS` contains a spec name, use `curdx_find_spec()` to resolve it; otherwise use `curdx_resolve_current()`
-2. If no active spec, error: "No active spec. Run /curdx-flow:new <name> first."
-3. Check the resolved spec directory exists
-4. Read `.curdx-state.json` if it exists
-5. Read `.progress.md` to understand the goal
+1. Run `curdx-flow snapshot --spec "$ARGUMENTS"` when `$ARGUMENTS` begins with a spec name; otherwise run `curdx-flow snapshot`.
+2. If `snapshot.active` is false, error: "No active spec. Run /curdx-flow:new <name> first."
+3. Use `snapshot.spec.fsPath` as `$SPEC_PATH`.
+4. Read `snapshot.state`, `snapshot.topology`, and `.progress.md` to understand the goal.
+5. Read `references/workflow-contract.md`, `references/agent-output-contract.md`, and `references/context-and-dispatch-policy.md`.
 
 ## Step 2: Interview (skip if --quick)
 
@@ -180,7 +180,7 @@ Ask ONE question: "How do you want to proceed?" with these options via AskUserQu
 2. **Merge** into `.curdx-state.json` (preserve all existing fields). `$RELATED_SPECS_JSON` is a JSON array literal (e.g. `'[{"name":"foo","path":"./specs/foo"}]'`):
    ```bash
    PATCH=$(node -e 'const s=process.argv[1]||"[]"; process.stdout.write(JSON.stringify({phase:"research",awaitingApproval:true,relatedSpecs:JSON.parse(s)}))' "$RELATED_SPECS_JSON")
-   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/merge-state.mjs" \
+   curdx-flow state merge \
      "$SPEC_PATH/.curdx-state.json" "$PATCH"
    ```
 3. Update `.progress.md` with research completion

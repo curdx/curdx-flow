@@ -10,6 +10,24 @@ user-invocable: false
 
 Core skill for curdx-flow plugin. Defines common arguments, execution modes, shared behaviors, and coordinator delegation rules.
 
+## Runtime CLI
+
+The plugin ships a Bash-visible executable: `curdx-flow`.
+
+Use it instead of repeating fragile shell snippets:
+
+```bash
+curdx-flow route --goal "$GOAL" --flags "$ARGUMENTS"
+curdx-flow snapshot --spec "$SPEC" --goal "$GOAL"
+curdx-flow state merge "$SPEC_PATH/.curdx-state.json" '{"phase":"tasks"}'
+curdx-flow tasks count "$SPEC_PATH/tasks.md"
+curdx-flow doctor
+```
+
+The CLI is a thin wrapper around bundled TypeScript helpers under
+`${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/`. It is the default source of truth
+for route facts, active spec facts, task counts, and state merge operations.
+
 ## Common Arguments
 
 All curdx-flow public entrypoint skills support these standard arguments:
@@ -35,7 +53,7 @@ Argument precedence: `--no-commit-spec` > `--commit-spec` > mode default.
 Every new spec runs deterministic policy classification before expensive model work:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/auto-policy.mjs" --goal "$GOAL" --flags "$ARGUMENTS"
+curdx-flow route --goal "$GOAL" --flags "$ARGUMENTS"
 ```
 
 Persist the JSON as `.curdx-state.json::autoPolicy`. Later phases must obey it
@@ -67,9 +85,14 @@ instead of asking the user to choose fast/deep. Policy controls:
 
 ## State File
 
-curdx-flow uses `.curdx-state.json` for execution state. See `references/state-file-schema.md` for full schema.
+curdx-flow uses `.curdx-state.json` for execution state. New state files use
+`version: 2`; legacy state may be reinitialized rather than migrated. See
+`references/state-file-schema.md` for the current schema.
 
 Key fields: `phase`, `taskIndex`, `totalTasks`, `taskIteration`, `maxTaskIterations`, `awaitingApproval`.
+
+Phase skills must start by running `curdx-flow snapshot`. Treat the snapshot's
+`gates` list as blocking unless the current skill explicitly owns that gate.
 
 ## Commit Behavior
 

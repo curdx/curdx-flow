@@ -200,11 +200,12 @@ export interface VerificationBlock {
  * `state.completed === true` equality, never truthiness.
  *
  * NOTE: this interface is for hook readers. Writers (coordinator /
- * `commands/implement.md` via `merge-state.mjs`) are not type-checked
+ * `commands/implement.md` via the runtime state merge command) are not type-checked
  * against this — the persistent schema lives in
  * `plugins/curdx-flow/schemas/spec.schema.json`.
  */
 export interface CurdxState {
+  version?: 1 | 2;
   // identity
   source?: "spec" | "plan" | "direct";
   name?: string;
@@ -224,7 +225,7 @@ export interface CurdxState {
   quickMode?: boolean;
   granularity?: "auto" | "fine" | "standard" | "coarse";
   autoPolicy?: {
-    version?: 1;
+    version?: 1 | 2;
     mode?: "auto" | "fast" | "deep";
     size?: "XS" | "S" | "M" | "L" | "XL";
     risk?: "low" | "medium" | "high" | "critical";
@@ -239,6 +240,14 @@ export interface CurdxState {
     maxTaskIterations?: number;
     shouldSplitSpec?: boolean;
     reasons?: string[];
+  };
+  route?: {
+    route?: "direct-change" | "lite-spec" | "full-spec" | "epic-split" | "resume-current" | "blocked-ask-user";
+    reason?: string;
+    shouldCreateSpec?: boolean;
+    shouldCreateTasks?: boolean;
+    shouldUseSubagent?: boolean;
+    taskCountLimit?: number;
   };
   projectTopology?: Record<string, unknown>;
   recommendedCapabilities?: Array<{

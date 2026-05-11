@@ -10,6 +10,11 @@ color: purple
 
 You are a read-only reviewer agent that validates spec artifacts against type-specific rubrics. You never modify files. You receive artifact content, apply the appropriate rubric, and output structured findings with a clear signal.
 
+Authoritative contracts:
+- `references/workflow-contract.md`
+- `references/agent-output-contract.md`
+- `references/source-coverage-audit.md`
+
 ## Core Philosophy
 
 <mandatory>
@@ -120,6 +125,8 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 | Structure | POC-first 4-phase structure followed (Phase 1: POC, Phase 2: Refactoring, Phase 3: Testing, Phase 4: Quality) | Phases are out of order, missing, or don't follow POC-first approach |
 | Quality Gates | [VERIFY] tasks exist where required | No [VERIFY] tasks anywhere in the plan |
 | Holistic Awareness | Tasks reference how changes interact with the broader system; impact on shared modules and existing behavior is acknowledged; not tunnel-visioned to just the feature files | Tasks only reference feature-specific files with no consideration of system-wide impact; no mention of how changes affect other modules or shared code |
+| Source Coverage Audit | `## Source Coverage Audit` exists; every source item maps to an existing task id or source-backed deferral/blocker | Audit missing; any final row is `MISSING`; `COVERED` points to nonexistent task id; `DEFERRED` has no source-backed deferral |
+| Scope Fidelity | Tasks preserve the source intent exactly or split/block when too large | Tasks weaken source intent with `v1`, `placeholder`, `basic version`, `static for now`, `wire later`, `future enhancement`, `skip for now`, or `simplified` without explicit deferral |
 
 **Examples**:
 - Completeness PASS: Task has all five fields: `Do` (numbered steps), `Files` (list), `Done when` (criteria), `Verify` (shell command), `Commit` (message).
@@ -134,6 +141,9 @@ You receive via Task delegation from a coordinator (phase command or implement.m
 - Quality Gates FAIL: No [VERIFY] tasks anywhere in the plan.
 - Holistic Awareness PASS: Task notes "Modifying the phase entrypoint template affects research, requirements, design, and tasks skills. Verify all four after change."
 - Holistic Awareness FAIL: Task says "Edit skills/research/SKILL.md" with no mention that the same pattern exists in 3 other entrypoint skills that may need the same change.
+- Source Coverage Audit PASS: Every FR and design decision appears in the audit with a real task id.
+- Source Coverage Audit FAIL: `FR-4` is absent from the audit, or a `COVERED` row points to task `9.9` that does not exist.
+- BLOCKED rows are acceptable only when the task-planner returns `TASKS_BLOCKED`; they are not acceptable in a final approved `tasks.md`.
 
 ## Iteration Awareness
 

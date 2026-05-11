@@ -2,10 +2,12 @@
 //
 // Design notes (echoes design.md → Component 1, AC1–AC4, D3, D4):
 //   • POSIX-only v1 — Windows path separators deferred to a future spec.
-//   • Encoding mirrors Claude Code's own convention:
-//       /Users/x/foo  →  -Users-x-foo
-//     (replace `/` with `-`, leading `-` preserved). No hash, no dot escape,
-//     no double-encoding of existing hyphens.
+//   • Encoding mirrors Claude Code's current project directory convention:
+//       /Users/x/foo        →  -Users-x-foo
+//       /tmp/a_b/app.test   →  -tmp-a-b-app-test
+//     (replace every character outside [A-Za-z0-9] with `-`, leading `-`
+//     preserved). We also probe the legacy slash-only encoding as a fallback
+//     for transcripts created by older local tooling/tests.
 //   • realpath() resolves symlinks once per cwd via a module-level Map cache
 //     so repeated calls in the same process don't re-stat (D3).
 //   • 1-level glob (`readdirSync withFileTypes`) deliberately skips
@@ -92,7 +94,18 @@ function resolveRealCwd(cwd: string): string {
  * Pure / deterministic; no I/O. Exported only via the resolver.
  */
 function encodeCwd(realCwd: string): string {
+  return realCwd.replace(/[^A-Za-z0-9]/g, '-');
+}
+
+function encodeLegacyCwd(realCwd: string): string {
   return realCwd.replace(/\//g, '-');
+}
+
+function candidateProjectDirs(home: string, realCwd: string): string[] {
+  const encoded = encodeCwd(realCwd);
+  const legacy = encodeLegacyCwd(realCwd);
+  const names = encoded === legacy ? [encoded] : [encoded, legacy];
+  return names.map((name) => path.join(home, '.claude', 'projects', name));
 }
 
 /**
@@ -129,13 +142,23 @@ export function resolveTranscriptSource(opts: ResolveOpts = {}): TranscriptSourc
 
   const home = opts.homedir ?? homedir();
   const realCwd = resolveRealCwd(cwd);
-  const encoded = encodeCwd(realCwd);
-  const encodedDir = path.join(home, '.claude', 'projects', encoded);
+  const candidates = candidateProjectDirs(home, realCwd);
+  let encodedDir = candidates[0]!;
 
   let entries: Dirent[] = [];
-  try {
-    entries = readdirSync(encodedDir, { withFileTypes: true });
-  } catch {
+  let foundDir = false;
+  for (const candidate of candidates) {
+    try {
+      entries = readdirSync(candidate, { withFileTypes: true });
+      encodedDir = candidate;
+      foundDir = true;
+      break;
+    } catch {
+      // Try the next encoding candidate.
+    }
+  }
+
+  if (!foundDir) {
     throw new TranscriptNotFoundError(
       encodedDir,
       `no Claude Code project dir for cwd ${cwd} — run \`claude\` here at least once, or pass CURDX_TRANSCRIPT_FIXTURE=… for tests`,

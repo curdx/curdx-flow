@@ -80,8 +80,31 @@ try {
     throw new Error('status smoke did not include a recommended next action');
   }
 
-  const route = runNode('smart-route direct-change', [
-    join(pluginRoot, 'hooks', 'scripts', 'lib', 'smart-route.mjs'),
+  const doctor = runNode('runtime doctor', [
+    join(pluginRoot, 'bin', 'curdx-flow'),
+    'doctor',
+    '--cwd',
+    tmp,
+  ]);
+  const doctorParsed = JSON.parse(doctor);
+  if (doctorParsed.ok !== true) {
+    throw new Error(`runtime doctor failed: ${doctor}`);
+  }
+
+  const snapshot = runNode('runtime snapshot', [
+    join(pluginRoot, 'bin', 'curdx-flow'),
+    'snapshot',
+    '--cwd',
+    tmp,
+  ]);
+  const snapshotParsed = JSON.parse(snapshot);
+  if (snapshotParsed.active !== false || snapshotParsed.nextAction !== 'No active spec. Run /curdx-flow:start <name> <goal>.') {
+    throw new Error(`unexpected runtime snapshot output: ${snapshot}`);
+  }
+
+  const route = runNode('runtime route direct-change', [
+    join(pluginRoot, 'bin', 'curdx-flow'),
+    'route',
     '--goal',
     'Fix README typo',
     '--files',
@@ -95,8 +118,9 @@ try {
     throw new Error(`direct-change should not recommend third-party tools: ${route}`);
   }
 
-  const capabilityRoute = runNode('smart-route capability recommendations', [
-    join(pluginRoot, 'hooks', 'scripts', 'lib', 'smart-route.mjs'),
+  const capabilityRoute = runNode('runtime route capability recommendations', [
+    join(pluginRoot, 'bin', 'curdx-flow'),
+    'route',
     '--goal',
     'Debug React network error in Chrome using latest docs',
     '--files',
@@ -132,8 +156,9 @@ try {
     mkdirSync(frontend, { recursive: true });
     writeFileSync(join(backend, 'CLAUDE.md'), '## Dev\n- frontend: ../frontend\n- backend: .\n');
     writeFileSync(join(frontend, 'package.json'), JSON.stringify({ dependencies: { react: '^19.0.0' } }));
-    const splitRoute = runNode('smart-route split missing frontend', [
-      join(pluginRoot, 'hooks', 'scripts', 'lib', 'smart-route.mjs'),
+    const splitRoute = runNode('runtime route split missing frontend', [
+      join(pluginRoot, 'bin', 'curdx-flow'),
+      'route',
       '--cwd',
       backend,
       '--goal',

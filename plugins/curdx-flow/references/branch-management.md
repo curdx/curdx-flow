@@ -113,11 +113,11 @@ In `--quick` mode, still perform branch check but skip the user prompt for non-d
 - `$SPEC_PATH/.curdx-state.json` - Loop state (phase, taskIndex, iterations)
 - `$SPEC_PATH/.progress.md` - Progress tracking and learnings
 
-**Note**: The spec may be in any configured specs_dir, not just `./specs/`. Use `curdx_resolve_current()` to get the full spec path.
+**Note**: The spec may be in any configured specs_dir, not just `./specs/`. Use `curdx-flow specs resolve` to get the full spec path.
 
 These files are copied when:
 1. The worktree is created via `git worktree add`
-2. A spec is currently active (resolved via `curdx_resolve_current()`)
+2. A spec is currently active (resolved via `curdx-flow specs resolve`)
 3. The source files exist in the main worktree
 
 Copy uses non-overwrite semantics (skips if file already exists in target).
@@ -128,13 +128,15 @@ Copy uses non-overwrite semantics (skips if file already exists in target).
 # Get repo name for path suggestion
 REPO_NAME=$(basename $(git rev-parse --show-toplevel))
 
-# Get default specs dir and resolve current spec path using path resolver
-DEFAULT_SPECS_DIR=$(curdx_get_default_dir)  # e.g., "./specs"
+# Get default specs dir and resolve current spec path using the runtime CLI
+DIRS_JSON=$(curdx-flow specs dirs)
+DEFAULT_SPECS_DIR=$(printf '%s' "$DIRS_JSON" | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(JSON.parse(s).defaultDir))')
 SPEC_PATH=""
 SPEC_NAME=""
 
 # Resolve current spec (handles both bare names and full paths)
-if SPEC_PATH=$(curdx_resolve_current 2>/dev/null); then
+if SPEC_JSON=$(curdx-flow specs resolve 2>/dev/null); then
+    SPEC_PATH=$(printf '%s' "$SPEC_JSON" | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(JSON.parse(s).path || ""))')
     SPEC_NAME=$(basename "$SPEC_PATH")
 fi
 

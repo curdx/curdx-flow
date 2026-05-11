@@ -13,13 +13,12 @@ You are switching the active specification.
 
 ## Multi-Directory Resolution
 
-This command uses the path resolver for multi-root spec discovery:
+This command uses the plugin runtime for multi-root spec discovery:
 
 ```bash
-# Source the path resolver (conceptual - commands use these patterns)
-# curdx_find_spec(name)   - Find spec by name across all roots
-# curdx_list_specs()      - List all specs as "name|path" pairs
-# curdx_resolve_current() - Get current spec's full path
+curdx-flow specs list
+curdx-flow specs resolve [name-or-path]
+curdx-flow specs find <name>
 ```
 
 ## Parse Arguments
@@ -36,7 +35,7 @@ From `$ARGUMENTS`:
    - Check if path exists as directory
    - If not, error: "Spec path '$input' not found"
 3. If input is a spec name:
-   - Use `curdx_find_spec()` pattern to search all configured specs_dirs
+   - Use `curdx-flow specs find "$input"` to search all configured specs_dirs
    - Exit code 0 (found unique): proceed with switch
    - Exit code 1 (not found): error with list of searched directories
    - Exit code 2 (ambiguous): show disambiguation prompt
@@ -45,8 +44,8 @@ From `$ARGUMENTS`:
 
 If `$ARGUMENTS` is empty:
 
-1. Use `curdx_list_specs()` pattern to gather all specs from all roots
-2. Read current active spec using `curdx_resolve_current()` pattern
+1. Use `curdx-flow specs list` to gather all specs from all roots
+2. Read `active` from the same runtime output
 3. Group specs by their root directory with numbered options
 4. Show list with current marked and directory context
 5. If no specs found, guide user to create one
