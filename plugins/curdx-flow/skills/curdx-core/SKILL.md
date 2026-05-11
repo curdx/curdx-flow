@@ -17,15 +17,36 @@ All curdx-flow public entrypoint skills support these standard arguments:
 | Argument | Short | Description | Default |
 |----------|-------|-------------|---------|
 | `--quick` | `-q` | Skip interactive phases, auto-generate artifacts, start execution immediately | false |
+| `--mode` | | Execution policy override: `auto`, `fast`, or `deep` | auto |
 | `--commit-spec` | | Commit and push spec files after each phase | true (normal), false (quick) |
 | `--no-commit-spec` | | Explicitly disable committing spec files | - |
 | `--max-task-iterations` | `-m` | Max retries per failed task before stopping | 5 |
 | `--max-global-iterations` | | Max whole-spec loop iterations before stopping | 30 |
 | `--fresh` | `-f` | Force new spec/feature, overwrite if exists | false |
+| `--tasks-size` | | Task sizing override: `auto`, `coarse`, `standard`, or `fine` | auto |
+| `--review` | | Review override: `minimal`, `standard`, or `strict` | policy-derived |
 
 Argument precedence: `--no-commit-spec` > `--commit-spec` > mode default.
 
 ## Execution Modes
+
+### Auto Policy (Default)
+
+Every new spec runs deterministic policy classification before expensive model work:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/auto-policy.mjs" --goal "$GOAL" --flags "$ARGUMENTS"
+```
+
+Persist the JSON as `.curdx-state.json::autoPolicy`. Later phases must obey it
+instead of asking the user to choose fast/deep. Policy controls:
+- XS/S/M/L/XL size
+- risk level
+- task target range
+- review cadence
+- verification level
+- subagent policy
+- Stop-hook continuation length
 
 ### Normal Mode (Interactive)
 

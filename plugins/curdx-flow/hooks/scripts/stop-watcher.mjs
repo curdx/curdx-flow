@@ -826,6 +826,19 @@ function buildContinuationBlock(args) {
   const taskHeader = args.isParallel ? "## Current Task Group (PARALLEL)" : "## Current Task";
   const parallelInstructions = args.isParallel ? `
 PARALLEL: These are [P] tasks -- dispatch ALL in ONE message via Task tool. Each gets progressFile: .progress-task-$INDEX.md. After all complete: merge progress, advance taskIndex past group.` : "";
+  if (args.stopHookPolicy === "short-continuation") {
+    const reason2 = `Continue spec: ${args.specName} (Task ${args.taskIndex + 1}/${args.totalTasks}, Iter ${args.globalIteration})
+State: path=${args.specPath} index=${args.taskIndex} taskIteration=${args.taskIteration}/${args.maxTaskIter} recovery=${args.recoveryMode}
+
+${taskHeader}
+${args.taskBlock}
+${parallelInstructions}
+
+Next: delegate this vertical-slice task, run its Verify command, update tasks.md and .curdx-state.json, then continue. Output ALL_TASKS_COMPLETE only after every task is [x].`;
+    let systemMessage2 = `curdx-flow iteration ${args.globalIteration} | Task ${args.taskIndex + 1}/${args.totalTasks}`;
+    if (args.isParallel) systemMessage2 += " (PARALLEL GROUP)";
+    return { decision: "block", reason: reason2, systemMessage: systemMessage2 };
+  }
   const reason = `Continue spec: ${args.specName} (Task ${args.taskIndex + 1}/${args.totalTasks}, Iter ${args.globalIteration})
 
 ## State
@@ -987,6 +1000,13 @@ runHook(async (input) => {
     return;
   }
   if (phase === "execution" && taskIndex < totalTasks) {
+    if (state.autoPolicy?.stopHookPolicy === "disabled") {
+      process5.stderr.write(
+        `[curdx-flow] autoPolicy stopHookPolicy=disabled, allowing stop
+`
+      );
+      return;
+    }
     if (state.awaitingApproval === true) {
       process5.stderr.write(
         `[curdx-flow] awaitingApproval=true, allowing stop for user gate
@@ -1035,7 +1055,8 @@ runHook(async (input) => {
       recoveryMode,
       nativeSync,
       taskBlock,
-      isParallel
+      isParallel,
+      stopHookPolicy: state.autoPolicy?.stopHookPolicy
     });
   }
   cleanupStaleProgressFiles(join3(cwd, specPath));

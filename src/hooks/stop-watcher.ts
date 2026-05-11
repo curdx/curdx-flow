@@ -633,6 +633,7 @@ function buildContinuationBlock(args: {
   nativeSync: boolean;
   taskBlock: string;
   isParallel: boolean;
+  stopHookPolicy?: "disabled" | "short-continuation" | "full-loop";
 }): BlockDecision {
   const taskHeader = args.isParallel
     ? "## Current Task Group (PARALLEL)"
@@ -645,6 +646,21 @@ function buildContinuationBlock(args: {
   const parallelInstructions = args.isParallel
     ? `\nPARALLEL: These are [P] tasks -- dispatch ALL in ONE message via Task tool. Each gets progressFile: .progress-task-$INDEX.md. After all complete: merge progress, advance taskIndex past group.`
     : "";
+
+  if (args.stopHookPolicy === "short-continuation") {
+    const reason =
+      `Continue spec: ${args.specName} (Task ${args.taskIndex + 1}/${args.totalTasks}, Iter ${args.globalIteration})\n` +
+      `State: path=${args.specPath} index=${args.taskIndex} taskIteration=${args.taskIteration}/${args.maxTaskIter} recovery=${args.recoveryMode}\n\n` +
+      `${taskHeader}\n` +
+      `${args.taskBlock}\n` +
+      `${parallelInstructions}\n\n` +
+      `Next: delegate this vertical-slice task, run its Verify command, update tasks.md and .curdx-state.json, then continue. Output ALL_TASKS_COMPLETE only after every task is [x].`;
+
+    let systemMessage =
+      `curdx-flow iteration ${args.globalIteration} | Task ${args.taskIndex + 1}/${args.totalTasks}`;
+    if (args.isParallel) systemMessage += " (PARALLEL GROUP)";
+    return { decision: "block", reason, systemMessage };
+  }
 
   // The heredoc layout (v6 L314-337) interpolates variables literally on their
   // own lines. Reproduce by joining each substituted segment with `\n`.
@@ -905,6 +921,13 @@ runHook(async (input) => {
 
   // Loop control: continuation prompt when more tasks remain.
   if (phase === "execution" && taskIndex < totalTasks) {
+    if (state.autoPolicy?.stopHookPolicy === "disabled") {
+      process.stderr.write(
+        `[curdx-flow] autoPolicy stopHookPolicy=disabled, allowing stop\n`,
+      );
+      return;
+    }
+
     if (state.awaitingApproval === true) {
       process.stderr.write(
         `[curdx-flow] awaitingApproval=true, allowing stop for user gate\n`,
@@ -971,6 +994,7 @@ runHook(async (input) => {
       nativeSync,
       taskBlock,
       isParallel,
+      stopHookPolicy: state.autoPolicy?.stopHookPolicy,
     });
   }
 

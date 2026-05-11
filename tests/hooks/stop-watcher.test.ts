@@ -108,6 +108,79 @@ describe("stop-watcher (Stop hook)", () => {
     expect(norm(r.stderr)).toContain("demo-spec");
   });
 
+  it("autoPolicy short-continuation → emits compact resume prompt", () => {
+    const shortSpec = createFixtureSpec({
+      state: {
+        phase: "execution",
+        taskIndex: 1,
+        totalTasks: 3,
+        autoPolicy: {
+          version: 1,
+          mode: "auto",
+          size: "M",
+          risk: "medium",
+          executionMode: "standard",
+          taskGranularity: "standard",
+          taskTargetRange: { min: 3, max: 7 },
+          reviewCadence: "final",
+          verificationLevel: "standard",
+          subagentPolicy: "on-demand",
+          stopHookPolicy: "short-continuation",
+        },
+      },
+    });
+    try {
+      const r = runHook(
+        "stop-watcher",
+        "tests/hooks/fixtures/stop-watcher/execution-block.json",
+        { cwd: shortSpec.cwd },
+      );
+      expect(r.exitCode).toBe(0);
+      expect((r.json as any).decision).toBe("block");
+      expect((r.json as any).reason).toContain("vertical-slice task");
+      expect((r.json as any).reason).not.toContain("Read ./specs");
+      expect((r.json as any).reason).not.toContain("verification-layers.md");
+    } finally {
+      shortSpec.cleanup();
+    }
+  });
+
+  it("autoPolicy disabled stop hook → allows stop without continuation", () => {
+    const directSpec = createFixtureSpec({
+      state: {
+        phase: "execution",
+        taskIndex: 1,
+        totalTasks: 3,
+        autoPolicy: {
+          version: 1,
+          mode: "auto",
+          size: "S",
+          risk: "low",
+          executionMode: "spec-lite",
+          taskGranularity: "coarse",
+          taskTargetRange: { min: 1, max: 3 },
+          reviewCadence: "minimal",
+          verificationLevel: "targeted",
+          subagentPolicy: "none",
+          stopHookPolicy: "disabled",
+        },
+      },
+    });
+    try {
+      const r = runHook(
+        "stop-watcher",
+        "tests/hooks/fixtures/stop-watcher/execution-block.json",
+        { cwd: directSpec.cwd },
+      );
+      expect(r.exitCode).toBe(0);
+      expect(r.stdout).toBe("");
+      expect(r.json).toBeUndefined();
+      expect(norm(r.stderr)).toContain("stopHookPolicy=disabled");
+    } finally {
+      directSpec.cleanup();
+    }
+  });
+
   it("edge: corrupt state file → exit 0, JSON decision=block with recovery instructions", () => {
     const r = runHook(
       "stop-watcher",

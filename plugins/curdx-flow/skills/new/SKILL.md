@@ -133,6 +133,12 @@ The goal MUST be captured before proceeding:
    ```
 
 5. Create `.curdx-state.json` in the spec directory (note: basePath uses resolved path):
+   First compute deterministic AutoPolicy:
+   ```bash
+   POLICY_JSON=$(node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/auto-policy.mjs" --goal "$goal" --flags "$ARGUMENTS")
+   ```
+   If `POLICY_JSON.executionMode == "epic-triage"` or `POLICY_JSON.shouldSplitSpec == true`, stop and route to `/curdx-flow:triage` with the same goal.
+
    ```json
    {
      "source": "spec",
@@ -142,13 +148,16 @@ The goal MUST be captured before proceeding:
      "taskIndex": 0,
      "totalTasks": 0,
      "taskIteration": 1,
-     "maxTaskIterations": 5,
+     "maxTaskIterations": "<POLICY_JSON.maxTaskIterations>",
      "globalIteration": 1,
-     "maxGlobalIterations": 30
+     "maxGlobalIterations": "<POLICY_JSON.maxGlobalIterations>",
+     "autoPolicy": "<POLICY_JSON object>",
+     "granularity": "<POLICY_JSON.taskGranularity>"
    }
    ```
 
    If `--skip-research`, set `"phase": "requirements"` instead.
+   If AutoPolicy cannot be computed, fall back to `"maxGlobalIterations": 30`.
 
 6. Create initial `.progress.md` with the captured goal:
    ```markdown

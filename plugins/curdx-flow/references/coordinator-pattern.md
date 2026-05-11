@@ -352,7 +352,8 @@ This guarantees orphaned processes (dev servers, browsers) are cleaned up even w
 
 ## Verification Layers
 
-CRITICAL: Run these 3 verifications BEFORE advancing taskIndex. All must pass.
+CRITICAL: Run completion verification BEFORE advancing taskIndex. Layers 1-2
+always run. Layer 3 is controlled by `.curdx-state.json::autoPolicy.reviewCadence`.
 
 **Layer 1: CONTRADICTION Detection**
 
@@ -381,10 +382,11 @@ If TASK_COMPLETE missing:
 
 **Layer 3: Artifact Review (Periodic)**
 
-Runs only when:
-- Phase boundary (task phase changed from previous task)
-- Every 5th task (taskIndex > 0 && taskIndex % 5 == 0)
-- Final task (taskIndex == totalTasks - 1)
+Read `autoPolicy.reviewCadence`:
+- `minimal`: skip artifact review; rely on task Verify command and final verification.
+- `final`: run only on final task.
+- `periodic`: run on phase boundary, every 5th task, and final task.
+- `strict`: run on every high-risk task, every 5th task, phase boundary, and final task.
 
 When triggered: run the full artifact review loop defined in `${CLAUDE_PLUGIN_ROOT}/references/verification-layers.md` (section "Layer 3: Artifact Review").
 
@@ -392,10 +394,10 @@ When skipped: append "Skipping artifact review (next at task N)" to .progress.md
 
 **Verification Summary**
 
-All 3 layers must pass:
+Completion gate:
 1. No contradiction phrases with completion claim
 2. Explicit TASK_COMPLETE signal present
-3. Artifact review passes (when triggered; auto-pass when skipped per periodic rules)
+3. Artifact review passes when triggered by policy; auto-pass when skipped
 
 Only after all verifications pass, proceed to State Update.
 

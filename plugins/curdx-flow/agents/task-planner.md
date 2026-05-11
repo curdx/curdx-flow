@@ -544,11 +544,16 @@ Tasks 1.5 and 1.6 have zero file overlap and no output dependencies — safe to 
 <mandatory>
 Read `${CLAUDE_PLUGIN_ROOT}/references/sizing-rules.md` for sizing constraints.
 
-**Determine granularity level**: Read `granularity` from the delegation context (passed by tasks.md coordinator). If not provided, default to `fine`.
+**Determine granularity level**: Read `autoPolicy` from `.curdx-state.json` first.
+Use `autoPolicy.taskGranularity`, `autoPolicy.taskTargetRange`, `autoPolicy.reviewCadence`, and `autoPolicy.verificationLevel`.
+If `autoPolicy` is absent, read `granularity`; if both are absent, default to `standard`.
 
 Apply the sizing rules (task count, max steps, max files) for the detected level.
-[VERIFY] checkpoint frequency remains mandatory: insert a quality checkpoint every 2-3 tasks across all phases regardless of granularity.
+Do not exceed `autoPolicy.taskTargetRange.max` for a single spec. If the work requires more top-level tasks, output an XL split recommendation instead of bloating tasks.md.
+[VERIFY] checkpoints are policy-driven: strict verification gets phase-boundary and high-risk checkpoints; standard/minimal verification gets final or risk-triggered checkpoints only.
 All shared rules apply regardless of level.
+
+**Vertical-slice rule**: A top-level task includes test/reproduction, implementation, verification, and commit for one behavior or component. Never create separate top-level tasks for "write test", "write implementation", "run test", "fix test", or "commit".
 
 **Simplicity principle**: Each task should describe the MINIMUM code to achieve its goal. No speculative features, no abstractions for single-use code, no error handling for impossible scenarios. If 50 lines solve it, don't write 200.
 
@@ -888,12 +893,14 @@ Every tasks output follows this order:
 Before completing tasks:
 - [ ] All tasks use the `- [ ] <task-id> …` list-item format (no `### Task` headlines)
 - [ ] No `- [ ]` checkbox lines reference AC/FR/NFR/US ids (use plain bullets instead)
-- [ ] All tasks have <= 4 Do steps
-- [ ] All tasks touch <= 3 files (except test+impl pairs)
+- [ ] All tasks stay within sizing-rule Do-step limits for the selected granularity
+- [ ] All tasks stay within sizing-rule file limits for the selected granularity
 - [ ] All tasks reference requirements/design
 - [ ] No Verify field contains "manual", "visually", or "ask user"
 - [ ] Each task has a runnable Verify command
-- [ ] Quality checkpoints inserted every 2-3 tasks throughout all phases
+- [ ] Top-level task count fits `autoPolicy.taskTargetRange`
+- [ ] No action-only task split: test + implementation + verification + commit live in the same vertical-slice task
+- [ ] Quality checkpoints match `autoPolicy.reviewCadence` and `autoPolicy.verificationLevel`
 - [ ] Quality gates are last phase
 - [ ] Tasks are ordered by dependency
 - [ ] Every task has a meaningful **Done when** (the contract, not just "it works")
@@ -905,17 +912,17 @@ Before completing tasks:
 
 **POC-specific (GREENFIELD):**
 - [ ] POC phase focuses on validation, not perfection
-- [ ] Fine: Total task count is 40+ (split further if under 40)
-- [ ] Coarse: Total task count is 10+ (split further if under 10)
+- [ ] Standard: Total task count follows AutoPolicy range (M: 3-7, L: 5-12)
+- [ ] Fine is used only when explicitly requested with `--tasks-size fine`
 - [ ] [P] groups have max 5 tasks, broken by [VERIFY] checkpoints
 
 **TDD-specific (Non-Greenfield):**
-- [ ] Every implementation task has a preceding [RED] test task
-- [ ] [RED] tasks verify test FAILS, [GREEN] tasks verify test PASSES
+- [ ] Every implementation task includes a RED step and GREEN step inside the same vertical-slice task
+- [ ] RED step verifies test FAILS, GREEN step verifies test PASSES
 - [ ] [YELLOW] tasks are optional — only when refactoring is needed
 - [ ] TDD triplets are grouped by logical behavior
-- [ ] Fine: Total task count is 30+ (split further if under 30)
-- [ ] Coarse: Total task count is 8+ (split further if under 8)
+- [ ] Standard: Total task count follows AutoPolicy range (M: 3-7, L: 5-12)
+- [ ] Fine is used only when explicitly requested with `--tasks-size fine`
 
 ## Final Step: Set Awaiting Approval
 

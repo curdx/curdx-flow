@@ -222,7 +222,24 @@ export interface CurdxState {
   nativeSyncEnabled?: boolean;
   // mode
   quickMode?: boolean;
-  granularity?: "fine" | "coarse";
+  granularity?: "auto" | "fine" | "standard" | "coarse";
+  autoPolicy?: {
+    version?: 1;
+    mode?: "auto" | "fast" | "deep";
+    size?: "XS" | "S" | "M" | "L" | "XL";
+    risk?: "low" | "medium" | "high" | "critical";
+    executionMode?: "direct" | "spec-lite" | "standard" | "deep-spec" | "epic-triage";
+    taskGranularity?: "none" | "coarse" | "standard" | "fine";
+    taskTargetRange?: { min?: number; max?: number };
+    reviewCadence?: "minimal" | "final" | "periodic" | "strict";
+    verificationLevel?: "targeted" | "standard" | "strict";
+    subagentPolicy?: "none" | "on-demand" | "per-slice";
+    stopHookPolicy?: "disabled" | "short-continuation" | "full-loop";
+    maxGlobalIterations?: number;
+    maxTaskIterations?: number;
+    shouldSplitSpec?: boolean;
+    reasons?: string[];
+  };
   epicName?: string;
   // verification iron-law (design D2): per-phase Verify command outcomes
   verificationBlocks?: Partial<Record<VerificationPhase, VerificationBlock>>;

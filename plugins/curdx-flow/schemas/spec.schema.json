@@ -96,6 +96,94 @@
   },
 
   "definitions": {
+    "autoPolicy": {
+      "type": "object",
+      "description": "Deterministic execution policy selected before expensive model work. Drives task sizing, review cadence, subagent usage, verification strictness, and Stop-hook continuation length.",
+      "required": ["version", "mode", "size", "risk", "executionMode", "taskGranularity", "taskTargetRange", "reviewCadence", "verificationLevel", "subagentPolicy", "stopHookPolicy"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "integer",
+          "const": 1,
+          "description": "AutoPolicy schema version"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["auto", "fast", "deep"],
+          "description": "User override mode parsed from --mode; auto is default"
+        },
+        "size": {
+          "type": "string",
+          "enum": ["XS", "S", "M", "L", "XL"],
+          "description": "Execution size selected by deterministic classifier"
+        },
+        "risk": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "description": "Blast-radius risk selected by deterministic classifier"
+        },
+        "executionMode": {
+          "type": "string",
+          "enum": ["direct", "spec-lite", "standard", "deep-spec", "epic-triage"],
+          "description": "Workflow strength selected for this spec"
+        },
+        "taskGranularity": {
+          "type": "string",
+          "enum": ["none", "coarse", "standard", "fine"],
+          "description": "Task sizing policy; none means direct work without tasks.md"
+        },
+        "taskTargetRange": {
+          "type": "object",
+          "required": ["min", "max"],
+          "additionalProperties": false,
+          "properties": {
+            "min": { "type": "integer", "minimum": 0 },
+            "max": { "type": "integer", "minimum": 1 }
+          },
+          "description": "Target number of vertical-slice tasks for a single spec"
+        },
+        "reviewCadence": {
+          "type": "string",
+          "enum": ["minimal", "final", "periodic", "strict"],
+          "description": "How often independent review is required"
+        },
+        "verificationLevel": {
+          "type": "string",
+          "enum": ["targeted", "standard", "strict"],
+          "description": "Verification strictness for task and phase exits"
+        },
+        "subagentPolicy": {
+          "type": "string",
+          "enum": ["none", "on-demand", "per-slice"],
+          "description": "When implementation/review subagents should be used"
+        },
+        "stopHookPolicy": {
+          "type": "string",
+          "enum": ["disabled", "short-continuation", "full-loop"],
+          "description": "How much continuation context the Stop hook may inject"
+        },
+        "maxGlobalIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Policy-selected global loop cap"
+        },
+        "maxTaskIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Policy-selected per-task retry cap"
+        },
+        "shouldSplitSpec": {
+          "type": "boolean",
+          "description": "True when the request should be decomposed into an epic or multiple specs"
+        },
+        "reasons": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Human-readable classifier reasons for auditability"
+        }
+      }
+    },
+
     "state": {
       "type": "object",
       "description": "Runtime state for spec execution loop",
@@ -279,8 +367,12 @@
         },
         "granularity": {
           "type": "string",
-          "enum": ["fine", "coarse"],
-          "description": "Task sizing level: fine (40-60+ tasks) or coarse (10-20 tasks)"
+          "enum": ["auto", "fine", "standard", "coarse"],
+          "description": "Task sizing override. AutoPolicy is authoritative when present; legacy fine/coarse states remain valid."
+        },
+        "autoPolicy": {
+          "$ref": "#/definitions/autoPolicy",
+          "description": "Policy selected by hooks/scripts/lib/auto-policy.mjs and persisted for all later phases"
         },
         "completed": {
           "type": "boolean",

@@ -17,6 +17,20 @@ curdx-flow uses `.curdx-state.json` to track execution state.
   "totalTasks": 0,
   "taskIteration": 1,
   "maxTaskIterations": 5,
+  "maxGlobalIterations": 30,
+  "autoPolicy": {
+    "version": 1,
+    "mode": "auto",
+    "size": "M",
+    "risk": "medium",
+    "executionMode": "standard",
+    "taskGranularity": "standard",
+    "taskTargetRange": { "min": 3, "max": 7 },
+    "reviewCadence": "final",
+    "verificationLevel": "standard",
+    "subagentPolicy": "on-demand",
+    "stopHookPolicy": "short-continuation"
+  },
   "awaitingApproval": false,
   "completed": false,
   "completedAt": "2026-05-04T12:00:00.000Z"
@@ -32,6 +46,8 @@ curdx-flow uses `.curdx-state.json` to track execution state.
 | `totalTasks` | number | Total tasks in tasks.md |
 | `taskIteration` | number | Current retry attempt (1-based) |
 | `maxTaskIterations` | number | Max retries before blocking |
+| `maxGlobalIterations` | number | Max execution loop iterations before blocking |
+| `autoPolicy` | object | Deterministic policy controlling sizing, review, verification, subagents, and stop-hook behavior |
 | `awaitingApproval` | boolean | Waiting for user to proceed |
 | `completed` | boolean | Spec fully complete (all tasks done, terminal state) |
 | `completedAt` | string (date-time) | ISO 8601 UTC timestamp when spec entered completed phase |
@@ -40,6 +56,21 @@ curdx-flow uses `.curdx-state.json` to track execution state.
 
 - `completed: boolean` — terminal flag set when all tasks in tasks.md are checked off; coordinator transitions phase to `completed` and writes this true.
 - `completedAt: string (date-time)` — ISO 8601 UTC timestamp captured at the moment `completed` flips to true; unset on refactor.
+
+### AutoPolicy Fields
+
+`autoPolicy` is computed by `hooks/scripts/lib/auto-policy.mjs` when a spec is created. Later phases must obey it instead of re-asking the user to choose fast/deep:
+
+| Field | Values |
+|-------|--------|
+| `size` | `XS`, `S`, `M`, `L`, `XL` |
+| `risk` | `low`, `medium`, `high`, `critical` |
+| `executionMode` | `direct`, `spec-lite`, `standard`, `deep-spec`, `epic-triage` |
+| `taskGranularity` | `none`, `coarse`, `standard`, `fine` |
+| `reviewCadence` | `minimal`, `final`, `periodic`, `strict` |
+| `verificationLevel` | `targeted`, `standard`, `strict` |
+| `subagentPolicy` | `none`, `on-demand`, `per-slice` |
+| `stopHookPolicy` | `disabled`, `short-continuation`, `full-loop` |
 
 ## Phase Values
 

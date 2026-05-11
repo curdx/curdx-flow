@@ -2,7 +2,9 @@
 
 > Used by: implement.md
 
-Three verification layers run BEFORE advancing taskIndex after a task reports TASK_COMPLETE. All must pass.
+Completion verification runs BEFORE advancing taskIndex after a task reports
+TASK_COMPLETE. Layers 1-2 always run. Layer 3 runs only when AutoPolicy says it
+should.
 
 ## Layer 1: Contradiction Detection
 
@@ -37,13 +39,14 @@ After Layers 1-2 pass, invoke the `spec-reviewer` agent to validate the implemen
 
 ### When to Run
 
-Layer 3 runs only when ANY of these conditions are true:
-- **Phase boundary**: Current task is the first task of a new phase (phase number in task ID changed from previous completed task)
-- **Every 5th task**: taskIndex > 0 && taskIndex % 5 == 0
-- **Final task**: taskIndex == totalTasks - 1 (accepts either TASK_COMPLETE or ALL_TASKS_COMPLETE from spec-executor)
+Layer 3 is controlled by `.curdx-state.json::autoPolicy.reviewCadence`:
+- **minimal**: skip artifact review; rely on task Verify command and final verification
+- **final**: final task only
+- **periodic**: phase boundary, every 5th task, and final task
+- **strict**: high-risk tasks, phase boundary, every 5th task, and final task
 
 When skipped, coordinator appends to .progress.md:
-"Skipping artifact review (next at task N)" where N is the next taskIndex satisfying the periodic condition (taskIndex > 0 && taskIndex % 5 == 0). For example, at taskIndex 1, N = 5; at taskIndex 6, N = 10. Phase boundary and final task triggers are computed separately.
+"Skipping artifact review by autoPolicy.reviewCadence=<value>" plus the next known trigger when applicable.
 
 **Pre-requisite**: Before delegating each task, the coordinator records `TASK_START_SHA=$(git rev-parse HEAD)` to capture the commit state before task execution.
 

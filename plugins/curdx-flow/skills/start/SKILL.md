@@ -1,7 +1,7 @@
 ---
 name: start
 description: Use when starting curdx-flow, creating a spec, resuming work, or routing intent.
-argument-hint: "[name] [goal] [--fresh] [--quick] [--commit-spec] [--no-commit-spec] [--specs-dir <path>] [--tasks-size fine|coarse]"
+argument-hint: "[name] [goal] [--fresh] [--quick] [--mode auto|fast|deep] [--tasks-size auto|coarse|standard|fine] [--review minimal|standard|strict] [--commit-spec] [--no-commit-spec] [--specs-dir <path>]"
 allowed-tools: "Read Write Edit Bash Task Skill AskUserQuestion"
 disable-model-invocation: true
 ---
@@ -138,27 +138,33 @@ Continuing...
    node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/ensure-gitignore.mjs" '**/.progress.md'
    ```
 7. Initialize `.curdx-state.json`:
+   First compute AutoPolicy:
+   ```bash
+   POLICY_JSON=$(node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/auto-policy.mjs" --goal "$goal" --flags "$ARGUMENTS")
+   ```
+   Use `POLICY_JSON` as the source of truth for task sizing, review cadence, verification level, subagent usage, and Stop-hook behavior.
+   If `POLICY_JSON.executionMode == "epic-triage"` or `POLICY_JSON.shouldSplitSpec == true`, stop the single-spec flow and route to `/curdx-flow:triage` with the same goal. Do not create a bloated one-spec task list.
+
    ```json
    {
      "source": "spec", "name": "$name", "basePath": "$basePath",
      "phase": "research", "taskIndex": 0, "totalTasks": 0,
-     "taskIteration": 1, "maxTaskIterations": 5,
-     "globalIteration": 1, "maxGlobalIterations": 30,
+     "taskIteration": 1, "maxTaskIterations": "<POLICY_JSON.maxTaskIterations or 5>",
+     "globalIteration": 1, "maxGlobalIterations": "<POLICY_JSON.maxGlobalIterations or 30>",
      "commitSpec": true, "quickMode": false,
      "discoveredSkills": [],
+     "autoPolicy": "<POLICY_JSON object>",
+     "granularity": "<POLICY_JSON.taskGranularity>",
      "completed": false
    }
    ```
+   Set `maxTaskIterations` and `maxGlobalIterations` from `POLICY_JSON` when present.
+   If AutoPolicy cannot be computed, fall back to `"maxGlobalIterations": 30`.
    If this spec was suggested by an active epic, also include:
    ```json
    "epicName": "$EPIC_NAME"
    ```
    in the initial state, and pre-populate the goal and acceptance criteria from `epic.md`.
-
-   **`--tasks-size` handling**: If `--tasks-size` flag is present in `$ARGUMENTS`:
-   - If value is `fine` or `coarse`: add `"granularity": "<value>"` to the JSON above
-   - If value is invalid (not `fine` or `coarse`): warn the user (`⚠️ Invalid --tasks-size value "<value>", defaulting to fine`) and add `"granularity": "fine"`
-   - If `--tasks-size` flag is absent: omit the `granularity` field entirely (do not add it)
 8. Create `.progress.md` with goal
 9. **Skill Discovery Pass 1** -- Scan all skill files and match against the goal text:
    1. Scan SKILL.md files from all skill paths (collect all skills before matching):

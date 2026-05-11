@@ -81,14 +81,17 @@ Done!
 
 ### start skill
 ```
-/curdx-flow:start [name] [goal] [--fresh] [--quick] [--commit-spec] [--no-commit-spec]
+/curdx-flow:start [name] [goal] [--fresh] [--quick] [--mode auto|fast|deep] [--tasks-size auto|coarse|standard|fine] [--review minimal|standard|strict] [--commit-spec] [--no-commit-spec]
 ```
 - `--fresh`: Force new spec, overwrite if exists (skips "resume or fresh?" prompt)
 - `--quick`: Skip interactive phases, auto-generate all specs, start execution immediately
+- `--mode`: Override deterministic AutoPolicy (`auto` default; `fast` biases lower cost; `deep` biases stronger review)
+- `--tasks-size`: Override AutoPolicy task granularity
+- `--review`: Override AutoPolicy review cadence
 - `--commit-spec`: Commit and push spec files after each phase (default: true in normal mode, false in quick mode)
 - `--no-commit-spec`: Explicitly disable committing spec files
 
-The `--commit-spec` setting is stored in `.curdx-state.json` and applies to all subsequent phases (research, requirements, design, tasks).
+The `autoPolicy` and `commitSpec` settings are stored in `.curdx-state.json` and apply to all subsequent phases.
 
 ### new skill
 ```

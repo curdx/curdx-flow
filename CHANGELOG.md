@@ -2,6 +2,20 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.15 — 2026-05-11
+
+### Added
+
+- **Deterministic AutoPolicy execution classifier.** New hook utility `hooks/scripts/lib/auto-policy.mjs` classifies each goal into XS/S/M/L/XL size, risk, execution mode, task target range, review cadence, verification level, subagent policy, Stop-hook behavior, and iteration caps before expensive model work starts.
+- **Runtime and schema support for persisted `autoPolicy`.** `.curdx-state.json` now stores the selected policy, schema validation accepts `autoPolicy`, and shared hook types expose the policy contract.
+- **Regression tests for policy behavior and workflow drift.** New hook tests lock classifier decisions and Stop-hook policy behavior; runner tests prevent task sizing docs from drifting back to 40+ task defaults.
+
+### Changed
+
+- **Specs now default to automatic strength selection instead of asking users to choose fast/deep or fine/coarse.** `/curdx-flow:start`, `/curdx-flow:new`, `/curdx-flow:tasks`, `/curdx-flow:implement`, help, core references, and task-planner guidance all treat `autoPolicy` as the source of truth while still allowing explicit `--mode`, `--tasks-size`, and `--review` overrides.
+- **Task planning is now bounded around vertical slices.** Top-level tasks keep test/reproduce, implementation, verification, and commit together; normal specs target 3-7 or 5-12 tasks, and oversized requests route to triage instead of inflating one spec.
+- **Stop-hook continuation is shorter when policy allows it.** Medium and larger specs use a compact continuation prompt; XS/S specs can disable automatic Stop-hook continuation entirely to avoid token-heavy loop prompts.
+
 ## 7.1.14 — 2026-05-10
 
 ### Fixed

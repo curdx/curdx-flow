@@ -49,6 +49,11 @@ From `$ARGUMENTS`:
 - **--max-global-iterations**: Max total loop iterations (default: 30 per FR-D1; tightened from legacy 100 to bound cost runaway blast radius). Safety limit to prevent infinite execution loops; when hit, the coordinator halts entirely (US-1 / AC-1.1). Override example: `--max-global-iterations 100` to opt back into legacy cap. Mirrors `--max-task-iterations` parse pattern: flag value propagates into `state.maxGlobalIterations` at init.
 - **--recovery-mode**: Enable iterative failure recovery (default: false). When enabled, failed tasks trigger automatic fix task generation instead of stopping.
 
+Read existing `.curdx-state.json::autoPolicy` before applying defaults:
+- If no explicit `--max-task-iterations`, use `autoPolicy.maxTaskIterations` when present, else 5.
+- If no explicit `--max-global-iterations`, use `autoPolicy.maxGlobalIterations` when present, else 30.
+- If `autoPolicy.stopHookPolicy == "disabled"`, execute the first task normally but do not rely on Stop-hook continuation for unattended looping.
+
 ## Step 3: Initialize Execution State
 
 Count tasks using these exact commands:
@@ -106,7 +111,10 @@ Where `$MAX_TASK_ITER`, `$RECOVERY_MODE`, `$MAX_GLOBAL_ITER` come from parsed ar
 ## Step 4: Execute Task Loop
 
 After writing the state file, output the coordinator prompt below. This starts the execution loop.
-The stop-hook will continue the loop by blocking stops and prompting the coordinator to check state.
+The stop-hook continues the loop only when policy allows it. `autoPolicy.stopHookPolicy` controls this:
+- `disabled`: no automatic continuation; complete the current task and stop with status.
+- `short-continuation`: hook injects only current task + next action.
+- `full-loop`: legacy long coordinator prompt.
 
 ### Coordinator Prompt
 
@@ -132,6 +140,11 @@ Then Read and follow these references in order. They contain the complete coordi
 
 5. **Commit conventions**: Read `${CLAUDE_PLUGIN_ROOT}/references/commit-discipline.md` and follow it.
    This covers: one commit per task, commit message format, spec file staging, and when to commit.
+
+Before dispatching any task, read `.curdx-state.json::autoPolicy` and obey:
+- `subagentPolicy`: no implementation subagent for `none`; on-demand delegation for `on-demand`; one focused subagent per vertical slice for `per-slice`.
+- `reviewCadence`: artifact review only at the cadence selected by policy.
+- `verificationLevel`: targeted/standard/strict verification depth.
 
 ### Pre-Dispatch Cap Check (MANDATORY — runs every iteration, before any Task(...) call)
 

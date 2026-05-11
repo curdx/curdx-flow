@@ -14,7 +14,9 @@ From `$ARGUMENTS`, extract:
 - **--commit-spec**: Commit and push spec files after generation (default: true in normal mode, false in quick mode)
 - **--no-commit-spec**: Explicitly disable committing spec files
 - **--specs-dir <path>**: Create spec in specified directory (must be in configured specs_dirs array)
-- **--tasks-size <fine|coarse>**: Task granularity level for task generation
+- **--mode <auto|fast|deep>**: AutoPolicy override (default auto)
+- **--tasks-size <auto|coarse|standard|fine>**: Task granularity override
+- **--review <minimal|standard|strict>**: Review cadence override
 
 ### Commit Spec Flag Logic
 
@@ -36,7 +38,7 @@ From `$ARGUMENTS`, extract:
 - `/curdx-flow:start ./my-plan.md --quick` -> Quick mode with file input
 - `/curdx-flow:start my-feature ./plan.md --quick` -> Quick mode with name+file
 - `/curdx-flow:start my-feature --quick` -> Quick mode using existing plan.md
-- `/curdx-flow:start my-feature "Add logging" --tasks-size coarse` -> Coarse granularity (10-20 tasks)
+- `/curdx-flow:start my-feature "Add logging" --tasks-size coarse` -> Coarse granularity (1-3 or 3-5 vertical-slice tasks depending on AutoPolicy size)
 - `/curdx-flow:start my-feature --quick --tasks-size fine` -> Quick mode with fine granularity
 
 ## Detection Logic (Normal Mode)

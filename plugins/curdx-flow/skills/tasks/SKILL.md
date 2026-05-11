@@ -1,7 +1,7 @@
 ---
 name: tasks
 description: Use when a spec has design.md and needs implementation tasks.
-argument-hint: "[spec-name] [--tasks-size fine|coarse]"
+argument-hint: "[spec-name] [--tasks-size auto|coarse|standard|fine]"
 allowed-tools: "Read Write Edit Bash Task AskUserQuestion"
 disable-model-invocation: true
 ---
@@ -31,10 +31,15 @@ Create a task for each item and complete in order:
 5. Check `requirements.md` exists
 6. Read `.curdx-state.json`; clear approval flag: `awaitingApproval: false`
 7. **`--tasks-size` flag handling**: Check `$ARGUMENTS` for `--tasks-size` flag:
-   - If value is `fine` or `coarse`: update `granularity` in `.curdx-state.json` to the given value (overrides any value set by `/curdx-flow:start`)
-   - If value is invalid (not `fine` or `coarse`): warn the user (`⚠️ Invalid --tasks-size value "<value>", defaulting to fine`) and set `"granularity": "fine"` in `.curdx-state.json`
+   - Valid values: `auto`, `coarse`, `standard`, `fine`
+   - If valid: update `granularity` in `.curdx-state.json` and treat it as an explicit override of `autoPolicy.taskGranularity`
+   - If invalid: warn the user (`Invalid --tasks-size value "<value>", using autoPolicy/default standard`) and set `"granularity": "auto"`
    - If `--tasks-size` flag is absent: leave `granularity` unchanged in `.curdx-state.json` (preserve any value set by `/curdx-flow:start`)
-8. **Quick mode granularity default**: If `--quick` is present in `$ARGUMENTS` AND `granularity` is not set in `.curdx-state.json`, set `"granularity": "fine"` in `.curdx-state.json`
+8. **AutoPolicy default**: If no `autoPolicy` exists, run:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/auto-policy.mjs" --goal "$GOAL" --flags "$ARGUMENTS"
+   ```
+   Merge the JSON into `.curdx-state.json` as `{ "autoPolicy": <policy>, "granularity": <policy.taskGranularity> }`.
 9. Read context: `requirements.md`, `design.md`, `research.md` (if exists), `.progress.md`
 
 ## Step 2: Interview (skip if --quick)
@@ -58,18 +63,8 @@ Apply adaptive dialogue from `${CLAUDE_PLUGIN_ROOT}/skills/interview-framework/S
 - **Execution priority** -- ship fast with shortcuts, balanced pace, or quality-first from the start?
 - **Dependency ordering** -- are there tasks that must complete before others can begin?
 - **Team workflow constraints** -- PR review process, CI pipeline requirements, branch strategy?
-- **E2E verification** -- add autonomous end-to-end verification tasks? (default YES). What should be tested end-to-end?
-- **Task granularity** -- fine (40-60+ small tasks, ideal for parallel) or coarse (10-20 larger tasks, fewer tokens)? Both include [VERIFY] checkpoints every 2-3 tasks. Fine is recommended.
-
-**Granularity question skip conditions**: Only ask the "Task granularity" question when ALL of these are true:
-- `--quick` is NOT present in `$ARGUMENTS`
-- `granularity` is NOT already set in `.curdx-state.json` (i.e., not pre-set via `--tasks-size` flag on `/curdx-flow:start` or `/curdx-flow:tasks`)
-
-If either condition is false, skip the granularity question:
-- In `--quick` mode: handled in Step 1 (quick mode granularity default)
-- If `granularity` already set in `.curdx-state.json`: use the existing value without asking
-
-When the user answers the granularity question, store the response in `.progress.md` under Interview Responses and update `"granularity"` in `.curdx-state.json`.
+- **E2E verification** -- ask only when `autoPolicy.verificationLevel` is `strict` or the design has explicit UI/deployment risk.
+- **Task granularity** -- do not ask by default. AutoPolicy selects the task target range. Ask only if the user explicitly requests manual sizing.
 
 ### Tasks Approach Proposals
 
@@ -106,11 +101,12 @@ Direct path:
 1. Optionally create a visible native task with `TaskCreate(subject: "Generate implementation tasks for $spec", activeForm: "Generating tasks")`. If unavailable or failing, continue without it.
 2. Dispatch `Task(subagent_type: task-planner)` with requirements, design, interview context, and the Delegation Context below. Instruct it to:
    - Break implementation into POC-first phases (Phase 1-5 per phase-rules.md)
-   - Create atomic, autonomous-ready tasks with Do/Files/Done when/Verify/Commit fields
-   - Insert quality checkpoints per quality-checkpoints.md
+   - Create vertical-slice tasks with Do/Files/Done when/Verify/Commit fields
+   - Keep top-level task count inside `autoPolicy.taskTargetRange`; if this requires >12 tasks, stop and recommend `/curdx-flow:triage`
+   - Insert quality checkpoints according to `autoPolicy.reviewCadence` and `autoPolicy.verificationLevel`
    - Each task = one commit, tasks must be executable without human interaction
    - Count total tasks, output to `./specs/$spec/tasks.md`
-   - If quick mode: auto-enable VE tasks. Pass verification tooling from research.md and strategy "auto" to task-planner
+   - If quick mode and policy verification is strict: auto-enable VE tasks. Otherwise keep VE tasks risk-triggered.
 3. Wait for the Task result, then read `./specs/$spec/tasks.md`.
 
 Optional Agent Teams path:
@@ -124,7 +120,12 @@ Optional Agent Teams path:
 7. Read `./specs/$spec/tasks.md`, then `TeamDelete()`.
 
 > **Delegation Context**: When delegating to task-planner, include these inputs:
-> - **Granularity**: [fine|coarse] (from `granularity` field in `.curdx-state.json`; default to `fine` if field is absent)
+> - **AutoPolicy**: full `.curdx-state.json::autoPolicy` JSON
+> - **Granularity**: `autoPolicy.taskGranularity`, unless `granularity` explicitly overrides it
+> - **Task Target**: `autoPolicy.taskTargetRange`
+> - **Review Cadence**: `autoPolicy.reviewCadence`
+> - **Verification Level**: `autoPolicy.verificationLevel`
+> - **Vertical Slice Rule**: test/reproduce + implementation + verification + commit stay inside one top-level task
 >
 > For VE Tasks — VE1 (startup), VE2 (check), VE3 (cleanup) — generation:
 > - **E2E Verification**: enabled or disabled (from interview response, or auto-enabled in quick mode)
@@ -136,6 +137,10 @@ Optional Agent Teams path:
 
 <mandatory>
 **Review loop must complete before walkthrough. Max 3 iterations.**
+
+Read `.curdx-state.json::autoPolicy.reviewCadence`:
+- `minimal`: skip subagent artifact review for tasks.md; run the task-planner self-check and proceed to walkthrough.
+- `final`, `periodic`, `strict`: run the two-stage review below.
 
 This step runs the **two-stage review protocol** at the tasks phase boundary: `spec-reviewer` (specCompliance) and `code-quality-reviewer` (codeQuality) are dispatched **in parallel**, in ONE message, against the frozen `tasks.md` artifact. Both reviewers must complete before reconciliation.
 
