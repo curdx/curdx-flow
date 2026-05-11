@@ -121,8 +121,12 @@ describe("manifest discovery", () => {
     expect(manifest.repository).toBe("https://github.com/curdx/curdx-flow");
     expect(manifest.license).toBe("MIT");
     expect(manifest.commands, "commands must not be declared after skills-only migration").toBeUndefined();
+    expect(
+      manifest.hooks,
+      "standard hooks/hooks.json is auto-discovered; plugin.json must not redeclare it",
+    ).toBeUndefined();
 
-    for (const key of ["skills", "agents", "hooks"] as const) {
+    for (const key of ["skills", "agents"] as const) {
       const value = manifest[key];
       expect(value, `plugin.json: missing ${key}`).toBeDefined();
       const paths = Array.isArray(value) ? value : [value!];
@@ -135,6 +139,11 @@ describe("manifest discovery", () => {
         ).toBe(true);
       }
     }
+
+    expect(
+      existsSync(HOOKS_CONFIG),
+      "standard hooks/hooks.json must exist for automatic hook discovery",
+    ).toBe(true);
   });
 
   it("has no commands directory and includes all migrated slash skills", () => {

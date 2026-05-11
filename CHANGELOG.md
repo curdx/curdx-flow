@@ -2,6 +2,13 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.16 — 2026-05-11
+
+### Fixed
+
+- **Installed plugin load failure on Claude Code 2.1.138.** Removed the duplicate `hooks` path from `plugin.json`; Claude Code auto-discovers the standard `hooks/hooks.json` file, and redeclaring the same path caused `curdx-flow@7.1.15` to fail with `Duplicate hooks file detected` after `claudecc plugin update`.
+- **Manifest drift guard for hook discovery.** Runner tests now require `hooks/hooks.json` to exist while forbidding `plugin.json` from redeclaring that standard hook file.
+
 ## 7.1.15 — 2026-05-11
 
 ### Added
