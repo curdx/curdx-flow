@@ -76,13 +76,18 @@ If `nativeSyncEnabled` is `false`: skip all sync operations silently.
 
 If taskIndex >= totalTasks:
 1. Verify all tasks marked [x] in tasks.md
-2. Mark state as completed (preserve audit fields):
+2. Record final execution verification with the last completed task's exact `**Verify**` command:
+   ```bash
+   curdx-flow verify run --phase execution --command "$VERIFY_CMD" --spec "$SPEC_PATH"
+   ```
+   This command actually executes the verification and writes `.curdx-state.json::verificationBlocks.execution` with `command`, `exitCode`, `timestamp`, and `srcMtime`. If it exits non-zero, do not mark completion; fix the issue and rerun verification.
+3. Mark state as completed (preserve audit fields):
    ```bash
    COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
    curdx-flow state merge "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
    ```
-3. Output: ALL_TASKS_COMPLETE
-4. STOP - do not delegate any task
+4. Output: ALL_TASKS_COMPLETE
+5. STOP - do not delegate any task
 
 ## Parse Current Task
 
@@ -542,27 +547,32 @@ Before outputting ALL_TASKS_COMPLETE:
 
 Before outputting:
 1. Verify all tasks marked [x] in tasks.md
-2. Write completion marker to `.curdx-state.json` (preserve execution state for audit):
+2. Record final execution verification with the last completed task's exact `**Verify**` command:
+   ```bash
+   curdx-flow verify run --phase execution --command "$VERIFY_CMD" --spec "$SPEC_PATH"
+   ```
+   This command actually executes the verification and writes `.curdx-state.json::verificationBlocks.execution` with `command`, `exitCode`, `timestamp`, and `srcMtime`. If it exits non-zero, stop and fix the failure before outputting `ALL_TASKS_COMPLETE`.
+3. Write completion marker to `.curdx-state.json` (preserve execution state for audit):
    ```bash
    COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
    curdx-flow state merge "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
    ```
    > Note: This write is idempotent with the Check Completion write — coordinator may invoke either path; both produce the same final state.
-3. Keep .progress.md (preserve learnings and history)
-4. **Cleanup orphaned temp progress files** (from interrupted parallel batches):
+4. Keep .progress.md (preserve learnings and history)
+5. **Cleanup orphaned temp progress files** (from interrupted parallel batches):
    ```bash
    find "$SPEC_PATH" -name ".progress-task-*.md" -mmin +60 -delete 2>/dev/null || true
    ```
-5. **Update Spec Index** (marks spec as completed):
+6. **Update Spec Index** (marks spec as completed):
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet
    ```
-6. **Commit all remaining spec changes** (progress, tasks, index):
+7. **Commit all remaining spec changes** (progress, tasks, index):
    ```bash
    git add "$SPEC_PATH/tasks.md" "$SPEC_PATH/.progress.md" ./specs/.index/
    git diff --cached --quiet || git commit -m "chore(spec): final progress update for $spec"
    ```
-7. Check for PR and output link if exists: `gh pr view --json url -q .url 2>/dev/null`
+8. Check for PR and output link if exists: `gh pr view --json url -q .url 2>/dev/null`
 
 This signal terminates the Loop.
 

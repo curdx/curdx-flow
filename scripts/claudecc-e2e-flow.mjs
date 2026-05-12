@@ -28,6 +28,15 @@ function log(message) {
   console.log(`[claudecc-e2e] ${message}`);
 }
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+function shellCommandToken(value) {
+  const raw = String(value);
+  return /^[A-Za-z0-9_@%+=:,./-]+$/.test(raw) ? raw : shellQuote(raw);
+}
+
 function fail(message, detail) {
   if (detail) {
     console.error(detail);
@@ -38,6 +47,34 @@ function fail(message, detail) {
 function run(label, command, args, options = {}) {
   log(label);
   const result = spawnSync(command, args, {
+    cwd: options.cwd ?? tmp,
+    encoding: 'utf8',
+    timeout: options.timeout ?? 120000,
+    maxBuffer: options.maxBuffer ?? 1024 * 1024 * 20,
+    env: {
+      ...process.env,
+      CI: '1',
+    },
+  });
+
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.error) throw result.error;
+
+  const expectedStatus = options.expectedStatus ?? 0;
+  if (result.status !== expectedStatus) {
+    fail(`${label} exited ${result.status}; expected ${expectedStatus}`, [
+      result.stdout ? `stdout:\n${result.stdout}` : '',
+      result.stderr ? `stderr:\n${result.stderr}` : '',
+    ].filter(Boolean).join('\n'));
+  }
+  return result;
+}
+
+function runClaudeCode(label, args, options = {}) {
+  log(label);
+  const command = [shellCommandToken(claudeBin), ...args.map(shellQuote)].join(' ');
+  const result = spawnSync('zsh', ['-lic', command], {
     cwd: options.cwd ?? tmp,
     encoding: 'utf8',
     timeout: options.timeout ?? 120000,
@@ -156,11 +193,23 @@ function validateArtifacts() {
   assert(/^- \[[ x]\] \d+\.\d+ .+/m.test(tasks), 'tasks.md missing top-level checkbox tasks');
   assert(!/^##\s*T\d+\b/m.test(tasks), 'tasks.md contains heading-only task sections');
 
+  const state = parseJson(
+    'curdx state',
+    readFileSync(join(specDir, '.curdx-state.json'), 'utf8'),
+  );
+  const executionBlock = state.verificationBlocks?.execution;
+  assert(executionBlock, 'state missing verificationBlocks.execution');
+  assert(executionBlock.command === 'npm test', `unexpected verification command: ${executionBlock.command}`);
+  assert(executionBlock.exitCode === 0, `unexpected verification exitCode: ${executionBlock.exitCode}`);
+  assert(Number.isFinite(Date.parse(executionBlock.timestamp)), 'verification timestamp is invalid');
+  assert(Number.isFinite(executionBlock.srcMtime) && executionBlock.srcMtime >= 0, 'verification srcMtime is invalid');
+
   const snapshotRaw = run('runtime snapshot', process.execPath, [runtimeCli, 'snapshot', '--cwd', tmp]).stdout;
   const snapshot = parseJson('runtime snapshot', snapshotRaw);
   assert(snapshot.active === true, 'snapshot did not detect active spec');
   assert(snapshot.spec?.path === 'specs/greet-helper', `snapshot resolved wrong spec path: ${snapshot.spec?.path}`);
   assert(snapshot.tasks?.total > 0, 'snapshot task count is zero');
+  assert(snapshot.state?.verificationBlocks?.execution?.command === 'npm test', 'snapshot missing execution verification block');
   assert(!snapshot.gates?.includes('empty-tasks'), 'snapshot reported empty-tasks');
   assert(!snapshot.gates?.includes('missing-state'), 'snapshot reported missing-state');
 }
@@ -211,9 +260,8 @@ try {
     '--quick --no-commit-spec --mode fast --tasks-size coarse --review minimal',
   ].join(' ');
 
-  run(
+  runClaudeCode(
     'real Claude Code slash workflow',
-    claudeBin,
     [
       '--plugin-dir',
       pluginRoot,

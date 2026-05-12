@@ -8,7 +8,7 @@ const __dirname = __ccd(__filename);
 // src/hooks/lib/runtime-cli.ts
 import { spawnSync } from "node:child_process";
 import { existsSync as existsSync6, readFileSync as readFileSync6, statSync as statSync5 } from "node:fs";
-import { basename as basename7, dirname, isAbsolute as isAbsolute4, join as join4, resolve as resolve2 } from "node:path";
+import { basename as basename8, dirname, isAbsolute as isAbsolute4, join as join5, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath6 } from "node:url";
 
 // src/hooks/lib/smart-route.ts
@@ -2103,6 +2103,45 @@ function resolveActiveSpecDir(specsDir) {
   return latest;
 }
 
+// src/hooks/lib/verify-blocks.ts
+import { promises as fs } from "node:fs";
+import { basename as basename7, join as join4 } from "node:path";
+var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  ".curdx",
+  ".claude"
+]);
+var WALK_MAX_DEPTH = 6;
+async function walkSrcTree(dir) {
+  let maxMtime = 0;
+  async function walk(current, depth) {
+    let entries;
+    try {
+      entries = await fs.readdir(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const abs = join4(current, entry.name);
+      if (entry.isDirectory()) {
+        if (WALK_SKIP_DIRS.has(entry.name)) continue;
+        if (depth >= WALK_MAX_DEPTH) continue;
+        await walk(abs, depth + 1);
+        continue;
+      }
+      try {
+        const st = await fs.stat(abs);
+        if (st.mtimeMs > maxMtime) maxMtime = st.mtimeMs;
+      } catch {
+      }
+    }
+  }
+  await walk(dir, 0);
+  return maxMtime;
+}
+
 // src/hooks/lib/runtime-cli.ts
 function readArg6(name, argv) {
   const idx = argv.indexOf(name);
@@ -2129,6 +2168,7 @@ function usage(exitCode = 1) {
     "  specs resolve [name-or-path] [--cwd <dir>]",
     "  state merge <state-file> <json-patch>",
     "  tasks count <tasks.md>",
+    "  verify run --command <cmd> [--phase execution] [--spec <name-or-path>] [--cwd <dir>] [--description <text>]",
     "  verify-blocks [--cwd <dir>] [--spec <name-or-path>]",
     "  doctor [--cwd <dir>]"
   ].join("\n");
@@ -2142,7 +2182,7 @@ function pluginRoot() {
   return process.env.CLAUDE_PLUGIN_ROOT || resolve2(scriptRoot(), "..", "..", "..");
 }
 function runBundled(scriptName, args, cwd) {
-  const script = join4(scriptRoot(), `${scriptName}.mjs`);
+  const script = join5(scriptRoot(), `${scriptName}.mjs`);
   const result = spawnSync(process.execPath, [script, ...args], {
     cwd: cwd ?? process.cwd(),
     encoding: "utf8",
@@ -2209,11 +2249,11 @@ function readJsonFile2(path3) {
   }
 }
 function detectPackageManager2(cwd) {
-  if (existsSync6(join4(cwd, "pnpm-lock.yaml"))) return "pnpm";
-  if (existsSync6(join4(cwd, "bun.lockb")) || existsSync6(join4(cwd, "bun.lock"))) return "bun";
-  if (existsSync6(join4(cwd, "yarn.lock"))) return "yarn";
-  if (existsSync6(join4(cwd, "package-lock.json"))) return "npm";
-  if (existsSync6(join4(cwd, "package.json"))) return "npm";
+  if (existsSync6(join5(cwd, "pnpm-lock.yaml"))) return "pnpm";
+  if (existsSync6(join5(cwd, "bun.lockb")) || existsSync6(join5(cwd, "bun.lock"))) return "bun";
+  if (existsSync6(join5(cwd, "yarn.lock"))) return "yarn";
+  if (existsSync6(join5(cwd, "package-lock.json"))) return "npm";
+  if (existsSync6(join5(cwd, "package.json"))) return "npm";
   return null;
 }
 function scriptCommand(packageManager, scriptName) {
@@ -2229,7 +2269,7 @@ function scriptCommand(packageManager, scriptName) {
   }
 }
 function detectProjectScripts(cwd) {
-  const pkg = readJsonFile2(join4(cwd, "package.json"));
+  const pkg = readJsonFile2(join5(cwd, "package.json"));
   const packageManager = detectPackageManager2(cwd);
   const scripts = pkg?.scripts ?? {};
   const allDependencies = { ...pkg?.dependencies ?? {}, ...pkg?.devDependencies ?? {} };
@@ -2254,7 +2294,7 @@ function detectProjectScripts(cwd) {
   };
 }
 function detectConfigFiles(cwd, filenames) {
-  return filenames.filter((name) => existsSync6(join4(cwd, name)));
+  return filenames.filter((name) => existsSync6(join5(cwd, name)));
 }
 function detectChrome() {
   const envPath = process.env.CHROME_PATH;
@@ -2267,8 +2307,8 @@ function detectChrome() {
   }
   if (process.platform === "win32") {
     const suffixes = [
-      join4("Google", "Chrome SxS", "Application", "chrome.exe"),
-      join4("Google", "Chrome", "Application", "chrome.exe")
+      join5("Google", "Chrome SxS", "Application", "chrome.exe"),
+      join5("Google", "Chrome", "Application", "chrome.exe")
     ];
     const prefixes = [
       process.env.LOCALAPPDATA,
@@ -2277,7 +2317,7 @@ function detectChrome() {
     ].filter((value) => Boolean(value));
     for (const prefix of prefixes) {
       for (const suffix of suffixes) {
-        const candidate = join4(prefix, suffix);
+        const candidate = join5(prefix, suffix);
         if (existsSync6(candidate)) {
           return { installed: true, path: candidate, source: "windows-default" };
         }
@@ -2294,7 +2334,7 @@ function detectChrome() {
   return { installed: false, path: null, source: null };
 }
 function detectChromeDevtoolsDependency() {
-  const manifest = readJsonFile2(join4(pluginRoot(), ".claude-plugin", "plugin.json"));
+  const manifest = readJsonFile2(join5(pluginRoot(), ".claude-plugin", "plugin.json"));
   const dependency = manifest?.dependencies?.find((item) => item.name === "chrome-devtools-mcp");
   return {
     declared: dependency !== void 0,
@@ -2358,8 +2398,84 @@ function browserVerificationDoctor(cwd) {
     ]
   };
 }
+function collectCommandHooks(config) {
+  const root = pluginRoot();
+  const prefix = "${CLAUDE_PLUGIN_ROOT}/";
+  const out = [];
+  for (const [event, matchers] of Object.entries(config?.hooks ?? {})) {
+    if (!Array.isArray(matchers)) continue;
+    for (const matcher of matchers) {
+      if (!Array.isArray(matcher.hooks)) continue;
+      for (const hook of matcher.hooks) {
+        if (hook.type !== "command") continue;
+        const command = typeof hook.command === "string" ? hook.command : null;
+        const args = Array.isArray(hook.args) ? hook.args.filter((arg) => typeof arg === "string") : [];
+        const scriptArg = args[0] ?? null;
+        const scriptPath = scriptArg?.startsWith(prefix) === true ? join5(root, scriptArg.slice(prefix.length)) : null;
+        out.push({
+          event,
+          command,
+          args,
+          shell: typeof hook.shell === "string" ? hook.shell : null,
+          execForm: command === "node" && scriptArg !== null && scriptArg.startsWith(prefix),
+          scriptArg,
+          scriptPath,
+          scriptExists: scriptPath === null ? null : existsSync6(scriptPath)
+        });
+      }
+    }
+  }
+  return out;
+}
+function pluginHealthDoctor() {
+  const root = pluginRoot();
+  const manifestPath = join5(root, ".claude-plugin", "plugin.json");
+  const hooksPath = join5(root, "hooks", "hooks.json");
+  const binPath = join5(root, "bin", "curdx-flow");
+  const manifest = readJsonFile2(manifestPath);
+  const hooksConfig = readJsonFile2(hooksPath);
+  const commandHooks = collectCommandHooks(hooksConfig);
+  const shellFormHooks = commandHooks.filter((hook) => !hook.execForm || hook.shell !== null);
+  const missingScripts = commandHooks.filter((hook) => hook.scriptExists === false);
+  const validHooksObject = hooksConfig !== null && typeof hooksConfig.hooks === "object" && hooksConfig.hooks !== null;
+  const ready = existsSync6(root) && manifest !== null && manifest.name === "curdx-flow" && existsSync6(binPath) && validHooksObject && commandHooks.length > 0 && shellFormHooks.length === 0 && missingScripts.length === 0;
+  return {
+    ready,
+    root,
+    dataDir: process.env.CLAUDE_PLUGIN_DATA ?? null,
+    manifest: {
+      path: manifestPath,
+      exists: existsSync6(manifestPath),
+      valid: manifest !== null,
+      name: manifest?.name ?? null,
+      version: manifest?.version ?? null
+    },
+    hooks: {
+      path: hooksPath,
+      exists: existsSync6(hooksPath),
+      valid: validHooksObject,
+      commandHookCount: commandHooks.length,
+      execForm: shellFormHooks.length === 0,
+      shellFormHooks: shellFormHooks.map((hook) => ({
+        event: hook.event,
+        command: hook.command,
+        args: hook.args,
+        shell: hook.shell
+      })),
+      missingScripts: missingScripts.map((hook) => ({
+        event: hook.event,
+        scriptArg: hook.scriptArg,
+        scriptPath: hook.scriptPath
+      }))
+    },
+    bin: {
+      curdxFlow: existsSync6(binPath),
+      path: binPath
+    }
+  };
+}
 function resolveSpecPathForOutput(cwd, path3) {
-  const fsPath = isAbsolute4(path3) ? path3 : join4(cwd, path3);
+  const fsPath = isAbsolute4(path3) ? path3 : join5(cwd, path3);
   return { path: path3, fsPath };
 }
 function specs(argv) {
@@ -2401,7 +2517,7 @@ function specs(argv) {
         printJson({ ok: false, reason: "not-found", path: target });
         process.exit(1);
       }
-      printJson({ ok: true, name: basename7(target), ...resolved2 });
+      printJson({ ok: true, name: basename8(target), ...resolved2 });
       return;
     }
     const found = findSpec(target, { cwd });
@@ -2410,7 +2526,7 @@ function specs(argv) {
       process.exit(found.reason === "ambiguous" ? 2 : 1);
     }
     const resolved = resolveSpecPathForOutput(cwd, found.path);
-    printJson({ ok: true, name: basename7(found.path), ...resolved });
+    printJson({ ok: true, name: basename8(found.path), ...resolved });
     return;
   }
   usage();
@@ -2429,6 +2545,70 @@ function tasks(argv) {
   const tasksFile = argv[1];
   if (!tasksFile) usage();
   return runBundled("count-tasks", [tasksFile]);
+}
+async function verify(argv) {
+  const [sub, ...rest] = argv;
+  if (sub !== "run") usage();
+  const command = readArg6("--command", rest);
+  if (!command) usage();
+  const cwd = resolve2(readArg6("--cwd", rest) ?? process.cwd());
+  const phase = readArg6("--phase", rest) ?? "execution";
+  if (!["research", "requirements", "design", "tasks", "execution"].includes(phase)) {
+    process.stderr.write(`verify run: unsupported phase: ${phase}
+`);
+    process.exit(2);
+  }
+  const snap = buildWorkflowSnapshot({
+    cwd,
+    spec: readArg6("--spec", rest)
+  });
+  if (!snap.spec?.fsPath || !snap.spec.statePath) {
+    process.stderr.write("verify run: no active spec\n");
+    process.exit(2);
+  }
+  const result = spawnSync(command, {
+    cwd,
+    shell: true,
+    stdio: "inherit",
+    env: process.env
+  });
+  const exitCode = result.status ?? 1;
+  if (result.error) {
+    process.stderr.write(`verify run: ${result.error.message}
+`);
+  }
+  const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+  const srcMtime = await walkSrcTree(snap.spec.fsPath);
+  const block = {
+    command,
+    exitCode,
+    timestamp,
+    srcMtime,
+    description: readArg6("--description", rest) ?? `Verification for ${phase}`
+  };
+  if (exitCode !== 0) {
+    block.failedReason = result.error ? result.error.message : `command exited ${exitCode}`;
+  }
+  const patch = JSON.stringify({
+    verificationBlocks: {
+      [phase]: block
+    }
+  });
+  const merge = spawnSync(process.execPath, [join5(scriptRoot(), "merge-state.mjs"), snap.spec.statePath, patch], {
+    cwd,
+    encoding: "utf8",
+    stdio: ["inherit", "ignore", "pipe"]
+  });
+  if (merge.stderr) process.stderr.write(merge.stderr);
+  if (merge.error) {
+    process.stderr.write(`verify run: failed to record verification: ${merge.error.message}
+`);
+    process.exit(1);
+  }
+  if (merge.status !== 0) {
+    process.exit(merge.status ?? 1);
+  }
+  process.exit(exitCode);
 }
 async function verifyBlocks(argv) {
   const cwd = readArg6("--cwd", argv);
@@ -2449,20 +2629,36 @@ function doctor(argv) {
   const cwd = resolve2(readArg6("--cwd", argv) ?? process.cwd());
   const snap = buildWorkflowSnapshot({ cwd, spec: readArg6("--spec", argv) });
   const expected = [
-    join4(scriptRoot(), "workflow-snapshot.mjs"),
-    join4(scriptRoot(), "smart-route.mjs"),
-    join4(scriptRoot(), "merge-state.mjs"),
-    join4(scriptRoot(), "count-tasks.mjs")
+    join5(scriptRoot(), "workflow-snapshot.mjs"),
+    join5(scriptRoot(), "smart-route.mjs"),
+    join5(scriptRoot(), "merge-state.mjs"),
+    join5(scriptRoot(), "count-tasks.mjs")
   ];
+  const runtimeReady = expected.every((p) => existsSync6(p));
+  const plugin = pluginHealthDoctor();
+  const root = pluginRoot();
   printJson({
-    ok: expected.every((p) => existsSync6(p)),
+    ok: runtimeReady && plugin.ready === true,
     cwd,
-    scripts: Object.fromEntries(expected.map((p) => [basename7(p), existsSync6(p)])),
+    scripts: Object.fromEntries(expected.map((p) => [basename8(p), existsSync6(p)])),
+    runtime: {
+      ready: runtimeReady,
+      scripts: Object.fromEntries(expected.map((p) => [basename8(p), existsSync6(p)]))
+    },
+    plugin,
     browserVerification: browserVerificationDoctor(cwd),
     active: snap.active,
     spec: snap.spec,
     gates: snap.gates,
-    nextAction: snap.nextAction
+    nextAction: snap.nextAction,
+    recommendations: [
+      { id: "workflow", action: snap.nextAction },
+      { id: "plugin-validate", command: `claude plugin validate ${root}` },
+      {
+        id: "plugin-smoke",
+        command: "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc"
+      }
+    ]
   });
 }
 async function main6() {
@@ -2483,6 +2679,9 @@ async function main6() {
     case "tasks":
       tasks(argv);
       return;
+    case "verify":
+      await verify(argv);
+      return;
     case "verify-blocks":
       await verifyBlocks(argv);
       return;
@@ -2501,7 +2700,7 @@ async function main6() {
 function isDirectRun6() {
   try {
     const entry = fileURLToPath6(import.meta.url);
-    return process.argv[1] === entry && basename7(entry).startsWith("runtime-cli.");
+    return process.argv[1] === entry && basename8(entry).startsWith("runtime-cli.");
   } catch {
     return false;
   }

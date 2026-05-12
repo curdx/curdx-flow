@@ -21,12 +21,16 @@ curdx-flow route --goal "$GOAL" --flags "$ARGUMENTS"
 curdx-flow snapshot --spec "$SPEC" --goal "$GOAL"
 curdx-flow state merge "$SPEC_PATH/.curdx-state.json" '{"phase":"tasks"}'
 curdx-flow tasks count "$SPEC_PATH/tasks.md"
+curdx-flow verify run --phase execution --command "npm test" --spec "$SPEC_PATH"
 curdx-flow doctor
 ```
 
 The CLI is a thin wrapper around bundled TypeScript helpers under
 `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/`. It is the default source of truth
 for route facts, active spec facts, task counts, and state merge operations.
+`curdx-flow verify run` is the preferred way to perform final task/spec
+verification because it runs the command and records the resulting
+`verificationBlocks.<phase>` evidence in one step.
 `curdx-flow doctor` also reports browser verification readiness: detected E2E
 scripts, Playwright dependencies/config files, chrome-devtools-mcp dependency
 declaration, and local Chrome availability.

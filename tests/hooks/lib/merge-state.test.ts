@@ -295,4 +295,56 @@ describe("merge-state", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("completion: quick/lite specs require a passing execution verification block", () => {
+    const dir = makeTmpDir("merge-completion-vb-required");
+    const stateFile = path.join(dir, "state.json");
+    writeFileSync(
+      stateFile,
+      JSON.stringify({
+        quickMode: true,
+        autoPolicy: { executionMode: "spec-lite" },
+      }),
+    );
+    try {
+      const r = runLib("merge-state", [stateFile, '{"completed":true}']);
+      expect(r.exitCode).toBe(1);
+      expect(r.stderr).toContain("verificationBlocks.execution");
+      expect(JSON.parse(readFileSync(stateFile, "utf8"))).toEqual({
+        quickMode: true,
+        autoPolicy: { executionMode: "spec-lite" },
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("completion: quick/lite specs can complete after passing execution verification", () => {
+    const dir = makeTmpDir("merge-completion-vb-pass");
+    const stateFile = path.join(dir, "state.json");
+    const execution = {
+      command: "npm test",
+      exitCode: 0,
+      timestamp: "2026-05-06T12:00:00.000Z",
+      srcMtime: 1714994400000,
+    };
+    writeFileSync(
+      stateFile,
+      JSON.stringify({
+        route: { route: "lite-spec" },
+        verificationBlocks: { execution },
+      }),
+    );
+    try {
+      const r = runLib("merge-state", [stateFile, '{"completed":true}']);
+      expect(r.exitCode).toBe(0);
+      expect(JSON.parse(readFileSync(stateFile, "utf8"))).toEqual({
+        route: { route: "lite-spec" },
+        verificationBlocks: { execution },
+        completed: true,
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

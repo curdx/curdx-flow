@@ -263,6 +263,21 @@ describe("hooks config integrity", () => {
           expect(hook.command, `${event}: command hook missing command`).toEqual(
             expect.any(String),
           );
+          expect(hook.command, `${event}: plugin hooks should use exec form via node`).toBe(
+            "node",
+          );
+          expect(hook.shell, `${event}: exec-form hooks must not set shell`).toBeUndefined();
+          expect(Array.isArray(hook.args), `${event}: exec-form hook missing args`).toBe(true);
+          const args = Array.isArray(hook.args) ? hook.args : [];
+          expect(args.length, `${event}: expected exactly one script arg`).toBe(1);
+          expect(args[0], `${event}: script path must use CLAUDE_PLUGIN_ROOT`).toMatch(
+            /^\$\{CLAUDE_PLUGIN_ROOT\}\/hooks\/scripts\/[a-z0-9-]+\.mjs$/,
+          );
+          const relScript = String(args[0]).replace("${CLAUDE_PLUGIN_ROOT}/", "");
+          expect(
+            existsSync(path.join(PLUGIN_ROOT, relScript)),
+            `${event}: hook script does not exist: ${args[0]}`,
+          ).toBe(true);
           expect(hook.statusMessage, `${event}: command hook missing statusMessage`).toEqual(
             expect.any(String),
           );

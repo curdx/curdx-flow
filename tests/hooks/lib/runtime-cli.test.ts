@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { makeTmpDir, runLib } from "./_lib-helpers.js";
@@ -123,6 +123,26 @@ describe("runtime-cli lib", () => {
       });
       expect(result.exitCode).toBe(0);
       const json = result.json as {
+        ok?: boolean;
+        runtime?: {
+          ready?: boolean;
+        };
+        plugin?: {
+          ready?: boolean;
+          manifest?: {
+            name?: string | null;
+            version?: string | null;
+          };
+          hooks?: {
+            commandHookCount?: number;
+            execForm?: boolean;
+            shellFormHooks?: unknown[];
+            missingScripts?: unknown[];
+          };
+          bin?: {
+            curdxFlow?: boolean;
+          };
+        };
         browserVerification?: {
           project?: {
             devServerScripts?: string[];
@@ -140,7 +160,31 @@ describe("runtime-cli lib", () => {
             chromeInstalled?: boolean;
           };
         };
+        recommendations?: Array<{ id?: string; command?: string; action?: string }>;
       };
+      expect(json.ok).toBe(true);
+      expect(json.runtime?.ready).toBe(true);
+      expect(json.plugin).toMatchObject({
+        ready: true,
+        manifest: {
+          name: "curdx-flow",
+        },
+        hooks: {
+          execForm: true,
+          shellFormHooks: [],
+          missingScripts: [],
+        },
+        bin: {
+          curdxFlow: true,
+        },
+      });
+      expect(json.plugin?.hooks?.commandHookCount).toBeGreaterThan(0);
+      expect(json.recommendations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "workflow" }),
+          expect.objectContaining({ id: "plugin-validate" }),
+        ]),
+      );
       expect(json.browserVerification?.project?.devServerScripts).toContain("dev");
       expect(json.browserVerification?.project?.e2eScripts).toContain("test:e2e");
       expect(json.browserVerification?.project?.e2eConfigFiles).toContain("playwright.config.ts");
@@ -154,6 +198,60 @@ describe("runtime-cli lib", () => {
         dependencyDeclared: true,
         chromeInstalled: true,
       });
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("runs verification commands and records execution evidence", () => {
+    const cwd = makeTmpDir("runtime-verify-run");
+    try {
+      mkdirSync(path.join(cwd, "specs", "x"), { recursive: true });
+      writeFileSync(path.join(cwd, "specs", ".current-spec"), "x\n");
+      writeFileSync(
+        path.join(cwd, "specs", "x", ".curdx-state.json"),
+        JSON.stringify({
+          version: 2,
+          source: "spec",
+          name: "x",
+          basePath: "./specs/x",
+          phase: "execution",
+          verificationBlocks: {},
+        }),
+      );
+      writeFileSync(path.join(cwd, "specs", "x", "tasks.md"), "- [x] 1.1 Done\n");
+
+      const command = `${JSON.stringify(process.execPath)} -e "process.exit(0)"`;
+      const result = runLib("runtime-cli", [
+        "verify",
+        "run",
+        "--cwd",
+        cwd,
+        "--phase",
+        "execution",
+        "--command",
+        command,
+      ]);
+      expect(result.exitCode).toBe(0);
+
+      const state = JSON.parse(
+        readFileSync(path.join(cwd, "specs", "x", ".curdx-state.json"), "utf8"),
+      ) as {
+        verificationBlocks?: {
+          execution?: {
+            command?: string;
+            exitCode?: number;
+            timestamp?: string;
+            srcMtime?: number;
+          };
+        };
+      };
+      expect(state.verificationBlocks?.execution).toMatchObject({
+        command,
+        exitCode: 0,
+      });
+      expect(Date.parse(state.verificationBlocks?.execution?.timestamp ?? "")).not.toBeNaN();
+      expect(state.verificationBlocks?.execution?.srcMtime).toEqual(expect.any(Number));
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

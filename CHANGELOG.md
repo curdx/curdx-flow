@@ -2,6 +2,29 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.24 — 2026-05-12
+
+### Added
+
+- **Runtime verification recorder.** Added `curdx-flow verify run --phase execution --command "<cmd>"`, which executes the real verification command, records `verificationBlocks.<phase>` with command, exit code, timestamp, and source mtime, and returns the command's exit code.
+- **True Claude Code E2E evidence gate.** The real Claude Code E2E now asserts quick/lite specs persist `verificationBlocks.execution` after a passing `npm test`, so completion cannot be only a model claim.
+
+### Changed
+
+- **Plugin hooks now use Claude Code exec form.** `hooks/hooks.json` uses `command: "node"` plus `args` with `${CLAUDE_PLUGIN_ROOT}` for every bundled hook script, matching current Claude Code guidance for path placeholders and avoiding shell quoting issues.
+- **Quick/lite completion is verification-backed.** `/curdx-flow:start`, `/curdx-flow:implement`, and coordinator guidance now require final verification through `curdx-flow verify run` before marking a quick/lite spec complete.
+- **Runtime health output is more useful.** `curdx-flow doctor` now reports plugin manifest health, hook exec-form status, missing hook scripts, plugin bin readiness, browser verification readiness, and recommended validation commands.
+- **Claude CLI smoke scripts support local `claudecc` aliases.** Smoke and E2E scripts can run through zsh login aliases while still supporting `CURDX_FLOW_CLAUDE_BIN=claude` for the official binary.
+
+### Fixed
+
+- **State completion hard gate.** `curdx-flow state merge` now rejects `completed:true` for quick/lite specs unless a passing `verificationBlocks.execution` record already exists.
+- **Help/status first-run UX.** Public help/status outputs now suppress unrelated injected hook context, and smoke tests fail if PUA/injection/third-party hook text leaks into those surfaces.
+
+### Tests
+
+- Verified with `npm run verify`, `CURDX_FLOW_CLAUDE_BIN=claudecc npm run test:claudecc`, and real Claude Code E2E `CURDX_FLOW_CLAUDE_BIN=claudecc CURDX_FLOW_E2E_MAX_BUDGET_USD=3 npm run test:claudecc:e2e`.
+
 ## 7.1.23 — 2026-05-11
 
 ### Changed

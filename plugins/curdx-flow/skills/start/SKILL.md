@@ -133,7 +133,12 @@ When `--quick` causes this skill to generate phase artifacts inline instead of d
 ```
 
 - Do not create heading-only task sections such as `## T1`; runtime task parsing ignores them and `/curdx-flow:status` will report `empty-tasks`.
-- If implementation is completed in the same quick run, mark the checkbox `[x]`, set `completed: true`, and leave `taskIndex` equal to the number of top-level checkbox tasks.
+- If implementation is completed in the same quick run, run the final task's exact **Verify** command through the runtime recorder before marking completion:
+  ```bash
+  curdx-flow verify run --phase execution --command "<exact Verify command>" --spec "$name"
+  ```
+  This command actually executes the verification, records `.curdx-state.json::verificationBlocks.execution` with the command, exit code, timestamp, and source mtime, and returns the verification exit code. If the verification fails, do not set `completed: true`; fix the issue and rerun the recorder.
+- After recorded verification passes, mark the checkbox `[x]`, set `completed: true`, and leave `taskIndex` equal to the number of top-level checkbox tasks.
 
 ## Skill Discovery
 

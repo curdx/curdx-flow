@@ -117,6 +117,39 @@ function validateVerificationBlocks(merged) {
     }
   }
 }
+function patchSetsCompletedTrue(patch) {
+  return isPlainObject(patch) && patch["completed"] === true;
+}
+function isQuickOrLiteSpecState(merged) {
+  if (!isPlainObject(merged)) return false;
+  if (merged["quickMode"] === true) return true;
+  const autoPolicy = merged["autoPolicy"];
+  if (isPlainObject(autoPolicy) && autoPolicy["executionMode"] === "spec-lite") {
+    return true;
+  }
+  const route = merged["route"];
+  return isPlainObject(route) && route["route"] === "lite-spec";
+}
+function validateCompletionHasExecutionVerification(merged, patch) {
+  if (!patchSetsCompletedTrue(patch) || !isQuickOrLiteSpecState(merged)) return;
+  if (!isPlainObject(merged)) return;
+  const blocks = merged["verificationBlocks"];
+  const execution = isPlainObject(blocks) ? blocks["execution"] : void 0;
+  if (!isPlainObject(execution)) {
+    throw new Error(
+      "cannot set completed=true for quick/lite spec without verificationBlocks.execution"
+    );
+  }
+  const command = execution["command"];
+  const exitCode = execution["exitCode"];
+  const timestamp = execution["timestamp"];
+  const srcMtime = execution["srcMtime"];
+  if (typeof command !== "string" || command.length === 0 || exitCode !== 0 || typeof timestamp !== "string" || Number.isNaN(Date.parse(timestamp)) || typeof srcMtime !== "number" || !Number.isFinite(srcMtime) || srcMtime < 0) {
+    throw new Error(
+      "cannot set completed=true for quick/lite spec without a passing verificationBlocks.execution record"
+    );
+  }
+}
 function main() {
   const args = process.argv.slice(2);
   const stateFile = args[0];
@@ -166,6 +199,13 @@ function main() {
 `);
       process.exit(1);
     }
+  }
+  try {
+    validateCompletionHasExecutionVerification(merged, patch);
+  } catch (err) {
+    process.stderr.write(`merge-state: ${err.message}
+`);
+    process.exit(1);
   }
   const serialized = JSON.stringify(merged) + "\n";
   writeFileAtomic(stateFile, serialized);

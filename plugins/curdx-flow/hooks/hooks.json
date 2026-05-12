@@ -7,8 +7,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/user-prompt-expansion-guard.mjs\"",
-            "shell": "bash",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/user-prompt-expansion-guard.mjs"],
             "timeout": 10,
             "statusMessage": "Checking curdx-flow slash context"
           }
@@ -21,8 +21,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/quick-mode-guard.mjs\"",
-            "shell": "bash",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/quick-mode-guard.mjs"],
             "timeout": 10,
             "statusMessage": "Checking quick-mode question policy"
           }
@@ -35,8 +35,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-watcher.mjs\"",
-            "shell": "bash",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-watcher.mjs"],
             "timeout": 30,
             "statusMessage": "Checking curdx-flow execution state"
           }
@@ -49,8 +49,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/load-spec-context.mjs\"",
-            "shell": "bash",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/load-spec-context.mjs"],
             "timeout": 15,
             "async": true,
             "statusMessage": "Loading active spec context"
@@ -63,8 +63,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/subagent-context-injector.mjs\"",
-            "shell": "bash",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/subagent-context-injector.mjs"],
             "timeout": 15,
             "statusMessage": "Preparing subagent spec context"
           }
@@ -76,8 +76,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/task-completed-verifier.mjs\"",
-            "shell": "bash",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/task-completed-verifier.mjs"],
             "timeout": 20,
             "statusMessage": "Verifying completed task evidence"
           }
@@ -89,8 +89,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-tool-batch-snapshot.mjs\"",
-            "shell": "bash",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-tool-batch-snapshot.mjs"],
             "timeout": 10,
             "statusMessage": "Checking curdx-flow batch state"
           }
@@ -102,8 +102,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-failure-handler.mjs\"",
-            "shell": "bash",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-failure-handler.mjs"],
             "timeout": 15,
             "statusMessage": "Recording stop failure context"
           }

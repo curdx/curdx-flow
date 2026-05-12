@@ -213,21 +213,26 @@ Only when both `globalIteration < maxGlobalIterations` AND `taskIteration < maxT
 
 When all tasks complete (taskIndex >= totalTasks):
 1. Verify all tasks marked [x] in tasks.md
-2. Mark state as completed (preserve audit fields):
+2. Record final execution verification before marking completion. Use the final completed task's exact `**Verify**` command from `tasks.md`:
+   ```bash
+   curdx-flow verify run --phase execution --command "$VERIFY_CMD" --spec "$SPEC_PATH"
+   ```
+   This command actually executes the verification and writes `.curdx-state.json::verificationBlocks.execution` with the command, exit code, timestamp, and source mtime. If it exits non-zero, do not continue to completion; fix the issue and rerun verification.
+3. Mark state as completed (preserve audit fields):
    ```bash
    COMPLETED_AT=$(node -e "process.stdout.write(new Date().toISOString())")
    curdx-flow state merge "$SPEC_PATH/.curdx-state.json" "{\"completed\":true,\"completedAt\":\"$COMPLETED_AT\",\"awaitingApproval\":false}"
    ```
-3. Keep .progress.md (preserve learnings and history)
-4. Cleanup orphaned temp progress files: `find "$SPEC_PATH" -name ".progress-task-*.md" -mmin +60 -delete 2>/dev/null || true`
-5. Update spec index: `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet`
-6. Commit remaining spec changes:
+4. Keep .progress.md (preserve learnings and history)
+5. Cleanup orphaned temp progress files: `find "$SPEC_PATH" -name ".progress-task-*.md" -mmin +60 -delete 2>/dev/null || true`
+6. Update spec index: `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet`
+7. Commit remaining spec changes:
    ```bash
    git add "$SPEC_PATH/tasks.md" "$SPEC_PATH/.progress.md" "$SPEC_PATH/.curdx-state.json" ./specs/.index/
    git diff --cached --quiet || git commit -m "chore(spec): final progress update for $spec"
    ```
-7. Check for PR link: `gh pr view --json url -q .url 2>/dev/null`
-8. Output: ALL_TASKS_COMPLETE (and PR link if exists)
+8. Check for PR link: `gh pr view --json url -q .url 2>/dev/null`
+9. Output: ALL_TASKS_COMPLETE (and PR link if exists)
 
 ## Output on Start
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Smoke-test the shipped Claude Code plugin through the user's claudecc entry.
+// Smoke-test the shipped Claude Code plugin through Claude Code.
 //
 // The commands that may invoke slash skills run in an isolated temp directory
 // so smoke validation never creates specs or state files in this repository.
@@ -18,6 +18,28 @@ function quote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
+function shellCommandToken(value) {
+  const raw = String(value);
+  return /^[A-Za-z0-9_@%+=:,./-]+$/.test(raw) ? raw : quote(raw);
+}
+
+function canRunClaudeBin(bin) {
+  const result = spawnSync('zsh', ['-lic', `${shellCommandToken(bin)} --version >/dev/null 2>&1`], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 30000,
+  });
+  return result.status === 0;
+}
+
+function resolveClaudeBin() {
+  if (process.env.CURDX_FLOW_CLAUDE_BIN) return process.env.CURDX_FLOW_CLAUDE_BIN;
+  if (canRunClaudeBin('claudecc')) return 'claudecc';
+  return 'claude';
+}
+
+const claudeBin = resolveClaudeBin();
+
 function runZsh(label, command, cwd = repoRoot) {
   console.log(`[claudecc-smoke] ${label}`);
   const result = spawnSync('zsh', ['-lic', command], {
@@ -35,6 +57,10 @@ function runZsh(label, command, cwd = repoRoot) {
     throw new Error(`${label} failed with exit ${result.status}`);
   }
   return result.stdout;
+}
+
+function runClaude(label, args, cwd = repoRoot) {
+  return runZsh(label, `${shellCommandToken(claudeBin)} ${args}`, cwd);
 }
 
 function runNode(label, args, cwd = repoRoot) {
@@ -56,29 +82,38 @@ function runNode(label, args, cwd = repoRoot) {
   return result.stdout;
 }
 
+function assertCleanSlashOutput(label, output) {
+  if (/\bPUA\b|pua[:\s]|注入|injected prompt|third-party hook|第三方 hook/i.test(output)) {
+    throw new Error(`${label} exposed unrelated injected context`);
+  }
+}
+
 const tmp = mkdtempSync(join(tmpdir(), 'curdx-flow-claudecc-smoke-'));
 
 try {
-  runZsh('version', 'claudecc --version');
-  runZsh('plugin validate', `claudecc plugin validate ${quote(pluginRoot)}`);
+  console.log(`[claudecc-smoke] using ${claudeBin}`);
+  runClaude('version', '--version');
+  runClaude('plugin validate', `plugin validate ${quote(pluginRoot)}`);
 
-  const help = runZsh(
+  const help = runClaude(
     'slash help',
-    `claudecc --plugin-dir ${quote(pluginRoot)} -p ${quote('/curdx-flow:help')}`,
+    `--plugin-dir ${quote(pluginRoot)} -p ${quote('/curdx-flow:help')}`,
     tmp,
   );
   if (!help.includes('/curdx-flow:start')) {
     throw new Error('help smoke did not include /curdx-flow:start');
   }
+  assertCleanSlashOutput('help smoke', help);
 
-  const status = runZsh(
+  const status = runClaude(
     'slash status',
-    `claudecc --plugin-dir ${quote(pluginRoot)} -p ${quote('/curdx-flow:status')}`,
+    `--plugin-dir ${quote(pluginRoot)} -p ${quote('/curdx-flow:status')}`,
     tmp,
   );
   if (!/Recommended next action/i.test(status)) {
     throw new Error('status smoke did not include a recommended next action');
   }
+  assertCleanSlashOutput('status smoke', status);
 
   const doctor = runNode('runtime doctor', [
     join(pluginRoot, 'bin', 'curdx-flow'),

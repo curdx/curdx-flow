@@ -209,6 +209,53 @@ function validateVerificationBlocks(merged: JsonValue): void {
   }
 }
 
+function patchSetsCompletedTrue(patch: JsonValue): boolean {
+  return isPlainObject(patch) && patch["completed"] === true;
+}
+
+function isQuickOrLiteSpecState(merged: JsonValue): boolean {
+  if (!isPlainObject(merged)) return false;
+  if (merged["quickMode"] === true) return true;
+
+  const autoPolicy = merged["autoPolicy"];
+  if (isPlainObject(autoPolicy) && autoPolicy["executionMode"] === "spec-lite") {
+    return true;
+  }
+
+  const route = merged["route"];
+  return isPlainObject(route) && route["route"] === "lite-spec";
+}
+
+function validateCompletionHasExecutionVerification(merged: JsonValue, patch: JsonValue): void {
+  if (!patchSetsCompletedTrue(patch) || !isQuickOrLiteSpecState(merged)) return;
+  if (!isPlainObject(merged)) return;
+  const blocks = merged["verificationBlocks"];
+  const execution = isPlainObject(blocks) ? blocks["execution"] : undefined;
+  if (!isPlainObject(execution)) {
+    throw new Error(
+      "cannot set completed=true for quick/lite spec without verificationBlocks.execution",
+    );
+  }
+  const command = execution["command"];
+  const exitCode = execution["exitCode"];
+  const timestamp = execution["timestamp"];
+  const srcMtime = execution["srcMtime"];
+  if (
+    typeof command !== "string" ||
+    command.length === 0 ||
+    exitCode !== 0 ||
+    typeof timestamp !== "string" ||
+    Number.isNaN(Date.parse(timestamp)) ||
+    typeof srcMtime !== "number" ||
+    !Number.isFinite(srcMtime) ||
+    srcMtime < 0
+  ) {
+    throw new Error(
+      "cannot set completed=true for quick/lite spec without a passing verificationBlocks.execution record",
+    );
+  }
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   const stateFile = args[0];
@@ -277,6 +324,12 @@ function main(): void {
       process.stderr.write(`merge-state: ${(err as Error).message}\n`);
       process.exit(1);
     }
+  }
+  try {
+    validateCompletionHasExecutionVerification(merged, patch);
+  } catch (err) {
+    process.stderr.write(`merge-state: ${(err as Error).message}\n`);
+    process.exit(1);
   }
 
   // Compact form (no whitespace between tokens) keeps the file's keys dense

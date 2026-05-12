@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { classifySmartRoute } from "./smart-route.js";
 import { buildWorkflowSnapshot } from "./workflow-snapshot.js";
 import { runVerificationCheck } from "./check-verification-blocks.js";
+import { walkSrcTree } from "./verify-blocks.js";
 import {
   findSpec,
   getDefaultDir,
@@ -50,6 +51,7 @@ function usage(exitCode = 1): never {
     "  specs resolve [name-or-path] [--cwd <dir>]",
     "  state merge <state-file> <json-patch>",
     "  tasks count <tasks.md>",
+    "  verify run --command <cmd> [--phase execution] [--spec <name-or-path>] [--cwd <dir>] [--description <text>]",
     "  verify-blocks [--cwd <dir>] [--spec <name-or-path>]",
     "  doctor [--cwd <dir>]",
   ].join("\n");
@@ -135,6 +137,27 @@ function readJsonFile<T>(path: string): T | null {
   } catch {
     return null;
   }
+}
+
+interface HookCommandConfig {
+  type?: unknown;
+  command?: unknown;
+  args?: unknown;
+  shell?: unknown;
+}
+
+interface HookMatcherConfig {
+  hooks?: HookCommandConfig[];
+}
+
+interface HooksConfig {
+  hooks?: Record<string, HookMatcherConfig[]>;
+}
+
+interface PluginManifest {
+  name?: string;
+  version?: string;
+  dependencies?: Array<{ name?: string; marketplace?: string }>;
 }
 
 function detectPackageManager(cwd: string): string | null {
@@ -255,9 +278,7 @@ function detectChromeDevtoolsDependency(): {
   declared: boolean;
   marketplace: string | null;
 } {
-  const manifest = readJsonFile<{
-    dependencies?: Array<{ name?: string; marketplace?: string }>;
-  }>(join(pluginRoot(), ".claude-plugin", "plugin.json"));
+  const manifest = readJsonFile<PluginManifest>(join(pluginRoot(), ".claude-plugin", "plugin.json"));
   const dependency = manifest?.dependencies?.find((item) => item.name === "chrome-devtools-mcp");
   return {
     declared: dependency !== undefined,
@@ -329,6 +350,119 @@ function browserVerificationDoctor(cwd: string): unknown {
       "console/network/performance diagnosis",
       "Playwright flaky or insufficient evidence",
     ],
+  };
+}
+
+function collectCommandHooks(config: HooksConfig | null): Array<{
+  event: string;
+  command: string | null;
+  args: string[];
+  shell: string | null;
+  execForm: boolean;
+  scriptArg: string | null;
+  scriptPath: string | null;
+  scriptExists: boolean | null;
+}> {
+  const root = pluginRoot();
+  const prefix = "${CLAUDE_PLUGIN_ROOT}/";
+  const out: Array<{
+    event: string;
+    command: string | null;
+    args: string[];
+    shell: string | null;
+    execForm: boolean;
+    scriptArg: string | null;
+    scriptPath: string | null;
+    scriptExists: boolean | null;
+  }> = [];
+
+  for (const [event, matchers] of Object.entries(config?.hooks ?? {})) {
+    if (!Array.isArray(matchers)) continue;
+    for (const matcher of matchers) {
+      if (!Array.isArray(matcher.hooks)) continue;
+      for (const hook of matcher.hooks) {
+        if (hook.type !== "command") continue;
+        const command = typeof hook.command === "string" ? hook.command : null;
+        const args = Array.isArray(hook.args)
+          ? hook.args.filter((arg): arg is string => typeof arg === "string")
+          : [];
+        const scriptArg = args[0] ?? null;
+        const scriptPath =
+          scriptArg?.startsWith(prefix) === true
+            ? join(root, scriptArg.slice(prefix.length))
+            : null;
+        out.push({
+          event,
+          command,
+          args,
+          shell: typeof hook.shell === "string" ? hook.shell : null,
+          execForm: command === "node" && scriptArg !== null && scriptArg.startsWith(prefix),
+          scriptArg,
+          scriptPath,
+          scriptExists: scriptPath === null ? null : existsSync(scriptPath),
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
+function pluginHealthDoctor(): unknown {
+  const root = pluginRoot();
+  const manifestPath = join(root, ".claude-plugin", "plugin.json");
+  const hooksPath = join(root, "hooks", "hooks.json");
+  const binPath = join(root, "bin", "curdx-flow");
+  const manifest = readJsonFile<PluginManifest>(manifestPath);
+  const hooksConfig = readJsonFile<HooksConfig>(hooksPath);
+  const commandHooks = collectCommandHooks(hooksConfig);
+  const shellFormHooks = commandHooks.filter((hook) => !hook.execForm || hook.shell !== null);
+  const missingScripts = commandHooks.filter((hook) => hook.scriptExists === false);
+  const validHooksObject =
+    hooksConfig !== null && typeof hooksConfig.hooks === "object" && hooksConfig.hooks !== null;
+  const ready =
+    existsSync(root) &&
+    manifest !== null &&
+    manifest.name === "curdx-flow" &&
+    existsSync(binPath) &&
+    validHooksObject &&
+    commandHooks.length > 0 &&
+    shellFormHooks.length === 0 &&
+    missingScripts.length === 0;
+
+  return {
+    ready,
+    root,
+    dataDir: process.env.CLAUDE_PLUGIN_DATA ?? null,
+    manifest: {
+      path: manifestPath,
+      exists: existsSync(manifestPath),
+      valid: manifest !== null,
+      name: manifest?.name ?? null,
+      version: manifest?.version ?? null,
+    },
+    hooks: {
+      path: hooksPath,
+      exists: existsSync(hooksPath),
+      valid: validHooksObject,
+      commandHookCount: commandHooks.length,
+      execForm: shellFormHooks.length === 0,
+      shellFormHooks: shellFormHooks.map((hook) => ({
+        event: hook.event,
+        command: hook.command,
+        args: hook.args,
+        shell: hook.shell,
+      })),
+      missingScripts: missingScripts.map((hook) => ({
+        event: hook.event,
+        scriptArg: hook.scriptArg,
+        scriptPath: hook.scriptPath,
+      })),
+    },
+    bin: {
+      curdxFlow: existsSync(binPath),
+      path: binPath,
+    },
   };
 }
 
@@ -415,6 +549,74 @@ function tasks(argv: string[]): never {
   return runBundled("count-tasks", [tasksFile]);
 }
 
+async function verify(argv: string[]): Promise<void> {
+  const [sub, ...rest] = argv;
+  if (sub !== "run") usage();
+  const command = readArg("--command", rest);
+  if (!command) usage();
+  const cwd = resolve(readArg("--cwd", rest) ?? process.cwd());
+  const phase = readArg("--phase", rest) ?? "execution";
+  if (!["research", "requirements", "design", "tasks", "execution"].includes(phase)) {
+    process.stderr.write(`verify run: unsupported phase: ${phase}\n`);
+    process.exit(2);
+  }
+
+  const snap = buildWorkflowSnapshot({
+    cwd,
+    spec: readArg("--spec", rest),
+  });
+  if (!snap.spec?.fsPath || !snap.spec.statePath) {
+    process.stderr.write("verify run: no active spec\n");
+    process.exit(2);
+  }
+
+  const result = spawnSync(command, {
+    cwd,
+    shell: true,
+    stdio: "inherit",
+    env: process.env,
+  });
+  const exitCode = result.status ?? 1;
+  if (result.error) {
+    process.stderr.write(`verify run: ${(result.error as Error).message}\n`);
+  }
+
+  const timestamp = new Date().toISOString();
+  const srcMtime = await walkSrcTree(snap.spec.fsPath);
+  const block: Record<string, unknown> = {
+    command,
+    exitCode,
+    timestamp,
+    srcMtime,
+    description: readArg("--description", rest) ?? `Verification for ${phase}`,
+  };
+  if (exitCode !== 0) {
+    block.failedReason = result.error
+      ? (result.error as Error).message
+      : `command exited ${exitCode}`;
+  }
+
+  const patch = JSON.stringify({
+    verificationBlocks: {
+      [phase]: block,
+    },
+  });
+  const merge = spawnSync(process.execPath, [join(scriptRoot(), "merge-state.mjs"), snap.spec.statePath, patch], {
+    cwd,
+    encoding: "utf8",
+    stdio: ["inherit", "ignore", "pipe"],
+  });
+  if (merge.stderr) process.stderr.write(merge.stderr);
+  if (merge.error) {
+    process.stderr.write(`verify run: failed to record verification: ${(merge.error as Error).message}\n`);
+    process.exit(1);
+  }
+  if (merge.status !== 0) {
+    process.exit(merge.status ?? 1);
+  }
+  process.exit(exitCode);
+}
+
 async function verifyBlocks(argv: string[]): Promise<void> {
   const cwd = readArg("--cwd", argv);
   const snap = buildWorkflowSnapshot({
@@ -440,15 +642,31 @@ function doctor(argv: string[]): void {
     join(scriptRoot(), "merge-state.mjs"),
     join(scriptRoot(), "count-tasks.mjs"),
   ];
+  const runtimeReady = expected.every((p) => existsSync(p));
+  const plugin = pluginHealthDoctor() as { ready?: boolean };
+  const root = pluginRoot();
   printJson({
-    ok: expected.every((p) => existsSync(p)),
+    ok: runtimeReady && plugin.ready === true,
     cwd,
     scripts: Object.fromEntries(expected.map((p) => [basename(p), existsSync(p)])),
+    runtime: {
+      ready: runtimeReady,
+      scripts: Object.fromEntries(expected.map((p) => [basename(p), existsSync(p)])),
+    },
+    plugin,
     browserVerification: browserVerificationDoctor(cwd),
     active: snap.active,
     spec: snap.spec,
     gates: snap.gates,
     nextAction: snap.nextAction,
+    recommendations: [
+      { id: "workflow", action: snap.nextAction },
+      { id: "plugin-validate", command: `claude plugin validate ${root}` },
+      {
+        id: "plugin-smoke",
+        command: "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc",
+      },
+    ],
   });
 }
 
@@ -469,6 +687,9 @@ async function main(): Promise<void> {
       return;
     case "tasks":
       tasks(argv);
+      return;
+    case "verify":
+      await verify(argv);
       return;
     case "verify-blocks":
       await verifyBlocks(argv);
