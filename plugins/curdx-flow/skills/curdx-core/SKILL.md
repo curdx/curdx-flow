@@ -21,6 +21,11 @@ curdx-flow route --goal "$GOAL" --flags "$ARGUMENTS"
 curdx-flow snapshot --spec "$SPEC" --goal "$GOAL"
 curdx-flow state merge "$SPEC_PATH/.curdx-state.json" '{"phase":"tasks"}'
 curdx-flow tasks count "$SPEC_PATH/tasks.md"
+curdx-flow dev detect
+curdx-flow dev up
+curdx-flow dev health
+curdx-flow dev verify
+curdx-flow dev down
 curdx-flow verify run --phase execution --command "npm test" --spec "$SPEC_PATH"
 curdx-flow doctor
 ```
@@ -31,6 +36,10 @@ for route facts, active spec facts, task counts, and state merge operations.
 `curdx-flow verify run` is the preferred way to perform final task/spec
 verification because it runs the command and records the resulting
 `verificationBlocks.<phase>` evidence in one step.
+`curdx-flow dev detect/up/health/verify/down` is the preferred runtime surface
+for last-mile local evidence. It detects frontend/backend roots, starts only
+project-declared dev commands, checks health endpoints, runs baseline
+verification commands, and stops processes that curdx-flow started.
 `curdx-flow doctor` also reports browser verification readiness: detected E2E
 scripts, Playwright dependencies/config files, chrome-devtools-mcp dependency
 declaration, and local Chrome availability.

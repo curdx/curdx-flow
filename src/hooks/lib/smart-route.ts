@@ -11,11 +11,25 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { classifyAutoPolicy, type AutoPolicy } from "./auto-policy.js";
-import { discoverProjectTopology, type ProjectTopology } from "./project-topology.js";
+import {
+  discoverProjectTopology,
+  type ProjectTopology,
+  type WorkspaceState,
+} from "./project-topology.js";
 import {
   recommendToolCapabilities,
   type CapabilityRecommendation,
 } from "./tool-capabilities.js";
+import {
+  detectStackProfile,
+  selectContextBudget,
+  selectQualityGates,
+  selectSuggestedVerifier,
+  type ContextBudget,
+  type QualityGate,
+  type StackProfile,
+  type SuggestedVerifier,
+} from "./stack-capabilities.js";
 import { findSpec, resolveCurrent } from "../_shared/path-resolver.js";
 
 export type SmartRouteName =
@@ -23,8 +37,43 @@ export type SmartRouteName =
   | "lite-spec"
   | "full-spec"
   | "epic-split"
+  | "scaffold"
+  | "product-inception"
+  | "greenfield-spec"
+  | "prototype"
+  | "import-spec"
   | "resume-current"
   | "blocked-ask-user";
+
+export type IntentKind =
+  | "scaffold"
+  | "product"
+  | "prototype"
+  | "import-spec"
+  | "feature"
+  | "fix"
+  | "refactor"
+  | "release"
+  | "unknown";
+
+export type IntentClarity = "high" | "medium" | "low";
+export type DeliveryExpectation =
+  | "demo"
+  | "usable-app"
+  | "production"
+  | "maintenance";
+
+export interface SmartIntent {
+  workspaceState: WorkspaceState;
+  intentKind: IntentKind;
+  clarity: IntentClarity;
+  stackSpecified: boolean;
+  artifactProvided: boolean;
+  deliveryExpectation: DeliveryExpectation;
+  missingFacts: string[];
+  confidence: number;
+  recommendedAction: string;
+}
 
 export interface SmartRouteInput {
   goal?: string;
@@ -54,8 +103,13 @@ export interface SmartRoute {
   };
   topology?: Pick<
     ProjectTopology,
-    "devContextFound" | "roots" | "requiredRoots" | "missingRoots" | "accessFix" | "warnings"
+    "workspaceState" | "devContextFound" | "roots" | "requiredRoots" | "missingRoots" | "accessFix" | "warnings"
   >;
+  intent: SmartIntent;
+  stackProfile: StackProfile;
+  qualityGates: QualityGate[];
+  suggestedVerifier: SuggestedVerifier;
+  contextBudget: ContextBudget;
   blockedReason?: string;
   recommendedCapabilities: CapabilityRecommendation[];
   policy: {
@@ -209,6 +263,140 @@ function routeFromPolicy(policy: AutoPolicy): SmartRouteName {
   return "full-spec";
 }
 
+const STACK_RE =
+  /\b(vue|vue3|vite|pinia|vue router|react|next\.?js|nuxt|spring|spring boot|spring cloud|maven|gradle|java|node|nestjs|fastapi|go|postgres|mysql|redis|docker)\b|前端|后端|全栈|全家桶/i;
+const ARTIFACT_RE =
+  /\b(prd|spec|requirements?|design doc|figma|wireframe|openapi|swagger|api doc|接口文档|产品文档|需求文档|设计稿|原型图)\b/i;
+const SCAFFOLD_RE =
+  /\b(scaffold|bootstrap|init|starter|template|skeleton|create project|create app|new project|setup project)\b|脚手架|初始化|搭建项目|创建项目|项目骨架|先搭骨架|搭骨架/i;
+const PROTOTYPE_RE =
+  /\b(prototype|poc|demo|spike|experiment|technical validation|prove|验证|原型|演示|技术验证|试验)\b/i;
+const PRODUCT_RE =
+  /\b(app|application|system|platform|saas|crm|dashboard|admin|portal|product|service|tool)\b|系统|平台|后台|管理端|应用|产品|工具|开发一套|做一个|做一套/i;
+const PRODUCT_DOMAIN_HINT_RE =
+  /\b(crm|customer|order|inventory|invoice|booking|calendar|todo|task|project|ticket|commerce|shop|blog|cms|dashboard|admin|user|auth|report)\b|客户|订单|库存|合同|发票|预约|日历|待办|任务|项目|工单|商城|电商|博客|内容|后台|用户|权限|登录|报表/i;
+const FIX_RE =
+  /\b(fix|bug|debug|repair|resolve|broken|regression|修复|报错|失败|排查|定位)\b/i;
+const REFACTOR_RE =
+  /\b(refactor|rewrite|cleanup|restructure|重构|重写|整理)\b/i;
+const RELEASE_RE =
+  /\b(release|publish|deploy|ship|tag|npm|上线|发布|部署|打包)\b/i;
+const DEMO_RE = /\b(demo|prototype|poc|演示|原型)\b/i;
+const PRODUCTION_RE = /\b(production|prod|ship|launch|deploy|release|上线|生产|发布|可用|能用)\b/i;
+
+function classifyIntent(goal: string, topology: ProjectTopology): SmartIntent {
+  const artifactProvided = ARTIFACT_RE.test(goal);
+  const stackSpecified = STACK_RE.test(goal);
+  let intentKind: IntentKind = "unknown";
+  if (artifactProvided) intentKind = "import-spec";
+  else if (SCAFFOLD_RE.test(goal)) intentKind = "scaffold";
+  else if (PROTOTYPE_RE.test(goal)) intentKind = "prototype";
+  else if (RELEASE_RE.test(goal)) intentKind = "release";
+  else if (FIX_RE.test(goal)) intentKind = "fix";
+  else if (REFACTOR_RE.test(goal)) intentKind = "refactor";
+  else if (PRODUCT_RE.test(goal)) intentKind = "product";
+  else if (goal.length > 0) intentKind = "feature";
+
+  let deliveryExpectation: DeliveryExpectation = "maintenance";
+  if (DEMO_RE.test(goal)) deliveryExpectation = "demo";
+  else if (PRODUCTION_RE.test(goal)) deliveryExpectation = "production";
+  else if (intentKind === "product" || topology.workspaceState === "empty") {
+    deliveryExpectation = "usable-app";
+  }
+
+  const missingFacts: string[] = [];
+  if (
+    topology.workspaceState === "empty" &&
+    intentKind === "product" &&
+    !artifactProvided &&
+    !PRODUCT_DOMAIN_HINT_RE.test(goal)
+  ) {
+    missingFacts.push("product domain, target user, MVP acceptance criteria");
+  }
+  if (
+    topology.workspaceState === "empty" &&
+    (intentKind === "product" || intentKind === "feature") &&
+    !stackSpecified
+  ) {
+    missingFacts.push("preferred stack or permission to choose defaults");
+  }
+  if (intentKind === "prototype" && !/success|metric|prove|验证|成功|标准/i.test(goal)) {
+    missingFacts.push("prototype success criterion");
+  }
+
+  let clarity: IntentClarity = "medium";
+  if (artifactProvided || intentKind === "scaffold") clarity = "high";
+  else if (missingFacts.length > 0) clarity = "low";
+  else if (stackSpecified || intentKind === "fix" || intentKind === "refactor") clarity = "high";
+
+  let confidence = 0.62;
+  if (artifactProvided || SCAFFOLD_RE.test(goal) || PROTOTYPE_RE.test(goal)) confidence += 0.22;
+  if (stackSpecified) confidence += 0.08;
+  if (missingFacts.length > 0) confidence -= 0.18;
+  confidence = Math.max(0.1, Math.min(0.98, Number(confidence.toFixed(2))));
+
+  let recommendedAction = "route with deterministic policy";
+  if (topology.workspaceState === "empty") {
+    if (intentKind === "scaffold") {
+      recommendedAction =
+        "select an official/ecosystem scaffold source when available, create the requested skeleton, then run baseline verification";
+    } else if (intentKind === "import-spec") {
+      recommendedAction = "import the provided artifact, derive plan/tasks, then implement";
+    } else if (intentKind === "prototype") {
+      recommendedAction = "create a bounded prototype spec with an explicit success criterion";
+    } else if (clarity === "low") {
+      recommendedAction = "perform product inception before writing application code";
+    } else {
+      recommendedAction = "create greenfield spec with constitution and walking skeleton tasks";
+    }
+  }
+
+  return {
+    workspaceState: topology.workspaceState,
+    intentKind,
+    clarity,
+    stackSpecified,
+    artifactProvided,
+    deliveryExpectation,
+    missingFacts,
+    confidence,
+    recommendedAction,
+  };
+}
+
+function routeFromIntent(intent: SmartIntent, policy: AutoPolicy): SmartRouteName {
+  if (intent.workspaceState === "empty") {
+    switch (intent.intentKind) {
+      case "scaffold":
+        return "scaffold";
+      case "import-spec":
+        return "import-spec";
+      case "prototype":
+        return "prototype";
+      case "product":
+        return intent.clarity === "low" ? "product-inception" : "greenfield-spec";
+      case "feature":
+        return intent.clarity === "low" ? "product-inception" : "greenfield-spec";
+      default:
+        return "product-inception";
+    }
+  }
+  return routeFromPolicy(policy);
+}
+
+function reasonForRoute(route: SmartRouteName, policy: AutoPolicy, intent: SmartIntent): string {
+  if (
+    route === "scaffold" ||
+    route === "product-inception" ||
+    route === "greenfield-spec" ||
+    route === "prototype" ||
+    route === "import-spec"
+  ) {
+    return intent.recommendedAction;
+  }
+  return policy.reasons[0] ?? "deterministic policy classification";
+}
+
 function routeDefaults(route: SmartRouteName): Pick<
   SmartRoute,
   "nextAction" | "shouldCreateSpec" | "shouldCreateTasks" | "shouldUseSubagent" | "taskCountLimit"
@@ -249,6 +437,51 @@ function routeDefaults(route: SmartRouteName): Pick<
         shouldUseSubagent: true,
         taskCountLimit: 12,
       };
+    case "scaffold":
+      return {
+        nextAction:
+          "Select an official/ecosystem scaffold source when available, create the requested skeleton, record assumptions, then run baseline verification.",
+        shouldCreateSpec: false,
+        shouldCreateTasks: false,
+        shouldUseSubagent: false,
+        taskCountLimit: 1,
+      };
+    case "product-inception":
+      return {
+        nextAction:
+          "Create product context first: mission, constraints, roadmap, tech-stack assumptions, and project constitution before application code.",
+        shouldCreateSpec: false,
+        shouldCreateTasks: false,
+        shouldUseSubagent: true,
+        taskCountLimit: 0,
+      };
+    case "greenfield-spec":
+      return {
+        nextAction:
+          "Create a greenfield spec with constitution, technical plan, walking skeleton, and vertical-slice tasks.",
+        shouldCreateSpec: true,
+        shouldCreateTasks: true,
+        shouldUseSubagent: true,
+        taskCountLimit: 10,
+      };
+    case "prototype":
+      return {
+        nextAction:
+          "Create a bounded prototype spec, define the success criterion, implement the thinnest proof, and verify it.",
+        shouldCreateSpec: true,
+        shouldCreateTasks: true,
+        shouldUseSubagent: false,
+        taskCountLimit: 5,
+      };
+    case "import-spec":
+      return {
+        nextAction:
+          "Import the provided PRD/spec/design/API artifact, normalize it into curdx-flow artifacts, then plan implementation.",
+        shouldCreateSpec: true,
+        shouldCreateTasks: true,
+        shouldUseSubagent: true,
+        taskCountLimit: 12,
+      };
     case "resume-current":
       return {
         nextAction: "Resume the active spec at its next incomplete phase.",
@@ -270,6 +503,7 @@ function routeDefaults(route: SmartRouteName): Pick<
 
 function publicTopology(topology: ProjectTopology): SmartRoute["topology"] {
   return {
+    workspaceState: topology.workspaceState,
     devContextFound: topology.devContextFound,
     roots: topology.roots,
     requiredRoots: topology.requiredRoots,
@@ -292,6 +526,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
   const cwd = input.cwd ?? process.cwd();
   const activeSpec = findActiveSpec({ ...input, cwd });
   const topology = discoverProjectTopology({ cwd, goal });
+  const intent = classifyIntent(goal, topology);
   const policy = classifyAutoPolicy({
     goal,
     flags: input.flags,
@@ -299,12 +534,48 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
     estimatedFiles: input.estimatedFiles,
     taskCount: input.taskCount,
   });
+  const routeCandidate = routeFromIntent(intent, policy);
+  const stackProfile = detectStackProfile({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk,
+  });
+  const qualityGates = selectQualityGates({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk,
+    stackProfile,
+  });
+  const suggestedVerifier = selectSuggestedVerifier({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk,
+    stackProfile,
+    qualityGates,
+  });
+  const contextBudget = selectContextBudget({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk,
+    stackProfile,
+  });
   const recommendations = recommendToolCapabilities({
     goal,
-    route: routeFromPolicy(policy),
+    route: routeCandidate,
     risk: policy.risk,
     topologyKinds: topologyKinds(topology),
     topologyFrameworks: topologyFrameworks(topology),
+    stackProfile,
+    qualityGates,
+    contextBudget,
     missingRoots: topology.missingRoots.length,
     availableCapabilities: input.availableCapabilities,
   });
@@ -318,6 +589,11 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
       ...routeDefaults("resume-current"),
       nextAction: nextActionForActiveSpec(activeSpec),
       topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
       recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["active unfinished spec"],
@@ -339,6 +615,11 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
         "Ask whether to resume the existing spec or rerun with --fresh for new work.",
       ...routeDefaults("blocked-ask-user"),
       topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
       recommendedCapabilities: recommendations,
       policy: publicPolicy(policy),
       reasons: ["existing unfinished spec with new goal text"],
@@ -356,6 +637,11 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
         blockedReason: `Ambiguous spec '${explicitName}': ${found.matches.join(", ")}`,
         ...routeDefaults("blocked-ask-user"),
         topology: publicTopology(topology),
+        intent,
+        stackProfile,
+        qualityGates,
+        suggestedVerifier,
+        contextBudget,
         recommendedCapabilities: recommendations,
         policy: publicPolicy(policy),
         reasons: ["ambiguous spec name"],
@@ -371,6 +657,11 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
       blockedReason: "Ask for the goal or a spec name.",
       ...routeDefaults("blocked-ask-user"),
       topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
       recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["missing goal"],
@@ -390,20 +681,30 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
       ...routeDefaults("blocked-ask-user"),
       nextAction: topology.accessFix ?? "Add the missing code root, then rerun /curdx-flow:start.",
       topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
       recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["related code root is outside current Claude Code access"],
     };
   }
 
-  const route = routeFromPolicy(policy);
+  const route = routeCandidate;
   const defaults = routeDefaults(route);
   return {
     version: 1,
     route,
-    reason: policy.reasons[0] ?? "deterministic policy classification",
+    reason: reasonForRoute(route, policy, intent),
     ...defaults,
     topology: publicTopology(topology),
+    intent,
+    stackProfile,
+    qualityGates,
+    suggestedVerifier,
+    contextBudget,
     recommendedCapabilities: recommendations,
     policy: publicPolicy(policy),
     reasons: policy.reasons,

@@ -164,22 +164,37 @@ try {
     'context7,frontend-design,chrome-devtools-mcp,sequential-thinking',
   ]);
   const capabilityParsed = JSON.parse(capabilityRoute);
-  const capabilityIds = capabilityParsed.recommendedCapabilities?.map((rec) => rec.id) ?? [];
-  for (const expected of [
-    'context7',
-    'claude-mem',
-    'frontend-design',
-    'chrome-devtools-mcp',
-    'sequential-thinking',
-    'pua',
+  const capabilityRecs = capabilityParsed.recommendedCapabilities ?? [];
+  const capabilityById = new Map(capabilityRecs.map((rec) => [rec.id, rec]));
+  for (const [expected, availability] of [
+    ['context7', 'core-required'],
+    ['claude-mem', 'core-required'],
+    ['frontend-design', 'core-required'],
+    ['chrome-devtools-mcp', 'core-required'],
+    ['sequential-thinking', 'core-required'],
+    ['pua', 'core-required'],
+    ['docs-query', 'known-available'],
+    ['browser-verification', 'known-available'],
+    ['stack-specific-verification', 'known-available'],
+    ['context-budget', 'known-available'],
   ]) {
-    if (!capabilityIds.includes(expected)) {
+    const rec = capabilityById.get(expected);
+    if (!rec) {
       throw new Error(`missing capability recommendation ${expected}: ${capabilityRoute}`);
     }
+    if (rec.availability !== availability) {
+      throw new Error(`expected ${expected} availability ${availability}: ${capabilityRoute}`);
+    }
   }
-  for (const rec of capabilityParsed.recommendedCapabilities ?? []) {
-    if (rec.availability !== 'core-required') {
-      throw new Error(`expected core-required capability ${rec.id}: ${capabilityRoute}`);
+  for (const [expected, phase] of [
+    ['docs-query', 'before-coding'],
+    ['browser-verification', 'verification'],
+    ['stack-specific-verification', 'verification'],
+    ['context-budget', 'planning'],
+  ]) {
+    const rec = capabilityById.get(expected);
+    if (rec?.phase !== phase) {
+      throw new Error(`expected ${expected} phase ${phase}: ${capabilityRoute}`);
     }
   }
 

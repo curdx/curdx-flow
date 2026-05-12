@@ -72,6 +72,19 @@ function readText(file) {
     return "";
   }
 }
+function meaningfulProjectEntries(projectRoot) {
+  try {
+    return readdirSync2(projectRoot).filter((name) => {
+      if (name === ".git" || name === ".hg" || name === ".svn") return false;
+      if (name === ".DS_Store" || name === "Thumbs.db") return false;
+      if (name === ".claude" || name === ".curdx") return false;
+      if (name === "specs") return false;
+      return true;
+    });
+  } catch {
+    return [];
+  }
+}
 function normalizeSerializedPath(input) {
   const trimmed = input.trim().replace(/^["'`]+|["'`]+$/g, "");
   if (!trimmed || trimmed === "./") return ".";
@@ -287,6 +300,23 @@ function detectPackageManager(rootAbs) {
   if (isFile(path.join(rootAbs, "build.gradle")) || isFile(path.join(rootAbs, "build.gradle.kts"))) return "gradle";
   return void 0;
 }
+function hasManifestOrSource(rootAbs) {
+  return [
+    "package.json",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "go.mod",
+    "pyproject.toml",
+    "Cargo.toml",
+    "Dockerfile",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "src",
+    "app",
+    "packages"
+  ].some((entry) => existsSync2(path.join(rootAbs, entry)));
+}
 function pushUnique(items, item) {
   if (!items.includes(item)) items.push(item);
 }
@@ -441,6 +471,24 @@ function siblingCandidates(projectRoot) {
   }
   return out;
 }
+function detectWorkspaceState(projectRoot, roots) {
+  const meaningfulEntries = meaningfulProjectEntries(projectRoot);
+  if (meaningfulEntries.length === 0) return "empty";
+  const accessibleRoots = roots.filter((root) => root.access !== "missing-path");
+  const hasFrontend = accessibleRoots.some(
+    (root) => root.role === "frontend" || root.kinds.includes("frontend-app")
+  );
+  const hasBackend = accessibleRoots.some(
+    (root) => root.role === "backend" || root.kinds.includes("backend-service")
+  );
+  const hasMultipleRoots = new Set(accessibleRoots.map((root) => root.path)).size > 1;
+  if (hasMultipleRoots && hasFrontend && hasBackend) return "split-repo";
+  const current = accessibleRoots.find((root) => root.path === ".");
+  const currentAbs = projectRoot;
+  const currentKnown = current !== void 0 && current.kinds.some((kind) => kind !== "unknown" && kind !== "infra");
+  if (currentKnown || hasManifestOrSource(currentAbs)) return "existing";
+  return "scaffolded";
+}
 function discoverRawRoots(projectRoot) {
   const fromClaude = parseRootsFromClaudeMd(projectRoot);
   const map = /* @__PURE__ */ new Map();
@@ -530,10 +578,12 @@ function discoverProjectTopology(options = {}) {
   const missingRoots = requiredRoots.filter(
     (root) => root.access === "outside-working-directory" || root.access === "missing-path"
   );
+  const workspaceState = detectWorkspaceState(projectRoot, roots);
   return {
     version: 1,
     cwd,
     projectRoot,
+    workspaceState,
     devContextFound: raw.devContextFound,
     roots,
     requiredRoots,
@@ -547,6 +597,7 @@ function renderContextMap(topology) {
     "# Project Context Map",
     "",
     `Project root: ${topology.projectRoot}`,
+    `Workspace state: ${topology.workspaceState}`,
     `Dev context found: ${topology.devContextFound ? "yes" : "no"}`,
     "",
     "## Code Roots",

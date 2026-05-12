@@ -2,6 +2,7 @@
 // edits. It is advisory and fail-open.
 
 import { buildWorkflowSnapshot } from "./lib/workflow-snapshot.js";
+import { classifySmartRoute } from "./lib/smart-route.js";
 import { readStdinJson } from "./_shared/stdin.js";
 
 interface ToolCall {
@@ -30,6 +31,14 @@ async function main(): Promise<void> {
   try {
     const snapshot = buildWorkflowSnapshot({ cwd: input.cwd });
     if (!snapshot.active || snapshot.gates.length === 0) return;
+    const route = classifySmartRoute({ cwd: input.cwd });
+    const missingVerifier =
+      route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? "repo verifier";
+    const qualityGateText = route.qualityGates
+      .filter((gate) => gate.required)
+      .slice(0, 3)
+      .map((gate) => gate.command ? `${gate.id} (${gate.command})` : gate.id)
+      .join(", ");
 
     process.stdout.write(
       JSON.stringify({
@@ -37,6 +46,9 @@ async function main(): Promise<void> {
           hookEventName: "PostToolBatch",
           additionalContext:
             `curdx-flow snapshot gates after batch: ${snapshot.gates.join(", ")}. ` +
+            `Stack: ${route.stackProfile.primary}. ` +
+            `Quality gates: ${qualityGateText || "none"}. ` +
+            `Suggested verifier: ${missingVerifier}. ` +
             `Next action: ${snapshot.nextAction}`,
         },
       }),

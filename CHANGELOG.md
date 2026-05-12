@@ -2,6 +2,27 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.25 — 2026-05-12
+
+### Added
+
+- **Prompt optimization skill.** Added `/curdx-flow:prompt-optimize`, an advisory-only skill that diagnoses task prompts, recommends route/skills/agents, lists risks and quality gates, and outputs a paste-ready optimized prompt without executing the task.
+- **Stack-aware routing data source.** Added a typed stack capability map adapted from ECC for TypeScript, React, Vue, Next.js, Node, Spring Boot/Spring Cloud, Python, Go, Rust, and Claude Code plugin projects.
+- **Route quality gates.** `curdx-flow route` now includes `stackProfile`, `qualityGates`, `suggestedVerifier`, and `contextBudget` alongside existing route and capability recommendations.
+- **Routing references.** Added `references/intelligent-routing.md` and `references/prompt-optimization.md` so long route, quality gate, and prompt rules stay out of high-frequency skill text.
+
+### Changed
+
+- **Capability recommendations are stage-aware.** Smart-route recommendations now include docs query, browser verification, TDD, security review, stack-specific verification, and context-budget workflow hints while preserving the existing companion tool recommendations.
+- **Runtime diagnostics are richer.** `curdx-flow doctor` reports stack profile, quality gates, suggested verifier, docs-sensitive warnings, and hook freshness; `dev-runtime` uses stack-aware fallback verifiers for Go, Rust, Python, and Claude Code plugin projects.
+- **Hooks provide compact routing context.** UserPromptExpansion and PostToolBatch now inject stack, verifier, quality gate, and context-budget hints; TaskCompleted failure reasons include a suggested verifier without adding new block conditions.
+- **Agent frontmatter is more delegation-friendly.** Agent descriptions now start with natural trigger language; executor guidance explicitly protects release/plugin metadata unless listed in task files.
+- **Installer bundle stays slim.** CLAUDE.md sync rendering no longer statically imports the hook capability router, keeping `dist/index.mjs` below the 84KB bundle gate.
+
+### Tests
+
+- Added coverage for stack capabilities, prompt-optimize expansion, PostToolBatch context, stage-aware capabilities, route quality gates, doctor output, and agent/references manifest integrity.
+
 ## 7.1.24 — 2026-05-12
 
 ### Added

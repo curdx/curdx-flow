@@ -53,6 +53,12 @@ export type RootAccess =
   | "outside-working-directory"
   | "missing-path";
 
+export type WorkspaceState =
+  | "empty"
+  | "scaffolded"
+  | "existing"
+  | "split-repo";
+
 export interface CodeRoot {
   name: string;
   path: string;
@@ -76,6 +82,7 @@ export interface ProjectTopology {
   version: 1;
   cwd: string;
   projectRoot: string;
+  workspaceState: WorkspaceState;
   devContextFound: boolean;
   roots: CodeRoot[];
   requiredRoots: RequiredRoot[];
@@ -134,6 +141,20 @@ function readText(file: string): string {
     return readFileSync(file, "utf8");
   } catch {
     return "";
+  }
+}
+
+function meaningfulProjectEntries(projectRoot: string): string[] {
+  try {
+    return readdirSync(projectRoot).filter((name) => {
+      if (name === ".git" || name === ".hg" || name === ".svn") return false;
+      if (name === ".DS_Store" || name === "Thumbs.db") return false;
+      if (name === ".claude" || name === ".curdx") return false;
+      if (name === "specs") return false;
+      return true;
+    });
+  } catch {
+    return [];
   }
 }
 
@@ -386,6 +407,24 @@ function detectPackageManager(rootAbs: string): string | undefined {
   return undefined;
 }
 
+function hasManifestOrSource(rootAbs: string): boolean {
+  return [
+    "package.json",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "go.mod",
+    "pyproject.toml",
+    "Cargo.toml",
+    "Dockerfile",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "src",
+    "app",
+    "packages",
+  ].some((entry) => existsSync(path.join(rootAbs, entry)));
+}
+
 function pushUnique<T extends string>(items: T[], item: T): void {
   if (!items.includes(item)) items.push(item);
 }
@@ -564,6 +603,30 @@ function siblingCandidates(projectRoot: string): RawRoot[] {
   return out;
 }
 
+function detectWorkspaceState(projectRoot: string, roots: CodeRoot[]): WorkspaceState {
+  const meaningfulEntries = meaningfulProjectEntries(projectRoot);
+  if (meaningfulEntries.length === 0) return "empty";
+
+  const accessibleRoots = roots.filter((root) => root.access !== "missing-path");
+  const hasFrontend = accessibleRoots.some(
+    (root) => root.role === "frontend" || root.kinds.includes("frontend-app"),
+  );
+  const hasBackend = accessibleRoots.some(
+    (root) => root.role === "backend" || root.kinds.includes("backend-service"),
+  );
+  const hasMultipleRoots = new Set(accessibleRoots.map((root) => root.path)).size > 1;
+  if (hasMultipleRoots && hasFrontend && hasBackend) return "split-repo";
+
+  const current = accessibleRoots.find((root) => root.path === ".");
+  const currentAbs = projectRoot;
+  const currentKnown =
+    current !== undefined &&
+    current.kinds.some((kind) => kind !== "unknown" && kind !== "infra");
+  if (currentKnown || hasManifestOrSource(currentAbs)) return "existing";
+
+  return "scaffolded";
+}
+
 function discoverRawRoots(projectRoot: string): {
   roots: RawRoot[];
   devContextFound: boolean;
@@ -670,11 +733,13 @@ export function discoverProjectTopology(options: DiscoveryOptions = {}): Project
   const missingRoots = requiredRoots.filter(
     (root) => root.access === "outside-working-directory" || root.access === "missing-path",
   );
+  const workspaceState = detectWorkspaceState(projectRoot, roots);
 
   return {
     version: 1,
     cwd,
     projectRoot,
+    workspaceState,
     devContextFound: raw.devContextFound,
     roots,
     requiredRoots,
@@ -689,6 +754,7 @@ export function renderContextMap(topology: ProjectTopology): string {
     "# Project Context Map",
     "",
     `Project root: ${topology.projectRoot}`,
+    `Workspace state: ${topology.workspaceState}`,
     `Dev context found: ${topology.devContextFound ? "yes" : "no"}`,
     "",
     "## Code Roots",

@@ -12,7 +12,37 @@ function writeJson(file: string, value: unknown): void {
 }
 
 describe("project-topology detector", () => {
-  it("extracts dev code roots from CLAUDE.md and classifies Vue plus Spring Cloud", () => {
+  it("classifies a truly empty workspace as empty", () => {
+    const cwd = makeTmpDir("topology-empty");
+    try {
+      const topology = discoverProjectTopology({ cwd });
+
+      expect(topology.workspaceState).toBe("empty");
+      expect(topology.roots).toEqual([
+        expect.objectContaining({
+          name: "current",
+          kinds: ["unknown"],
+        }),
+      ]);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("classifies package-only starter folders as scaffolded or existing after manifests appear", () => {
+    const cwd = makeTmpDir("topology-scaffolded");
+    try {
+      writeFileSync(path.join(cwd, "README.md"), "# Starter\n");
+
+      const topology = discoverProjectTopology({ cwd });
+
+      expect(topology.workspaceState).toBe("scaffolded");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("extracts dev code roots from CLAUDE.md and classifies frontend plus backend stack hints", () => {
     const parent = makeTmpDir("topology-split");
     const backend = path.join(parent, "backend");
     const frontend = path.join(parent, "frontend");
@@ -54,6 +84,7 @@ describe("project-topology detector", () => {
       const front = topology.roots.find((root) => root.name === "frontend");
       const back = topology.roots.find((root) => root.name === "backend");
       expect(topology.devContextFound).toBe(true);
+      expect(topology.workspaceState).toBe("split-repo");
       expect(front?.kinds).toContain("frontend-app");
       expect(front?.frameworks).toEqual(expect.arrayContaining(["vue", "vite"]));
       expect(back?.kinds).toContain("backend-service");

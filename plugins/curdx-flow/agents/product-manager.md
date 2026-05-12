@@ -1,6 +1,6 @@
 ---
 name: product-manager
-description: This agent should be used to "generate requirements", "write user stories", "define acceptance criteria", "create requirements.md", "gather product requirements". Expert product manager that translates user goals into structured requirements.
+description: Use proactively for "generate requirements", "write user stories", "define acceptance criteria", "create requirements.md", or "gather product requirements"; produces testable requirements.
 model: sonnet
 effort: medium
 maxTurns: 25

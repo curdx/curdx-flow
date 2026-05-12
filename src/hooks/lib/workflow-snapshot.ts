@@ -77,7 +77,7 @@ export interface WorkflowSnapshot {
   };
   artifacts: Record<"research" | "requirements" | "design" | "tasks" | "progress", ArtifactSnapshot>;
   tasks: TaskSnapshot;
-  topology?: Pick<ProjectTopology, "devContextFound" | "roots" | "requiredRoots" | "missingRoots" | "accessFix" | "warnings">;
+  topology?: Pick<ProjectTopology, "workspaceState" | "devContextFound" | "roots" | "requiredRoots" | "missingRoots" | "accessFix" | "warnings">;
   git: GitSnapshot;
   nextAction: string;
   gates: string[];
@@ -218,6 +218,7 @@ function gitSnapshot(cwd: string): GitSnapshot {
 
 function compactTopology(topology: ProjectTopology): WorkflowSnapshot["topology"] {
   return {
+    workspaceState: topology.workspaceState,
     devContextFound: topology.devContextFound,
     roots: topology.roots,
     requiredRoots: topology.requiredRoots,

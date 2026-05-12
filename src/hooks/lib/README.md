@@ -1,6 +1,6 @@
 # lib/ — cross-platform Node CLI utilities
 
-This directory holds 11 single-purpose Node CLIs that replace the v6
+This directory holds single-purpose Node CLIs that replace the v6
 `bash + jq + grep + find + lsof` toolchain so the curdx-flow plugin runs
 on Windows, Linux, and macOS without a POSIX shell. Sources are TypeScript
 in `src/hooks/lib/*.ts`; esbuild bundles them to
@@ -10,7 +10,7 @@ them as `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/<name>.mjs" <args>`.
 
 ## Convergence rationale
 
-The catalog converged from an initial 11 to **10** during Phase 2.5
+The core catalog converged from an initial 11 to **10** during Phase 2.5
 (`specs/cross-platform-support/tasks.md` task 2.5). Convergence bar:
 **a lib stays only if it has ≥2 distinct callers OR ≥30 lines of
 non-trivial impl** (the disjunction means a "future-use" lib with
@@ -25,7 +25,9 @@ diverged from the canonical `spec.schema.json::fixTaskMap` shape
 `{attempts, fixTaskIds, lastError}` documented in `references/failure-recovery.md`,
 `references/coordinator-pattern.md`, and `skills/implement/SKILL.md`. Keeping
 the lib risked a future caller picking up the wrong shape and writing
-state that violates the schema. The inline `node -e` pattern shown in
+state that violates the schema. Later additions such as `project-topology` and
+`dev-runtime` and `stack-capabilities` follow the same "non-trivial or
+multi-caller" bar. The inline `node -e` pattern shown in
 `references/failure-recovery.md:250-260` already mutates `fixTaskMap`
 correctly with the canonical shape — no replacement lib is needed.
 
@@ -44,13 +46,15 @@ to recreate later.
 | `cleanup-files` | 185 | 0 (designed for `skills/implement/SKILL.md` cleanup phase) | glob + delete with safety guards (refuses to delete outside repo, refuses dotfiles unless explicit) |
 | `count-mocks` | 107 | 0 (designed for `templates/tasks.md` verification-before-completion VE2) | walks tests/, counts `vi.mock` / `jest.mock` / `mock.fn` occurrences, prints mock-vs-real ratio JSON |
 | `count-tasks` | 54 | 0 (designed for `templates/tasks.md`, `skills/status/SKILL.md`) | parse `tasks.md` → `{total, completed, pending}` JSON via `_shared/markdown-task-parser` |
+| `dev-runtime` | 500+ | 1 (`runtime-cli`) | last-mile local evidence runtime: detect project commands, start services, check health, run verification, and stop curdx-flow-started services |
 | `ensure-gitignore` | 64 | 0 (designed for `skills/implement/SKILL.md`, `templates/tasks.md`) | idempotent: append `<entry>` to `.gitignore` only if missing |
 | `get-default-branch` | 105 | 0 (designed for native sync + `skills/start/SKILL.md`) | cross-platform git default branch detection (origin/HEAD → main → master fallback chain) |
 | `init-execution-state` | 88 | 0 (designed for `skills/start/SKILL.md`) | copy `.curdx-state.json` template into spec dir with atomic write |
 | `kill-port` | 129 | 0 (designed for `templates/tasks.md` cleanup + dev-server reset) | cross-platform port killer (replaces `lsof -ti:PORT \| xargs kill`); uses `netstat`/`ss`/`lsof` per OS |
 | `merge-state` | 106 | **9** (`skills/{requirements,design,research,implement}/SKILL.md`, `agents/{product-manager,research-analyst,task-planner,architect-reviewer}.md`, `references/coordinator-pattern.md`) | JSON deep-merge + atomic write — the **load-bearing** lib that replaces every `jq '.field=val' s.json > tmp && mv` in the markdown sweep |
-| `project-topology` | 600+ | 2 (`skills/start/SKILL.md`, `skills/index/SKILL.md`) | cheap CLAUDE.md/settings/manifest scanner that identifies code roots, Vue/React/Spring/plugin stacks, and missing cross-root access |
+| `project-topology` | 600+ | 2 (`skills/start/SKILL.md`, `skills/index/SKILL.md`) | cheap CLAUDE.md/settings/manifest scanner that identifies workspace state, code roots, common frontend/backend/plugin stack hints, and missing cross-root access |
 | `search-files` | 154 | 0 (designed for complex grep cases in skill prompts) | cross-platform recursive content search (replaces `grep -rn` for non-trivial patterns); supports include/exclude globs |
+| `stack-capabilities` | 600+ | 3 (`smart-route`, `dev-runtime`, `runtime-cli doctor`) | typed stack capability map adapted from ECC: stack profile, quality gates, suggested verifier, and context budget for TypeScript/React/Vue/Next/Node/Spring/Python/Go/Rust/Claude Code plugin work |
 | `update-modification-map` | 61 | 0 (designed for `agents/task-planner.md` modification tracking) | maintain `<spec-dir>/.file-modifications.json` (taskId → unique file list); separate sidecar from `.curdx-state.json::modificationMap` |
 
 **Caller counts** are from a `grep -rln 'lib/<name>\.mjs'` sweep over

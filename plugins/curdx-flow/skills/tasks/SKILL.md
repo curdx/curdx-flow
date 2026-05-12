@@ -43,7 +43,8 @@ Complete these coordination steps in order; do not create user-facing implementa
    curdx-flow route --goal "$GOAL" --flags "$ARGUMENTS"
    ```
    Merge the JSON into `.curdx-state.json` as `{ "autoPolicy": <policy>, "granularity": <policy.taskGranularity> }`.
-9. Read context: `requirements.md`, `design.md`, `research.md` (if exists), `.progress.md`
+9. Read route context from `.curdx-state.json` when present: `route.stackProfile`, `route.qualityGates`, `route.suggestedVerifier`, and `route.contextBudget`. Use `${CLAUDE_PLUGIN_ROOT}/references/intelligent-routing.md` only when the compact route facts need interpretation.
+10. Read context: `requirements.md`, `design.md`, `research.md` (if exists), `.progress.md`
 
 ## Step 2: Interview (skip if --quick)
 
@@ -114,6 +115,9 @@ Direct path:
    - Count total tasks, output to `./specs/$spec/tasks.md`
    - If quick mode and policy verification is strict: auto-enable VE tasks. Otherwise keep VE tasks risk-triggered. For UI/full-stack work, Browser Verify must select Playwright CLI or Chrome DevTools MCP.
    - When Browser Verify selects Playwright and no E2E package script exists, include a task to add `test:e2e` or the repo's equivalent script before final verification.
+   - For greenfield work (`intent.workspaceState == "empty"` or route `greenfield-spec`), include a walking-skeleton task before business slices. It must prove the selected project shape, contract, and dev runtime can start and verify together.
+   - For scaffold or greenfield foundation work, prefer official or ecosystem-maintained scaffold generators for named stacks when current docs show one exists; self-author only when no trustworthy generator exists, the requested skeleton is intentionally smaller, or a custom skeleton is safer to verify.
+   - Prefer `curdx-flow dev detect`, `curdx-flow dev up`, `curdx-flow dev health`, `curdx-flow dev verify`, and `curdx-flow dev down` for local runtime evidence when project scripts exist.
 3. Wait for the Task result. Require `TASKS_READY` before proceeding; if `TASKS_BLOCKED`, surface the blocking source items and stop.
 4. Read `$SPEC_PATH/tasks.md`.
 
@@ -134,6 +138,9 @@ Optional Agent Teams path:
 > - **Review Cadence**: `autoPolicy.reviewCadence`
 > - **Verification Level**: `autoPolicy.verificationLevel`
 > - **Value Slice Rule**: test/reproduce + implementation + verification + commit stay inside one top-level task
+> - **Intent Facts**: full `.curdx-state.json::intent` JSON when present
+> - **Project Topology**: full `.curdx-state.json::projectTopology` JSON when present
+> - **Greenfield Rule**: if workspace is empty/greenfield, plan foundation as a walking skeleton before business slices
 >
 > For VE Tasks — VE1 (startup), VE2 (check), VE3 (cleanup) — generation:
 > - **Browser Verification**: Playwright CLI by default, Chrome DevTools MCP for GIS/WebGL/canvas/map/GPU/rendering or console/network/performance diagnosis, none only for non-browser work

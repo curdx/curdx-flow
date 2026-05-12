@@ -12,6 +12,9 @@ describe("workflow-snapshot lib", () => {
       expect(result.json).toMatchObject({
         version: 2,
         active: false,
+        topology: {
+          workspaceState: "empty",
+        },
         nextAction: "No active spec. Run /curdx-flow:start <name> <goal>.",
       });
     } finally {

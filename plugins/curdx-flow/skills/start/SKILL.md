@@ -26,8 +26,13 @@ Users do not need to know `--add-dir`. If routing returns a missing code root, s
      --goal "$goal" \
      --flags "$ARGUMENTS"
    ```
-3. Treat the returned `route` as the source of truth. Do not invent a different workflow unless the router says `blocked-ask-user` and the user's answer changes the facts.
-4. If the router returns `recommendedCapabilities`, treat them as tool-use hints, not mandatory steps. `availability: core-required` means the curdx-flow bundle expects that companion to be installed by default (`context7`, `claude-mem`, `frontend-design`, `chrome-devtools-mcp`, `sequential-thinking`, `pua`). `availability: check-if-installed` is reserved for future non-core capabilities; check the current Claude Code tool/skill surface before invoking those.
+3. Treat the returned `route` and `intent` as the source of truth. Do not invent a different workflow unless the router says `blocked-ask-user` and the user's answer changes the facts.
+4. Always read these adaptive facts before acting:
+   - `topology.workspaceState`: `empty`, `scaffolded`, `existing`, or `split-repo`
+   - `intent.intentKind`: `scaffold`, `product`, `prototype`, `import-spec`, `feature`, `fix`, `refactor`, `release`, or `unknown`
+   - `intent.clarity`, `intent.stackSpecified`, `intent.artifactProvided`, `intent.deliveryExpectation`, and `intent.missingFacts`
+5. If the router returns `recommendedCapabilities`, treat them as phase-specific hints, not mandatory steps. `availability: core-required` means the curdx-flow bundle expects that companion to be installed by default (`context7`, `claude-mem`, `frontend-design`, `chrome-devtools-mcp`, `sequential-thinking`, `pua`). Workflow/policy hints such as `docs-query`, `tdd-cycle`, `security-review`, `stack-specific-verification`, and `context-budget` need no installation.
+6. For stack profile, quality gates, suggested verifier, and context-budget interpretation, use `${CLAUDE_PLUGIN_ROOT}/references/intelligent-routing.md` only when the compact router output is insufficient.
 
 ## Route Actions
 
@@ -38,22 +43,91 @@ Users do not need to know `--add-dir`. If routing returns a missing code root, s
 | `lite-spec` | Create a lightweight spec, then generate 1-3 value-slice tasks. |
 | `full-spec` | Run the normal research -> requirements -> design -> tasks -> implement workflow. |
 | `epic-split` | Invoke `/curdx-flow:triage` with the same goal. Do not force the work into one spec. |
+| `scaffold` | Select the best scaffold source, create only the explicitly requested skeleton, write assumptions, then run baseline verification. |
+| `product-inception` | Create product context before application code: mission, constraints, roadmap, tech-stack assumptions, and constitution. |
+| `greenfield-spec` | Create a greenfield spec with product context, technical plan, walking skeleton, and vertical-slice tasks. |
+| `prototype` | Create a bounded prototype spec with an explicit success criterion and minimal verification loop. |
+| `import-spec` | Import the provided PRD/spec/design/API artifact into curdx-flow phase artifacts, then plan implementation. |
 | `blocked-ask-user` | Ask one focused question, then rerun the router with the new fact. |
 
 If `blocked-ask-user` includes `topology.missingRoots`, do not ask an open-ended question. Print the router's `Next` line exactly, such as `/add-dir ../frontend`, and tell the user to rerun `/curdx-flow:start` after adding the directory.
 
 ## Hard Rules
 
-- Use behavior route names exactly as returned: `direct-change`, `lite-spec`, `full-spec`, `epic-split`, `resume-current`, `blocked-ask-user`.
+- Use behavior route names exactly as returned: `direct-change`, `lite-spec`, `full-spec`, `epic-split`, `scaffold`, `product-inception`, `greenfield-spec`, `prototype`, `import-spec`, `resume-current`, `blocked-ask-user`.
 - Top-level tasks are value slices. Never split a slice into separate "write test", "write implementation", "run test", or "commit" tasks.
 - If the route says `direct-change`, skip branch prompts, spec creation, phase documents, task planning, and subagents unless the user explicitly asks for them.
-- If `recommendedCapabilities` includes `context7`, `claude-mem`, `frontend-design`, `chrome-devtools-mcp`, `sequential-thinking`, or `pua`, use the recommendation only at its listed phase and only when it materially reduces uncertainty or verifies real behavior. If a future recommendation is marked `check-if-installed`, skip silently when that capability is absent.
+- If the route says `scaffold`, do only what the user explicitly asked to scaffold. Prefer official or ecosystem-maintained generators for the named stack when current docs show one exists; self-author the skeleton only when that is safer, smaller, or no trustworthy generator exists. Record assumptions in `CLAUDE.md` or `.curdx/assumptions.md` when no project convention exists, then run the best detected baseline command through `curdx-flow dev verify` or the project equivalent.
+- If the route says `product-inception`, do not write application source yet. Produce compact product context artifacts and ask at most the missing high-leverage questions from `intent.missingFacts`.
+- If the route says `greenfield-spec`, bootstrap curdx-flow artifacts before app code: product context, constitution, requirements, design, tasks, then implementation.
+- If the route says `prototype`, constrain scope to a success criterion; do not silently expand it into a production product.
+- If the route says `import-spec`, preserve source artifact traceability in research/requirements/design/tasks rather than re-interviewing from scratch.
+- If `recommendedCapabilities` includes tool, workflow, or policy hints, use the recommendation only at its listed phase and only when it materially reduces uncertainty, improves context efficiency, or verifies real behavior. If a future recommendation is marked `check-if-installed`, skip silently when that capability is absent.
 - If the route says `epic-split`, stop single-spec creation and run triage.
 - If a spec state is created, store `autoPolicy` for compatibility and set `maxGlobalIterations` from policy, defaulting to 30 if the helper fails.
 
+## Empty Workspace Rules
+
+An empty folder is not a small feature request. When
+`topology.workspaceState == "empty"`, route by intent:
+
+- `scaffold`: the user named a stack or starter and expects files now.
+- `product-inception`: the user has a product idea but missing domain, user,
+  MVP, or acceptance facts.
+- `greenfield-spec`: the product and stack are clear enough to plan a usable
+  app.
+- `prototype`: the user wants a demo/POC/spike.
+- `import-spec`: the user supplied or referenced a PRD, design, OpenAPI, or
+  other source artifact.
+
+For greenfield work, create or preserve these context artifacts before coding:
+
+```text
+docs/mission.md          # product/user/problem
+docs/roadmap.md          # first usable slice and later slices
+docs/tech-stack.md       # chosen stack and assumptions
+docs/constitution.md     # quality, testing, security, UX, deployment rules
+```
+
+If the user already has equivalent files, reuse them. Do not create a separate
+methodology folder when the repository has a better convention.
+
+The first implementation task in a greenfield app must be a walking skeleton:
+selected runtime roots, contract, dev environment, and verification command run
+together. For example, a full-stack app should prove a real UI route can call
+a real service health/status endpoint before business features begin.
+
+Use `${CLAUDE_PLUGIN_ROOT}/references/greenfield-delivery.md` as the detailed
+contract for these artifacts and tasks.
+
+## Scaffold Source Selection
+
+For `scaffold`, choose the source before writing files:
+
+1. Identify the requested target shape: frontend app, backend service,
+   full-stack workspace, CLI, library, plugin, data tool, or another explicit
+   shape from the user.
+2. When the user named a stack or framework, check the latest official docs or
+   trusted ecosystem docs for the current scaffold command/API before running
+   it. Treat package-manager create flows, documented remote initializer APIs,
+   framework CLIs, templates, and project-local generators as candidates. Do
+   not make any single stack special in the route logic.
+3. Prefer non-global, repeatable commands (`npm create`, `pnpm create`,
+   `npx`, package-manager `dlx`, `curl` to a documented initializer API, or a
+   project-local generator). Avoid installing global CLIs.
+4. If the generator is interactive and missing choices materially affect the
+   result, ask one focused question. Otherwise choose conservative defaults
+   from the user's request and record them.
+5. Self-author the scaffold only when no trustworthy generator exists, the
+   generator cannot satisfy the requested constraints, the requested skeleton is
+   intentionally smaller than the generator output, or a custom skeleton is
+   clearly easier to verify. Record the reason.
+6. After generation, normalize scripts and run baseline verification. Do not
+   claim the scaffold works without evidence.
+
 ## New Spec Creation
 
-For `lite-spec` and `full-spec`:
+For `lite-spec`, `full-spec`, `greenfield-spec`, `prototype`, and `import-spec`:
 
 1. Ensure the current branch is appropriate using `${CLAUDE_PLUGIN_ROOT}/references/branch-management.md`.
 2. Validate or ask for a kebab-case spec name only if missing.
@@ -97,6 +171,7 @@ For `lite-spec` and `full-spec`:
      "quickMode": false,
      "autoPolicy": "<POLICY_JSON object>",
      "route": "<ROUTE_JSON compact object>",
+     "intent": "<ROUTE_JSON.intent object>",
      "completed": false
    }
    ```
@@ -108,9 +183,15 @@ If policy computation fails, use this fallback cap:
 { "maxGlobalIterations": 30 }
 ```
 
-For `lite-spec`, keep interviews minimal and generate only 1-3 value-slice tasks. For `full-spec`, continue with research and the normal phase flow.
+For `lite-spec`, keep interviews minimal and generate only 1-3 value-slice tasks.
+For `full-spec`, continue with research and the normal phase flow.
+For `greenfield-spec`, include product context and constitution before design,
+then require a walking-skeleton task before feature slices.
+For `prototype`, keep tasks bounded to the success criterion.
+For `import-spec`, keep traceability to the imported source artifact in every
+phase artifact.
 
-When a spec state is created and router output includes `topology` or `recommendedCapabilities`, store compact copies in `.curdx-state.json` as `projectTopology` and `recommendedCapabilities`.
+When a spec state is created and router output includes `topology`, `intent`, or `recommendedCapabilities`, store compact copies in `.curdx-state.json` as `projectTopology`, `intent`, and `recommendedCapabilities`.
 
 ## Quick Artifact Contract
 
@@ -142,7 +223,7 @@ When `--quick` causes this skill to generate phase artifacts inline instead of d
 
 ## Skill Discovery
 
-Only scan and invoke additional skills when the route is `lite-spec` or `full-spec`. Match skills by semantic relevance to the goal. Skip discovery for `direct-change` unless the user explicitly asks to use a skill.
+Only scan and invoke additional skills when the route is `lite-spec`, `full-spec`, `greenfield-spec`, `prototype`, or `import-spec`. Match skills by semantic relevance to the goal. Skip discovery for `direct-change` and `scaffold` unless the user explicitly asks to use a skill.
 
 ## Output
 

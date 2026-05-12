@@ -6,14 +6,14 @@ const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
 // src/hooks/lib/runtime-cli.ts
-import { spawnSync } from "node:child_process";
-import { existsSync as existsSync6, readFileSync as readFileSync6, statSync as statSync5 } from "node:fs";
-import { basename as basename8, dirname, isAbsolute as isAbsolute4, join as join5, resolve as resolve2 } from "node:path";
+import { spawnSync as spawnSync2 } from "node:child_process";
+import { existsSync as existsSync8, readFileSync as readFileSync8, statSync as statSync5 } from "node:fs";
+import { basename as basename9, dirname, isAbsolute as isAbsolute6, join as join7, resolve as resolve4 } from "node:path";
 import { fileURLToPath as fileURLToPath6 } from "node:url";
 
 // src/hooks/lib/smart-route.ts
-import { existsSync as existsSync3, readFileSync as readFileSync3 } from "node:fs";
-import { basename as basename5, join as join2 } from "node:path";
+import { existsSync as existsSync4, readFileSync as readFileSync4 } from "node:fs";
+import { basename as basename5, join as join3 } from "node:path";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
 // src/hooks/lib/auto-policy.ts
@@ -482,6 +482,19 @@ function readText(file) {
     return "";
   }
 }
+function meaningfulProjectEntries(projectRoot) {
+  try {
+    return readdirSync2(projectRoot).filter((name) => {
+      if (name === ".git" || name === ".hg" || name === ".svn") return false;
+      if (name === ".DS_Store" || name === "Thumbs.db") return false;
+      if (name === ".claude" || name === ".curdx") return false;
+      if (name === "specs") return false;
+      return true;
+    });
+  } catch {
+    return [];
+  }
+}
 function normalizeSerializedPath(input) {
   const trimmed = input.trim().replace(/^["'`]+|["'`]+$/g, "");
   if (!trimmed || trimmed === "./") return ".";
@@ -697,6 +710,23 @@ function detectPackageManager(rootAbs) {
   if (isFile(path.join(rootAbs, "build.gradle")) || isFile(path.join(rootAbs, "build.gradle.kts"))) return "gradle";
   return void 0;
 }
+function hasManifestOrSource(rootAbs) {
+  return [
+    "package.json",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "go.mod",
+    "pyproject.toml",
+    "Cargo.toml",
+    "Dockerfile",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "src",
+    "app",
+    "packages"
+  ].some((entry) => existsSync2(path.join(rootAbs, entry)));
+}
 function pushUnique(items, item) {
   if (!items.includes(item)) items.push(item);
 }
@@ -851,6 +881,24 @@ function siblingCandidates(projectRoot) {
   }
   return out;
 }
+function detectWorkspaceState(projectRoot, roots) {
+  const meaningfulEntries = meaningfulProjectEntries(projectRoot);
+  if (meaningfulEntries.length === 0) return "empty";
+  const accessibleRoots = roots.filter((root) => root.access !== "missing-path");
+  const hasFrontend = accessibleRoots.some(
+    (root) => root.role === "frontend" || root.kinds.includes("frontend-app")
+  );
+  const hasBackend = accessibleRoots.some(
+    (root) => root.role === "backend" || root.kinds.includes("backend-service")
+  );
+  const hasMultipleRoots = new Set(accessibleRoots.map((root) => root.path)).size > 1;
+  if (hasMultipleRoots && hasFrontend && hasBackend) return "split-repo";
+  const current = accessibleRoots.find((root) => root.path === ".");
+  const currentAbs = projectRoot;
+  const currentKnown = current !== void 0 && current.kinds.some((kind) => kind !== "unknown" && kind !== "infra");
+  if (currentKnown || hasManifestOrSource(currentAbs)) return "existing";
+  return "scaffolded";
+}
 function discoverRawRoots(projectRoot) {
   const fromClaude = parseRootsFromClaudeMd(projectRoot);
   const map = /* @__PURE__ */ new Map();
@@ -940,10 +988,12 @@ function discoverProjectTopology(options = {}) {
   const missingRoots = requiredRoots.filter(
     (root) => root.access === "outside-working-directory" || root.access === "missing-path"
   );
+  const workspaceState = detectWorkspaceState(projectRoot, roots);
   return {
     version: 1,
     cwd,
     projectRoot,
+    workspaceState,
     devContextFound: raw.devContextFound,
     roots,
     requiredRoots,
@@ -957,6 +1007,7 @@ function renderContextMap(topology) {
     "# Project Context Map",
     "",
     `Project root: ${topology.projectRoot}`,
+    `Workspace state: ${topology.workspaceState}`,
     `Dev context found: ${topology.devContextFound ? "yes" : "no"}`,
     "",
     "## Code Roots",
@@ -1071,13 +1122,73 @@ var CAPABILITIES = {
     summary: "structured retries and parallel task decomposition",
     useWhen: "Use after multiple failed attempts or for truly independent parallel work slices.",
     skipWhen: "Skip on first-attempt failures, known fixes, and work that is sequential by dependency."
+  },
+  "docs-query": {
+    id: "docs-query",
+    name: "Docs query",
+    type: "workflow",
+    invocation: "Context7 or official docs",
+    summary: "phase-specific grounding against current documentation",
+    useWhen: "Use before implementation when quality gates mark docs as required.",
+    skipWhen: "Skip when local code fully defines the behavior and no external API/version matters."
+  },
+  "browser-verification": {
+    id: "browser-verification",
+    name: "Browser verification",
+    type: "workflow",
+    invocation: "Playwright or Chrome DevTools MCP",
+    summary: "repeatable browser/runtime proof for UI and full-stack behavior",
+    useWhen: "Use when browser-facing quality gates are required or suggested.",
+    skipWhen: "Skip for backend-only and CLI-only work."
+  },
+  "tdd-cycle": {
+    id: "tdd-cycle",
+    name: "TDD cycle",
+    type: "workflow",
+    invocation: "RED/GREEN/VERIFY loop",
+    summary: "test-first implementation for behavior changes",
+    useWhen: "Use when route/risk indicates implementation should be protected by a regression test.",
+    skipWhen: "Skip for docs-only edits and pure mechanical metadata updates."
+  },
+  "security-review": {
+    id: "security-review",
+    name: "Security review",
+    type: "workflow",
+    invocation: "read-only security review",
+    summary: "focused review of auth, secrets, injection, release, and dependency risk",
+    useWhen: "Use when quality gates indicate auth/security/release risk.",
+    skipWhen: "Skip for isolated copy edits with no executable behavior."
+  },
+  "stack-specific-verification": {
+    id: "stack-specific-verification",
+    name: "Stack-specific verification",
+    type: "workflow",
+    invocation: "curdx-flow route qualityGates",
+    summary: "run the verifier that matches the detected stack profile",
+    useWhen: "Use before completion whenever smart-route returns a suggestedVerifier.",
+    skipWhen: "Skip only when no stack profile is detected and no repo verifier exists."
+  },
+  "context-budget": {
+    id: "context-budget",
+    name: "Context budget",
+    type: "policy",
+    invocation: "curdx-flow route contextBudget",
+    summary: "limit reference loading by route and stack confidence",
+    useWhen: "Use for every non-trivial route to keep the session focused.",
+    skipWhen: "Skip only for no-op direct changes."
   }
 };
 var ORDER = [
   "context7",
+  "docs-query",
   "claude-mem",
   "frontend-design",
   "chrome-devtools-mcp",
+  "browser-verification",
+  "tdd-cycle",
+  "security-review",
+  "stack-specific-verification",
+  "context-budget",
   "sequential-thinking",
   "pua"
 ];
@@ -1089,7 +1200,7 @@ var CORE_REQUIRED = /* @__PURE__ */ new Set([
   "sequential-thinking",
   "pua"
 ]);
-var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node)\b|最新|依赖|框架|插件|官方|联网|搜索|文档.*(最新|官方|API|SDK|框架|插件|依赖)/i;
+var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|scaffold|starter|template|generator|initializer|initializr|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node|go|python|rust|cargo|maven|gradle|cookiecutter)\b|最新|依赖|框架|插件|官方|联网|搜索|文档|脚手架|初始化|生成器|模板/i;
 var MEMORY_RE = /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
 var UI_RE = /\b(ui|ux|frontend|front-end|browser|chrome|dom|css|html|layout|component|page|form|modal|responsive|visual|render|react|vue|vite|next\.?js|screenshot|interaction)\b|前端|页面|浏览器|样式|交互|组件|布局|视觉|截图/i;
 var BROWSER_VERIFY_RE = /\b(browser|chrome|dom|css|network|console|performance|render|screenshot|e2e|playwright|visual regression|interaction)\b|浏览器|控制台|网络|性能|渲染|截图|端到端/i;
@@ -1106,10 +1217,12 @@ function hasAny(values, candidates) {
 }
 function capabilityAvailability(id, available) {
   if (CORE_REQUIRED.has(id)) return "core-required";
+  const cap = CAPABILITIES[id];
+  if (cap.type === "workflow" || cap.type === "policy") return "known-available";
   if (available === null) return "check-if-installed";
   return available.has(id) ? "known-available" : null;
 }
-function pushRecommendation(out, available, id, phase, reason, instruction) {
+function pushRecommendation(out, available, id, phase, reason, instruction, extra = {}) {
   const availability = capabilityAvailability(id, available);
   if (availability === null) return;
   if (out.some((rec) => rec.id === id)) return;
@@ -1120,6 +1233,7 @@ function pushRecommendation(out, available, id, phase, reason, instruction) {
     type: cap.type,
     invocation: cap.invocation,
     phase,
+    ...extra,
     availability,
     reason,
     instruction
@@ -1134,6 +1248,9 @@ function recommendToolCapabilities(input) {
   const risk = normalize(input.risk);
   const topologyKinds2 = input.topologyKinds ?? [];
   const topologyFrameworks2 = input.topologyFrameworks ?? [];
+  const stackProfile = input.stackProfile;
+  const qualityGates = input.qualityGates ?? [];
+  const contextBudget = input.contextBudget;
   const missingRoots = input.missingRoots ?? 0;
   const available = input.availableCapabilities === void 0 ? null : new Set(input.availableCapabilities.filter(Boolean));
   const recs = [];
@@ -1150,14 +1267,30 @@ function recommendToolCapabilities(input) {
   const complex = COMPLEX_RE.test(goal) && route2 !== "direct-change" || risk === "high" || risk === "critical" || route2 === "full-spec" || route2 === "epic-split";
   const stuck = STUCK_RE.test(goal);
   const parallel = PARALLEL_RE.test(goal) || route2 === "epic-split";
-  if (externalDocsRelevant) {
+  const stackIds = stackProfile?.detected.map((stack) => stack.id) ?? [];
+  const docsGate = qualityGates.find((gate) => gate.id.endsWith("-docs"));
+  const browserGate = qualityGates.find((gate) => gate.id.endsWith("-browser"));
+  const tddGate = qualityGates.find((gate) => gate.id.endsWith("-tdd"));
+  const securityGate = qualityGates.find((gate) => gate.id.endsWith("-security-review"));
+  const baselineGate = qualityGates.find((gate) => gate.id.endsWith("-baseline"));
+  if (externalDocsRelevant || docsGate?.required === true) {
     pushRecommendation(
       recs,
       available,
       "context7",
       "before-coding",
-      "external documentation or current API behavior is likely relevant",
-      "Use Context7 before editing so version-specific behavior is grounded in current docs."
+      docsGate?.reason ?? "external documentation or current API behavior is likely relevant",
+      "Use Context7 before editing so version-specific behavior is grounded in current docs.",
+      { category: "docs", stackIds }
+    );
+    pushRecommendation(
+      recs,
+      available,
+      "docs-query",
+      "before-coding",
+      docsGate?.reason ?? "documentation grounding should happen before implementation",
+      "Query official/current docs first, then summarize only the decisions that affect this route.",
+      { category: "docs", stackIds }
     );
   }
   if (MEMORY_RE.test(goal) || stuck || route2 === "full-spec" || route2 === "epic-split") {
@@ -1167,7 +1300,8 @@ function recommendToolCapabilities(input) {
       "claude-mem",
       "planning",
       "similar prior work or longer-running plan may exist",
-      "Search memory before planning; use make-plan only when the work is genuinely phased."
+      "Search memory before planning; use make-plan only when the work is genuinely phased.",
+      { category: "context", stackIds }
     );
   }
   if (hasFrontend) {
@@ -1177,17 +1311,72 @@ function recommendToolCapabilities(input) {
       "frontend-design",
       "implementation",
       "visible frontend behavior or UI quality is in scope",
-      "Use frontend-design guidance for UI structure, interaction, responsive behavior, and visual polish."
+      "Use frontend-design guidance for UI structure, interaction, responsive behavior, and visual polish.",
+      { category: "verification", stackIds }
     );
   }
-  if (browserRuntime) {
+  if (browserRuntime || browserGate !== void 0) {
     pushRecommendation(
       recs,
       available,
       "chrome-devtools-mcp",
       "verification",
-      "browser runtime behavior should be verified in a real browser",
-      "Use Chrome DevTools MCP for console, network, DOM, performance, or visual proof after implementation."
+      browserGate?.reason ?? "browser runtime behavior should be verified in a real browser",
+      "Use Chrome DevTools MCP for console, network, DOM, performance, or visual proof after implementation.",
+      { category: "verification", stackIds }
+    );
+    pushRecommendation(
+      recs,
+      available,
+      "browser-verification",
+      "verification",
+      browserGate?.reason ?? "browser-facing behavior needs repeatable runtime evidence",
+      "Prefer Playwright for repeatable E2E; use Chrome DevTools MCP when high-fidelity runtime inspection is needed.",
+      { category: "verification", stackIds }
+    );
+  }
+  if (tddGate?.required === true) {
+    pushRecommendation(
+      recs,
+      available,
+      "tdd-cycle",
+      "implementation",
+      tddGate.reason,
+      "Start with a focused failing test or reproduction when behavior is changing; keep the test in the final verifier.",
+      { category: "tdd", stackIds }
+    );
+  }
+  if (securityGate !== void 0 || COMPLEX_RE.test(goal)) {
+    pushRecommendation(
+      recs,
+      available,
+      "security-review",
+      "verification",
+      securityGate?.reason ?? "the task touches a risk surface that benefits from security review",
+      "Run a read-only security pass over auth, input validation, secrets, dependencies, and release metadata before completion.",
+      { category: "security", stackIds }
+    );
+  }
+  if ((baselineGate !== void 0 || stackProfile?.primary !== "unknown") && route2 !== "direct-change") {
+    pushRecommendation(
+      recs,
+      available,
+      "stack-specific-verification",
+      "verification",
+      baselineGate?.reason ?? "detected stack should drive the final verifier",
+      baselineGate?.command ? `Run the stack verifier: ${baselineGate.command}.` : "Use the repository's documented verifier for the detected stack.",
+      { category: "verification", stackIds }
+    );
+  }
+  if (contextBudget !== void 0 && route2 !== "direct-change") {
+    pushRecommendation(
+      recs,
+      available,
+      "context-budget",
+      "planning",
+      `context budget is ${contextBudget.level}`,
+      contextBudget.strategy,
+      { category: "context", stackIds }
     );
   }
   if (complex || stuck) {
@@ -1197,7 +1386,8 @@ function recommendToolCapabilities(input) {
       "sequential-thinking",
       "planning",
       "risk or uncertainty requires explicit hypothesis management",
-      "Use sequential-thinking to break assumptions before choosing the implementation path."
+      "Use sequential-thinking to break assumptions before choosing the implementation path.",
+      { category: "context", stackIds }
     );
   }
   if (stuck || parallel) {
@@ -1207,7 +1397,8 @@ function recommendToolCapabilities(input) {
       "pua",
       stuck ? "recovery" : "planning",
       stuck ? "the goal indicates repeated failure or debugging difficulty" : "large work may contain independent parallel slices",
-      stuck ? "Use /pua:pua-loop only after local triage confirms the first fix path is not working." : "Use /pua:p9 only after dependencies prove the slices can run independently."
+      stuck ? "Use /pua:pua-loop only after local triage confirms the first fix path is not working." : "Use /pua:p9 only after dependencies prove the slices can run independently.",
+      { category: stuck ? "recovery" : "context", stackIds }
     );
   }
   return sortRecommendations(recs);
@@ -1246,8 +1437,498 @@ if (isDirectRun3()) {
   main3();
 }
 
-// src/hooks/lib/smart-route.ts
+// src/hooks/lib/stack-capabilities.ts
+import { existsSync as existsSync3, readFileSync as readFileSync3, readdirSync as readdirSync3 } from "node:fs";
+import { isAbsolute as isAbsolute3, join as join2, resolve as resolve2 } from "node:path";
+var STACKS = {
+  "typescript": {
+    id: "typescript",
+    name: "TypeScript",
+    frameworks: ["typescript"],
+    goalPattern: /\b(ts|typescript|typecheck|tsconfig)\b/i,
+    manifestHints: ["tsconfig.json", "tsconfig.*.json"],
+    docsQuery: "TypeScript official documentation for compiler and project configuration",
+    tdd: "Write focused tests first when behavior changes; keep typecheck as a mandatory gate.",
+    security: "Review unsafe casts, unchecked external input, and dependency/script changes.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run verify"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "react": {
+    id: "react",
+    name: "React",
+    frameworks: ["react"],
+    goalPattern: /\b(react|jsx|tsx|component|hook|frontend|ui)\b|前端|组件|页面/i,
+    manifestHints: ["package.json:react"],
+    docsQuery: "React official documentation for current component and hook behavior",
+    tdd: "Prefer component or interaction tests for user-visible behavior.",
+    security: "Review XSS, unsafe HTML, auth state leaks, and client-side permission assumptions.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run test:e2e"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "vue": {
+    id: "vue",
+    name: "Vue",
+    frameworks: ["vue", "vite"],
+    goalPattern: /\b(vue|vue3|vite|pinia|vue router|component|frontend|ui)\b|前端|组件|页面/i,
+    manifestHints: ["package.json:vue", "vite.config.*"],
+    docsQuery: "Vue and Vite official documentation for current project setup and runtime behavior",
+    tdd: "Prefer component or interaction tests; keep vue-tsc/typecheck and build gates.",
+    security: "Review template injection, route guards, auth state leaks, and unsafe dynamic HTML.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run test:e2e"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "next": {
+    id: "next",
+    name: "Next.js",
+    frameworks: ["next"],
+    goalPattern: /\b(next\.?js|next|app router|server action|route handler)\b/i,
+    manifestHints: ["next.config.*", "package.json:next"],
+    docsQuery: "Next.js official documentation for routing, server actions, rendering, and build behavior",
+    tdd: "Test server/client boundaries and route handlers before broad UI changes.",
+    security: "Review server/client data exposure, auth, cookies, headers, and route handlers.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run test:e2e"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "node": {
+    id: "node",
+    name: "Node.js",
+    frameworks: ["node-api", "nestjs", "fastify", "hono"],
+    goalPattern: /\b(node|api|express|fastify|nestjs|hono|server)\b/i,
+    manifestHints: ["package.json"],
+    docsQuery: "Node.js and framework official documentation for current API behavior",
+    tdd: "Use unit/integration tests around API behavior and error paths.",
+    security: "Review input validation, auth, command execution, secrets, and dependency scripts.",
+    verifierCommands: ["npm test", "npm run typecheck", "npm run build"],
+    releaseCommands: ["npm run verify"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "spring-boot": {
+    id: "spring-boot",
+    name: "Spring Boot",
+    frameworks: ["spring-boot"],
+    goalPattern: /\b(spring boot|spring|maven|gradle|controller|service|repository)\b|后端|接口/i,
+    manifestHints: ["pom.xml:spring-boot", "build.gradle:spring-boot"],
+    docsQuery: "Spring Boot official documentation for current runtime, testing, and actuator behavior",
+    tdd: "Use slice or integration tests for controller/service/repository behavior.",
+    security: "Review auth filters, authorization, validation, configuration, and secret exposure.",
+    verifierCommands: ["./mvnw test", "./gradlew test", "mvn test", "gradle test"],
+    releaseCommands: ["./mvnw verify", "./gradlew build"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "spring-cloud": {
+    id: "spring-cloud",
+    name: "Spring Cloud",
+    frameworks: ["spring-cloud"],
+    goalPattern: /\b(spring cloud|gateway|config server|eureka|openfeign|resilience4j)\b/i,
+    manifestHints: ["pom.xml:spring-cloud", "build.gradle:spring-cloud"],
+    docsQuery: "Spring Cloud official documentation for current integration, gateway, and config behavior",
+    tdd: "Prefer integration tests or contract tests for cross-service behavior.",
+    security: "Review gateway filters, service auth, config leakage, and network boundaries.",
+    verifierCommands: ["./mvnw test", "./gradlew test", "mvn test", "gradle test"],
+    releaseCommands: ["./mvnw verify", "./gradlew build"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "standard",
+      "full-spec": "expanded",
+      "epic-split": "expanded"
+    }
+  },
+  "python": {
+    id: "python",
+    name: "Python",
+    frameworks: ["python", "fastapi", "django", "flask"],
+    goalPattern: /\b(python|pytest|fastapi|django|flask|pyproject|ruff)\b/i,
+    manifestHints: ["pyproject.toml", "requirements.txt"],
+    docsQuery: "Python framework official documentation for current API and testing behavior",
+    tdd: "Use pytest around behavior and regression reproduction.",
+    security: "Review deserialization, SQL/query construction, auth, secrets, and dependency pinning.",
+    verifierCommands: ["pytest", "python -m pytest", "ruff check .", "mypy ."],
+    releaseCommands: ["python -m build"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "go": {
+    id: "go",
+    name: "Go",
+    frameworks: ["go"],
+    goalPattern: /\b(go|golang|go test|go mod|goroutine|grpc)\b/i,
+    manifestHints: ["go.mod"],
+    docsQuery: "Go official documentation for current standard library and tooling behavior",
+    tdd: "Use table-driven tests and keep go test ./... as the baseline gate.",
+    security: "Review context cancellation, goroutine leaks, input validation, auth, and unsafe file/network paths.",
+    verifierCommands: ["go test ./...", "go vet ./...", "go build ./..."],
+    releaseCommands: ["go test ./..."],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "rust": {
+    id: "rust",
+    name: "Rust",
+    frameworks: ["rust"],
+    goalPattern: /\b(rust|cargo|crate|tokio|axum)\b/i,
+    manifestHints: ["Cargo.toml"],
+    docsQuery: "Rust and crate official documentation for current API and safety behavior",
+    tdd: "Use cargo test and focused regression tests before implementation changes.",
+    security: "Review unsafe blocks, parsing, auth, IO boundaries, and dependency features.",
+    verifierCommands: ["cargo test", "cargo clippy -- -D warnings", "cargo build"],
+    releaseCommands: ["cargo test"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "claude-code-plugin": {
+    id: "claude-code-plugin",
+    name: "Claude Code plugin",
+    frameworks: ["claude-code-plugin"],
+    goalPattern: /\b(claude code|plugin|skill|agent|hook|hooks|mcp|marketplace|tag|release)\b/i,
+    manifestHints: [".claude-plugin/plugin.json", "hooks/hooks.json", "skills/*/SKILL.md"],
+    docsQuery: "Claude Code official docs for plugins, skills, agents, hooks, dependencies, and release tags",
+    tdd: "Use focused hook/runner tests and the real Claude Code smoke path before release.",
+    security: "Review hook fail-open behavior, plugin metadata, dependency declarations, and release tags.",
+    verifierCommands: [
+      "npm run check:hooks-fresh",
+      "npm run typecheck",
+      "npm run test:runner",
+      "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc"
+    ],
+    releaseCommands: ["claude plugin validate ./plugins/curdx-flow", "npm run verify"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  }
+};
+var STACK_PRIORITY = {
+  "claude-code-plugin": 110,
+  "next": 100,
+  "react": 90,
+  "vue": 90,
+  "spring-cloud": 85,
+  "spring-boot": 80,
+  "go": 75,
+  "rust": 75,
+  "python": 75,
+  "typescript": 30,
+  "node": 20
+};
 function normalizeText(input) {
+  return (input ?? "").trim().replace(/\s+/g, " ");
+}
+function rootFsPath(projectRoot, root) {
+  return isAbsolute3(root.path) ? resolve2(root.path) : resolve2(projectRoot, root.path);
+}
+function readText2(file) {
+  try {
+    return readFileSync3(file, "utf8");
+  } catch {
+    return "";
+  }
+}
+function packageJsonContains(rootAbs, pattern) {
+  return pattern.test(readText2(join2(rootAbs, "package.json")));
+}
+function hasManifestHint(rootAbs, hint) {
+  if (hint.includes(":")) {
+    const [file, needle] = hint.split(":", 2);
+    if (!file || !needle) return false;
+    return readText2(join2(rootAbs, file)).toLowerCase().includes(needle.toLowerCase());
+  }
+  if (hint.includes("*")) {
+    const pattern = new RegExp(`^${hint.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`);
+    const dir = hint.includes("/") ? hint.split("/").slice(0, -1).join("/") : ".";
+    const base = rootAbs === "" ? "." : rootAbs;
+    try {
+      return existsSync3(join2(base, dir)) && readdirSync3(join2(base, dir)).some(
+        (name) => pattern.test(dir === "." ? name : `${dir}/${name}`)
+      );
+    } catch {
+      return false;
+    }
+  }
+  return existsSync3(join2(rootAbs, hint));
+}
+function scoreStack(stack, roots, projectRoot, goal) {
+  const evidence = [];
+  let score = 0;
+  if (stack.goalPattern.test(goal)) {
+    score += stack.id === "claude-code-plugin" ? 0.46 : ["react", "vue", "next", "spring-cloud", "spring-boot"].includes(stack.id) ? 0.32 : 0.24;
+    evidence.push("goal keyword");
+  }
+  for (const root of roots) {
+    const rootAbs = rootFsPath(projectRoot, root);
+    const frameworkHits = root.frameworks.filter(
+      (framework) => stack.frameworks.includes(framework)
+    );
+    if (frameworkHits.length > 0) {
+      score += 0.34;
+      evidence.push(`${root.path}: framework ${frameworkHits.join(",")}`);
+    }
+    for (const hint of stack.manifestHints) {
+      if (hasManifestHint(rootAbs, hint)) {
+        score += 0.18;
+        evidence.push(`${root.path}: ${hint}`);
+      }
+    }
+    if (stack.id === "typescript" && packageJsonContains(rootAbs, /"typescript"\s*:/i)) {
+      score += 0.2;
+      evidence.push(`${root.path}: package.json:typescript`);
+    }
+  }
+  if (score <= 0) return null;
+  const confidence = Math.max(0.1, Math.min(0.99, Number(score.toFixed(2))));
+  return {
+    id: stack.id,
+    name: stack.name,
+    confidence,
+    evidence: [...new Set(evidence)].slice(0, 5)
+  };
+}
+function detectStackProfile(input) {
+  const goal = normalizeText(input.goal);
+  const roots = input.topology.roots;
+  const detected = Object.values(STACKS).map((stack) => scoreStack(stack, roots, input.topology.projectRoot, goal)).filter((item) => item !== null).sort(
+    (a, b) => b.confidence - a.confidence || STACK_PRIORITY[b.id] - STACK_PRIORITY[a.id]
+  );
+  const primary = detected[0]?.id ?? "unknown";
+  const confidence = detected[0]?.confidence ?? 0;
+  const warnings = [];
+  if (primary === "unknown") {
+    warnings.push("No first-class stack profile detected; use repository scripts as the verifier source.");
+  }
+  if (detected.length > 1 && detected[0] && detected[1] && detected[1].confidence > 0.5) {
+    warnings.push("Multiple stack profiles are relevant; keep verification multi-root and avoid single-stack assumptions.");
+  }
+  return {
+    version: 1,
+    primary,
+    detected,
+    confidence,
+    evidence: detected.flatMap((item) => item.evidence).slice(0, 8),
+    warnings
+  };
+}
+function stackFor(profile) {
+  return profile.primary === "unknown" ? null : STACKS[profile.primary];
+}
+function selectCommand(commands, roots, projectRoot) {
+  for (const command of commands) {
+    if (command.startsWith("./mvnw") && !roots.some((root) => existsSync3(join2(rootFsPath(projectRoot, root), "mvnw")))) {
+      continue;
+    }
+    if (command.startsWith("./gradlew") && !roots.some((root) => existsSync3(join2(rootFsPath(projectRoot, root), "gradlew")))) {
+      continue;
+    }
+    return command;
+  }
+  return commands[0] ?? null;
+}
+function selectQualityGates(input) {
+  const stack = stackFor(input.stackProfile);
+  const route2 = input.route ?? "";
+  const risk = input.risk ?? "";
+  if (stack === null) {
+    return [
+      {
+        id: "repo-verification",
+        phase: "verification",
+        required: route2 !== "direct-change",
+        command: null,
+        reason: "No stack profile matched; use the repository's documented verification command."
+      }
+    ];
+  }
+  const primaryCommand = selectCommand(stack.verifierCommands, input.topology.roots, input.topology.projectRoot);
+  const gates = [
+    {
+      id: `${stack.id}-docs`,
+      phase: "before-coding",
+      required: /plugin|hook|skill|agent|latest|official|framework|api|sdk/i.test(input.goal ?? "") || stack.id === "claude-code-plugin",
+      command: null,
+      reason: stack.docsQuery
+    },
+    {
+      id: `${stack.id}-tdd`,
+      phase: "implementation",
+      required: route2 !== "direct-change" && risk !== "low",
+      command: null,
+      reason: stack.tdd
+    },
+    {
+      id: `${stack.id}-baseline`,
+      phase: "verification",
+      required: true,
+      command: primaryCommand,
+      reason: `Baseline verification for ${stack.name}.`
+    }
+  ];
+  if (stack.browser) {
+    gates.push({
+      id: `${stack.id}-browser`,
+      phase: "verification",
+      required: route2 !== "direct-change",
+      command: "npm run test:e2e",
+      reason: "Browser-facing behavior needs Playwright or Chrome DevTools MCP evidence."
+    });
+  }
+  if (risk === "high" || risk === "critical" || /auth|security|permission|oauth|secret|release|publish|tag/i.test(input.goal ?? "")) {
+    gates.push({
+      id: `${stack.id}-security-review`,
+      phase: "verification",
+      required: risk === "critical" || /auth|security|permission|oauth|secret/i.test(input.goal ?? ""),
+      command: null,
+      reason: stack.security
+    });
+  }
+  if (route2 === "epic-split" || /release|publish|tag|npm/i.test(input.goal ?? "")) {
+    gates.push({
+      id: `${stack.id}-release`,
+      phase: "release",
+      required: /release|publish|tag|npm/i.test(input.goal ?? ""),
+      command: selectCommand(stack.releaseCommands, input.topology.roots, input.topology.projectRoot),
+      reason: `Release-facing ${stack.name} work needs the stricter release gate.`
+    });
+  }
+  return gates;
+}
+function selectSuggestedVerifier(input) {
+  const browserGate = input.qualityGates.find((gate) => gate.id.endsWith("-browser"));
+  if (browserGate && /ui|browser|frontend|page|component|css|layout|交互|页面|前端/i.test(input.goal ?? "")) {
+    return {
+      kind: "browser",
+      command: browserGate.command,
+      fallback: "Chrome DevTools MCP",
+      needsRuntime: true,
+      reason: browserGate.reason
+    };
+  }
+  if (input.stackProfile.primary === "claude-code-plugin") {
+    return {
+      kind: "plugin-smoke",
+      command: "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc",
+      fallback: "claude plugin validate ./plugins/curdx-flow",
+      needsRuntime: false,
+      reason: "Claude Code plugin changes need real plugin validation in addition to unit tests."
+    };
+  }
+  const baseline = input.qualityGates.find((gate) => gate.id.endsWith("-baseline"));
+  return {
+    kind: baseline?.command?.includes("build") ? "build" : "unit",
+    command: baseline?.command ?? null,
+    fallback: "Use the repository's documented verify command.",
+    needsRuntime: false,
+    reason: baseline?.reason ?? "Use local verification evidence before completion."
+  };
+}
+function selectContextBudget(input) {
+  const stack = stackFor(input.stackProfile);
+  const route2 = input.route ?? "full-spec";
+  const routeDefault = route2 === "direct-change" ? "tiny" : route2 === "scaffold" || route2 === "prototype" || route2 === "lite-spec" ? "focused" : route2 === "epic-split" ? "expanded" : "standard";
+  const level = stack?.contextBudget[route2] ?? routeDefault;
+  const limits = {
+    tiny: 2,
+    focused: 4,
+    standard: 8,
+    expanded: 12
+  };
+  return {
+    level,
+    maxReferenceFiles: limits[level],
+    strategy: level === "tiny" ? "Read only the directly touched files plus one local convention file." : level === "focused" ? "Read the target files, nearest tests, and one relevant reference before editing." : level === "standard" ? "Use bounded discovery across source, tests, docs, and official references." : "Split discovery by subsystem and summarize before implementation."
+  };
+}
+function readArg4(name, argv) {
+  const idx = argv.indexOf(name);
+  return idx === -1 ? void 0 : argv[idx + 1];
+}
+function main4() {
+  const argv = process.argv.slice(2);
+  const cwd = readArg4("--cwd", argv);
+  const goal = readArg4("--goal", argv) ?? "";
+  const route2 = readArg4("--route", argv);
+  const risk = readArg4("--risk", argv);
+  const topology = discoverProjectTopology({ cwd, goal });
+  const stackProfile = detectStackProfile({ cwd, goal, topology, route: route2, risk });
+  const qualityGates = selectQualityGates({ cwd, goal, topology, route: route2, risk, stackProfile });
+  const suggestedVerifier = selectSuggestedVerifier({ cwd, goal, topology, route: route2, risk, stackProfile, qualityGates });
+  const contextBudget = selectContextBudget({ cwd, goal, topology, route: route2, risk, stackProfile });
+  process.stdout.write(JSON.stringify({
+    stackProfile,
+    qualityGates,
+    suggestedVerifier,
+    contextBudget
+  }, null, 2) + "\n");
+}
+function isDirectRun4() {
+  try {
+    return process.argv[1]?.endsWith("stack-capabilities.mjs") === true;
+  } catch {
+    return false;
+  }
+}
+if (isDirectRun4()) {
+  main4();
+}
+
+// src/hooks/lib/smart-route.ts
+function normalizeText2(input) {
   return (input ?? "").trim().replace(/\s+/g, " ");
 }
 function hasFlag(flags, flag) {
@@ -1259,7 +1940,7 @@ function parseList3(value) {
   if (!value) return [];
   return value.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
 }
-function readArg4(name, argv) {
+function readArg5(name, argv) {
   const idx = argv.indexOf(name);
   if (idx === -1) return void 0;
   return argv[idx + 1];
@@ -1269,12 +1950,12 @@ function specNameFromPath(specPath) {
   return parts[parts.length - 1] ?? specPath;
 }
 function loadActiveSpecFromPath(cwd, specPath) {
-  const statePath = join2(cwd, specPath, ".curdx-state.json");
+  const statePath = join3(cwd, specPath, ".curdx-state.json");
   let phase = "unknown";
   let completed = false;
-  if (existsSync3(statePath)) {
+  if (existsSync4(statePath)) {
     try {
-      const parsed = JSON.parse(readFileSync3(statePath, "utf8"));
+      const parsed = JSON.parse(readFileSync4(statePath, "utf8"));
       if (typeof parsed.phase === "string" && parsed.phase.trim().length > 0) {
         phase = parsed.phase;
       }
@@ -1282,13 +1963,13 @@ function loadActiveSpecFromPath(cwd, specPath) {
     } catch {
       phase = "unknown";
     }
-  } else if (existsSync3(join2(cwd, specPath, "tasks.md"))) {
+  } else if (existsSync4(join3(cwd, specPath, "tasks.md"))) {
     phase = "execution";
-  } else if (existsSync3(join2(cwd, specPath, "design.md"))) {
+  } else if (existsSync4(join3(cwd, specPath, "design.md"))) {
     phase = "tasks";
-  } else if (existsSync3(join2(cwd, specPath, "requirements.md"))) {
+  } else if (existsSync4(join3(cwd, specPath, "requirements.md"))) {
     phase = "design";
-  } else if (existsSync3(join2(cwd, specPath, "research.md"))) {
+  } else if (existsSync4(join3(cwd, specPath, "research.md"))) {
     phase = "requirements";
   }
   return {
@@ -1302,7 +1983,7 @@ function findActiveSpec(input) {
   const cwd = input.cwd ?? process.cwd();
   const fresh = hasFlag(input.flags, "--fresh");
   if (fresh) return void 0;
-  const explicitName = normalizeText(input.name);
+  const explicitName = normalizeText2(input.name);
   if (explicitName) {
     const found = findSpec(explicitName, { cwd });
     if (found.ok) return loadActiveSpecFromPath(cwd, found.path);
@@ -1355,6 +2036,105 @@ function routeFromPolicy(policy) {
   if (policy.executionMode === "spec-lite") return "lite-spec";
   return "full-spec";
 }
+var STACK_RE = /\b(vue|vue3|vite|pinia|vue router|react|next\.?js|nuxt|spring|spring boot|spring cloud|maven|gradle|java|node|nestjs|fastapi|go|postgres|mysql|redis|docker)\b|前端|后端|全栈|全家桶/i;
+var ARTIFACT_RE = /\b(prd|spec|requirements?|design doc|figma|wireframe|openapi|swagger|api doc|接口文档|产品文档|需求文档|设计稿|原型图)\b/i;
+var SCAFFOLD_RE = /\b(scaffold|bootstrap|init|starter|template|skeleton|create project|create app|new project|setup project)\b|脚手架|初始化|搭建项目|创建项目|项目骨架|先搭骨架|搭骨架/i;
+var PROTOTYPE_RE = /\b(prototype|poc|demo|spike|experiment|technical validation|prove|验证|原型|演示|技术验证|试验)\b/i;
+var PRODUCT_RE = /\b(app|application|system|platform|saas|crm|dashboard|admin|portal|product|service|tool)\b|系统|平台|后台|管理端|应用|产品|工具|开发一套|做一个|做一套/i;
+var PRODUCT_DOMAIN_HINT_RE = /\b(crm|customer|order|inventory|invoice|booking|calendar|todo|task|project|ticket|commerce|shop|blog|cms|dashboard|admin|user|auth|report)\b|客户|订单|库存|合同|发票|预约|日历|待办|任务|项目|工单|商城|电商|博客|内容|后台|用户|权限|登录|报表/i;
+var FIX_RE = /\b(fix|bug|debug|repair|resolve|broken|regression|修复|报错|失败|排查|定位)\b/i;
+var REFACTOR_RE = /\b(refactor|rewrite|cleanup|restructure|重构|重写|整理)\b/i;
+var RELEASE_RE = /\b(release|publish|deploy|ship|tag|npm|上线|发布|部署|打包)\b/i;
+var DEMO_RE = /\b(demo|prototype|poc|演示|原型)\b/i;
+var PRODUCTION_RE = /\b(production|prod|ship|launch|deploy|release|上线|生产|发布|可用|能用)\b/i;
+function classifyIntent(goal, topology) {
+  const artifactProvided = ARTIFACT_RE.test(goal);
+  const stackSpecified = STACK_RE.test(goal);
+  let intentKind = "unknown";
+  if (artifactProvided) intentKind = "import-spec";
+  else if (SCAFFOLD_RE.test(goal)) intentKind = "scaffold";
+  else if (PROTOTYPE_RE.test(goal)) intentKind = "prototype";
+  else if (RELEASE_RE.test(goal)) intentKind = "release";
+  else if (FIX_RE.test(goal)) intentKind = "fix";
+  else if (REFACTOR_RE.test(goal)) intentKind = "refactor";
+  else if (PRODUCT_RE.test(goal)) intentKind = "product";
+  else if (goal.length > 0) intentKind = "feature";
+  let deliveryExpectation = "maintenance";
+  if (DEMO_RE.test(goal)) deliveryExpectation = "demo";
+  else if (PRODUCTION_RE.test(goal)) deliveryExpectation = "production";
+  else if (intentKind === "product" || topology.workspaceState === "empty") {
+    deliveryExpectation = "usable-app";
+  }
+  const missingFacts = [];
+  if (topology.workspaceState === "empty" && intentKind === "product" && !artifactProvided && !PRODUCT_DOMAIN_HINT_RE.test(goal)) {
+    missingFacts.push("product domain, target user, MVP acceptance criteria");
+  }
+  if (topology.workspaceState === "empty" && (intentKind === "product" || intentKind === "feature") && !stackSpecified) {
+    missingFacts.push("preferred stack or permission to choose defaults");
+  }
+  if (intentKind === "prototype" && !/success|metric|prove|验证|成功|标准/i.test(goal)) {
+    missingFacts.push("prototype success criterion");
+  }
+  let clarity = "medium";
+  if (artifactProvided || intentKind === "scaffold") clarity = "high";
+  else if (missingFacts.length > 0) clarity = "low";
+  else if (stackSpecified || intentKind === "fix" || intentKind === "refactor") clarity = "high";
+  let confidence = 0.62;
+  if (artifactProvided || SCAFFOLD_RE.test(goal) || PROTOTYPE_RE.test(goal)) confidence += 0.22;
+  if (stackSpecified) confidence += 0.08;
+  if (missingFacts.length > 0) confidence -= 0.18;
+  confidence = Math.max(0.1, Math.min(0.98, Number(confidence.toFixed(2))));
+  let recommendedAction = "route with deterministic policy";
+  if (topology.workspaceState === "empty") {
+    if (intentKind === "scaffold") {
+      recommendedAction = "select an official/ecosystem scaffold source when available, create the requested skeleton, then run baseline verification";
+    } else if (intentKind === "import-spec") {
+      recommendedAction = "import the provided artifact, derive plan/tasks, then implement";
+    } else if (intentKind === "prototype") {
+      recommendedAction = "create a bounded prototype spec with an explicit success criterion";
+    } else if (clarity === "low") {
+      recommendedAction = "perform product inception before writing application code";
+    } else {
+      recommendedAction = "create greenfield spec with constitution and walking skeleton tasks";
+    }
+  }
+  return {
+    workspaceState: topology.workspaceState,
+    intentKind,
+    clarity,
+    stackSpecified,
+    artifactProvided,
+    deliveryExpectation,
+    missingFacts,
+    confidence,
+    recommendedAction
+  };
+}
+function routeFromIntent(intent, policy) {
+  if (intent.workspaceState === "empty") {
+    switch (intent.intentKind) {
+      case "scaffold":
+        return "scaffold";
+      case "import-spec":
+        return "import-spec";
+      case "prototype":
+        return "prototype";
+      case "product":
+        return intent.clarity === "low" ? "product-inception" : "greenfield-spec";
+      case "feature":
+        return intent.clarity === "low" ? "product-inception" : "greenfield-spec";
+      default:
+        return "product-inception";
+    }
+  }
+  return routeFromPolicy(policy);
+}
+function reasonForRoute(route2, policy, intent) {
+  if (route2 === "scaffold" || route2 === "product-inception" || route2 === "greenfield-spec" || route2 === "prototype" || route2 === "import-spec") {
+    return intent.recommendedAction;
+  }
+  return policy.reasons[0] ?? "deterministic policy classification";
+}
 function routeDefaults(route2) {
   switch (route2) {
     case "direct-change":
@@ -1389,6 +2169,46 @@ function routeDefaults(route2) {
         shouldUseSubagent: true,
         taskCountLimit: 12
       };
+    case "scaffold":
+      return {
+        nextAction: "Select an official/ecosystem scaffold source when available, create the requested skeleton, record assumptions, then run baseline verification.",
+        shouldCreateSpec: false,
+        shouldCreateTasks: false,
+        shouldUseSubagent: false,
+        taskCountLimit: 1
+      };
+    case "product-inception":
+      return {
+        nextAction: "Create product context first: mission, constraints, roadmap, tech-stack assumptions, and project constitution before application code.",
+        shouldCreateSpec: false,
+        shouldCreateTasks: false,
+        shouldUseSubagent: true,
+        taskCountLimit: 0
+      };
+    case "greenfield-spec":
+      return {
+        nextAction: "Create a greenfield spec with constitution, technical plan, walking skeleton, and vertical-slice tasks.",
+        shouldCreateSpec: true,
+        shouldCreateTasks: true,
+        shouldUseSubagent: true,
+        taskCountLimit: 10
+      };
+    case "prototype":
+      return {
+        nextAction: "Create a bounded prototype spec, define the success criterion, implement the thinnest proof, and verify it.",
+        shouldCreateSpec: true,
+        shouldCreateTasks: true,
+        shouldUseSubagent: false,
+        taskCountLimit: 5
+      };
+    case "import-spec":
+      return {
+        nextAction: "Import the provided PRD/spec/design/API artifact, normalize it into curdx-flow artifacts, then plan implementation.",
+        shouldCreateSpec: true,
+        shouldCreateTasks: true,
+        shouldUseSubagent: true,
+        taskCountLimit: 12
+      };
     case "resume-current":
       return {
         nextAction: "Resume the active spec at its next incomplete phase.",
@@ -1409,6 +2229,7 @@ function routeDefaults(route2) {
 }
 function publicTopology(topology) {
   return {
+    workspaceState: topology.workspaceState,
     devContextFound: topology.devContextFound,
     roots: topology.roots,
     requiredRoots: topology.requiredRoots,
@@ -1424,10 +2245,11 @@ function topologyFrameworks(topology) {
   return [...new Set(topology.roots.flatMap((root) => root.frameworks))];
 }
 function classifySmartRoute(input) {
-  const goal = normalizeText(input.goal);
+  const goal = normalizeText2(input.goal);
   const cwd = input.cwd ?? process.cwd();
   const activeSpec = findActiveSpec({ ...input, cwd });
   const topology = discoverProjectTopology({ cwd, goal });
+  const intent = classifyIntent(goal, topology);
   const policy = classifyAutoPolicy({
     goal,
     flags: input.flags,
@@ -1435,12 +2257,48 @@ function classifySmartRoute(input) {
     estimatedFiles: input.estimatedFiles,
     taskCount: input.taskCount
   });
+  const routeCandidate = routeFromIntent(intent, policy);
+  const stackProfile = detectStackProfile({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk
+  });
+  const qualityGates = selectQualityGates({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk,
+    stackProfile
+  });
+  const suggestedVerifier = selectSuggestedVerifier({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk,
+    stackProfile,
+    qualityGates
+  });
+  const contextBudget = selectContextBudget({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk,
+    stackProfile
+  });
   const recommendations = recommendToolCapabilities({
     goal,
-    route: routeFromPolicy(policy),
+    route: routeCandidate,
     risk: policy.risk,
     topologyKinds: topologyKinds(topology),
     topologyFrameworks: topologyFrameworks(topology),
+    stackProfile,
+    qualityGates,
+    contextBudget,
     missingRoots: topology.missingRoots.length,
     availableCapabilities: input.availableCapabilities
   });
@@ -1453,12 +2311,17 @@ function classifySmartRoute(input) {
       ...routeDefaults("resume-current"),
       nextAction: nextActionForActiveSpec(activeSpec),
       topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
       recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["active unfinished spec"]
     };
   }
-  if (activeSpec !== void 0 && !activeSpec.completed && normalizeText(input.name).length > 0 && goal.length > 0) {
+  if (activeSpec !== void 0 && !activeSpec.completed && normalizeText2(input.name).length > 0 && goal.length > 0) {
     return {
       version: 1,
       route: "blocked-ask-user",
@@ -1467,12 +2330,17 @@ function classifySmartRoute(input) {
       blockedReason: "Ask whether to resume the existing spec or rerun with --fresh for new work.",
       ...routeDefaults("blocked-ask-user"),
       topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
       recommendedCapabilities: recommendations,
       policy: publicPolicy(policy),
       reasons: ["existing unfinished spec with new goal text"]
     };
   }
-  const explicitName = normalizeText(input.name);
+  const explicitName = normalizeText2(input.name);
   if (explicitName && !hasFlag(input.flags, "--fresh")) {
     const found = findSpec(explicitName, { cwd });
     if (!found.ok && found.reason === "ambiguous") {
@@ -1483,6 +2351,11 @@ function classifySmartRoute(input) {
         blockedReason: `Ambiguous spec '${explicitName}': ${found.matches.join(", ")}`,
         ...routeDefaults("blocked-ask-user"),
         topology: publicTopology(topology),
+        intent,
+        stackProfile,
+        qualityGates,
+        suggestedVerifier,
+        contextBudget,
         recommendedCapabilities: recommendations,
         policy: publicPolicy(policy),
         reasons: ["ambiguous spec name"]
@@ -1497,6 +2370,11 @@ function classifySmartRoute(input) {
       blockedReason: "Ask for the goal or a spec name.",
       ...routeDefaults("blocked-ask-user"),
       topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
       recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["missing goal"]
@@ -1512,34 +2390,44 @@ function classifySmartRoute(input) {
       ...routeDefaults("blocked-ask-user"),
       nextAction: topology.accessFix ?? "Add the missing code root, then rerun /curdx-flow:start.",
       topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
       recommendedCapabilities: [],
       policy: publicPolicy(policy),
       reasons: ["related code root is outside current Claude Code access"]
     };
   }
-  const route2 = routeFromPolicy(policy);
+  const route2 = routeCandidate;
   const defaults = routeDefaults(route2);
   return {
     version: 1,
     route: route2,
-    reason: policy.reasons[0] ?? "deterministic policy classification",
+    reason: reasonForRoute(route2, policy, intent),
     ...defaults,
     topology: publicTopology(topology),
+    intent,
+    stackProfile,
+    qualityGates,
+    suggestedVerifier,
+    contextBudget,
     recommendedCapabilities: recommendations,
     policy: publicPolicy(policy),
     reasons: policy.reasons
   };
 }
-function main4() {
+function main5() {
   const argv = process.argv.slice(2);
-  const goal = readArg4("--goal", argv) ?? "";
-  const name = readArg4("--name", argv);
-  const flags = readArg4("--flags", argv) ?? "";
-  const cwd = readArg4("--cwd", argv);
-  const files = parseList3(readArg4("--files", argv));
-  const availableCapabilities = parseList3(readArg4("--available-capabilities", argv));
-  const estimatedRaw = readArg4("--estimated-files", argv);
-  const taskRaw = readArg4("--task-count", argv);
+  const goal = readArg5("--goal", argv) ?? "";
+  const name = readArg5("--name", argv);
+  const flags = readArg5("--flags", argv) ?? "";
+  const cwd = readArg5("--cwd", argv);
+  const files = parseList3(readArg5("--files", argv));
+  const availableCapabilities = parseList3(readArg5("--available-capabilities", argv));
+  const estimatedRaw = readArg5("--estimated-files", argv);
+  const taskRaw = readArg5("--task-count", argv);
   const route2 = classifySmartRoute({
     goal,
     name,
@@ -1552,7 +2440,7 @@ function main4() {
   });
   process.stdout.write(JSON.stringify(route2, null, 2) + "\n");
 }
-function isDirectRun4() {
+function isDirectRun5() {
   try {
     const entry = fileURLToPath4(import.meta.url);
     return process.argv[1] === entry && basename5(entry).startsWith("smart-route.");
@@ -1560,14 +2448,14 @@ function isDirectRun4() {
     return false;
   }
 }
-if (isDirectRun4()) {
-  main4();
+if (isDirectRun5()) {
+  main5();
 }
 
 // src/hooks/lib/workflow-snapshot.ts
 import { execFileSync } from "node:child_process";
-import { existsSync as existsSync4, readFileSync as readFileSync4, statSync as statSync3 } from "node:fs";
-import { basename as basename6, isAbsolute as isAbsolute3, join as join3 } from "node:path";
+import { existsSync as existsSync5, readFileSync as readFileSync5, statSync as statSync3 } from "node:fs";
+import { basename as basename6, isAbsolute as isAbsolute4, join as join4 } from "node:path";
 import { fileURLToPath as fileURLToPath5 } from "node:url";
 
 // src/hooks/_shared/markdown-task-parser.ts
@@ -1631,14 +2519,14 @@ function parseTaskList(markdown) {
 }
 
 // src/hooks/lib/workflow-snapshot.ts
-function readArg5(name, argv) {
+function readArg6(name, argv) {
   const idx = argv.indexOf(name);
   if (idx === -1) return void 0;
   return argv[idx + 1];
 }
 function normalizeSpecPath(cwd, specPath) {
-  if (isAbsolute3(specPath)) return specPath;
-  return join3(cwd, specPath);
+  if (isAbsolute4(specPath)) return specPath;
+  return join4(cwd, specPath);
 }
 function specNameFromPath2(specPath) {
   const parts = specPath.split(/[\\/]+/).filter(Boolean);
@@ -1648,7 +2536,7 @@ function resolveSpecPath(input) {
   const cwd = input.cwd ?? process.cwd();
   const explicit = input.spec?.trim();
   if (explicit) {
-    if (explicit.startsWith("./") || explicit.startsWith("../") || isAbsolute3(explicit)) {
+    if (explicit.startsWith("./") || explicit.startsWith("../") || isAbsolute4(explicit)) {
       return explicit;
     }
     const found = findSpec(explicit, { cwd });
@@ -1659,14 +2547,14 @@ function resolveSpecPath(input) {
 }
 function readJsonFile(path3) {
   try {
-    return { ok: true, value: JSON.parse(readFileSync4(path3, "utf8")) };
+    return { ok: true, value: JSON.parse(readFileSync5(path3, "utf8")) };
   } catch (err) {
     return { ok: false, error: err.message };
   }
 }
 function artifact(specFs, filename) {
-  const p = join3(specFs, filename);
-  if (!existsSync4(p)) return { exists: false, path: p };
+  const p = join4(specFs, filename);
+  if (!existsSync5(p)) return { exists: false, path: p };
   try {
     const st = statSync3(p);
     return {
@@ -1690,13 +2578,13 @@ function extractFiles(raw) {
   return value.split(/[,;]/).map((part) => part.trim().replace(/^`|`$/g, "")).filter(Boolean);
 }
 function buildTaskSnapshot(specFs, state2) {
-  const tasksPath = join3(specFs, "tasks.md");
-  if (!existsSync4(tasksPath)) {
+  const tasksPath = join4(specFs, "tasks.md");
+  if (!existsSync5(tasksPath)) {
     return { total: 0, completed: 0, pending: 0, currentIndex: 0 };
   }
   let tasks2 = [];
   try {
-    tasks2 = parseTaskList(readFileSync4(tasksPath, "utf8"));
+    tasks2 = parseTaskList(readFileSync5(tasksPath, "utf8"));
   } catch {
     tasks2 = [];
   }
@@ -1747,6 +2635,7 @@ function gitSnapshot(cwd) {
 }
 function compactTopology(topology) {
   return {
+    workspaceState: topology.workspaceState,
     devContextFound: topology.devContextFound,
     roots: topology.roots,
     requiredRoots: topology.requiredRoots,
@@ -1813,11 +2702,11 @@ function buildWorkflowSnapshot(input = {}) {
         verificationBlocks: {}
       },
       artifacts: {
-        research: { exists: false, path: join3(cwd, "research.md") },
-        requirements: { exists: false, path: join3(cwd, "requirements.md") },
-        design: { exists: false, path: join3(cwd, "design.md") },
-        tasks: { exists: false, path: join3(cwd, "tasks.md") },
-        progress: { exists: false, path: join3(cwd, ".progress.md") }
+        research: { exists: false, path: join4(cwd, "research.md") },
+        requirements: { exists: false, path: join4(cwd, "requirements.md") },
+        design: { exists: false, path: join4(cwd, "design.md") },
+        tasks: { exists: false, path: join4(cwd, "tasks.md") },
+        progress: { exists: false, path: join4(cwd, ".progress.md") }
       },
       tasks: { total: 0, completed: 0, pending: 0, currentIndex: 0 },
       topology,
@@ -1827,10 +2716,10 @@ function buildWorkflowSnapshot(input = {}) {
     };
   }
   const specFs = normalizeSpecPath(cwd, specPath);
-  const statePath = join3(specFs, ".curdx-state.json");
+  const statePath = join4(specFs, ".curdx-state.json");
   let state2 = null;
   const stateInfo = {
-    exists: existsSync4(statePath),
+    exists: existsSync5(statePath),
     valid: false,
     completed: false,
     awaitingApproval: false,
@@ -1867,7 +2756,7 @@ function buildWorkflowSnapshot(input = {}) {
   return {
     version: 2,
     cwd,
-    active: existsSync4(specFs),
+    active: existsSync5(specFs),
     spec: {
       name: specNameFromPath2(specPath),
       path: specPath,
@@ -1883,16 +2772,16 @@ function buildWorkflowSnapshot(input = {}) {
     gates: buildGates(stateInfo, artifacts, tasks2, topology)
   };
 }
-function main5() {
+function main6() {
   const argv = process.argv.slice(2);
   const snapshot2 = buildWorkflowSnapshot({
-    cwd: readArg5("--cwd", argv),
-    spec: readArg5("--spec", argv),
-    goal: readArg5("--goal", argv)
+    cwd: readArg6("--cwd", argv),
+    spec: readArg6("--spec", argv),
+    goal: readArg6("--goal", argv)
   });
   process.stdout.write(JSON.stringify(snapshot2, null, 2) + "\n");
 }
-function isDirectRun5() {
+function isDirectRun6() {
   try {
     const entry = fileURLToPath5(import.meta.url);
     return process.argv[1] === entry && basename6(entry).startsWith("workflow-snapshot.");
@@ -1900,12 +2789,12 @@ function isDirectRun5() {
     return false;
   }
 }
-if (isDirectRun5()) {
-  main5();
+if (isDirectRun6()) {
+  main6();
 }
 
 // src/hooks/lib/check-verification-blocks.ts
-import { readFileSync as readFileSync5, readdirSync as readdirSync3, statSync as statSync4, existsSync as existsSync5 } from "node:fs";
+import { readFileSync as readFileSync6, readdirSync as readdirSync4, statSync as statSync4, existsSync as existsSync6 } from "node:fs";
 import path2 from "node:path";
 var VERIFICATION_PHASES = [
   "research",
@@ -1939,7 +2828,7 @@ async function runVerificationCheck(opts = {}) {
   const stateFile = path2.join(specDir, ".curdx-state.json");
   let state2;
   try {
-    state2 = JSON.parse(readFileSync5(stateFile, "utf8"));
+    state2 = JSON.parse(readFileSync6(stateFile, "utf8"));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return {
@@ -2067,20 +2956,20 @@ async function runVerificationCheck(opts = {}) {
 }
 function resolveActiveSpecDir(specsDir) {
   const pointer = path2.join(specsDir, ".current-spec");
-  if (existsSync5(pointer)) {
+  if (existsSync6(pointer)) {
     try {
-      const name = readFileSync5(pointer, "utf8").trim();
+      const name = readFileSync6(pointer, "utf8").trim();
       if (name) {
         const dir = path2.join(specsDir, name);
-        if (existsSync5(path2.join(dir, ".curdx-state.json"))) return dir;
+        if (existsSync6(path2.join(dir, ".curdx-state.json"))) return dir;
       }
     } catch {
     }
   }
-  if (!existsSync5(specsDir)) return null;
+  if (!existsSync6(specsDir)) return null;
   let entries;
   try {
-    entries = readdirSync3(specsDir, { withFileTypes: true });
+    entries = readdirSync4(specsDir, { withFileTypes: true });
   } catch {
     return null;
   }
@@ -2090,7 +2979,7 @@ function resolveActiveSpecDir(specsDir) {
     if (!e.isDirectory()) continue;
     if (e.name.startsWith(".") || e.name.startsWith("_")) continue;
     const stateFile = path2.join(specsDir, e.name, ".curdx-state.json");
-    if (!existsSync5(stateFile)) continue;
+    if (!existsSync6(stateFile)) continue;
     try {
       const st = statSync4(stateFile);
       if (st.mtimeMs > latestMtime) {
@@ -2105,7 +2994,7 @@ function resolveActiveSpecDir(specsDir) {
 
 // src/hooks/lib/verify-blocks.ts
 import { promises as fs } from "node:fs";
-import { basename as basename7, join as join4 } from "node:path";
+import { basename as basename7, join as join5 } from "node:path";
 var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
   ".git",
   "node_modules",
@@ -2124,7 +3013,7 @@ async function walkSrcTree(dir) {
       return;
     }
     for (const entry of entries) {
-      const abs = join4(current, entry.name);
+      const abs = join5(current, entry.name);
       if (entry.isDirectory()) {
         if (WALK_SKIP_DIRS.has(entry.name)) continue;
         if (depth >= WALK_MAX_DEPTH) continue;
@@ -2142,8 +3031,354 @@ async function walkSrcTree(dir) {
   return maxMtime;
 }
 
+// src/hooks/lib/dev-runtime.ts
+import { spawn, spawnSync } from "node:child_process";
+import {
+  existsSync as existsSync7,
+  mkdirSync,
+  openSync,
+  readFileSync as readFileSync7,
+  rmSync,
+  writeFileSync
+} from "node:fs";
+import { isAbsolute as isAbsolute5, join as join6, resolve as resolve3 } from "node:path";
+function readJsonFile2(path3) {
+  try {
+    return JSON.parse(readFileSync7(path3, "utf8"));
+  } catch {
+    return null;
+  }
+}
+function detectPackageManager2(rootAbs) {
+  if (existsSync7(join6(rootAbs, "pnpm-lock.yaml")) || existsSync7(join6(rootAbs, "pnpm-workspace.yaml"))) return "pnpm";
+  if (existsSync7(join6(rootAbs, "bun.lockb")) || existsSync7(join6(rootAbs, "bun.lock"))) return "bun";
+  if (existsSync7(join6(rootAbs, "yarn.lock"))) return "yarn";
+  if (existsSync7(join6(rootAbs, "package-lock.json"))) return "npm";
+  if (existsSync7(join6(rootAbs, "package.json"))) return "npm";
+  if (existsSync7(join6(rootAbs, "pom.xml"))) return "maven";
+  if (existsSync7(join6(rootAbs, "build.gradle")) || existsSync7(join6(rootAbs, "build.gradle.kts"))) return "gradle";
+  return null;
+}
+function scriptCommand(packageManager, scriptName) {
+  switch (packageManager) {
+    case "pnpm":
+      return `pnpm run ${scriptName}`;
+    case "yarn":
+      return `yarn ${scriptName}`;
+    case "bun":
+      return `bun run ${scriptName}`;
+    default:
+      return `npm run ${scriptName}`;
+  }
+}
+function firstScript(scripts, names) {
+  for (const name of names) {
+    if (Object.prototype.hasOwnProperty.call(scripts, name)) return name;
+  }
+  return null;
+}
+function scriptNamesMatching(scripts, pattern) {
+  return Object.entries(scripts).filter(([name, command]) => pattern.test(`${name} ${command}`)).map(([name]) => name);
+}
+function defaultUrlFor(root) {
+  if (root.frameworks.includes("vite")) return ["http://localhost:5173"];
+  if (root.frameworks.includes("next") || root.frameworks.includes("react")) return ["http://localhost:3000"];
+  if (root.frameworks.includes("spring-boot") || root.frameworks.includes("spring-cloud")) {
+    return ["http://localhost:8080/actuator/health", "http://localhost:8080/health"];
+  }
+  return [];
+}
+function rootFsPath2(projectRoot, root) {
+  return isAbsolute5(root.path) ? resolve3(root.path) : resolve3(projectRoot, root.path);
+}
+function javaCommands(rootAbs) {
+  if (existsSync7(join6(rootAbs, "pom.xml"))) {
+    const mvn = existsSync7(join6(rootAbs, "mvnw")) ? "./mvnw" : "mvn";
+    return {
+      startCommand: `${mvn} spring-boot:run`,
+      verifyCommands: [`${mvn} test`]
+    };
+  }
+  if (existsSync7(join6(rootAbs, "build.gradle")) || existsSync7(join6(rootAbs, "build.gradle.kts"))) {
+    const gradle = existsSync7(join6(rootAbs, "gradlew")) ? "./gradlew" : "gradle";
+    return {
+      startCommand: `${gradle} bootRun`,
+      verifyCommands: [`${gradle} test`]
+    };
+  }
+  return { startCommand: null, verifyCommands: [] };
+}
+function nativeVerifyCommands(rootAbs) {
+  if (existsSync7(join6(rootAbs, "go.mod"))) {
+    return ["go test ./...", "go vet ./..."];
+  }
+  if (existsSync7(join6(rootAbs, "Cargo.toml"))) {
+    return ["cargo test", "cargo clippy -- -D warnings"];
+  }
+  if (existsSync7(join6(rootAbs, "pyproject.toml")) || existsSync7(join6(rootAbs, "requirements.txt"))) {
+    return ["pytest", "ruff check ."];
+  }
+  if (existsSync7(join6(rootAbs, ".claude-plugin", "plugin.json"))) {
+    return [
+      "npm run check:hooks-fresh",
+      "npm run typecheck",
+      "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc"
+    ];
+  }
+  return [];
+}
+function detectRoot(projectRoot, root) {
+  const fsPath = rootFsPath2(projectRoot, root);
+  const pkg = readJsonFile2(join6(fsPath, "package.json"));
+  const scripts = pkg?.scripts ?? {};
+  const packageManager = detectPackageManager2(fsPath);
+  const scriptNames = Object.keys(scripts);
+  const devScript = firstScript(scripts, ["dev", "start", "serve", "preview"]);
+  const verifyScriptNames = [
+    ...["typecheck", "lint", "test", "build"].filter(
+      (name) => Object.prototype.hasOwnProperty.call(scripts, name)
+    )
+  ];
+  const e2eScriptNames = scriptNamesMatching(
+    scripts,
+    /(^|:|-)(e2e|browser|ui|acceptance)(:|-|$)|playwright|cypress|puppeteer/i
+  );
+  const java = javaCommands(fsPath);
+  const urls = defaultUrlFor(root);
+  const startCommand = devScript !== null ? scriptCommand(packageManager, devScript) : java.startCommand;
+  const healthCommands = urls.map((url) => `curl -fsS ${url}`);
+  const verifyCommands = [
+    ...verifyScriptNames.map((name) => scriptCommand(packageManager, name)),
+    ...java.verifyCommands,
+    ...nativeVerifyCommands(fsPath)
+  ];
+  const e2eCommands = e2eScriptNames.map((name) => scriptCommand(packageManager, name));
+  return {
+    name: root.name,
+    path: root.path,
+    fsPath,
+    role: root.role,
+    kinds: root.kinds,
+    frameworks: root.frameworks,
+    packageManager,
+    scripts: scriptNames,
+    startCommand,
+    healthCommands,
+    verifyCommands: [...new Set(verifyCommands)],
+    e2eCommands: [...new Set(e2eCommands)],
+    urls
+  };
+}
+function runtimeDir(projectRoot) {
+  return join6(projectRoot, ".curdx");
+}
+function runtimeStatePath(projectRoot) {
+  return join6(runtimeDir(projectRoot), "dev-runtime.json");
+}
+function serviceLogPath(projectRoot, name) {
+  return join6(runtimeDir(projectRoot), `dev-${name.replace(/[^a-z0-9_-]/gi, "-")}.log`);
+}
+function detectDevRuntime(input = {}) {
+  const cwd = resolve3(input.cwd ?? process.cwd());
+  const topology = discoverProjectTopology({ cwd });
+  const roots = topology.roots.filter((root) => root.access !== "missing-path").map((root) => detectRoot(topology.projectRoot, root));
+  const stackProfile = detectStackProfile({ cwd, topology });
+  const qualityGates = selectQualityGates({ cwd, topology, stackProfile });
+  const suggestedVerifier = selectSuggestedVerifier({
+    cwd,
+    topology,
+    stackProfile,
+    qualityGates
+  });
+  const gaps = [];
+  if (topology.workspaceState === "empty") {
+    gaps.push("workspace is empty; create or import product/spec context before runtime verification");
+  }
+  if (roots.every((root) => root.startCommand === null)) {
+    gaps.push("no dev/start command detected");
+  }
+  if (roots.every((root) => root.verifyCommands.length === 0)) {
+    gaps.push("no baseline verification command detected");
+  }
+  if (roots.some((root) => root.kinds.includes("frontend-app")) && roots.every((root) => root.e2eCommands.length === 0)) {
+    gaps.push("frontend/browser work has no detected e2e command");
+  }
+  return {
+    version: 1,
+    cwd,
+    projectRoot: topology.projectRoot,
+    workspaceState: topology.workspaceState,
+    roots,
+    services: roots.filter((root) => root.startCommand !== null).map((root) => ({
+      name: root.name,
+      root: root.path,
+      command: root.startCommand ?? "",
+      logPath: serviceLogPath(topology.projectRoot, root.name)
+    })),
+    health: roots.flatMap(
+      (root) => root.healthCommands.map((command) => ({ root: root.path, command }))
+    ),
+    verification: {
+      baselineCommands: roots.flatMap(
+        (root) => root.verifyCommands.map((command) => ({ root: root.path, command }))
+      ),
+      e2eCommands: roots.flatMap(
+        (root) => root.e2eCommands.map((command) => ({ root: root.path, command }))
+      )
+    },
+    stackProfile,
+    qualityGates,
+    suggestedVerifier,
+    gaps
+  };
+}
+function isPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function readRuntimeState(projectRoot) {
+  return readJsonFile2(runtimeStatePath(projectRoot));
+}
+function startDevRuntime(input = {}) {
+  const plan = detectDevRuntime(input);
+  mkdirSync(runtimeDir(plan.projectRoot), { recursive: true });
+  const services = [];
+  for (const service of plan.services) {
+    const root = plan.roots.find((candidate) => candidate.path === service.root);
+    if (!root) continue;
+    const logFd = openSync(service.logPath, "a");
+    const child = spawn(service.command, {
+      cwd: root.fsPath,
+      shell: true,
+      detached: true,
+      stdio: ["ignore", logFd, logFd],
+      env: process.env
+    });
+    child.unref();
+    if (typeof child.pid === "number") {
+      services.push({
+        name: service.name,
+        root: service.root,
+        command: service.command,
+        pid: child.pid,
+        logPath: service.logPath
+      });
+    }
+  }
+  const state2 = {
+    version: 1,
+    startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    cwd: plan.cwd,
+    projectRoot: plan.projectRoot,
+    services,
+    gaps: plan.gaps
+  };
+  writeFileSync(runtimeStatePath(plan.projectRoot), JSON.stringify(state2, null, 2) + "\n");
+  return state2;
+}
+function healthDevRuntime(input = {}) {
+  const plan = detectDevRuntime(input);
+  const state2 = readRuntimeState(plan.projectRoot);
+  const serviceStatus = (state2?.services ?? []).map((service) => ({
+    ...service,
+    alive: isPidAlive(service.pid)
+  }));
+  const commandStatus = input.dryRun === true ? plan.health.map((item) => ({ ...item, skipped: true })) : plan.health.map((item) => {
+    const root = plan.roots.find((candidate) => candidate.path === item.root);
+    const result = spawnSync(item.command, {
+      cwd: root?.fsPath ?? plan.projectRoot,
+      shell: true,
+      encoding: "utf8",
+      timeout: 1e4
+    });
+    return {
+      ...item,
+      exitCode: result.status ?? 1,
+      ok: result.status === 0,
+      stderr: result.stderr?.trim() ?? ""
+    };
+  });
+  const ok = serviceStatus.length > 0 && serviceStatus.every((service) => service.alive) && commandStatus.every((item) => "ok" in item ? item.ok === true : true);
+  return {
+    ok,
+    cwd: plan.cwd,
+    projectRoot: plan.projectRoot,
+    statePath: runtimeStatePath(plan.projectRoot),
+    services: serviceStatus,
+    health: commandStatus,
+    gaps: plan.gaps
+  };
+}
+function verifyDevRuntime(input = {}) {
+  const plan = detectDevRuntime(input);
+  const commands = [
+    ...plan.verification.baselineCommands,
+    ...input.includeE2e === true ? plan.verification.e2eCommands : []
+  ];
+  if (input.dryRun === true) {
+    return {
+      ok: commands.length > 0,
+      dryRun: true,
+      cwd: plan.cwd,
+      commands,
+      gaps: plan.gaps
+    };
+  }
+  const results = commands.map((item) => {
+    const root = plan.roots.find((candidate) => candidate.path === item.root);
+    const result = spawnSync(item.command, {
+      cwd: root?.fsPath ?? plan.projectRoot,
+      shell: true,
+      stdio: "inherit",
+      env: process.env
+    });
+    return {
+      ...item,
+      exitCode: result.status ?? 1,
+      ok: result.status === 0
+    };
+  });
+  return {
+    ok: commands.length > 0 && results.every((item) => item.ok),
+    cwd: plan.cwd,
+    commands: results,
+    gaps: plan.gaps
+  };
+}
+function stopDevRuntime(input = {}) {
+  const plan = detectDevRuntime(input);
+  const state2 = readRuntimeState(plan.projectRoot);
+  const stopped = (state2?.services ?? []).map((service) => {
+    let ok = false;
+    let alreadyStopped = false;
+    try {
+      process.kill(-service.pid, "SIGTERM");
+      ok = true;
+    } catch {
+      try {
+        process.kill(service.pid, "SIGTERM");
+        ok = true;
+      } catch {
+        alreadyStopped = !isPidAlive(service.pid);
+      }
+    }
+    return { ...service, stopped: ok, alreadyStopped };
+  });
+  rmSync(runtimeStatePath(plan.projectRoot), { force: true });
+  return {
+    ok: stopped.every((service) => service.stopped || service.alreadyStopped),
+    cwd: plan.cwd,
+    projectRoot: plan.projectRoot,
+    stopped
+  };
+}
+
 // src/hooks/lib/runtime-cli.ts
-function readArg6(name, argv) {
+function readArg7(name, argv) {
   const idx = argv.indexOf(name);
   if (idx === -1) return void 0;
   return argv[idx + 1];
@@ -2168,9 +3403,14 @@ function usage(exitCode = 1) {
     "  specs resolve [name-or-path] [--cwd <dir>]",
     "  state merge <state-file> <json-patch>",
     "  tasks count <tasks.md>",
+    "  dev detect [--cwd <dir>]",
+    "  dev up [--cwd <dir>]",
+    "  dev health [--cwd <dir>] [--dry-run]",
+    "  dev verify [--cwd <dir>] [--dry-run] [--include-e2e]",
+    "  dev down [--cwd <dir>]",
     "  verify run --command <cmd> [--phase execution] [--spec <name-or-path>] [--cwd <dir>] [--description <text>]",
     "  verify-blocks [--cwd <dir>] [--spec <name-or-path>]",
-    "  doctor [--cwd <dir>]"
+    "  doctor [--cwd <dir>] [--goal <text>]"
   ].join("\n");
   process.stderr.write(text + "\n");
   process.exit(exitCode);
@@ -2179,11 +3419,14 @@ function scriptRoot() {
   return dirname(fileURLToPath6(import.meta.url));
 }
 function pluginRoot() {
-  return process.env.CLAUDE_PLUGIN_ROOT || resolve2(scriptRoot(), "..", "..", "..");
+  return process.env.CLAUDE_PLUGIN_ROOT || resolve4(scriptRoot(), "..", "..", "..");
+}
+function repoRootFromPlugin() {
+  return resolve4(pluginRoot(), "..", "..");
 }
 function runBundled(scriptName, args, cwd) {
-  const script = join5(scriptRoot(), `${scriptName}.mjs`);
-  const result = spawnSync(process.execPath, [script, ...args], {
+  const script = join7(scriptRoot(), `${scriptName}.mjs`);
+  const result = spawnSync2(process.execPath, [script, ...args], {
     cwd: cwd ?? process.cwd(),
     encoding: "utf8",
     stdio: ["inherit", "pipe", "pipe"]
@@ -2198,16 +3441,16 @@ function runBundled(scriptName, args, cwd) {
   process.exit(result.status ?? 1);
 }
 function route(argv) {
-  const estimatedRaw = readArg6("--estimated-files", argv);
-  const taskRaw = readArg6("--task-count", argv);
+  const estimatedRaw = readArg7("--estimated-files", argv);
+  const taskRaw = readArg7("--task-count", argv);
   printJson(
     classifySmartRoute({
-      goal: readArg6("--goal", argv) ?? "",
-      name: readArg6("--name", argv),
-      flags: readArg6("--flags", argv) ?? "",
-      cwd: readArg6("--cwd", argv),
-      changedFiles: parseList4(readArg6("--files", argv)),
-      availableCapabilities: parseList4(readArg6("--available-capabilities", argv)),
+      goal: readArg7("--goal", argv) ?? "",
+      name: readArg7("--name", argv),
+      flags: readArg7("--flags", argv) ?? "",
+      cwd: readArg7("--cwd", argv),
+      changedFiles: parseList4(readArg7("--files", argv)),
+      availableCapabilities: parseList4(readArg7("--available-capabilities", argv)),
       estimatedFiles: estimatedRaw === void 0 ? void 0 : Number(estimatedRaw),
       taskCount: taskRaw === void 0 ? void 0 : Number(taskRaw)
     })
@@ -2216,9 +3459,9 @@ function route(argv) {
 function snapshot(argv) {
   printJson(
     buildWorkflowSnapshot({
-      cwd: readArg6("--cwd", argv),
-      spec: readArg6("--spec", argv),
-      goal: readArg6("--goal", argv)
+      cwd: readArg7("--cwd", argv),
+      spec: readArg7("--spec", argv),
+      goal: readArg7("--goal", argv)
     })
   );
 }
@@ -2234,6 +3477,9 @@ function firstPositional(argv) {
   }
   return void 0;
 }
+function hasFlag2(argv, flag) {
+  return argv.includes(flag);
+}
 function isDirectory(path3) {
   try {
     return statSync5(path3).isDirectory();
@@ -2241,22 +3487,22 @@ function isDirectory(path3) {
     return false;
   }
 }
-function readJsonFile2(path3) {
+function readJsonFile3(path3) {
   try {
-    return JSON.parse(readFileSync6(path3, "utf8"));
+    return JSON.parse(readFileSync8(path3, "utf8"));
   } catch {
     return null;
   }
 }
-function detectPackageManager2(cwd) {
-  if (existsSync6(join5(cwd, "pnpm-lock.yaml"))) return "pnpm";
-  if (existsSync6(join5(cwd, "bun.lockb")) || existsSync6(join5(cwd, "bun.lock"))) return "bun";
-  if (existsSync6(join5(cwd, "yarn.lock"))) return "yarn";
-  if (existsSync6(join5(cwd, "package-lock.json"))) return "npm";
-  if (existsSync6(join5(cwd, "package.json"))) return "npm";
+function detectPackageManager3(cwd) {
+  if (existsSync8(join7(cwd, "pnpm-lock.yaml"))) return "pnpm";
+  if (existsSync8(join7(cwd, "bun.lockb")) || existsSync8(join7(cwd, "bun.lock"))) return "bun";
+  if (existsSync8(join7(cwd, "yarn.lock"))) return "yarn";
+  if (existsSync8(join7(cwd, "package-lock.json"))) return "npm";
+  if (existsSync8(join7(cwd, "package.json"))) return "npm";
   return null;
 }
-function scriptCommand(packageManager, scriptName) {
+function scriptCommand2(packageManager, scriptName) {
   switch (packageManager) {
     case "pnpm":
       return `pnpm run ${scriptName}`;
@@ -2269,8 +3515,8 @@ function scriptCommand(packageManager, scriptName) {
   }
 }
 function detectProjectScripts(cwd) {
-  const pkg = readJsonFile2(join5(cwd, "package.json"));
-  const packageManager = detectPackageManager2(cwd);
+  const pkg = readJsonFile3(join7(cwd, "package.json"));
+  const packageManager = detectPackageManager3(cwd);
   const scripts = pkg?.scripts ?? {};
   const allDependencies = { ...pkg?.dependencies ?? {}, ...pkg?.devDependencies ?? {} };
   const dependencyNames = Object.keys(allDependencies).filter(
@@ -2294,21 +3540,21 @@ function detectProjectScripts(cwd) {
   };
 }
 function detectConfigFiles(cwd, filenames) {
-  return filenames.filter((name) => existsSync6(join5(cwd, name)));
+  return filenames.filter((name) => existsSync8(join7(cwd, name)));
 }
 function detectChrome() {
   const envPath = process.env.CHROME_PATH;
-  if (envPath && existsSync6(envPath)) {
+  if (envPath && existsSync8(envPath)) {
     return { installed: true, path: envPath, source: "CHROME_PATH" };
   }
   if (process.platform === "darwin") {
     const path3 = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-    return existsSync6(path3) ? { installed: true, path: path3, source: "macos-default" } : { installed: false, path: null, source: null };
+    return existsSync8(path3) ? { installed: true, path: path3, source: "macos-default" } : { installed: false, path: null, source: null };
   }
   if (process.platform === "win32") {
     const suffixes = [
-      join5("Google", "Chrome SxS", "Application", "chrome.exe"),
-      join5("Google", "Chrome", "Application", "chrome.exe")
+      join7("Google", "Chrome SxS", "Application", "chrome.exe"),
+      join7("Google", "Chrome", "Application", "chrome.exe")
     ];
     const prefixes = [
       process.env.LOCALAPPDATA,
@@ -2317,8 +3563,8 @@ function detectChrome() {
     ].filter((value) => Boolean(value));
     for (const prefix of prefixes) {
       for (const suffix of suffixes) {
-        const candidate = join5(prefix, suffix);
-        if (existsSync6(candidate)) {
+        const candidate = join7(prefix, suffix);
+        if (existsSync8(candidate)) {
           return { installed: true, path: candidate, source: "windows-default" };
         }
       }
@@ -2326,7 +3572,7 @@ function detectChrome() {
     return { installed: false, path: null, source: null };
   }
   for (const bin of ["google-chrome", "chromium", "chromium-browser"]) {
-    const found = spawnSync("which", [bin], { encoding: "utf8" });
+    const found = spawnSync2("which", [bin], { encoding: "utf8" });
     if (found.status === 0) {
       return { installed: true, path: found.stdout.trim() || bin, source: "PATH" };
     }
@@ -2334,7 +3580,7 @@ function detectChrome() {
   return { installed: false, path: null, source: null };
 }
 function detectChromeDevtoolsDependency() {
-  const manifest = readJsonFile2(join5(pluginRoot(), ".claude-plugin", "plugin.json"));
+  const manifest = readJsonFile3(join7(pluginRoot(), ".claude-plugin", "plugin.json"));
   const dependency = manifest?.dependencies?.find((item) => item.name === "chrome-devtools-mcp");
   return {
     declared: dependency !== void 0,
@@ -2362,7 +3608,7 @@ function browserVerificationDoctor(cwd) {
   ]);
   const hasPlaywrightDependency = scripts.dependencies.some((name) => /(^@playwright\/test$|^playwright$|playwright-core)/i.test(name));
   const playwrightScriptCandidates = [.../* @__PURE__ */ new Set([...scripts.playwrightScripts, ...scripts.e2e])];
-  const recommendedPlaywrightCommand = playwrightScriptCandidates[0] !== void 0 ? scriptCommand(scripts.packageManager, playwrightScriptCandidates[0]) : hasPlaywrightDependency || playwrightConfigFiles.length > 0 ? "npx playwright test" : null;
+  const recommendedPlaywrightCommand = playwrightScriptCandidates[0] !== void 0 ? scriptCommand2(scripts.packageManager, playwrightScriptCandidates[0]) : hasPlaywrightDependency || playwrightConfigFiles.length > 0 ? "npx playwright test" : null;
   const chrome = detectChrome();
   const chromeDevtools = detectChromeDevtoolsDependency();
   return {
@@ -2411,7 +3657,7 @@ function collectCommandHooks(config) {
         const command = typeof hook.command === "string" ? hook.command : null;
         const args = Array.isArray(hook.args) ? hook.args.filter((arg) => typeof arg === "string") : [];
         const scriptArg = args[0] ?? null;
-        const scriptPath = scriptArg?.startsWith(prefix) === true ? join5(root, scriptArg.slice(prefix.length)) : null;
+        const scriptPath = scriptArg?.startsWith(prefix) === true ? join7(root, scriptArg.slice(prefix.length)) : null;
         out.push({
           event,
           command,
@@ -2420,7 +3666,7 @@ function collectCommandHooks(config) {
           execForm: command === "node" && scriptArg !== null && scriptArg.startsWith(prefix),
           scriptArg,
           scriptPath,
-          scriptExists: scriptPath === null ? null : existsSync6(scriptPath)
+          scriptExists: scriptPath === null ? null : existsSync8(scriptPath)
         });
       }
     }
@@ -2429,30 +3675,30 @@ function collectCommandHooks(config) {
 }
 function pluginHealthDoctor() {
   const root = pluginRoot();
-  const manifestPath = join5(root, ".claude-plugin", "plugin.json");
-  const hooksPath = join5(root, "hooks", "hooks.json");
-  const binPath = join5(root, "bin", "curdx-flow");
-  const manifest = readJsonFile2(manifestPath);
-  const hooksConfig = readJsonFile2(hooksPath);
+  const manifestPath = join7(root, ".claude-plugin", "plugin.json");
+  const hooksPath = join7(root, "hooks", "hooks.json");
+  const binPath = join7(root, "bin", "curdx-flow");
+  const manifest = readJsonFile3(manifestPath);
+  const hooksConfig = readJsonFile3(hooksPath);
   const commandHooks = collectCommandHooks(hooksConfig);
   const shellFormHooks = commandHooks.filter((hook) => !hook.execForm || hook.shell !== null);
   const missingScripts = commandHooks.filter((hook) => hook.scriptExists === false);
   const validHooksObject = hooksConfig !== null && typeof hooksConfig.hooks === "object" && hooksConfig.hooks !== null;
-  const ready = existsSync6(root) && manifest !== null && manifest.name === "curdx-flow" && existsSync6(binPath) && validHooksObject && commandHooks.length > 0 && shellFormHooks.length === 0 && missingScripts.length === 0;
+  const ready = existsSync8(root) && manifest !== null && manifest.name === "curdx-flow" && existsSync8(binPath) && validHooksObject && commandHooks.length > 0 && shellFormHooks.length === 0 && missingScripts.length === 0;
   return {
     ready,
     root,
     dataDir: process.env.CLAUDE_PLUGIN_DATA ?? null,
     manifest: {
       path: manifestPath,
-      exists: existsSync6(manifestPath),
+      exists: existsSync8(manifestPath),
       valid: manifest !== null,
       name: manifest?.name ?? null,
       version: manifest?.version ?? null
     },
     hooks: {
       path: hooksPath,
-      exists: existsSync6(hooksPath),
+      exists: existsSync8(hooksPath),
       valid: validHooksObject,
       commandHookCount: commandHooks.length,
       execForm: shellFormHooks.length === 0,
@@ -2469,18 +3715,56 @@ function pluginHealthDoctor() {
       }))
     },
     bin: {
-      curdxFlow: existsSync6(binPath),
+      curdxFlow: existsSync8(binPath),
       path: binPath
     }
   };
 }
+function hookFreshnessDoctor() {
+  const sourceRoot = join7(repoRootFromPlugin(), "src", "hooks");
+  const bundleRoot = join7(pluginRoot(), "hooks", "scripts");
+  const pairs = [
+    ["user-prompt-expansion-guard.ts", "user-prompt-expansion-guard.mjs"],
+    ["post-tool-batch-snapshot.ts", "post-tool-batch-snapshot.mjs"],
+    ["task-completed-verifier.ts", "task-completed-verifier.mjs"],
+    [join7("lib", "smart-route.ts"), join7("lib", "smart-route.mjs")],
+    [join7("lib", "tool-capabilities.ts"), join7("lib", "tool-capabilities.mjs")],
+    [join7("lib", "stack-capabilities.ts"), join7("lib", "stack-capabilities.mjs")],
+    [join7("lib", "dev-runtime.ts"), join7("lib", "dev-runtime.mjs")],
+    [join7("lib", "runtime-cli.ts"), join7("lib", "runtime-cli.mjs")]
+  ];
+  const entries = pairs.map(([srcRel, bundleRel]) => {
+    const sourcePath = join7(sourceRoot, srcRel);
+    const bundlePath = join7(bundleRoot, bundleRel);
+    const sourceExists = existsSync8(sourcePath);
+    const bundleExists = existsSync8(bundlePath);
+    const sourceMtime = sourceExists ? statSync5(sourcePath).mtimeMs : null;
+    const bundleMtime = bundleExists ? statSync5(bundlePath).mtimeMs : null;
+    return {
+      source: srcRel,
+      bundle: bundleRel,
+      sourceExists,
+      bundleExists,
+      fresh: sourceMtime === null || bundleMtime === null ? false : bundleMtime >= sourceMtime
+    };
+  });
+  const sourceAvailable = existsSync8(sourceRoot);
+  return {
+    sourceAvailable,
+    bundleRoot,
+    fresh: entries.every((entry) => entry.fresh),
+    stale: entries.filter((entry) => !entry.fresh),
+    entries,
+    checkCommand: "npm run check:hooks-fresh"
+  };
+}
 function resolveSpecPathForOutput(cwd, path3) {
-  const fsPath = isAbsolute4(path3) ? path3 : join5(cwd, path3);
+  const fsPath = isAbsolute6(path3) ? path3 : join7(cwd, path3);
   return { path: path3, fsPath };
 }
 function specs(argv) {
   const [sub, ...rest] = argv;
-  const cwd = resolve2(readArg6("--cwd", rest) ?? process.cwd());
+  const cwd = resolve4(readArg7("--cwd", rest) ?? process.cwd());
   if (sub === "dirs") {
     printJson({
       defaultDir: getDefaultDir({ cwd }),
@@ -2511,13 +3795,13 @@ function specs(argv) {
       printJson({ ok: false, reason: "no-current" });
       process.exit(1);
     }
-    if (target.startsWith("./") || target.startsWith("../") || target.includes("/") || isAbsolute4(target)) {
+    if (target.startsWith("./") || target.startsWith("../") || target.includes("/") || isAbsolute6(target)) {
       const resolved2 = resolveSpecPathForOutput(cwd, target);
       if (!isDirectory(resolved2.fsPath)) {
         printJson({ ok: false, reason: "not-found", path: target });
         process.exit(1);
       }
-      printJson({ ok: true, name: basename8(target), ...resolved2 });
+      printJson({ ok: true, name: basename9(target), ...resolved2 });
       return;
     }
     const found = findSpec(target, { cwd });
@@ -2526,7 +3810,7 @@ function specs(argv) {
       process.exit(found.reason === "ambiguous" ? 2 : 1);
     }
     const resolved = resolveSpecPathForOutput(cwd, found.path);
-    printJson({ ok: true, name: basename8(found.path), ...resolved });
+    printJson({ ok: true, name: basename9(found.path), ...resolved });
     return;
   }
   usage();
@@ -2546,13 +3830,43 @@ function tasks(argv) {
   if (!tasksFile) usage();
   return runBundled("count-tasks", [tasksFile]);
 }
+function dev(argv) {
+  const [sub, ...rest] = argv;
+  const cwd = readArg7("--cwd", rest);
+  switch (sub) {
+    case "detect":
+      printJson(detectDevRuntime({ cwd }));
+      return;
+    case "up":
+      printJson(startDevRuntime({ cwd }));
+      return;
+    case "health":
+      printJson(healthDevRuntime({ cwd, dryRun: hasFlag2(rest, "--dry-run") }));
+      return;
+    case "verify": {
+      const result = verifyDevRuntime({
+        cwd,
+        dryRun: hasFlag2(rest, "--dry-run"),
+        includeE2e: hasFlag2(rest, "--include-e2e")
+      });
+      printJson(result);
+      if (result.ok === false && !hasFlag2(rest, "--dry-run")) process.exit(1);
+      return;
+    }
+    case "down":
+      printJson(stopDevRuntime({ cwd }));
+      return;
+    default:
+      usage();
+  }
+}
 async function verify(argv) {
   const [sub, ...rest] = argv;
   if (sub !== "run") usage();
-  const command = readArg6("--command", rest);
+  const command = readArg7("--command", rest);
   if (!command) usage();
-  const cwd = resolve2(readArg6("--cwd", rest) ?? process.cwd());
-  const phase = readArg6("--phase", rest) ?? "execution";
+  const cwd = resolve4(readArg7("--cwd", rest) ?? process.cwd());
+  const phase = readArg7("--phase", rest) ?? "execution";
   if (!["research", "requirements", "design", "tasks", "execution"].includes(phase)) {
     process.stderr.write(`verify run: unsupported phase: ${phase}
 `);
@@ -2560,13 +3874,13 @@ async function verify(argv) {
   }
   const snap = buildWorkflowSnapshot({
     cwd,
-    spec: readArg6("--spec", rest)
+    spec: readArg7("--spec", rest)
   });
   if (!snap.spec?.fsPath || !snap.spec.statePath) {
     process.stderr.write("verify run: no active spec\n");
     process.exit(2);
   }
-  const result = spawnSync(command, {
+  const result = spawnSync2(command, {
     cwd,
     shell: true,
     stdio: "inherit",
@@ -2584,7 +3898,7 @@ async function verify(argv) {
     exitCode,
     timestamp,
     srcMtime,
-    description: readArg6("--description", rest) ?? `Verification for ${phase}`
+    description: readArg7("--description", rest) ?? `Verification for ${phase}`
   };
   if (exitCode !== 0) {
     block.failedReason = result.error ? result.error.message : `command exited ${exitCode}`;
@@ -2594,7 +3908,7 @@ async function verify(argv) {
       [phase]: block
     }
   });
-  const merge = spawnSync(process.execPath, [join5(scriptRoot(), "merge-state.mjs"), snap.spec.statePath, patch], {
+  const merge = spawnSync2(process.execPath, [join7(scriptRoot(), "merge-state.mjs"), snap.spec.statePath, patch], {
     cwd,
     encoding: "utf8",
     stdio: ["inherit", "ignore", "pipe"]
@@ -2611,10 +3925,10 @@ async function verify(argv) {
   process.exit(exitCode);
 }
 async function verifyBlocks(argv) {
-  const cwd = readArg6("--cwd", argv);
+  const cwd = readArg7("--cwd", argv);
   const snap = buildWorkflowSnapshot({
     cwd,
-    spec: readArg6("--spec", argv)
+    spec: readArg7("--spec", argv)
   });
   if (!snap.spec?.fsPath) {
     process.stderr.write("verify-blocks: no active spec\n");
@@ -2626,26 +3940,44 @@ async function verifyBlocks(argv) {
   process.exit(result.code);
 }
 function doctor(argv) {
-  const cwd = resolve2(readArg6("--cwd", argv) ?? process.cwd());
-  const snap = buildWorkflowSnapshot({ cwd, spec: readArg6("--spec", argv) });
+  const cwd = resolve4(readArg7("--cwd", argv) ?? process.cwd());
+  const snap = buildWorkflowSnapshot({ cwd, spec: readArg7("--spec", argv) });
+  const goal = readArg7("--goal", argv) ?? "";
+  const routeFacts = classifySmartRoute({ cwd, goal });
+  const topology = discoverProjectTopology({ cwd, goal });
+  const stackProfile = detectStackProfile({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk });
+  const qualityGates = selectQualityGates({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
+  const suggestedVerifier = selectSuggestedVerifier({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile, qualityGates });
+  const contextBudget = selectContextBudget({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
   const expected = [
-    join5(scriptRoot(), "workflow-snapshot.mjs"),
-    join5(scriptRoot(), "smart-route.mjs"),
-    join5(scriptRoot(), "merge-state.mjs"),
-    join5(scriptRoot(), "count-tasks.mjs")
+    join7(scriptRoot(), "workflow-snapshot.mjs"),
+    join7(scriptRoot(), "smart-route.mjs"),
+    join7(scriptRoot(), "stack-capabilities.mjs"),
+    join7(scriptRoot(), "merge-state.mjs"),
+    join7(scriptRoot(), "count-tasks.mjs")
   ];
-  const runtimeReady = expected.every((p) => existsSync6(p));
+  const runtimeReady = expected.every((p) => existsSync8(p));
   const plugin = pluginHealthDoctor();
+  const hookFreshness = hookFreshnessDoctor();
   const root = pluginRoot();
   printJson({
-    ok: runtimeReady && plugin.ready === true,
+    ok: runtimeReady && plugin.ready === true && (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
     cwd,
-    scripts: Object.fromEntries(expected.map((p) => [basename8(p), existsSync6(p)])),
+    scripts: Object.fromEntries(expected.map((p) => [basename9(p), existsSync8(p)])),
     runtime: {
       ready: runtimeReady,
-      scripts: Object.fromEntries(expected.map((p) => [basename8(p), existsSync6(p)]))
+      scripts: Object.fromEntries(expected.map((p) => [basename9(p), existsSync8(p)]))
     },
     plugin,
+    hookFreshness,
+    docsSensitiveWarnings: [
+      "Claude Code plugin, skill, agent, hook, dependency, marketplace, and tag behavior must be verified against https://code.claude.com/docs/llms.txt before release-facing changes."
+    ],
+    route: routeFacts.route,
+    stackProfile,
+    qualityGates,
+    suggestedVerifier,
+    contextBudget,
     browserVerification: browserVerificationDoctor(cwd),
     active: snap.active,
     spec: snap.spec,
@@ -2661,7 +3993,7 @@ function doctor(argv) {
     ]
   });
 }
-async function main6() {
+async function main7() {
   const [command, ...argv] = process.argv.slice(2);
   switch (command) {
     case "route":
@@ -2678,6 +4010,9 @@ async function main6() {
       return;
     case "tasks":
       tasks(argv);
+      return;
+    case "dev":
+      dev(argv);
       return;
     case "verify":
       await verify(argv);
@@ -2697,15 +4032,15 @@ async function main6() {
 `);
   usage();
 }
-function isDirectRun6() {
+function isDirectRun7() {
   try {
     const entry = fileURLToPath6(import.meta.url);
-    return process.argv[1] === entry && basename8(entry).startsWith("runtime-cli.");
+    return process.argv[1] === entry && basename9(entry).startsWith("runtime-cli.");
   } catch {
     return false;
   }
 }
-if (isDirectRun6()) {
-  void main6();
+if (isDirectRun7()) {
+  void main7();
 }
 //# sourceMappingURL=runtime-cli.mjs.map

@@ -159,7 +159,8 @@ describe("task-completed-verifier (TaskCompleted hook)", () => {
     expect(r.exitCode).toBe(2);
     expect(r.json).toBeDefined();
     expect((r.json as any).decision).toBe("block");
-    expect((r.json as any).reason).toBe("missing");
+    expect((r.json as any).reason).toContain("missing");
+    expect((r.json as any).reason).toContain("Suggested verifier");
   });
 
   it("(c): stale block (srcMtime > Date.parse(timestamp)) → exit 2, reason starts with 'Stale evidence'", () => {

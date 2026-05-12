@@ -3,6 +3,7 @@
 // blocks unknown curdx-flow command names before expansion.
 
 import { buildWorkflowSnapshot } from "./lib/workflow-snapshot.js";
+import { classifySmartRoute } from "./lib/smart-route.js";
 import { readStdinJson } from "./_shared/stdin.js";
 
 const KNOWN = new Set([
@@ -13,6 +14,7 @@ const KNOWN = new Set([
   "curdx-flow:implement",
   "curdx-flow:index",
   "curdx-flow:new",
+  "curdx-flow:prompt-optimize",
   "curdx-flow:refactor",
   "curdx-flow:requirements",
   "curdx-flow:research",
@@ -62,12 +64,31 @@ async function main(): Promise<void> {
       cwd: input.cwd,
       goal: input.command_args,
     });
+    const route = classifySmartRoute({
+      cwd: input.cwd,
+      goal: input.command_args,
+    });
+    const topGates = route.qualityGates
+      .filter((gate) => gate.required)
+      .slice(0, 3)
+      .map((gate) => gate.command ? `${gate.id}:${gate.command}` : gate.id)
+      .join(",");
+    const promptOptimizeHint =
+      commandName === "curdx-flow:prompt-optimize"
+        ? " advisory-only=true no-execution=true"
+        : "";
     const context = [
       "curdx-flow expansion context:",
       `active=${snapshot.active}`,
+      `route=${route.route}`,
+      `stack=${route.stackProfile.primary}`,
+      `verifier=${route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? "repo-default"}`,
+      `contextBudget=${route.contextBudget.level}`,
+      `qualityGates=${topGates || "none"}`,
       `next=${snapshot.nextAction}`,
       `gates=${snapshot.gates.join(",") || "none"}`,
-    ].join(" ");
+      promptOptimizeHint.trim(),
+    ].filter(Boolean).join(" ");
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {

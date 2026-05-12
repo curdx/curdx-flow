@@ -9,6 +9,11 @@
 
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import type {
+  ContextBudget,
+  QualityGate,
+  StackProfile,
+} from "./stack-capabilities.js";
 
 export type ToolCapabilityId =
   | "claude-mem"
@@ -16,9 +21,15 @@ export type ToolCapabilityId =
   | "sequential-thinking"
   | "chrome-devtools-mcp"
   | "frontend-design"
-  | "pua";
+  | "pua"
+  | "docs-query"
+  | "browser-verification"
+  | "tdd-cycle"
+  | "security-review"
+  | "stack-specific-verification"
+  | "context-budget";
 
-export type CapabilityToolType = "plugin" | "mcp";
+export type CapabilityToolType = "plugin" | "mcp" | "workflow" | "policy";
 
 export type CapabilityPhase =
   | "before-coding"
@@ -48,6 +59,9 @@ export interface CapabilityRoutingInput {
   risk?: string;
   topologyKinds?: string[];
   topologyFrameworks?: string[];
+  stackProfile?: StackProfile;
+  qualityGates?: QualityGate[];
+  contextBudget?: ContextBudget;
   missingRoots?: number;
   availableCapabilities?: string[];
 }
@@ -58,9 +72,11 @@ export interface CapabilityRecommendation {
   type: CapabilityToolType;
   invocation: string;
   phase: CapabilityPhase;
+  category?: "docs" | "verification" | "tdd" | "security" | "context" | "recovery";
   availability: CapabilityAvailability;
   reason: string;
   instruction: string;
+  stackIds?: string[];
 }
 
 const CAPABILITIES: Record<ToolCapabilityId, ToolCapability> = {
@@ -118,13 +134,73 @@ const CAPABILITIES: Record<ToolCapabilityId, ToolCapability> = {
     useWhen: "Use after multiple failed attempts or for truly independent parallel work slices.",
     skipWhen: "Skip on first-attempt failures, known fixes, and work that is sequential by dependency.",
   },
+  "docs-query": {
+    id: "docs-query",
+    name: "Docs query",
+    type: "workflow",
+    invocation: "Context7 or official docs",
+    summary: "phase-specific grounding against current documentation",
+    useWhen: "Use before implementation when quality gates mark docs as required.",
+    skipWhen: "Skip when local code fully defines the behavior and no external API/version matters.",
+  },
+  "browser-verification": {
+    id: "browser-verification",
+    name: "Browser verification",
+    type: "workflow",
+    invocation: "Playwright or Chrome DevTools MCP",
+    summary: "repeatable browser/runtime proof for UI and full-stack behavior",
+    useWhen: "Use when browser-facing quality gates are required or suggested.",
+    skipWhen: "Skip for backend-only and CLI-only work.",
+  },
+  "tdd-cycle": {
+    id: "tdd-cycle",
+    name: "TDD cycle",
+    type: "workflow",
+    invocation: "RED/GREEN/VERIFY loop",
+    summary: "test-first implementation for behavior changes",
+    useWhen: "Use when route/risk indicates implementation should be protected by a regression test.",
+    skipWhen: "Skip for docs-only edits and pure mechanical metadata updates.",
+  },
+  "security-review": {
+    id: "security-review",
+    name: "Security review",
+    type: "workflow",
+    invocation: "read-only security review",
+    summary: "focused review of auth, secrets, injection, release, and dependency risk",
+    useWhen: "Use when quality gates indicate auth/security/release risk.",
+    skipWhen: "Skip for isolated copy edits with no executable behavior.",
+  },
+  "stack-specific-verification": {
+    id: "stack-specific-verification",
+    name: "Stack-specific verification",
+    type: "workflow",
+    invocation: "curdx-flow route qualityGates",
+    summary: "run the verifier that matches the detected stack profile",
+    useWhen: "Use before completion whenever smart-route returns a suggestedVerifier.",
+    skipWhen: "Skip only when no stack profile is detected and no repo verifier exists.",
+  },
+  "context-budget": {
+    id: "context-budget",
+    name: "Context budget",
+    type: "policy",
+    invocation: "curdx-flow route contextBudget",
+    summary: "limit reference loading by route and stack confidence",
+    useWhen: "Use for every non-trivial route to keep the session focused.",
+    skipWhen: "Skip only for no-op direct changes.",
+  },
 };
 
 const ORDER: ToolCapabilityId[] = [
   "context7",
+  "docs-query",
   "claude-mem",
   "frontend-design",
   "chrome-devtools-mcp",
+  "browser-verification",
+  "tdd-cycle",
+  "security-review",
+  "stack-specific-verification",
+  "context-budget",
   "sequential-thinking",
   "pua",
 ];
@@ -139,7 +215,7 @@ const CORE_REQUIRED: ReadonlySet<ToolCapabilityId> = new Set([
 ]);
 
 const EXTERNAL_DOCS_RE =
-  /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node)\b|最新|依赖|框架|插件|官方|联网|搜索|文档.*(最新|官方|API|SDK|框架|插件|依赖)/i;
+  /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|scaffold|starter|template|generator|initializer|initializr|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node|go|python|rust|cargo|maven|gradle|cookiecutter)\b|最新|依赖|框架|插件|官方|联网|搜索|文档|脚手架|初始化|生成器|模板/i;
 
 const MEMORY_RE =
   /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
@@ -176,6 +252,8 @@ function capabilityAvailability(
   available: Set<string> | null,
 ): CapabilityAvailability | null {
   if (CORE_REQUIRED.has(id)) return "core-required";
+  const cap = CAPABILITIES[id];
+  if (cap.type === "workflow" || cap.type === "policy") return "known-available";
   if (available === null) return "check-if-installed";
   return available.has(id) ? "known-available" : null;
 }
@@ -187,6 +265,7 @@ function pushRecommendation(
   phase: CapabilityPhase,
   reason: string,
   instruction: string,
+  extra: Pick<CapabilityRecommendation, "category" | "stackIds"> = {},
 ): void {
   const availability = capabilityAvailability(id, available);
   if (availability === null) return;
@@ -198,6 +277,7 @@ function pushRecommendation(
     type: cap.type,
     invocation: cap.invocation,
     phase,
+    ...extra,
     availability,
     reason,
     instruction,
@@ -222,6 +302,9 @@ export function recommendToolCapabilities(
   const risk = normalize(input.risk);
   const topologyKinds = input.topologyKinds ?? [];
   const topologyFrameworks = input.topologyFrameworks ?? [];
+  const stackProfile = input.stackProfile;
+  const qualityGates = input.qualityGates ?? [];
+  const contextBudget = input.contextBudget;
   const missingRoots = input.missingRoots ?? 0;
   const available =
     input.availableCapabilities === undefined
@@ -253,15 +336,31 @@ export function recommendToolCapabilities(
     route === "epic-split";
   const stuck = STUCK_RE.test(goal);
   const parallel = PARALLEL_RE.test(goal) || route === "epic-split";
+  const stackIds = stackProfile?.detected.map((stack) => stack.id) ?? [];
+  const docsGate = qualityGates.find((gate) => gate.id.endsWith("-docs"));
+  const browserGate = qualityGates.find((gate) => gate.id.endsWith("-browser"));
+  const tddGate = qualityGates.find((gate) => gate.id.endsWith("-tdd"));
+  const securityGate = qualityGates.find((gate) => gate.id.endsWith("-security-review"));
+  const baselineGate = qualityGates.find((gate) => gate.id.endsWith("-baseline"));
 
-  if (externalDocsRelevant) {
+  if (externalDocsRelevant || docsGate?.required === true) {
     pushRecommendation(
       recs,
       available,
       "context7",
       "before-coding",
-      "external documentation or current API behavior is likely relevant",
+      docsGate?.reason ?? "external documentation or current API behavior is likely relevant",
       "Use Context7 before editing so version-specific behavior is grounded in current docs.",
+      { category: "docs", stackIds },
+    );
+    pushRecommendation(
+      recs,
+      available,
+      "docs-query",
+      "before-coding",
+      docsGate?.reason ?? "documentation grounding should happen before implementation",
+      "Query official/current docs first, then summarize only the decisions that affect this route.",
+      { category: "docs", stackIds },
     );
   }
 
@@ -273,6 +372,7 @@ export function recommendToolCapabilities(
       "planning",
       "similar prior work or longer-running plan may exist",
       "Search memory before planning; use make-plan only when the work is genuinely phased.",
+      { category: "context", stackIds },
     );
   }
 
@@ -284,17 +384,78 @@ export function recommendToolCapabilities(
       "implementation",
       "visible frontend behavior or UI quality is in scope",
       "Use frontend-design guidance for UI structure, interaction, responsive behavior, and visual polish.",
+      { category: "verification", stackIds },
     );
   }
 
-  if (browserRuntime) {
+  if (browserRuntime || browserGate !== undefined) {
     pushRecommendation(
       recs,
       available,
       "chrome-devtools-mcp",
       "verification",
-      "browser runtime behavior should be verified in a real browser",
+      browserGate?.reason ?? "browser runtime behavior should be verified in a real browser",
       "Use Chrome DevTools MCP for console, network, DOM, performance, or visual proof after implementation.",
+      { category: "verification", stackIds },
+    );
+    pushRecommendation(
+      recs,
+      available,
+      "browser-verification",
+      "verification",
+      browserGate?.reason ?? "browser-facing behavior needs repeatable runtime evidence",
+      "Prefer Playwright for repeatable E2E; use Chrome DevTools MCP when high-fidelity runtime inspection is needed.",
+      { category: "verification", stackIds },
+    );
+  }
+
+  if (tddGate?.required === true) {
+    pushRecommendation(
+      recs,
+      available,
+      "tdd-cycle",
+      "implementation",
+      tddGate.reason,
+      "Start with a focused failing test or reproduction when behavior is changing; keep the test in the final verifier.",
+      { category: "tdd", stackIds },
+    );
+  }
+
+  if (securityGate !== undefined || COMPLEX_RE.test(goal)) {
+    pushRecommendation(
+      recs,
+      available,
+      "security-review",
+      "verification",
+      securityGate?.reason ?? "the task touches a risk surface that benefits from security review",
+      "Run a read-only security pass over auth, input validation, secrets, dependencies, and release metadata before completion.",
+      { category: "security", stackIds },
+    );
+  }
+
+  if ((baselineGate !== undefined || stackProfile?.primary !== "unknown") && route !== "direct-change") {
+    pushRecommendation(
+      recs,
+      available,
+      "stack-specific-verification",
+      "verification",
+      baselineGate?.reason ?? "detected stack should drive the final verifier",
+      baselineGate?.command
+        ? `Run the stack verifier: ${baselineGate.command}.`
+        : "Use the repository's documented verifier for the detected stack.",
+      { category: "verification", stackIds },
+    );
+  }
+
+  if (contextBudget !== undefined && route !== "direct-change") {
+    pushRecommendation(
+      recs,
+      available,
+      "context-budget",
+      "planning",
+      `context budget is ${contextBudget.level}`,
+      contextBudget.strategy,
+      { category: "context", stackIds },
     );
   }
 
@@ -306,6 +467,7 @@ export function recommendToolCapabilities(
       "planning",
       "risk or uncertainty requires explicit hypothesis management",
       "Use sequential-thinking to break assumptions before choosing the implementation path.",
+      { category: "context", stackIds },
     );
   }
 
@@ -321,6 +483,7 @@ export function recommendToolCapabilities(
       stuck
         ? "Use /pua:pua-loop only after local triage confirms the first fix path is not working."
         : "Use /pua:p9 only after dependencies prove the slices can run independently.",
+      { category: stuck ? "recovery" : "context", stackIds },
     );
   }
 

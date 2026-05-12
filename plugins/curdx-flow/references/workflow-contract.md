@@ -16,7 +16,7 @@ Every phase skill starts from facts, not memory:
 
 | Skill | Owns | Must Not Do |
 | --- | --- | --- |
-| `start` | route, create/reinitialize spec state, choose direct/spec/epic flow | implement feature work |
+| `start` | route, classify workspace/intent, create/reinitialize spec state, choose direct/scaffold/inception/spec/prototype/import/epic flow | implement feature work |
 | `research` | discover constraints, current docs, code patterns | write requirements/design/tasks |
 | `requirements` | FR/NFR/AC, scope, locked decisions | invent architecture |
 | `design` | technical architecture and rewrite boundaries | create task checkboxes |
@@ -24,6 +24,7 @@ Every phase skill starts from facts, not memory:
 | `implement` | coordinate task dispatch and gates | edit product files directly |
 | `triage` | split oversized work into dependency-aware specs | force epic work into one spec |
 | `status` | report snapshot and next action | mutate state |
+| `prompt-optimize` | improve a task prompt, route suggestion, missing context, risks, and quality gates | execute the task or mutate files |
 
 ## Gate Types
 
@@ -35,6 +36,7 @@ Every phase skill starts from facts, not memory:
 ## Completion Rules
 
 - No phase is complete without the expected artifact on disk and a fresh state merge.
+- No greenfield product phase may begin business feature implementation before product context, constitution, and a walking-skeleton task exist or are explicitly source-deferred.
 - No tasks phase is complete unless `tasks.md` has `## Source Coverage Audit` and executable top-level tasks are checkbox list items (`- [ ] 1.1 ...` or `- [x] 1.1 ...`), not heading-only sections.
 - No implementation task is complete without `TASK_COMPLETE`, the task Verify command, and a sane post-commit diff.
 - No release/tag/push claim is complete without `npm run verify` passing in the same worktree.

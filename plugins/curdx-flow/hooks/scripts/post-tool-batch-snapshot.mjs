@@ -257,6 +257,19 @@ function readText(file) {
     return "";
   }
 }
+function meaningfulProjectEntries(projectRoot) {
+  try {
+    return readdirSync2(projectRoot).filter((name) => {
+      if (name === ".git" || name === ".hg" || name === ".svn") return false;
+      if (name === ".DS_Store" || name === "Thumbs.db") return false;
+      if (name === ".claude" || name === ".curdx") return false;
+      if (name === "specs") return false;
+      return true;
+    });
+  } catch {
+    return [];
+  }
+}
 function normalizeSerializedPath(input) {
   const trimmed = input.trim().replace(/^["'`]+|["'`]+$/g, "");
   if (!trimmed || trimmed === "./") return ".";
@@ -472,6 +485,23 @@ function detectPackageManager(rootAbs) {
   if (isFile(path.join(rootAbs, "build.gradle")) || isFile(path.join(rootAbs, "build.gradle.kts"))) return "gradle";
   return void 0;
 }
+function hasManifestOrSource(rootAbs) {
+  return [
+    "package.json",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "go.mod",
+    "pyproject.toml",
+    "Cargo.toml",
+    "Dockerfile",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "src",
+    "app",
+    "packages"
+  ].some((entry) => existsSync2(path.join(rootAbs, entry)));
+}
 function pushUnique(items, item) {
   if (!items.includes(item)) items.push(item);
 }
@@ -626,6 +656,24 @@ function siblingCandidates(projectRoot) {
   }
   return out;
 }
+function detectWorkspaceState(projectRoot, roots) {
+  const meaningfulEntries = meaningfulProjectEntries(projectRoot);
+  if (meaningfulEntries.length === 0) return "empty";
+  const accessibleRoots = roots.filter((root) => root.access !== "missing-path");
+  const hasFrontend = accessibleRoots.some(
+    (root) => root.role === "frontend" || root.kinds.includes("frontend-app")
+  );
+  const hasBackend = accessibleRoots.some(
+    (root) => root.role === "backend" || root.kinds.includes("backend-service")
+  );
+  const hasMultipleRoots = new Set(accessibleRoots.map((root) => root.path)).size > 1;
+  if (hasMultipleRoots && hasFrontend && hasBackend) return "split-repo";
+  const current = accessibleRoots.find((root) => root.path === ".");
+  const currentAbs = projectRoot;
+  const currentKnown = current !== void 0 && current.kinds.some((kind) => kind !== "unknown" && kind !== "infra");
+  if (currentKnown || hasManifestOrSource(currentAbs)) return "existing";
+  return "scaffolded";
+}
 function discoverRawRoots(projectRoot) {
   const fromClaude = parseRootsFromClaudeMd(projectRoot);
   const map = /* @__PURE__ */ new Map();
@@ -715,10 +763,12 @@ function discoverProjectTopology(options = {}) {
   const missingRoots = requiredRoots.filter(
     (root) => root.access === "outside-working-directory" || root.access === "missing-path"
   );
+  const workspaceState = detectWorkspaceState(projectRoot, roots);
   return {
     version: 1,
     cwd,
     projectRoot,
+    workspaceState,
     devContextFound: raw.devContextFound,
     roots,
     requiredRoots,
@@ -732,6 +782,7 @@ function renderContextMap(topology) {
     "# Project Context Map",
     "",
     `Project root: ${topology.projectRoot}`,
+    `Workspace state: ${topology.workspaceState}`,
     `Dev context found: ${topology.devContextFound ? "yes" : "no"}`,
     "",
     "## Code Roots",
@@ -906,6 +957,7 @@ function gitSnapshot(cwd) {
 }
 function compactTopology(topology) {
   return {
+    workspaceState: topology.workspaceState,
     devContextFound: topology.devContextFound,
     roots: topology.roots,
     requiredRoots: topology.requiredRoots,
@@ -1063,6 +1115,1650 @@ if (isDirectRun2()) {
   main2();
 }
 
+// src/hooks/lib/smart-route.ts
+import { existsSync as existsSync5, readFileSync as readFileSync5 } from "node:fs";
+import { basename as basename6, join as join4 } from "node:path";
+import { fileURLToPath as fileURLToPath5 } from "node:url";
+
+// src/hooks/lib/auto-policy.ts
+import { fileURLToPath as fileURLToPath3 } from "node:url";
+import { basename as basename4 } from "node:path";
+var LOW_RISK_RE = /\b(readme|docs?|documentation|typo|copy|wording|comment|comments|changelog|license|format text|rename label|css copy|style text)\b/i;
+var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|delete|remove|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
+var CRITICAL_RISK_RE = /\b(payment|billing|security|secret|secrets|password|token|oauth|authorization|permission|migration|data loss|release|publish|tag|hooks?\.json|plugin\.json|claude-plugin)\b/i;
+var XL_RE = /\b(epic|multi-spec|multiple specs|multiple subsystems|cross-system|whole app|entire app|rewrite|rebuild|platform|framework migration|全量|重写|多个子系统|史诗)\b/i;
+var ADD_OR_FIX_RE = /\b(add|build|create|implement|support|fix|debug|repair|resolve|refactor|change|modify|update)\b/i;
+function normalizeWords(input) {
+  return (input ?? "").trim().replace(/\s+/g, " ");
+}
+function parseFlags(flags) {
+  const text = ` ${flags ?? ""} `;
+  const modeMatch = text.match(/\s--mode\s+(auto|fast|deep)(?=\s|$)/);
+  const tasksMatch = text.match(
+    /\s--tasks-size\s+(auto|coarse|standard|fine)(?=\s|$)/
+  );
+  const reviewMatch = text.match(
+    /\s--review\s+(minimal|standard|strict)(?=\s|$)/
+  );
+  return {
+    mode: modeMatch?.[1] ?? "auto",
+    tasksSize: tasksMatch?.[1],
+    review: reviewMatch?.[1]
+  };
+}
+function countDistinctDirs(files) {
+  const dirs = /* @__PURE__ */ new Set();
+  for (const file of files) {
+    const parts = file.split(/[\\/]+/).filter(Boolean);
+    if (parts.length <= 1) {
+      dirs.add(".");
+    } else {
+      dirs.add(parts.slice(0, Math.min(2, parts.length - 1)).join("/"));
+    }
+  }
+  return dirs.size;
+}
+function bumpRisk(a, b) {
+  const order = ["low", "medium", "high", "critical"];
+  return order[Math.max(order.indexOf(a), order.indexOf(b))];
+}
+function classifyRisk(goal, files, fileCount) {
+  let risk = "medium";
+  const reasons = [];
+  if (LOW_RISK_RE.test(goal)) {
+    risk = "low";
+    reasons.push("low-risk wording/docs signal");
+  }
+  if (!ADD_OR_FIX_RE.test(goal) && fileCount <= 2) {
+    risk = bumpRisk(risk, "low");
+    reasons.push("small unclear change; keep validation targeted");
+  }
+  if (HIGH_RISK_RE.test(goal) || files.some((f) => HIGH_RISK_RE.test(f))) {
+    risk = bumpRisk(risk, "high");
+    reasons.push("high-risk domain or publish-critical file");
+  }
+  if (CRITICAL_RISK_RE.test(goal) || files.some((f) => CRITICAL_RISK_RE.test(f))) {
+    risk = bumpRisk(risk, "critical");
+    reasons.push("critical security/data/release/plugin surface");
+  }
+  if (fileCount >= 9) {
+    risk = bumpRisk(risk, "high");
+    reasons.push("large file surface");
+  }
+  if (countDistinctDirs(files) >= 4) {
+    risk = bumpRisk(risk, "high");
+    reasons.push("cross-directory blast radius");
+  }
+  return { risk, reasons };
+}
+function classifySize(args) {
+  const reasons = [];
+  let size;
+  if (XL_RE.test(args.goal) || args.fileCount >= 16 || args.dirCount >= 6 || typeof args.taskCount === "number" && args.taskCount > 12) {
+    size = "XL";
+    reasons.push("epic or oversized task/file surface");
+  } else if (args.risk === "critical" || args.fileCount >= 9) {
+    size = "L";
+    reasons.push("critical/high blast radius requires deep spec");
+  } else if (args.risk === "high" || args.fileCount >= 4) {
+    size = "M";
+    reasons.push("moderate implementation surface");
+  } else if (args.risk === "low" && args.fileCount <= 1) {
+    size = "XS";
+    reasons.push("single low-risk change");
+  } else if (args.fileCount <= 3) {
+    size = "S";
+    reasons.push("small bounded change");
+  } else {
+    size = "M";
+    reasons.push("default standard slice");
+  }
+  if (args.mode === "deep" && size !== "XL") {
+    size = size === "XS" || size === "S" ? "M" : "L";
+    reasons.push("explicit deep mode");
+  }
+  if (args.mode === "fast" && size === "L" && args.risk !== "critical") {
+    size = "M";
+    reasons.push("explicit fast mode without critical risk");
+  }
+  return { size, reasons };
+}
+function policyForSize(size) {
+  switch (size) {
+    case "XS":
+      return {
+        executionMode: "direct",
+        taskGranularity: "none",
+        taskTargetRange: { min: 0, max: 1 },
+        reviewCadence: "minimal",
+        verificationLevel: "targeted",
+        subagentPolicy: "none",
+        stopHookPolicy: "disabled",
+        maxGlobalIterations: 5,
+        maxTaskIterations: 2
+      };
+    case "S":
+      return {
+        executionMode: "spec-lite",
+        taskGranularity: "coarse",
+        taskTargetRange: { min: 1, max: 3 },
+        reviewCadence: "minimal",
+        verificationLevel: "targeted",
+        subagentPolicy: "none",
+        stopHookPolicy: "disabled",
+        maxGlobalIterations: 8,
+        maxTaskIterations: 3
+      };
+    case "M":
+      return {
+        executionMode: "standard",
+        taskGranularity: "standard",
+        taskTargetRange: { min: 3, max: 7 },
+        reviewCadence: "final",
+        verificationLevel: "standard",
+        subagentPolicy: "on-demand",
+        stopHookPolicy: "short-continuation",
+        maxGlobalIterations: 18,
+        maxTaskIterations: 4
+      };
+    case "L":
+      return {
+        executionMode: "deep-spec",
+        taskGranularity: "standard",
+        taskTargetRange: { min: 5, max: 12 },
+        reviewCadence: "periodic",
+        verificationLevel: "strict",
+        subagentPolicy: "per-slice",
+        stopHookPolicy: "short-continuation",
+        maxGlobalIterations: 30,
+        maxTaskIterations: 5
+      };
+    case "XL":
+      return {
+        executionMode: "epic-triage",
+        taskGranularity: "standard",
+        taskTargetRange: { min: 5, max: 10 },
+        reviewCadence: "strict",
+        verificationLevel: "strict",
+        subagentPolicy: "per-slice",
+        stopHookPolicy: "short-continuation",
+        maxGlobalIterations: 30,
+        maxTaskIterations: 5
+      };
+  }
+}
+function applyOverrides(policy, overrides) {
+  const next = { ...policy };
+  if (overrides.tasksSize !== void 0 && overrides.tasksSize !== "auto") {
+    next.taskGranularity = overrides.tasksSize;
+    next.reasons = [...next.reasons, `explicit tasks-size=${overrides.tasksSize}`];
+  }
+  if (overrides.review === "minimal") {
+    next.reviewCadence = "minimal";
+    next.reasons = [...next.reasons, "explicit review=minimal"];
+  } else if (overrides.review === "strict") {
+    next.reviewCadence = "strict";
+    next.verificationLevel = "strict";
+    next.reasons = [...next.reasons, "explicit review=strict"];
+  }
+  return next;
+}
+function classifyAutoPolicy(input) {
+  const goal = normalizeWords(input.goal);
+  const flags = parseFlags(input.flags);
+  const changedFiles = input.changedFiles ?? [];
+  const estimatedFiles = typeof input.estimatedFiles === "number" && Number.isFinite(input.estimatedFiles) ? Math.max(0, Math.floor(input.estimatedFiles)) : changedFiles.length;
+  const fileCount = Math.max(estimatedFiles, changedFiles.length);
+  const dirCount = countDistinctDirs(changedFiles);
+  const riskResult = classifyRisk(goal, changedFiles, fileCount);
+  const sizeResult = classifySize({
+    goal,
+    risk: riskResult.risk,
+    fileCount,
+    dirCount,
+    taskCount: input.taskCount,
+    mode: flags.mode
+  });
+  const base = policyForSize(sizeResult.size);
+  const taskCount = input.taskCount;
+  const shouldSplitSpec = sizeResult.size === "XL" || typeof taskCount === "number" && taskCount > base.taskTargetRange.max;
+  return applyOverrides(
+    {
+      version: 1,
+      mode: flags.mode,
+      size: sizeResult.size,
+      risk: riskResult.risk,
+      shouldSplitSpec,
+      reasons: [...riskResult.reasons, ...sizeResult.reasons],
+      ...base
+    },
+    flags
+  );
+}
+function parseList(value) {
+  if (!value) return [];
+  return value.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
+}
+function readArg3(name, argv) {
+  const idx = argv.indexOf(name);
+  if (idx === -1) return void 0;
+  return argv[idx + 1];
+}
+function main3() {
+  const argv = process.argv.slice(2);
+  const goal = readArg3("--goal", argv) ?? "";
+  const flags = readArg3("--flags", argv) ?? "";
+  const files = parseList(readArg3("--files", argv));
+  const estimatedRaw = readArg3("--estimated-files", argv);
+  const taskRaw = readArg3("--task-count", argv);
+  const policy = classifyAutoPolicy({
+    goal,
+    flags,
+    changedFiles: files,
+    estimatedFiles: estimatedRaw === void 0 ? void 0 : Number(estimatedRaw),
+    taskCount: taskRaw === void 0 ? void 0 : Number(taskRaw)
+  });
+  process.stdout.write(JSON.stringify(policy, null, 2) + "\n");
+}
+function isDirectRun3() {
+  try {
+    const entry = fileURLToPath3(import.meta.url);
+    return process.argv[1] === entry && basename4(entry).startsWith("auto-policy.");
+  } catch {
+    return false;
+  }
+}
+if (isDirectRun3()) {
+  main3();
+}
+
+// src/hooks/lib/tool-capabilities.ts
+import { basename as basename5 } from "node:path";
+import { fileURLToPath as fileURLToPath4 } from "node:url";
+var CAPABILITIES = {
+  "context7": {
+    id: "context7",
+    name: "Context7",
+    type: "mcp",
+    invocation: "Context7 MCP",
+    summary: "current official docs for libraries, SDKs, APIs, and Claude Code",
+    useWhen: "use the Context7 MCP before implementation when external library, SDK, API, framework, or Claude Code behavior matters.",
+    skipWhen: "Skip for pure local logic, typos, and code paths fully understood from this repository."
+  },
+  "claude-mem": {
+    id: "claude-mem",
+    name: "claude-mem",
+    type: "plugin",
+    invocation: "/claude-mem:mem-search",
+    summary: "cross-session memory search and phased plan/execution commands",
+    useWhen: "Use /claude-mem:mem-search when similar work, prior decisions, or repeated failures may exist; use /claude-mem:make-plan only for genuinely phased work.",
+    skipWhen: "Skip when the task is new, obvious, and smaller than a short local edit."
+  },
+  "sequential-thinking": {
+    id: "sequential-thinking",
+    name: "sequential-thinking",
+    type: "mcp",
+    invocation: "sequential-thinking MCP",
+    summary: "structured hypothesis breakdown for hard architecture and debugging problems",
+    useWhen: "Use for architecture tradeoffs, migrations, security/data/release risk, or debugging where assumptions may change.",
+    skipWhen: "Skip for direct edits, simple lookups, and deterministic fixes."
+  },
+  "chrome-devtools-mcp": {
+    id: "chrome-devtools-mcp",
+    name: "Chrome DevTools MCP",
+    type: "plugin",
+    invocation: "Chrome DevTools MCP",
+    summary: "real browser console, network, DOM, performance, and screenshot/snapshot verification",
+    useWhen: "Use for browser runtime behavior, UI regressions, DOM/CSS issues, network failures, and frontend verification.",
+    skipWhen: "Skip for backend-only code with no browser-facing behavior."
+  },
+  "frontend-design": {
+    id: "frontend-design",
+    name: "frontend-design",
+    type: "plugin",
+    invocation: "frontend-design plugin skills",
+    summary: "frontend UX/design guidance for UI pages, components, and interaction polish",
+    useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
+    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work."
+  },
+  "pua": {
+    id: "pua",
+    name: "pua",
+    type: "plugin",
+    invocation: "/pua:pua-loop or /pua:p9",
+    summary: "structured retries and parallel task decomposition",
+    useWhen: "Use after multiple failed attempts or for truly independent parallel work slices.",
+    skipWhen: "Skip on first-attempt failures, known fixes, and work that is sequential by dependency."
+  },
+  "docs-query": {
+    id: "docs-query",
+    name: "Docs query",
+    type: "workflow",
+    invocation: "Context7 or official docs",
+    summary: "phase-specific grounding against current documentation",
+    useWhen: "Use before implementation when quality gates mark docs as required.",
+    skipWhen: "Skip when local code fully defines the behavior and no external API/version matters."
+  },
+  "browser-verification": {
+    id: "browser-verification",
+    name: "Browser verification",
+    type: "workflow",
+    invocation: "Playwright or Chrome DevTools MCP",
+    summary: "repeatable browser/runtime proof for UI and full-stack behavior",
+    useWhen: "Use when browser-facing quality gates are required or suggested.",
+    skipWhen: "Skip for backend-only and CLI-only work."
+  },
+  "tdd-cycle": {
+    id: "tdd-cycle",
+    name: "TDD cycle",
+    type: "workflow",
+    invocation: "RED/GREEN/VERIFY loop",
+    summary: "test-first implementation for behavior changes",
+    useWhen: "Use when route/risk indicates implementation should be protected by a regression test.",
+    skipWhen: "Skip for docs-only edits and pure mechanical metadata updates."
+  },
+  "security-review": {
+    id: "security-review",
+    name: "Security review",
+    type: "workflow",
+    invocation: "read-only security review",
+    summary: "focused review of auth, secrets, injection, release, and dependency risk",
+    useWhen: "Use when quality gates indicate auth/security/release risk.",
+    skipWhen: "Skip for isolated copy edits with no executable behavior."
+  },
+  "stack-specific-verification": {
+    id: "stack-specific-verification",
+    name: "Stack-specific verification",
+    type: "workflow",
+    invocation: "curdx-flow route qualityGates",
+    summary: "run the verifier that matches the detected stack profile",
+    useWhen: "Use before completion whenever smart-route returns a suggestedVerifier.",
+    skipWhen: "Skip only when no stack profile is detected and no repo verifier exists."
+  },
+  "context-budget": {
+    id: "context-budget",
+    name: "Context budget",
+    type: "policy",
+    invocation: "curdx-flow route contextBudget",
+    summary: "limit reference loading by route and stack confidence",
+    useWhen: "Use for every non-trivial route to keep the session focused.",
+    skipWhen: "Skip only for no-op direct changes."
+  }
+};
+var ORDER = [
+  "context7",
+  "docs-query",
+  "claude-mem",
+  "frontend-design",
+  "chrome-devtools-mcp",
+  "browser-verification",
+  "tdd-cycle",
+  "security-review",
+  "stack-specific-verification",
+  "context-budget",
+  "sequential-thinking",
+  "pua"
+];
+var CORE_REQUIRED = /* @__PURE__ */ new Set([
+  "context7",
+  "claude-mem",
+  "frontend-design",
+  "chrome-devtools-mcp",
+  "sequential-thinking",
+  "pua"
+]);
+var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|scaffold|starter|template|generator|initializer|initializr|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node|go|python|rust|cargo|maven|gradle|cookiecutter)\b|最新|依赖|框架|插件|官方|联网|搜索|文档|脚手架|初始化|生成器|模板/i;
+var MEMORY_RE = /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
+var UI_RE = /\b(ui|ux|frontend|front-end|browser|chrome|dom|css|html|layout|component|page|form|modal|responsive|visual|render|react|vue|vite|next\.?js|screenshot|interaction)\b|前端|页面|浏览器|样式|交互|组件|布局|视觉|截图/i;
+var BROWSER_VERIFY_RE = /\b(browser|chrome|dom|css|network|console|performance|render|screenshot|e2e|playwright|visual regression|interaction)\b|浏览器|控制台|网络|性能|渲染|截图|端到端/i;
+var COMPLEX_RE = /\b(architecture|architect|migration|migrate|security|auth|authentication|authorization|permission|oauth|payment|billing|database|schema|release|publish|npm|tag|hook|subagent|multi[- ]?repo|monorepo|cross[- ]?system|concurrency|race|cache|rewrite|refactor)\b|架构|迁移|安全|权限|认证|数据库|发布|重写|并发|跨仓库|多仓库/i;
+var STUCK_RE = /\b(stuck|failed|failure|fails|flaky|retry|debug|investigate|root cause|not working|broken|regression)\b|卡住|失败|报错|不行|修不好|定位|排查/i;
+var PARALLEL_RE = /\b(parallel|multi-agent|team|decompose|split|epic|multiple subsystems|large refactor)\b|并行|多智能体|拆分|史诗|多模块/i;
+var LOW_RISK_LOCAL_RE = /\b(typo|readme|docs?|comment|comments|copy|wording|rename label|format text)\b|错别字|注释|文案/i;
+function normalize2(input) {
+  return (input ?? "").trim().replace(/\s+/g, " ");
+}
+function hasAny(values, candidates) {
+  const set = new Set((values ?? []).map((v) => v.toLowerCase()));
+  return candidates.some((candidate) => set.has(candidate.toLowerCase()));
+}
+function capabilityAvailability(id, available) {
+  if (CORE_REQUIRED.has(id)) return "core-required";
+  const cap = CAPABILITIES[id];
+  if (cap.type === "workflow" || cap.type === "policy") return "known-available";
+  if (available === null) return "check-if-installed";
+  return available.has(id) ? "known-available" : null;
+}
+function pushRecommendation(out, available, id, phase, reason, instruction, extra = {}) {
+  const availability = capabilityAvailability(id, available);
+  if (availability === null) return;
+  if (out.some((rec) => rec.id === id)) return;
+  const cap = CAPABILITIES[id];
+  out.push({
+    id,
+    name: cap.name,
+    type: cap.type,
+    invocation: cap.invocation,
+    phase,
+    ...extra,
+    availability,
+    reason,
+    instruction
+  });
+}
+function sortRecommendations(recs) {
+  return [...recs].sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
+}
+function recommendToolCapabilities(input) {
+  const goal = normalize2(input.goal);
+  const route = normalize2(input.route);
+  const risk = normalize2(input.risk);
+  const topologyKinds2 = input.topologyKinds ?? [];
+  const topologyFrameworks2 = input.topologyFrameworks ?? [];
+  const stackProfile = input.stackProfile;
+  const qualityGates = input.qualityGates ?? [];
+  const contextBudget = input.contextBudget;
+  const missingRoots = input.missingRoots ?? 0;
+  const available = input.availableCapabilities === void 0 ? null : new Set(input.availableCapabilities.filter(Boolean));
+  const recs = [];
+  if (missingRoots > 0) {
+    return recs;
+  }
+  const externalDocsRelevant = EXTERNAL_DOCS_RE.test(goal);
+  const localLowRisk = LOW_RISK_LOCAL_RE.test(goal) && route === "direct-change" && !externalDocsRelevant;
+  if (localLowRisk) {
+    return recs;
+  }
+  const hasFrontend = UI_RE.test(goal) || hasAny(topologyKinds2, ["frontend-app"]) || hasAny(topologyFrameworks2, ["react", "vue", "next.js", "vite"]);
+  const browserRuntime = BROWSER_VERIFY_RE.test(goal) || hasFrontend;
+  const complex = COMPLEX_RE.test(goal) && route !== "direct-change" || risk === "high" || risk === "critical" || route === "full-spec" || route === "epic-split";
+  const stuck = STUCK_RE.test(goal);
+  const parallel = PARALLEL_RE.test(goal) || route === "epic-split";
+  const stackIds = stackProfile?.detected.map((stack) => stack.id) ?? [];
+  const docsGate = qualityGates.find((gate) => gate.id.endsWith("-docs"));
+  const browserGate = qualityGates.find((gate) => gate.id.endsWith("-browser"));
+  const tddGate = qualityGates.find((gate) => gate.id.endsWith("-tdd"));
+  const securityGate = qualityGates.find((gate) => gate.id.endsWith("-security-review"));
+  const baselineGate = qualityGates.find((gate) => gate.id.endsWith("-baseline"));
+  if (externalDocsRelevant || docsGate?.required === true) {
+    pushRecommendation(
+      recs,
+      available,
+      "context7",
+      "before-coding",
+      docsGate?.reason ?? "external documentation or current API behavior is likely relevant",
+      "Use Context7 before editing so version-specific behavior is grounded in current docs.",
+      { category: "docs", stackIds }
+    );
+    pushRecommendation(
+      recs,
+      available,
+      "docs-query",
+      "before-coding",
+      docsGate?.reason ?? "documentation grounding should happen before implementation",
+      "Query official/current docs first, then summarize only the decisions that affect this route.",
+      { category: "docs", stackIds }
+    );
+  }
+  if (MEMORY_RE.test(goal) || stuck || route === "full-spec" || route === "epic-split") {
+    pushRecommendation(
+      recs,
+      available,
+      "claude-mem",
+      "planning",
+      "similar prior work or longer-running plan may exist",
+      "Search memory before planning; use make-plan only when the work is genuinely phased.",
+      { category: "context", stackIds }
+    );
+  }
+  if (hasFrontend) {
+    pushRecommendation(
+      recs,
+      available,
+      "frontend-design",
+      "implementation",
+      "visible frontend behavior or UI quality is in scope",
+      "Use frontend-design guidance for UI structure, interaction, responsive behavior, and visual polish.",
+      { category: "verification", stackIds }
+    );
+  }
+  if (browserRuntime || browserGate !== void 0) {
+    pushRecommendation(
+      recs,
+      available,
+      "chrome-devtools-mcp",
+      "verification",
+      browserGate?.reason ?? "browser runtime behavior should be verified in a real browser",
+      "Use Chrome DevTools MCP for console, network, DOM, performance, or visual proof after implementation.",
+      { category: "verification", stackIds }
+    );
+    pushRecommendation(
+      recs,
+      available,
+      "browser-verification",
+      "verification",
+      browserGate?.reason ?? "browser-facing behavior needs repeatable runtime evidence",
+      "Prefer Playwright for repeatable E2E; use Chrome DevTools MCP when high-fidelity runtime inspection is needed.",
+      { category: "verification", stackIds }
+    );
+  }
+  if (tddGate?.required === true) {
+    pushRecommendation(
+      recs,
+      available,
+      "tdd-cycle",
+      "implementation",
+      tddGate.reason,
+      "Start with a focused failing test or reproduction when behavior is changing; keep the test in the final verifier.",
+      { category: "tdd", stackIds }
+    );
+  }
+  if (securityGate !== void 0 || COMPLEX_RE.test(goal)) {
+    pushRecommendation(
+      recs,
+      available,
+      "security-review",
+      "verification",
+      securityGate?.reason ?? "the task touches a risk surface that benefits from security review",
+      "Run a read-only security pass over auth, input validation, secrets, dependencies, and release metadata before completion.",
+      { category: "security", stackIds }
+    );
+  }
+  if ((baselineGate !== void 0 || stackProfile?.primary !== "unknown") && route !== "direct-change") {
+    pushRecommendation(
+      recs,
+      available,
+      "stack-specific-verification",
+      "verification",
+      baselineGate?.reason ?? "detected stack should drive the final verifier",
+      baselineGate?.command ? `Run the stack verifier: ${baselineGate.command}.` : "Use the repository's documented verifier for the detected stack.",
+      { category: "verification", stackIds }
+    );
+  }
+  if (contextBudget !== void 0 && route !== "direct-change") {
+    pushRecommendation(
+      recs,
+      available,
+      "context-budget",
+      "planning",
+      `context budget is ${contextBudget.level}`,
+      contextBudget.strategy,
+      { category: "context", stackIds }
+    );
+  }
+  if (complex || stuck) {
+    pushRecommendation(
+      recs,
+      available,
+      "sequential-thinking",
+      "planning",
+      "risk or uncertainty requires explicit hypothesis management",
+      "Use sequential-thinking to break assumptions before choosing the implementation path.",
+      { category: "context", stackIds }
+    );
+  }
+  if (stuck || parallel) {
+    pushRecommendation(
+      recs,
+      available,
+      "pua",
+      stuck ? "recovery" : "planning",
+      stuck ? "the goal indicates repeated failure or debugging difficulty" : "large work may contain independent parallel slices",
+      stuck ? "Use /pua:pua-loop only after local triage confirms the first fix path is not working." : "Use /pua:p9 only after dependencies prove the slices can run independently.",
+      { category: stuck ? "recovery" : "context", stackIds }
+    );
+  }
+  return sortRecommendations(recs);
+}
+function parseList2(value) {
+  if (!value) return [];
+  return value.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
+}
+function readArg4(name, argv) {
+  const idx = argv.indexOf(name);
+  if (idx === -1) return void 0;
+  return argv[idx + 1];
+}
+function main4() {
+  const argv = process.argv.slice(2);
+  const recommendations = recommendToolCapabilities({
+    goal: readArg4("--goal", argv),
+    route: readArg4("--route", argv),
+    risk: readArg4("--risk", argv),
+    topologyKinds: parseList2(readArg4("--topology-kinds", argv)),
+    topologyFrameworks: parseList2(readArg4("--topology-frameworks", argv)),
+    missingRoots: Number(readArg4("--missing-roots", argv) ?? 0),
+    availableCapabilities: readArg4("--available-capabilities", argv) ? parseList2(readArg4("--available-capabilities", argv)) : void 0
+  });
+  process.stdout.write(JSON.stringify(recommendations, null, 2) + "\n");
+}
+function isDirectRun4() {
+  try {
+    const entry = fileURLToPath4(import.meta.url);
+    return process.argv[1] === entry && basename5(entry).startsWith("tool-capabilities.");
+  } catch {
+    return false;
+  }
+}
+if (isDirectRun4()) {
+  main4();
+}
+
+// src/hooks/lib/stack-capabilities.ts
+import { existsSync as existsSync4, readFileSync as readFileSync4, readdirSync as readdirSync3 } from "node:fs";
+import { isAbsolute as isAbsolute4, join as join3, resolve as resolve2 } from "node:path";
+var STACKS = {
+  "typescript": {
+    id: "typescript",
+    name: "TypeScript",
+    frameworks: ["typescript"],
+    goalPattern: /\b(ts|typescript|typecheck|tsconfig)\b/i,
+    manifestHints: ["tsconfig.json", "tsconfig.*.json"],
+    docsQuery: "TypeScript official documentation for compiler and project configuration",
+    tdd: "Write focused tests first when behavior changes; keep typecheck as a mandatory gate.",
+    security: "Review unsafe casts, unchecked external input, and dependency/script changes.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run verify"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "react": {
+    id: "react",
+    name: "React",
+    frameworks: ["react"],
+    goalPattern: /\b(react|jsx|tsx|component|hook|frontend|ui)\b|前端|组件|页面/i,
+    manifestHints: ["package.json:react"],
+    docsQuery: "React official documentation for current component and hook behavior",
+    tdd: "Prefer component or interaction tests for user-visible behavior.",
+    security: "Review XSS, unsafe HTML, auth state leaks, and client-side permission assumptions.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run test:e2e"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "vue": {
+    id: "vue",
+    name: "Vue",
+    frameworks: ["vue", "vite"],
+    goalPattern: /\b(vue|vue3|vite|pinia|vue router|component|frontend|ui)\b|前端|组件|页面/i,
+    manifestHints: ["package.json:vue", "vite.config.*"],
+    docsQuery: "Vue and Vite official documentation for current project setup and runtime behavior",
+    tdd: "Prefer component or interaction tests; keep vue-tsc/typecheck and build gates.",
+    security: "Review template injection, route guards, auth state leaks, and unsafe dynamic HTML.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run test:e2e"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "next": {
+    id: "next",
+    name: "Next.js",
+    frameworks: ["next"],
+    goalPattern: /\b(next\.?js|next|app router|server action|route handler)\b/i,
+    manifestHints: ["next.config.*", "package.json:next"],
+    docsQuery: "Next.js official documentation for routing, server actions, rendering, and build behavior",
+    tdd: "Test server/client boundaries and route handlers before broad UI changes.",
+    security: "Review server/client data exposure, auth, cookies, headers, and route handlers.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run test:e2e"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "node": {
+    id: "node",
+    name: "Node.js",
+    frameworks: ["node-api", "nestjs", "fastify", "hono"],
+    goalPattern: /\b(node|api|express|fastify|nestjs|hono|server)\b/i,
+    manifestHints: ["package.json"],
+    docsQuery: "Node.js and framework official documentation for current API behavior",
+    tdd: "Use unit/integration tests around API behavior and error paths.",
+    security: "Review input validation, auth, command execution, secrets, and dependency scripts.",
+    verifierCommands: ["npm test", "npm run typecheck", "npm run build"],
+    releaseCommands: ["npm run verify"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "spring-boot": {
+    id: "spring-boot",
+    name: "Spring Boot",
+    frameworks: ["spring-boot"],
+    goalPattern: /\b(spring boot|spring|maven|gradle|controller|service|repository)\b|后端|接口/i,
+    manifestHints: ["pom.xml:spring-boot", "build.gradle:spring-boot"],
+    docsQuery: "Spring Boot official documentation for current runtime, testing, and actuator behavior",
+    tdd: "Use slice or integration tests for controller/service/repository behavior.",
+    security: "Review auth filters, authorization, validation, configuration, and secret exposure.",
+    verifierCommands: ["./mvnw test", "./gradlew test", "mvn test", "gradle test"],
+    releaseCommands: ["./mvnw verify", "./gradlew build"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "spring-cloud": {
+    id: "spring-cloud",
+    name: "Spring Cloud",
+    frameworks: ["spring-cloud"],
+    goalPattern: /\b(spring cloud|gateway|config server|eureka|openfeign|resilience4j)\b/i,
+    manifestHints: ["pom.xml:spring-cloud", "build.gradle:spring-cloud"],
+    docsQuery: "Spring Cloud official documentation for current integration, gateway, and config behavior",
+    tdd: "Prefer integration tests or contract tests for cross-service behavior.",
+    security: "Review gateway filters, service auth, config leakage, and network boundaries.",
+    verifierCommands: ["./mvnw test", "./gradlew test", "mvn test", "gradle test"],
+    releaseCommands: ["./mvnw verify", "./gradlew build"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "standard",
+      "full-spec": "expanded",
+      "epic-split": "expanded"
+    }
+  },
+  "python": {
+    id: "python",
+    name: "Python",
+    frameworks: ["python", "fastapi", "django", "flask"],
+    goalPattern: /\b(python|pytest|fastapi|django|flask|pyproject|ruff)\b/i,
+    manifestHints: ["pyproject.toml", "requirements.txt"],
+    docsQuery: "Python framework official documentation for current API and testing behavior",
+    tdd: "Use pytest around behavior and regression reproduction.",
+    security: "Review deserialization, SQL/query construction, auth, secrets, and dependency pinning.",
+    verifierCommands: ["pytest", "python -m pytest", "ruff check .", "mypy ."],
+    releaseCommands: ["python -m build"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "go": {
+    id: "go",
+    name: "Go",
+    frameworks: ["go"],
+    goalPattern: /\b(go|golang|go test|go mod|goroutine|grpc)\b/i,
+    manifestHints: ["go.mod"],
+    docsQuery: "Go official documentation for current standard library and tooling behavior",
+    tdd: "Use table-driven tests and keep go test ./... as the baseline gate.",
+    security: "Review context cancellation, goroutine leaks, input validation, auth, and unsafe file/network paths.",
+    verifierCommands: ["go test ./...", "go vet ./...", "go build ./..."],
+    releaseCommands: ["go test ./..."],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "rust": {
+    id: "rust",
+    name: "Rust",
+    frameworks: ["rust"],
+    goalPattern: /\b(rust|cargo|crate|tokio|axum)\b/i,
+    manifestHints: ["Cargo.toml"],
+    docsQuery: "Rust and crate official documentation for current API and safety behavior",
+    tdd: "Use cargo test and focused regression tests before implementation changes.",
+    security: "Review unsafe blocks, parsing, auth, IO boundaries, and dependency features.",
+    verifierCommands: ["cargo test", "cargo clippy -- -D warnings", "cargo build"],
+    releaseCommands: ["cargo test"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "claude-code-plugin": {
+    id: "claude-code-plugin",
+    name: "Claude Code plugin",
+    frameworks: ["claude-code-plugin"],
+    goalPattern: /\b(claude code|plugin|skill|agent|hook|hooks|mcp|marketplace|tag|release)\b/i,
+    manifestHints: [".claude-plugin/plugin.json", "hooks/hooks.json", "skills/*/SKILL.md"],
+    docsQuery: "Claude Code official docs for plugins, skills, agents, hooks, dependencies, and release tags",
+    tdd: "Use focused hook/runner tests and the real Claude Code smoke path before release.",
+    security: "Review hook fail-open behavior, plugin metadata, dependency declarations, and release tags.",
+    verifierCommands: [
+      "npm run check:hooks-fresh",
+      "npm run typecheck",
+      "npm run test:runner",
+      "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc"
+    ],
+    releaseCommands: ["claude plugin validate ./plugins/curdx-flow", "npm run verify"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  }
+};
+var STACK_PRIORITY = {
+  "claude-code-plugin": 110,
+  "next": 100,
+  "react": 90,
+  "vue": 90,
+  "spring-cloud": 85,
+  "spring-boot": 80,
+  "go": 75,
+  "rust": 75,
+  "python": 75,
+  "typescript": 30,
+  "node": 20
+};
+function normalizeText(input) {
+  return (input ?? "").trim().replace(/\s+/g, " ");
+}
+function rootFsPath(projectRoot, root) {
+  return isAbsolute4(root.path) ? resolve2(root.path) : resolve2(projectRoot, root.path);
+}
+function readText2(file) {
+  try {
+    return readFileSync4(file, "utf8");
+  } catch {
+    return "";
+  }
+}
+function packageJsonContains(rootAbs, pattern) {
+  return pattern.test(readText2(join3(rootAbs, "package.json")));
+}
+function hasManifestHint(rootAbs, hint) {
+  if (hint.includes(":")) {
+    const [file, needle] = hint.split(":", 2);
+    if (!file || !needle) return false;
+    return readText2(join3(rootAbs, file)).toLowerCase().includes(needle.toLowerCase());
+  }
+  if (hint.includes("*")) {
+    const pattern = new RegExp(`^${hint.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`);
+    const dir = hint.includes("/") ? hint.split("/").slice(0, -1).join("/") : ".";
+    const base = rootAbs === "" ? "." : rootAbs;
+    try {
+      return existsSync4(join3(base, dir)) && readdirSync3(join3(base, dir)).some(
+        (name) => pattern.test(dir === "." ? name : `${dir}/${name}`)
+      );
+    } catch {
+      return false;
+    }
+  }
+  return existsSync4(join3(rootAbs, hint));
+}
+function scoreStack(stack, roots, projectRoot, goal) {
+  const evidence = [];
+  let score = 0;
+  if (stack.goalPattern.test(goal)) {
+    score += stack.id === "claude-code-plugin" ? 0.46 : ["react", "vue", "next", "spring-cloud", "spring-boot"].includes(stack.id) ? 0.32 : 0.24;
+    evidence.push("goal keyword");
+  }
+  for (const root of roots) {
+    const rootAbs = rootFsPath(projectRoot, root);
+    const frameworkHits = root.frameworks.filter(
+      (framework) => stack.frameworks.includes(framework)
+    );
+    if (frameworkHits.length > 0) {
+      score += 0.34;
+      evidence.push(`${root.path}: framework ${frameworkHits.join(",")}`);
+    }
+    for (const hint of stack.manifestHints) {
+      if (hasManifestHint(rootAbs, hint)) {
+        score += 0.18;
+        evidence.push(`${root.path}: ${hint}`);
+      }
+    }
+    if (stack.id === "typescript" && packageJsonContains(rootAbs, /"typescript"\s*:/i)) {
+      score += 0.2;
+      evidence.push(`${root.path}: package.json:typescript`);
+    }
+  }
+  if (score <= 0) return null;
+  const confidence = Math.max(0.1, Math.min(0.99, Number(score.toFixed(2))));
+  return {
+    id: stack.id,
+    name: stack.name,
+    confidence,
+    evidence: [...new Set(evidence)].slice(0, 5)
+  };
+}
+function detectStackProfile(input) {
+  const goal = normalizeText(input.goal);
+  const roots = input.topology.roots;
+  const detected = Object.values(STACKS).map((stack) => scoreStack(stack, roots, input.topology.projectRoot, goal)).filter((item) => item !== null).sort(
+    (a, b) => b.confidence - a.confidence || STACK_PRIORITY[b.id] - STACK_PRIORITY[a.id]
+  );
+  const primary = detected[0]?.id ?? "unknown";
+  const confidence = detected[0]?.confidence ?? 0;
+  const warnings = [];
+  if (primary === "unknown") {
+    warnings.push("No first-class stack profile detected; use repository scripts as the verifier source.");
+  }
+  if (detected.length > 1 && detected[0] && detected[1] && detected[1].confidence > 0.5) {
+    warnings.push("Multiple stack profiles are relevant; keep verification multi-root and avoid single-stack assumptions.");
+  }
+  return {
+    version: 1,
+    primary,
+    detected,
+    confidence,
+    evidence: detected.flatMap((item) => item.evidence).slice(0, 8),
+    warnings
+  };
+}
+function stackFor(profile) {
+  return profile.primary === "unknown" ? null : STACKS[profile.primary];
+}
+function selectCommand(commands, roots, projectRoot) {
+  for (const command of commands) {
+    if (command.startsWith("./mvnw") && !roots.some((root) => existsSync4(join3(rootFsPath(projectRoot, root), "mvnw")))) {
+      continue;
+    }
+    if (command.startsWith("./gradlew") && !roots.some((root) => existsSync4(join3(rootFsPath(projectRoot, root), "gradlew")))) {
+      continue;
+    }
+    return command;
+  }
+  return commands[0] ?? null;
+}
+function selectQualityGates(input) {
+  const stack = stackFor(input.stackProfile);
+  const route = input.route ?? "";
+  const risk = input.risk ?? "";
+  if (stack === null) {
+    return [
+      {
+        id: "repo-verification",
+        phase: "verification",
+        required: route !== "direct-change",
+        command: null,
+        reason: "No stack profile matched; use the repository's documented verification command."
+      }
+    ];
+  }
+  const primaryCommand = selectCommand(stack.verifierCommands, input.topology.roots, input.topology.projectRoot);
+  const gates = [
+    {
+      id: `${stack.id}-docs`,
+      phase: "before-coding",
+      required: /plugin|hook|skill|agent|latest|official|framework|api|sdk/i.test(input.goal ?? "") || stack.id === "claude-code-plugin",
+      command: null,
+      reason: stack.docsQuery
+    },
+    {
+      id: `${stack.id}-tdd`,
+      phase: "implementation",
+      required: route !== "direct-change" && risk !== "low",
+      command: null,
+      reason: stack.tdd
+    },
+    {
+      id: `${stack.id}-baseline`,
+      phase: "verification",
+      required: true,
+      command: primaryCommand,
+      reason: `Baseline verification for ${stack.name}.`
+    }
+  ];
+  if (stack.browser) {
+    gates.push({
+      id: `${stack.id}-browser`,
+      phase: "verification",
+      required: route !== "direct-change",
+      command: "npm run test:e2e",
+      reason: "Browser-facing behavior needs Playwright or Chrome DevTools MCP evidence."
+    });
+  }
+  if (risk === "high" || risk === "critical" || /auth|security|permission|oauth|secret|release|publish|tag/i.test(input.goal ?? "")) {
+    gates.push({
+      id: `${stack.id}-security-review`,
+      phase: "verification",
+      required: risk === "critical" || /auth|security|permission|oauth|secret/i.test(input.goal ?? ""),
+      command: null,
+      reason: stack.security
+    });
+  }
+  if (route === "epic-split" || /release|publish|tag|npm/i.test(input.goal ?? "")) {
+    gates.push({
+      id: `${stack.id}-release`,
+      phase: "release",
+      required: /release|publish|tag|npm/i.test(input.goal ?? ""),
+      command: selectCommand(stack.releaseCommands, input.topology.roots, input.topology.projectRoot),
+      reason: `Release-facing ${stack.name} work needs the stricter release gate.`
+    });
+  }
+  return gates;
+}
+function selectSuggestedVerifier(input) {
+  const browserGate = input.qualityGates.find((gate) => gate.id.endsWith("-browser"));
+  if (browserGate && /ui|browser|frontend|page|component|css|layout|交互|页面|前端/i.test(input.goal ?? "")) {
+    return {
+      kind: "browser",
+      command: browserGate.command,
+      fallback: "Chrome DevTools MCP",
+      needsRuntime: true,
+      reason: browserGate.reason
+    };
+  }
+  if (input.stackProfile.primary === "claude-code-plugin") {
+    return {
+      kind: "plugin-smoke",
+      command: "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc",
+      fallback: "claude plugin validate ./plugins/curdx-flow",
+      needsRuntime: false,
+      reason: "Claude Code plugin changes need real plugin validation in addition to unit tests."
+    };
+  }
+  const baseline = input.qualityGates.find((gate) => gate.id.endsWith("-baseline"));
+  return {
+    kind: baseline?.command?.includes("build") ? "build" : "unit",
+    command: baseline?.command ?? null,
+    fallback: "Use the repository's documented verify command.",
+    needsRuntime: false,
+    reason: baseline?.reason ?? "Use local verification evidence before completion."
+  };
+}
+function selectContextBudget(input) {
+  const stack = stackFor(input.stackProfile);
+  const route = input.route ?? "full-spec";
+  const routeDefault = route === "direct-change" ? "tiny" : route === "scaffold" || route === "prototype" || route === "lite-spec" ? "focused" : route === "epic-split" ? "expanded" : "standard";
+  const level = stack?.contextBudget[route] ?? routeDefault;
+  const limits = {
+    tiny: 2,
+    focused: 4,
+    standard: 8,
+    expanded: 12
+  };
+  return {
+    level,
+    maxReferenceFiles: limits[level],
+    strategy: level === "tiny" ? "Read only the directly touched files plus one local convention file." : level === "focused" ? "Read the target files, nearest tests, and one relevant reference before editing." : level === "standard" ? "Use bounded discovery across source, tests, docs, and official references." : "Split discovery by subsystem and summarize before implementation."
+  };
+}
+function readArg5(name, argv) {
+  const idx = argv.indexOf(name);
+  return idx === -1 ? void 0 : argv[idx + 1];
+}
+function main5() {
+  const argv = process.argv.slice(2);
+  const cwd = readArg5("--cwd", argv);
+  const goal = readArg5("--goal", argv) ?? "";
+  const route = readArg5("--route", argv);
+  const risk = readArg5("--risk", argv);
+  const topology = discoverProjectTopology({ cwd, goal });
+  const stackProfile = detectStackProfile({ cwd, goal, topology, route, risk });
+  const qualityGates = selectQualityGates({ cwd, goal, topology, route, risk, stackProfile });
+  const suggestedVerifier = selectSuggestedVerifier({ cwd, goal, topology, route, risk, stackProfile, qualityGates });
+  const contextBudget = selectContextBudget({ cwd, goal, topology, route, risk, stackProfile });
+  process.stdout.write(JSON.stringify({
+    stackProfile,
+    qualityGates,
+    suggestedVerifier,
+    contextBudget
+  }, null, 2) + "\n");
+}
+function isDirectRun5() {
+  try {
+    return process.argv[1]?.endsWith("stack-capabilities.mjs") === true;
+  } catch {
+    return false;
+  }
+}
+if (isDirectRun5()) {
+  main5();
+}
+
+// src/hooks/lib/smart-route.ts
+function normalizeText2(input) {
+  return (input ?? "").trim().replace(/\s+/g, " ");
+}
+function hasFlag(flags, flag) {
+  return new RegExp(`(^|\\s)${flag.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}(\\s|$)`).test(
+    flags ?? ""
+  );
+}
+function parseList3(value) {
+  if (!value) return [];
+  return value.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
+}
+function readArg6(name, argv) {
+  const idx = argv.indexOf(name);
+  if (idx === -1) return void 0;
+  return argv[idx + 1];
+}
+function specNameFromPath2(specPath) {
+  const parts = specPath.split(/[\\/]+/).filter(Boolean);
+  return parts[parts.length - 1] ?? specPath;
+}
+function loadActiveSpecFromPath(cwd, specPath) {
+  const statePath = join4(cwd, specPath, ".curdx-state.json");
+  let phase = "unknown";
+  let completed = false;
+  if (existsSync5(statePath)) {
+    try {
+      const parsed = JSON.parse(readFileSync5(statePath, "utf8"));
+      if (typeof parsed.phase === "string" && parsed.phase.trim().length > 0) {
+        phase = parsed.phase;
+      }
+      completed = parsed.completed === true;
+    } catch {
+      phase = "unknown";
+    }
+  } else if (existsSync5(join4(cwd, specPath, "tasks.md"))) {
+    phase = "execution";
+  } else if (existsSync5(join4(cwd, specPath, "design.md"))) {
+    phase = "tasks";
+  } else if (existsSync5(join4(cwd, specPath, "requirements.md"))) {
+    phase = "design";
+  } else if (existsSync5(join4(cwd, specPath, "research.md"))) {
+    phase = "requirements";
+  }
+  return {
+    name: specNameFromPath2(specPath),
+    path: specPath,
+    phase,
+    completed
+  };
+}
+function findActiveSpec(input) {
+  const cwd = input.cwd ?? process.cwd();
+  const fresh = hasFlag(input.flags, "--fresh");
+  if (fresh) return void 0;
+  const explicitName = normalizeText2(input.name);
+  if (explicitName) {
+    const found = findSpec(explicitName, { cwd });
+    if (found.ok) return loadActiveSpecFromPath(cwd, found.path);
+    return void 0;
+  }
+  const current = resolveCurrent({ cwd });
+  if (current === null) return void 0;
+  return loadActiveSpecFromPath(cwd, current);
+}
+function nextActionForActiveSpec(spec) {
+  if (spec.completed) {
+    return `Active spec '${spec.name}' is completed; start a new spec or run /curdx-flow:refactor ${spec.name}.`;
+  }
+  switch (spec.phase) {
+    case "research":
+      return `Continue '${spec.name}' with /curdx-flow:requirements after reviewing research.md.`;
+    case "requirements":
+      return `Continue '${spec.name}' with /curdx-flow:design.`;
+    case "design":
+      return `Continue '${spec.name}' with /curdx-flow:tasks.`;
+    case "tasks":
+      return `Continue '${spec.name}' with /curdx-flow:implement.`;
+    case "execution":
+      return `Resume '${spec.name}' with /curdx-flow:implement.`;
+    default:
+      return `Inspect '${spec.name}' with /curdx-flow:status, then continue the next missing phase.`;
+  }
+}
+function publicPolicy(policy) {
+  return {
+    mode: policy.mode,
+    risk: policy.risk,
+    executionMode: policy.executionMode,
+    taskGranularity: policy.taskGranularity,
+    taskTargetRange: policy.taskTargetRange,
+    reviewCadence: policy.reviewCadence,
+    verificationLevel: policy.verificationLevel,
+    subagentPolicy: policy.subagentPolicy,
+    stopHookPolicy: policy.stopHookPolicy,
+    maxGlobalIterations: policy.maxGlobalIterations,
+    maxTaskIterations: policy.maxTaskIterations,
+    shouldSplitSpec: policy.shouldSplitSpec
+  };
+}
+function routeFromPolicy(policy) {
+  if (policy.shouldSplitSpec || policy.executionMode === "epic-triage") {
+    return "epic-split";
+  }
+  if (policy.executionMode === "direct") return "direct-change";
+  if (policy.executionMode === "spec-lite") return "lite-spec";
+  return "full-spec";
+}
+var STACK_RE = /\b(vue|vue3|vite|pinia|vue router|react|next\.?js|nuxt|spring|spring boot|spring cloud|maven|gradle|java|node|nestjs|fastapi|go|postgres|mysql|redis|docker)\b|前端|后端|全栈|全家桶/i;
+var ARTIFACT_RE = /\b(prd|spec|requirements?|design doc|figma|wireframe|openapi|swagger|api doc|接口文档|产品文档|需求文档|设计稿|原型图)\b/i;
+var SCAFFOLD_RE = /\b(scaffold|bootstrap|init|starter|template|skeleton|create project|create app|new project|setup project)\b|脚手架|初始化|搭建项目|创建项目|项目骨架|先搭骨架|搭骨架/i;
+var PROTOTYPE_RE = /\b(prototype|poc|demo|spike|experiment|technical validation|prove|验证|原型|演示|技术验证|试验)\b/i;
+var PRODUCT_RE = /\b(app|application|system|platform|saas|crm|dashboard|admin|portal|product|service|tool)\b|系统|平台|后台|管理端|应用|产品|工具|开发一套|做一个|做一套/i;
+var PRODUCT_DOMAIN_HINT_RE = /\b(crm|customer|order|inventory|invoice|booking|calendar|todo|task|project|ticket|commerce|shop|blog|cms|dashboard|admin|user|auth|report)\b|客户|订单|库存|合同|发票|预约|日历|待办|任务|项目|工单|商城|电商|博客|内容|后台|用户|权限|登录|报表/i;
+var FIX_RE = /\b(fix|bug|debug|repair|resolve|broken|regression|修复|报错|失败|排查|定位)\b/i;
+var REFACTOR_RE = /\b(refactor|rewrite|cleanup|restructure|重构|重写|整理)\b/i;
+var RELEASE_RE = /\b(release|publish|deploy|ship|tag|npm|上线|发布|部署|打包)\b/i;
+var DEMO_RE = /\b(demo|prototype|poc|演示|原型)\b/i;
+var PRODUCTION_RE = /\b(production|prod|ship|launch|deploy|release|上线|生产|发布|可用|能用)\b/i;
+function classifyIntent(goal, topology) {
+  const artifactProvided = ARTIFACT_RE.test(goal);
+  const stackSpecified = STACK_RE.test(goal);
+  let intentKind = "unknown";
+  if (artifactProvided) intentKind = "import-spec";
+  else if (SCAFFOLD_RE.test(goal)) intentKind = "scaffold";
+  else if (PROTOTYPE_RE.test(goal)) intentKind = "prototype";
+  else if (RELEASE_RE.test(goal)) intentKind = "release";
+  else if (FIX_RE.test(goal)) intentKind = "fix";
+  else if (REFACTOR_RE.test(goal)) intentKind = "refactor";
+  else if (PRODUCT_RE.test(goal)) intentKind = "product";
+  else if (goal.length > 0) intentKind = "feature";
+  let deliveryExpectation = "maintenance";
+  if (DEMO_RE.test(goal)) deliveryExpectation = "demo";
+  else if (PRODUCTION_RE.test(goal)) deliveryExpectation = "production";
+  else if (intentKind === "product" || topology.workspaceState === "empty") {
+    deliveryExpectation = "usable-app";
+  }
+  const missingFacts = [];
+  if (topology.workspaceState === "empty" && intentKind === "product" && !artifactProvided && !PRODUCT_DOMAIN_HINT_RE.test(goal)) {
+    missingFacts.push("product domain, target user, MVP acceptance criteria");
+  }
+  if (topology.workspaceState === "empty" && (intentKind === "product" || intentKind === "feature") && !stackSpecified) {
+    missingFacts.push("preferred stack or permission to choose defaults");
+  }
+  if (intentKind === "prototype" && !/success|metric|prove|验证|成功|标准/i.test(goal)) {
+    missingFacts.push("prototype success criterion");
+  }
+  let clarity = "medium";
+  if (artifactProvided || intentKind === "scaffold") clarity = "high";
+  else if (missingFacts.length > 0) clarity = "low";
+  else if (stackSpecified || intentKind === "fix" || intentKind === "refactor") clarity = "high";
+  let confidence = 0.62;
+  if (artifactProvided || SCAFFOLD_RE.test(goal) || PROTOTYPE_RE.test(goal)) confidence += 0.22;
+  if (stackSpecified) confidence += 0.08;
+  if (missingFacts.length > 0) confidence -= 0.18;
+  confidence = Math.max(0.1, Math.min(0.98, Number(confidence.toFixed(2))));
+  let recommendedAction = "route with deterministic policy";
+  if (topology.workspaceState === "empty") {
+    if (intentKind === "scaffold") {
+      recommendedAction = "select an official/ecosystem scaffold source when available, create the requested skeleton, then run baseline verification";
+    } else if (intentKind === "import-spec") {
+      recommendedAction = "import the provided artifact, derive plan/tasks, then implement";
+    } else if (intentKind === "prototype") {
+      recommendedAction = "create a bounded prototype spec with an explicit success criterion";
+    } else if (clarity === "low") {
+      recommendedAction = "perform product inception before writing application code";
+    } else {
+      recommendedAction = "create greenfield spec with constitution and walking skeleton tasks";
+    }
+  }
+  return {
+    workspaceState: topology.workspaceState,
+    intentKind,
+    clarity,
+    stackSpecified,
+    artifactProvided,
+    deliveryExpectation,
+    missingFacts,
+    confidence,
+    recommendedAction
+  };
+}
+function routeFromIntent(intent, policy) {
+  if (intent.workspaceState === "empty") {
+    switch (intent.intentKind) {
+      case "scaffold":
+        return "scaffold";
+      case "import-spec":
+        return "import-spec";
+      case "prototype":
+        return "prototype";
+      case "product":
+        return intent.clarity === "low" ? "product-inception" : "greenfield-spec";
+      case "feature":
+        return intent.clarity === "low" ? "product-inception" : "greenfield-spec";
+      default:
+        return "product-inception";
+    }
+  }
+  return routeFromPolicy(policy);
+}
+function reasonForRoute(route, policy, intent) {
+  if (route === "scaffold" || route === "product-inception" || route === "greenfield-spec" || route === "prototype" || route === "import-spec") {
+    return intent.recommendedAction;
+  }
+  return policy.reasons[0] ?? "deterministic policy classification";
+}
+function routeDefaults(route) {
+  switch (route) {
+    case "direct-change":
+      return {
+        nextAction: "Handle directly in the current turn; do not create a spec or tasks.md.",
+        shouldCreateSpec: false,
+        shouldCreateTasks: false,
+        shouldUseSubagent: false,
+        taskCountLimit: 1
+      };
+    case "lite-spec":
+      return {
+        nextAction: "Create a lightweight spec and 1-3 value-slice tasks, then execute without unnecessary subagents.",
+        shouldCreateSpec: true,
+        shouldCreateTasks: true,
+        shouldUseSubagent: false,
+        taskCountLimit: 3
+      };
+    case "full-spec":
+      return {
+        nextAction: "Run the full research, requirements, design, tasks, and implementation workflow.",
+        shouldCreateSpec: true,
+        shouldCreateTasks: true,
+        shouldUseSubagent: true,
+        taskCountLimit: 12
+      };
+    case "epic-split":
+      return {
+        nextAction: "Run /curdx-flow:triage; do not force this work into one oversized spec.",
+        shouldCreateSpec: false,
+        shouldCreateTasks: false,
+        shouldUseSubagent: true,
+        taskCountLimit: 12
+      };
+    case "scaffold":
+      return {
+        nextAction: "Select an official/ecosystem scaffold source when available, create the requested skeleton, record assumptions, then run baseline verification.",
+        shouldCreateSpec: false,
+        shouldCreateTasks: false,
+        shouldUseSubagent: false,
+        taskCountLimit: 1
+      };
+    case "product-inception":
+      return {
+        nextAction: "Create product context first: mission, constraints, roadmap, tech-stack assumptions, and project constitution before application code.",
+        shouldCreateSpec: false,
+        shouldCreateTasks: false,
+        shouldUseSubagent: true,
+        taskCountLimit: 0
+      };
+    case "greenfield-spec":
+      return {
+        nextAction: "Create a greenfield spec with constitution, technical plan, walking skeleton, and vertical-slice tasks.",
+        shouldCreateSpec: true,
+        shouldCreateTasks: true,
+        shouldUseSubagent: true,
+        taskCountLimit: 10
+      };
+    case "prototype":
+      return {
+        nextAction: "Create a bounded prototype spec, define the success criterion, implement the thinnest proof, and verify it.",
+        shouldCreateSpec: true,
+        shouldCreateTasks: true,
+        shouldUseSubagent: false,
+        taskCountLimit: 5
+      };
+    case "import-spec":
+      return {
+        nextAction: "Import the provided PRD/spec/design/API artifact, normalize it into curdx-flow artifacts, then plan implementation.",
+        shouldCreateSpec: true,
+        shouldCreateTasks: true,
+        shouldUseSubagent: true,
+        taskCountLimit: 12
+      };
+    case "resume-current":
+      return {
+        nextAction: "Resume the active spec at its next incomplete phase.",
+        shouldCreateSpec: false,
+        shouldCreateTasks: false,
+        shouldUseSubagent: true,
+        taskCountLimit: 12
+      };
+    case "blocked-ask-user":
+      return {
+        nextAction: "Ask one focused question before continuing.",
+        shouldCreateSpec: false,
+        shouldCreateTasks: false,
+        shouldUseSubagent: false,
+        taskCountLimit: 0
+      };
+  }
+}
+function publicTopology(topology) {
+  return {
+    workspaceState: topology.workspaceState,
+    devContextFound: topology.devContextFound,
+    roots: topology.roots,
+    requiredRoots: topology.requiredRoots,
+    missingRoots: topology.missingRoots,
+    ...topology.accessFix ? { accessFix: topology.accessFix } : {},
+    warnings: topology.warnings
+  };
+}
+function topologyKinds(topology) {
+  return [...new Set(topology.roots.flatMap((root) => root.kinds))];
+}
+function topologyFrameworks(topology) {
+  return [...new Set(topology.roots.flatMap((root) => root.frameworks))];
+}
+function classifySmartRoute(input) {
+  const goal = normalizeText2(input.goal);
+  const cwd = input.cwd ?? process.cwd();
+  const activeSpec = findActiveSpec({ ...input, cwd });
+  const topology = discoverProjectTopology({ cwd, goal });
+  const intent = classifyIntent(goal, topology);
+  const policy = classifyAutoPolicy({
+    goal,
+    flags: input.flags,
+    changedFiles: input.changedFiles,
+    estimatedFiles: input.estimatedFiles,
+    taskCount: input.taskCount
+  });
+  const routeCandidate = routeFromIntent(intent, policy);
+  const stackProfile = detectStackProfile({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk
+  });
+  const qualityGates = selectQualityGates({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk,
+    stackProfile
+  });
+  const suggestedVerifier = selectSuggestedVerifier({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk,
+    stackProfile,
+    qualityGates
+  });
+  const contextBudget = selectContextBudget({
+    cwd,
+    goal,
+    topology,
+    route: routeCandidate,
+    risk: policy.risk,
+    stackProfile
+  });
+  const recommendations = recommendToolCapabilities({
+    goal,
+    route: routeCandidate,
+    risk: policy.risk,
+    topologyKinds: topologyKinds(topology),
+    topologyFrameworks: topologyFrameworks(topology),
+    stackProfile,
+    qualityGates,
+    contextBudget,
+    missingRoots: topology.missingRoots.length,
+    availableCapabilities: input.availableCapabilities
+  });
+  if (activeSpec !== void 0 && !activeSpec.completed && goal.length === 0) {
+    return {
+      version: 1,
+      route: "resume-current",
+      reason: "active unfinished spec found and no new goal was provided",
+      activeSpec,
+      ...routeDefaults("resume-current"),
+      nextAction: nextActionForActiveSpec(activeSpec),
+      topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
+      recommendedCapabilities: [],
+      policy: publicPolicy(policy),
+      reasons: ["active unfinished spec"]
+    };
+  }
+  if (activeSpec !== void 0 && !activeSpec.completed && normalizeText2(input.name).length > 0 && goal.length > 0) {
+    return {
+      version: 1,
+      route: "blocked-ask-user",
+      reason: "requested spec already exists and is unfinished",
+      activeSpec,
+      blockedReason: "Ask whether to resume the existing spec or rerun with --fresh for new work.",
+      ...routeDefaults("blocked-ask-user"),
+      topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
+      recommendedCapabilities: recommendations,
+      policy: publicPolicy(policy),
+      reasons: ["existing unfinished spec with new goal text"]
+    };
+  }
+  const explicitName = normalizeText2(input.name);
+  if (explicitName && !hasFlag(input.flags, "--fresh")) {
+    const found = findSpec(explicitName, { cwd });
+    if (!found.ok && found.reason === "ambiguous") {
+      return {
+        version: 1,
+        route: "blocked-ask-user",
+        reason: "multiple specs match the requested name",
+        blockedReason: `Ambiguous spec '${explicitName}': ${found.matches.join(", ")}`,
+        ...routeDefaults("blocked-ask-user"),
+        topology: publicTopology(topology),
+        intent,
+        stackProfile,
+        qualityGates,
+        suggestedVerifier,
+        contextBudget,
+        recommendedCapabilities: recommendations,
+        policy: publicPolicy(policy),
+        reasons: ["ambiguous spec name"]
+      };
+    }
+  }
+  if (goal.length === 0) {
+    return {
+      version: 1,
+      route: "blocked-ask-user",
+      reason: "no goal and no resumable active spec",
+      blockedReason: "Ask for the goal or a spec name.",
+      ...routeDefaults("blocked-ask-user"),
+      topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
+      recommendedCapabilities: [],
+      policy: publicPolicy(policy),
+      reasons: ["missing goal"]
+    };
+  }
+  if (topology.missingRoots.length > 0) {
+    const missing = topology.missingRoots.map((root) => `${root.name} (${root.path})`).join(", ");
+    return {
+      version: 1,
+      route: "blocked-ask-user",
+      reason: "related code root is not accessible",
+      blockedReason: `Goal requires ${missing}. ${topology.accessFix ?? "Add the missing root before continuing."}`,
+      ...routeDefaults("blocked-ask-user"),
+      nextAction: topology.accessFix ?? "Add the missing code root, then rerun /curdx-flow:start.",
+      topology: publicTopology(topology),
+      intent,
+      stackProfile,
+      qualityGates,
+      suggestedVerifier,
+      contextBudget,
+      recommendedCapabilities: [],
+      policy: publicPolicy(policy),
+      reasons: ["related code root is outside current Claude Code access"]
+    };
+  }
+  const route = routeCandidate;
+  const defaults = routeDefaults(route);
+  return {
+    version: 1,
+    route,
+    reason: reasonForRoute(route, policy, intent),
+    ...defaults,
+    topology: publicTopology(topology),
+    intent,
+    stackProfile,
+    qualityGates,
+    suggestedVerifier,
+    contextBudget,
+    recommendedCapabilities: recommendations,
+    policy: publicPolicy(policy),
+    reasons: policy.reasons
+  };
+}
+function main6() {
+  const argv = process.argv.slice(2);
+  const goal = readArg6("--goal", argv) ?? "";
+  const name = readArg6("--name", argv);
+  const flags = readArg6("--flags", argv) ?? "";
+  const cwd = readArg6("--cwd", argv);
+  const files = parseList3(readArg6("--files", argv));
+  const availableCapabilities = parseList3(readArg6("--available-capabilities", argv));
+  const estimatedRaw = readArg6("--estimated-files", argv);
+  const taskRaw = readArg6("--task-count", argv);
+  const route = classifySmartRoute({
+    goal,
+    name,
+    flags,
+    cwd,
+    changedFiles: files,
+    availableCapabilities: availableCapabilities.length > 0 ? availableCapabilities : void 0,
+    estimatedFiles: estimatedRaw === void 0 ? void 0 : Number(estimatedRaw),
+    taskCount: taskRaw === void 0 ? void 0 : Number(taskRaw)
+  });
+  process.stdout.write(JSON.stringify(route, null, 2) + "\n");
+}
+function isDirectRun6() {
+  try {
+    const entry = fileURLToPath5(import.meta.url);
+    return process.argv[1] === entry && basename6(entry).startsWith("smart-route.");
+  } catch {
+    return false;
+  }
+}
+if (isDirectRun6()) {
+  main6();
+}
+
 // src/hooks/_shared/stdin.ts
 import process2 from "node:process";
 async function readStdinJson() {
@@ -1083,7 +2779,7 @@ async function readStdinJson() {
 }
 
 // src/hooks/post-tool-batch-snapshot.ts
-async function main3() {
+async function main7() {
   let input;
   try {
     input = await readStdinJson();
@@ -1098,16 +2794,19 @@ async function main3() {
   try {
     const snapshot = buildWorkflowSnapshot({ cwd: input.cwd });
     if (!snapshot.active || snapshot.gates.length === 0) return;
+    const route = classifySmartRoute({ cwd: input.cwd });
+    const missingVerifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? "repo verifier";
+    const qualityGateText = route.qualityGates.filter((gate) => gate.required).slice(0, 3).map((gate) => gate.command ? `${gate.id} (${gate.command})` : gate.id).join(", ");
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: "PostToolBatch",
-          additionalContext: `curdx-flow snapshot gates after batch: ${snapshot.gates.join(", ")}. Next action: ${snapshot.nextAction}`
+          additionalContext: `curdx-flow snapshot gates after batch: ${snapshot.gates.join(", ")}. Stack: ${route.stackProfile.primary}. Quality gates: ${qualityGateText || "none"}. Suggested verifier: ${missingVerifier}. Next action: ${snapshot.nextAction}`
         }
       })
     );
   } catch {
   }
 }
-void main3();
+void main7();
 //# sourceMappingURL=post-tool-batch-snapshot.mjs.map

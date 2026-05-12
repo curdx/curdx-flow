@@ -13,6 +13,20 @@ import { buildWorkflowSnapshot } from "./workflow-snapshot.js";
 import { runVerificationCheck } from "./check-verification-blocks.js";
 import { walkSrcTree } from "./verify-blocks.js";
 import {
+  detectDevRuntime,
+  healthDevRuntime,
+  startDevRuntime,
+  stopDevRuntime,
+  verifyDevRuntime,
+} from "./dev-runtime.js";
+import { discoverProjectTopology } from "./project-topology.js";
+import {
+  detectStackProfile,
+  selectContextBudget,
+  selectQualityGates,
+  selectSuggestedVerifier,
+} from "./stack-capabilities.js";
+import {
   findSpec,
   getDefaultDir,
   getSpecsDirs,
@@ -51,9 +65,14 @@ function usage(exitCode = 1): never {
     "  specs resolve [name-or-path] [--cwd <dir>]",
     "  state merge <state-file> <json-patch>",
     "  tasks count <tasks.md>",
+    "  dev detect [--cwd <dir>]",
+    "  dev up [--cwd <dir>]",
+    "  dev health [--cwd <dir>] [--dry-run]",
+    "  dev verify [--cwd <dir>] [--dry-run] [--include-e2e]",
+    "  dev down [--cwd <dir>]",
     "  verify run --command <cmd> [--phase execution] [--spec <name-or-path>] [--cwd <dir>] [--description <text>]",
     "  verify-blocks [--cwd <dir>] [--spec <name-or-path>]",
-    "  doctor [--cwd <dir>]",
+    "  doctor [--cwd <dir>] [--goal <text>]",
   ].join("\n");
   process.stderr.write(text + "\n");
   process.exit(exitCode);
@@ -65,6 +84,10 @@ function scriptRoot(): string {
 
 function pluginRoot(): string {
   return process.env.CLAUDE_PLUGIN_ROOT || resolve(scriptRoot(), "..", "..", "..");
+}
+
+function repoRootFromPlugin(): string {
+  return resolve(pluginRoot(), "..", "..");
 }
 
 function runBundled(scriptName: string, args: string[], cwd?: string): never {
@@ -121,6 +144,10 @@ function firstPositional(argv: string[]): string | undefined {
     return value;
   }
   return undefined;
+}
+
+function hasFlag(argv: string[], flag: string): boolean {
+  return argv.includes(flag);
 }
 
 function isDirectory(path: string): boolean {
@@ -466,6 +493,45 @@ function pluginHealthDoctor(): unknown {
   };
 }
 
+function hookFreshnessDoctor(): unknown {
+  const sourceRoot = join(repoRootFromPlugin(), "src", "hooks");
+  const bundleRoot = join(pluginRoot(), "hooks", "scripts");
+  const pairs: Array<[string, string]> = [
+    ["user-prompt-expansion-guard.ts", "user-prompt-expansion-guard.mjs"],
+    ["post-tool-batch-snapshot.ts", "post-tool-batch-snapshot.mjs"],
+    ["task-completed-verifier.ts", "task-completed-verifier.mjs"],
+    [join("lib", "smart-route.ts"), join("lib", "smart-route.mjs")],
+    [join("lib", "tool-capabilities.ts"), join("lib", "tool-capabilities.mjs")],
+    [join("lib", "stack-capabilities.ts"), join("lib", "stack-capabilities.mjs")],
+    [join("lib", "dev-runtime.ts"), join("lib", "dev-runtime.mjs")],
+    [join("lib", "runtime-cli.ts"), join("lib", "runtime-cli.mjs")],
+  ];
+  const entries = pairs.map(([srcRel, bundleRel]) => {
+    const sourcePath = join(sourceRoot, srcRel);
+    const bundlePath = join(bundleRoot, bundleRel);
+    const sourceExists = existsSync(sourcePath);
+    const bundleExists = existsSync(bundlePath);
+    const sourceMtime = sourceExists ? statSync(sourcePath).mtimeMs : null;
+    const bundleMtime = bundleExists ? statSync(bundlePath).mtimeMs : null;
+    return {
+      source: srcRel,
+      bundle: bundleRel,
+      sourceExists,
+      bundleExists,
+      fresh: sourceMtime === null || bundleMtime === null ? false : bundleMtime >= sourceMtime,
+    };
+  });
+  const sourceAvailable = existsSync(sourceRoot);
+  return {
+    sourceAvailable,
+    bundleRoot,
+    fresh: entries.every((entry) => entry.fresh),
+    stale: entries.filter((entry) => !entry.fresh),
+    entries,
+    checkCommand: "npm run check:hooks-fresh",
+  };
+}
+
 function resolveSpecPathForOutput(cwd: string, path: string): { path: string; fsPath: string } {
   const fsPath = isAbsolute(path) ? path : join(cwd, path);
   return { path, fsPath };
@@ -547,6 +613,37 @@ function tasks(argv: string[]): never {
   const tasksFile = argv[1];
   if (!tasksFile) usage();
   return runBundled("count-tasks", [tasksFile]);
+}
+
+function dev(argv: string[]): void {
+  const [sub, ...rest] = argv;
+  const cwd = readArg("--cwd", rest);
+  switch (sub) {
+    case "detect":
+      printJson(detectDevRuntime({ cwd }));
+      return;
+    case "up":
+      printJson(startDevRuntime({ cwd }));
+      return;
+    case "health":
+      printJson(healthDevRuntime({ cwd, dryRun: hasFlag(rest, "--dry-run") }));
+      return;
+    case "verify": {
+      const result = verifyDevRuntime({
+        cwd,
+        dryRun: hasFlag(rest, "--dry-run"),
+        includeE2e: hasFlag(rest, "--include-e2e"),
+      }) as { ok?: boolean };
+      printJson(result);
+      if (result.ok === false && !hasFlag(rest, "--dry-run")) process.exit(1);
+      return;
+    }
+    case "down":
+      printJson(stopDevRuntime({ cwd }));
+      return;
+    default:
+      usage();
+  }
 }
 
 async function verify(argv: string[]): Promise<void> {
@@ -636,17 +733,26 @@ async function verifyBlocks(argv: string[]): Promise<void> {
 function doctor(argv: string[]): void {
   const cwd = resolve(readArg("--cwd", argv) ?? process.cwd());
   const snap = buildWorkflowSnapshot({ cwd, spec: readArg("--spec", argv) });
+  const goal = readArg("--goal", argv) ?? "";
+  const routeFacts = classifySmartRoute({ cwd, goal });
+  const topology = discoverProjectTopology({ cwd, goal });
+  const stackProfile = detectStackProfile({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk });
+  const qualityGates = selectQualityGates({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
+  const suggestedVerifier = selectSuggestedVerifier({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile, qualityGates });
+  const contextBudget = selectContextBudget({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
   const expected = [
     join(scriptRoot(), "workflow-snapshot.mjs"),
     join(scriptRoot(), "smart-route.mjs"),
+    join(scriptRoot(), "stack-capabilities.mjs"),
     join(scriptRoot(), "merge-state.mjs"),
     join(scriptRoot(), "count-tasks.mjs"),
   ];
   const runtimeReady = expected.every((p) => existsSync(p));
   const plugin = pluginHealthDoctor() as { ready?: boolean };
+  const hookFreshness = hookFreshnessDoctor() as { fresh?: boolean; sourceAvailable?: boolean };
   const root = pluginRoot();
   printJson({
-    ok: runtimeReady && plugin.ready === true,
+    ok: runtimeReady && plugin.ready === true && (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
     cwd,
     scripts: Object.fromEntries(expected.map((p) => [basename(p), existsSync(p)])),
     runtime: {
@@ -654,6 +760,15 @@ function doctor(argv: string[]): void {
       scripts: Object.fromEntries(expected.map((p) => [basename(p), existsSync(p)])),
     },
     plugin,
+    hookFreshness,
+    docsSensitiveWarnings: [
+      "Claude Code plugin, skill, agent, hook, dependency, marketplace, and tag behavior must be verified against https://code.claude.com/docs/llms.txt before release-facing changes.",
+    ],
+    route: routeFacts.route,
+    stackProfile,
+    qualityGates,
+    suggestedVerifier,
+    contextBudget,
     browserVerification: browserVerificationDoctor(cwd),
     active: snap.active,
     spec: snap.spec,
@@ -687,6 +802,9 @@ async function main(): Promise<void> {
       return;
     case "tasks":
       tasks(argv);
+      return;
+    case "dev":
+      dev(argv);
       return;
     case "verify":
       await verify(argv);

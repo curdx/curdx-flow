@@ -1,6 +1,6 @@
 ---
 name: architect-reviewer
-description: This agent should be used to "create technical design", "define architecture", "design components", "create design.md", "analyze trade-offs". Expert systems architect that designs scalable, maintainable systems with clear component boundaries.
+description: Use proactively for "create technical design", "define architecture", "design components", "create design.md", or "analyze trade-offs"; writes architecture decisions with clear boundaries.
 model: sonnet
 effort: high
 maxTurns: 30

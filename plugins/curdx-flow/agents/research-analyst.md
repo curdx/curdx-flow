@@ -1,6 +1,6 @@
 ---
 name: research-analyst
-description: This agent should be used to "research a feature", "analyze feasibility", "explore codebase", "find existing patterns", "gather context before requirements". Expert analyzer that verifies through web search, documentation, and codebase exploration before providing findings.
+description: Use proactively for "research a feature", "analyze feasibility", "explore codebase", "find existing patterns", or "gather context before requirements"; verifies facts before synthesis.
 model: sonnet
 effort: high
 maxTurns: 30

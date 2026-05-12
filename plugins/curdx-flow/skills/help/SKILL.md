@@ -22,12 +22,15 @@ If the user has not named a specific command, recommend `/curdx-flow:start`. It 
 - Bounded local feature -> create a lightweight spec with 1-3 value-slice tasks
 - Cross-module or risky work -> run the full spec workflow
 - Oversized multi-system work -> run `/curdx-flow:triage`
+- Empty workspace -> classify intent first: scaffold, product inception, prototype, imported spec, or greenfield spec
+- Scaffold route -> prefer current official/ecosystem generators for named stacks, then verify the generated skeleton
 
 ## Common Commands
 
 | Command | Use |
 |---|---|
 | `/curdx-flow:start [name] [goal]` | Smart route, create, or resume |
+| `/curdx-flow:prompt-optimize [draft prompt]` | Improve a task prompt and route suggestion without executing it |
 | `/curdx-flow:status` | Show specs and the recommended next action |
 | `/curdx-flow:triage [epic-name] [goal]` | Split oversized work into dependency-aware specs |
 | `/curdx-flow:tasks` | Generate value-slice implementation tasks after design |
@@ -35,7 +38,7 @@ If the user has not named a specific command, recommend `/curdx-flow:start`. It 
 
 All public entrypoints remain available:
 
-`/curdx-flow:cancel`, `/curdx-flow:design`, `/curdx-flow:feedback`, `/curdx-flow:help`, `/curdx-flow:implement`, `/curdx-flow:index`, `/curdx-flow:new`, `/curdx-flow:refactor`, `/curdx-flow:requirements`, `/curdx-flow:research`, `/curdx-flow:start`, `/curdx-flow:status`, `/curdx-flow:switch`, `/curdx-flow:tasks`, `/curdx-flow:triage`.
+`/curdx-flow:cancel`, `/curdx-flow:design`, `/curdx-flow:feedback`, `/curdx-flow:help`, `/curdx-flow:implement`, `/curdx-flow:index`, `/curdx-flow:new`, `/curdx-flow:prompt-optimize`, `/curdx-flow:refactor`, `/curdx-flow:requirements`, `/curdx-flow:research`, `/curdx-flow:start`, `/curdx-flow:status`, `/curdx-flow:switch`, `/curdx-flow:tasks`, `/curdx-flow:triage`.
 
 ## Smart Start Options
 
@@ -63,6 +66,7 @@ The compatibility `autoPolicy` is stored in `.curdx-state.json`; behavior routin
 
 - Plugin schema: `claude plugin validate ./plugins/curdx-flow`
 - Runtime health: `curdx-flow doctor`
+- Local dev evidence: `curdx-flow dev detect`, `curdx-flow dev up`, `curdx-flow dev health`, `curdx-flow dev verify`, `curdx-flow dev down`
 - Smoke test: `npm run test:claudecc`
 
 `test:claudecc` auto-detects a `claudecc` zsh alias when present and falls back to `claude`; set `CURDX_FLOW_CLAUDE_BIN=claude` to force the official CLI binary.

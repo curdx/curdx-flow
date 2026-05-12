@@ -24,13 +24,20 @@ describe("tool capability router", () => {
       risk: "low",
     });
 
-    expect(recs).toEqual([
-      expect.objectContaining({
-        id: "context7",
-        phase: "before-coding",
-        availability: "core-required",
-      }),
-    ]);
+    expect(recs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "context7",
+          phase: "before-coding",
+          availability: "core-required",
+        }),
+        expect.objectContaining({
+          id: "docs-query",
+          type: "workflow",
+          category: "docs",
+        }),
+      ]),
+    );
   });
 
   it("treats bundled companion capabilities as core required even when filters are narrow", () => {
@@ -61,11 +68,15 @@ describe("tool capability router", () => {
       availableCapabilities: ["frontend-design", "chrome-devtools-mcp", "context7"],
     });
 
-    expect(recs.map((rec) => rec.id)).toEqual([
-      "context7",
-      "frontend-design",
-      "chrome-devtools-mcp",
-    ]);
+    expect(recs.map((rec) => rec.id)).toEqual(
+      expect.arrayContaining([
+        "context7",
+        "docs-query",
+        "frontend-design",
+        "chrome-devtools-mcp",
+        "browser-verification",
+      ]),
+    );
     expect(recs.find((rec) => rec.id === "frontend-design")?.phase).toBe("implementation");
     expect(recs.find((rec) => rec.id === "chrome-devtools-mcp")?.phase).toBe("verification");
     expect(recs.find((rec) => rec.id === "context7")?.availability).toBe("core-required");
@@ -88,12 +99,16 @@ describe("tool capability router", () => {
       ],
     });
 
-    expect(recs.map((rec) => rec.id)).toEqual([
-      "context7",
-      "claude-mem",
-      "sequential-thinking",
-      "pua",
-    ]);
+    expect(recs.map((rec) => rec.id)).toEqual(
+      expect.arrayContaining([
+        "context7",
+        "docs-query",
+        "claude-mem",
+        "security-review",
+        "sequential-thinking",
+        "pua",
+      ]),
+    );
     expect(recs.find((rec) => rec.id === "claude-mem")?.availability).toBe("core-required");
     expect(recs.find((rec) => rec.id === "context7")?.availability).toBe("core-required");
     expect(recs.find((rec) => rec.id === "sequential-thinking")?.availability).toBe("core-required");

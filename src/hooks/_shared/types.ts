@@ -242,23 +242,49 @@ export interface CurdxState {
     reasons?: string[];
   };
   route?: {
-    route?: "direct-change" | "lite-spec" | "full-spec" | "epic-split" | "resume-current" | "blocked-ask-user";
+    route?:
+      | "direct-change"
+      | "lite-spec"
+      | "full-spec"
+      | "epic-split"
+      | "scaffold"
+      | "product-inception"
+      | "greenfield-spec"
+      | "prototype"
+      | "import-spec"
+      | "resume-current"
+      | "blocked-ask-user";
     reason?: string;
     shouldCreateSpec?: boolean;
     shouldCreateTasks?: boolean;
     shouldUseSubagent?: boolean;
     taskCountLimit?: number;
+    intent?: Record<string, unknown>;
   };
   projectTopology?: Record<string, unknown>;
   recommendedCapabilities?: Array<{
-    id?: "claude-mem" | "context7" | "sequential-thinking" | "chrome-devtools-mcp" | "frontend-design" | "pua";
+    id?:
+      | "claude-mem"
+      | "context7"
+      | "sequential-thinking"
+      | "chrome-devtools-mcp"
+      | "frontend-design"
+      | "pua"
+      | "docs-query"
+      | "browser-verification"
+      | "tdd-cycle"
+      | "security-review"
+      | "stack-specific-verification"
+      | "context-budget";
     name?: string;
-    type?: "plugin" | "mcp";
+    type?: "plugin" | "mcp" | "workflow" | "policy";
     invocation?: string;
     phase?: "before-coding" | "planning" | "implementation" | "verification" | "recovery";
+    category?: "docs" | "verification" | "tdd" | "security" | "context" | "recovery";
     availability?: "core-required" | "known-available" | "check-if-installed";
     reason?: string;
     instruction?: string;
+    stackIds?: string[];
   }>;
   epicName?: string;
   // verification iron-law (design D2): per-phase Verify command outcomes

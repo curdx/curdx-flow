@@ -5,36 +5,31 @@ const require = __ccr(import.meta.url);
 const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
-// src/hooks/lib/workflow-snapshot.ts
-import { execFileSync } from "node:child_process";
-import { existsSync as existsSync3, readFileSync as readFileSync3, statSync as statSync3 } from "node:fs";
-import { basename as basename3, isAbsolute as isAbsolute3, join as join2 } from "node:path";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
+// src/hooks/lib/stack-capabilities.ts
+import { existsSync as existsSync3, readFileSync as readFileSync3, readdirSync as readdirSync3 } from "node:fs";
+import { isAbsolute as isAbsolute3, join as join2, resolve as resolve2 } from "node:path";
+
+// src/hooks/lib/project-topology.ts
+import {
+  existsSync as existsSync2,
+  readFileSync as readFileSync2,
+  readdirSync as readdirSync2,
+  statSync as statSync2
+} from "node:fs";
+import { homedir } from "node:os";
+import path, { basename as basename2, isAbsolute as isAbsolute2, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // src/hooks/_shared/path-resolver.ts
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
-var DEFAULT_SPECS_DIR = "./specs";
 var SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
-function resolveCwd(opts) {
-  return opts?.cwd ?? process.env["CURDX_CWD"] ?? process.cwd();
-}
-function warn(msg) {
-  process.stderr.write(`[curdx-warn] ${msg}
-`);
-}
 function isDir(p) {
   try {
     return statSync(p).isDirectory();
   } catch {
     return false;
   }
-}
-function normalizePath(input) {
-  if (!input) return ".";
-  let p = input.replace(/\/+$/, "");
-  if (p === "") p = ".";
-  return p;
 }
 function findRepoRoot(start) {
   const origin = start ?? process.cwd();
@@ -48,184 +43,8 @@ function findRepoRoot(start) {
   }
   return origin;
 }
-function parseSpecsDirsFromSettings(settingsPath) {
-  let raw;
-  try {
-    raw = readFileSync(settingsPath, "utf8");
-  } catch {
-    return [];
-  }
-  const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---\s*$/m);
-  const block = fmMatch?.[1] ?? raw;
-  const line = block.split(/\r?\n/).find((l) => /^\s*specs_dirs\s*:/.test(l));
-  if (!line) return [];
-  const value = line.replace(/^\s*specs_dirs\s*:\s*/, "");
-  return value.replace(/[\[\]"']/g, "").split(",").map((s) => s.trim()).filter((s) => s.length > 0);
-}
-function getSpecsDirs(opts) {
-  const cwd = resolveCwd(opts);
-  if (!isDir(cwd)) {
-    warn(`CURDX_CWD does not exist: ${cwd}`);
-    return [DEFAULT_SPECS_DIR];
-  }
-  const settingsPath = join(cwd, SETTINGS_REL_PATH);
-  const raw = existsSync(settingsPath) ? parseSpecsDirsFromSettings(settingsPath) : [];
-  if (raw.length === 0) return [DEFAULT_SPECS_DIR];
-  const validated = [];
-  for (const entry of raw) {
-    const dir = normalizePath(entry);
-    const absoluteOutsideCwd = isAbsolute(dir) && !dir.startsWith(cwd);
-    if (absoluteOutsideCwd) {
-      if (!isDir(dir)) {
-        warn(
-          `Skipping invalid absolute path in specs_dirs: ${dir} (does not exist)`
-        );
-        continue;
-      }
-    } else {
-      const resolved = isAbsolute(dir) ? dir : join(cwd, dir);
-      if (!isDir(resolved)) {
-        warn(
-          `Skipping invalid path in specs_dirs: ${dir} (directory not found at ${resolved})`
-        );
-        continue;
-      }
-    }
-    validated.push(dir);
-  }
-  if (validated.length === 0) {
-    warn(`No valid paths in specs_dirs, using default: ${DEFAULT_SPECS_DIR}`);
-    return [DEFAULT_SPECS_DIR];
-  }
-  return validated;
-}
-function getDefaultDir(opts) {
-  const dirs = getSpecsDirs(opts);
-  return normalizePath(dirs[0] ?? DEFAULT_SPECS_DIR);
-}
-function findSpec(name, opts) {
-  if (!name) {
-    return { ok: false, reason: "not-found", name: "" };
-  }
-  const cwd = resolveCwd(opts);
-  if (!isDir(cwd)) {
-    return { ok: false, reason: "not-found", name };
-  }
-  let cleaned = normalizePath(name);
-  if (cleaned.startsWith("./")) cleaned = cleaned.slice(2);
-  const matches = [];
-  for (const entry of getSpecsDirs(opts)) {
-    const dir = normalizePath(entry);
-    const candidateFs = isAbsolute(dir) ? join(dir, cleaned) : join(cwd, dir, cleaned);
-    if (isDir(candidateFs)) {
-      matches.push(posix.join(dir, cleaned));
-    }
-  }
-  if (matches.length === 0) {
-    return { ok: false, reason: "not-found", name: cleaned };
-  }
-  if (matches.length === 1) {
-    return { ok: true, path: matches[0] };
-  }
-  return { ok: false, reason: "ambiguous", name: cleaned, matches };
-}
-function resolveCurrent(opts) {
-  const cwd = resolveCwd(opts);
-  if (!isDir(cwd)) return null;
-  const defaultDir = getDefaultDir(opts);
-  const markerFs = [
-    join(cwd, defaultDir, ".current-spec"),
-    join(cwd, ".current-spec")
-  ].find((candidate) => existsSync(candidate));
-  if (!markerFs) return null;
-  let content;
-  try {
-    content = readFileSync(markerFs, "utf8");
-  } catch {
-    return null;
-  }
-  content = content.replace(/\s+/g, "");
-  if (!content) {
-    warn(".current-spec file is empty");
-    return null;
-  }
-  const normalized = normalizePath(content);
-  if (normalized.startsWith("./") || normalized.startsWith("../") || normalized.includes("/") || isAbsolute(normalized)) {
-    return normalized;
-  }
-  return posix.join(defaultDir, normalized);
-}
-
-// src/hooks/_shared/markdown-task-parser.ts
-var TASK_LINE_RE = /^- \[[ x]\]/;
-var INDENTED_RE = /^  /;
-var BLANK_RE = /^\s*$/;
-var TASK_HEADER_RE = /^- \[([ x])\]\s+(?:(\d+(?:\.\d+)*)\s+)?(.*)$/;
-function normalize(input) {
-  if (!input) return "";
-  let s = input;
-  if (s.charCodeAt(0) === 65279) s = s.slice(1);
-  return s.replace(/\r\n?/g, "\n");
-}
-function trimTrailingBlankLines(lines) {
-  let end = lines.length;
-  while (end > 0 && BLANK_RE.test(lines[end - 1] ?? "")) end--;
-  return lines.slice(0, end);
-}
-function parseTaskList(markdown) {
-  if (!markdown) return [];
-  const lines = normalize(markdown).split("\n");
-  const tasks = [];
-  let current = null;
-  const flush = () => {
-    if (!current) return;
-    const trimmed = trimTrailingBlankLines(current.lines);
-    const lineEnd = current.lineStart + trimmed.length - 1;
-    tasks.push({
-      ...current.meta,
-      raw: trimmed.join("\n"),
-      lineEnd
-    });
-    current = null;
-  };
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    const lineNo = i + 1;
-    if (TASK_LINE_RE.test(line)) {
-      flush();
-      const m = line.match(TASK_HEADER_RE);
-      const completed = m ? m[1] === "x" : false;
-      const id = m && m[2] ? m[2] : void 0;
-      const title = m && m[3] !== void 0 ? m[3] : line;
-      current = {
-        lines: [line],
-        lineStart: lineNo,
-        lineEnd: lineNo,
-        meta: { id, title, completed }
-      };
-      continue;
-    }
-    if (!current) continue;
-    if (INDENTED_RE.test(line) || BLANK_RE.test(line)) {
-      current.lines.push(line);
-      continue;
-    }
-    flush();
-  }
-  flush();
-  return tasks;
-}
 
 // src/hooks/lib/project-topology.ts
-import {
-  existsSync as existsSync2,
-  readFileSync as readFileSync2,
-  readdirSync as readdirSync2,
-  statSync as statSync2
-} from "node:fs";
-import { homedir } from "node:os";
-import path, { basename as basename2, isAbsolute as isAbsolute2, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 var FRONTEND_KEY_RE = /^(frontend|front-end|web|ui|client|admin|前端)$/i;
 var BACKEND_KEY_RE = /^(backend|back-end|api|server|service|后端)$/i;
 var SHARED_KEY_RE = /^(shared|common|contracts?|types?|sdk|共享|协议)$/i;
@@ -840,273 +659,489 @@ if (isDirectRun()) {
   main();
 }
 
-// src/hooks/lib/workflow-snapshot.ts
-function readArg2(name, argv) {
-  const idx = argv.indexOf(name);
-  if (idx === -1) return void 0;
-  return argv[idx + 1];
-}
-function normalizeSpecPath(cwd, specPath) {
-  if (isAbsolute3(specPath)) return specPath;
-  return join2(cwd, specPath);
-}
-function specNameFromPath(specPath) {
-  const parts = specPath.split(/[\\/]+/).filter(Boolean);
-  return parts[parts.length - 1] ?? basename3(specPath);
-}
-function resolveSpecPath(input) {
-  const cwd = input.cwd ?? process.cwd();
-  const explicit = input.spec?.trim();
-  if (explicit) {
-    if (explicit.startsWith("./") || explicit.startsWith("../") || isAbsolute3(explicit)) {
-      return explicit;
+// src/hooks/lib/stack-capabilities.ts
+var STACKS = {
+  "typescript": {
+    id: "typescript",
+    name: "TypeScript",
+    frameworks: ["typescript"],
+    goalPattern: /\b(ts|typescript|typecheck|tsconfig)\b/i,
+    manifestHints: ["tsconfig.json", "tsconfig.*.json"],
+    docsQuery: "TypeScript official documentation for compiler and project configuration",
+    tdd: "Write focused tests first when behavior changes; keep typecheck as a mandatory gate.",
+    security: "Review unsafe casts, unchecked external input, and dependency/script changes.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run verify"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
     }
-    const found = findSpec(explicit, { cwd });
-    if (found.ok) return found.path;
-    return explicit;
+  },
+  "react": {
+    id: "react",
+    name: "React",
+    frameworks: ["react"],
+    goalPattern: /\b(react|jsx|tsx|component|hook|frontend|ui)\b|前端|组件|页面/i,
+    manifestHints: ["package.json:react"],
+    docsQuery: "React official documentation for current component and hook behavior",
+    tdd: "Prefer component or interaction tests for user-visible behavior.",
+    security: "Review XSS, unsafe HTML, auth state leaks, and client-side permission assumptions.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run test:e2e"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "vue": {
+    id: "vue",
+    name: "Vue",
+    frameworks: ["vue", "vite"],
+    goalPattern: /\b(vue|vue3|vite|pinia|vue router|component|frontend|ui)\b|前端|组件|页面/i,
+    manifestHints: ["package.json:vue", "vite.config.*"],
+    docsQuery: "Vue and Vite official documentation for current project setup and runtime behavior",
+    tdd: "Prefer component or interaction tests; keep vue-tsc/typecheck and build gates.",
+    security: "Review template injection, route guards, auth state leaks, and unsafe dynamic HTML.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run test:e2e"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "next": {
+    id: "next",
+    name: "Next.js",
+    frameworks: ["next"],
+    goalPattern: /\b(next\.?js|next|app router|server action|route handler)\b/i,
+    manifestHints: ["next.config.*", "package.json:next"],
+    docsQuery: "Next.js official documentation for routing, server actions, rendering, and build behavior",
+    tdd: "Test server/client boundaries and route handlers before broad UI changes.",
+    security: "Review server/client data exposure, auth, cookies, headers, and route handlers.",
+    verifierCommands: ["npm run typecheck", "npm test", "npm run build"],
+    releaseCommands: ["npm run test:e2e"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "node": {
+    id: "node",
+    name: "Node.js",
+    frameworks: ["node-api", "nestjs", "fastify", "hono"],
+    goalPattern: /\b(node|api|express|fastify|nestjs|hono|server)\b/i,
+    manifestHints: ["package.json"],
+    docsQuery: "Node.js and framework official documentation for current API behavior",
+    tdd: "Use unit/integration tests around API behavior and error paths.",
+    security: "Review input validation, auth, command execution, secrets, and dependency scripts.",
+    verifierCommands: ["npm test", "npm run typecheck", "npm run build"],
+    releaseCommands: ["npm run verify"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "spring-boot": {
+    id: "spring-boot",
+    name: "Spring Boot",
+    frameworks: ["spring-boot"],
+    goalPattern: /\b(spring boot|spring|maven|gradle|controller|service|repository)\b|后端|接口/i,
+    manifestHints: ["pom.xml:spring-boot", "build.gradle:spring-boot"],
+    docsQuery: "Spring Boot official documentation for current runtime, testing, and actuator behavior",
+    tdd: "Use slice or integration tests for controller/service/repository behavior.",
+    security: "Review auth filters, authorization, validation, configuration, and secret exposure.",
+    verifierCommands: ["./mvnw test", "./gradlew test", "mvn test", "gradle test"],
+    releaseCommands: ["./mvnw verify", "./gradlew build"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "spring-cloud": {
+    id: "spring-cloud",
+    name: "Spring Cloud",
+    frameworks: ["spring-cloud"],
+    goalPattern: /\b(spring cloud|gateway|config server|eureka|openfeign|resilience4j)\b/i,
+    manifestHints: ["pom.xml:spring-cloud", "build.gradle:spring-cloud"],
+    docsQuery: "Spring Cloud official documentation for current integration, gateway, and config behavior",
+    tdd: "Prefer integration tests or contract tests for cross-service behavior.",
+    security: "Review gateway filters, service auth, config leakage, and network boundaries.",
+    verifierCommands: ["./mvnw test", "./gradlew test", "mvn test", "gradle test"],
+    releaseCommands: ["./mvnw verify", "./gradlew build"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "standard",
+      "full-spec": "expanded",
+      "epic-split": "expanded"
+    }
+  },
+  "python": {
+    id: "python",
+    name: "Python",
+    frameworks: ["python", "fastapi", "django", "flask"],
+    goalPattern: /\b(python|pytest|fastapi|django|flask|pyproject|ruff)\b/i,
+    manifestHints: ["pyproject.toml", "requirements.txt"],
+    docsQuery: "Python framework official documentation for current API and testing behavior",
+    tdd: "Use pytest around behavior and regression reproduction.",
+    security: "Review deserialization, SQL/query construction, auth, secrets, and dependency pinning.",
+    verifierCommands: ["pytest", "python -m pytest", "ruff check .", "mypy ."],
+    releaseCommands: ["python -m build"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "go": {
+    id: "go",
+    name: "Go",
+    frameworks: ["go"],
+    goalPattern: /\b(go|golang|go test|go mod|goroutine|grpc)\b/i,
+    manifestHints: ["go.mod"],
+    docsQuery: "Go official documentation for current standard library and tooling behavior",
+    tdd: "Use table-driven tests and keep go test ./... as the baseline gate.",
+    security: "Review context cancellation, goroutine leaks, input validation, auth, and unsafe file/network paths.",
+    verifierCommands: ["go test ./...", "go vet ./...", "go build ./..."],
+    releaseCommands: ["go test ./..."],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "rust": {
+    id: "rust",
+    name: "Rust",
+    frameworks: ["rust"],
+    goalPattern: /\b(rust|cargo|crate|tokio|axum)\b/i,
+    manifestHints: ["Cargo.toml"],
+    docsQuery: "Rust and crate official documentation for current API and safety behavior",
+    tdd: "Use cargo test and focused regression tests before implementation changes.",
+    security: "Review unsafe blocks, parsing, auth, IO boundaries, and dependency features.",
+    verifierCommands: ["cargo test", "cargo clippy -- -D warnings", "cargo build"],
+    releaseCommands: ["cargo test"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
+  "claude-code-plugin": {
+    id: "claude-code-plugin",
+    name: "Claude Code plugin",
+    frameworks: ["claude-code-plugin"],
+    goalPattern: /\b(claude code|plugin|skill|agent|hook|hooks|mcp|marketplace|tag|release)\b/i,
+    manifestHints: [".claude-plugin/plugin.json", "hooks/hooks.json", "skills/*/SKILL.md"],
+    docsQuery: "Claude Code official docs for plugins, skills, agents, hooks, dependencies, and release tags",
+    tdd: "Use focused hook/runner tests and the real Claude Code smoke path before release.",
+    security: "Review hook fail-open behavior, plugin metadata, dependency declarations, and release tags.",
+    verifierCommands: [
+      "npm run check:hooks-fresh",
+      "npm run typecheck",
+      "npm run test:runner",
+      "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc"
+    ],
+    releaseCommands: ["claude plugin validate ./plugins/curdx-flow", "npm run verify"],
+    browser: false,
+    contextBudget: {
+      "direct-change": "focused",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
   }
-  return resolveCurrent({ cwd }) ?? void 0;
+};
+var STACK_PRIORITY = {
+  "claude-code-plugin": 110,
+  "next": 100,
+  "react": 90,
+  "vue": 90,
+  "spring-cloud": 85,
+  "spring-boot": 80,
+  "go": 75,
+  "rust": 75,
+  "python": 75,
+  "typescript": 30,
+  "node": 20
+};
+function normalizeText(input) {
+  return (input ?? "").trim().replace(/\s+/g, " ");
 }
-function readJsonFile(path2) {
-  try {
-    return { ok: true, value: JSON.parse(readFileSync3(path2, "utf8")) };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
+function rootFsPath(projectRoot, root) {
+  return isAbsolute3(root.path) ? resolve2(root.path) : resolve2(projectRoot, root.path);
 }
-function artifact(specFs, filename) {
-  const p = join2(specFs, filename);
-  if (!existsSync3(p)) return { exists: false, path: p };
+function readText2(file) {
   try {
-    const st = statSync3(p);
-    return {
-      exists: true,
-      path: p,
-      mtimeMs: st.mtimeMs,
-      bytes: st.size
-    };
+    return readFileSync3(file, "utf8");
   } catch {
-    return { exists: true, path: p };
+    return "";
   }
 }
-function extractVerify(raw) {
-  const m = raw.match(/^\s+- \*\*Verify\*\*:\s*(.+)$/m);
-  return m?.[1]?.trim();
+function packageJsonContains(rootAbs, pattern) {
+  return pattern.test(readText2(join2(rootAbs, "package.json")));
 }
-function extractFiles(raw) {
-  const m = raw.match(/^\s+- \*\*Files\*\*:\s*(.+)$/m);
-  const value = m?.[1]?.trim();
-  if (!value) return [];
-  return value.split(/[,;]/).map((part) => part.trim().replace(/^`|`$/g, "")).filter(Boolean);
+function hasManifestHint(rootAbs, hint) {
+  if (hint.includes(":")) {
+    const [file, needle] = hint.split(":", 2);
+    if (!file || !needle) return false;
+    return readText2(join2(rootAbs, file)).toLowerCase().includes(needle.toLowerCase());
+  }
+  if (hint.includes("*")) {
+    const pattern = new RegExp(`^${hint.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`);
+    const dir = hint.includes("/") ? hint.split("/").slice(0, -1).join("/") : ".";
+    const base = rootAbs === "" ? "." : rootAbs;
+    try {
+      return existsSync3(join2(base, dir)) && readdirSync3(join2(base, dir)).some(
+        (name) => pattern.test(dir === "." ? name : `${dir}/${name}`)
+      );
+    } catch {
+      return false;
+    }
+  }
+  return existsSync3(join2(rootAbs, hint));
 }
-function buildTaskSnapshot(specFs, state) {
-  const tasksPath = join2(specFs, "tasks.md");
-  if (!existsSync3(tasksPath)) {
-    return { total: 0, completed: 0, pending: 0, currentIndex: 0 };
+function scoreStack(stack, roots, projectRoot, goal) {
+  const evidence = [];
+  let score = 0;
+  if (stack.goalPattern.test(goal)) {
+    score += stack.id === "claude-code-plugin" ? 0.46 : ["react", "vue", "next", "spring-cloud", "spring-boot"].includes(stack.id) ? 0.32 : 0.24;
+    evidence.push("goal keyword");
   }
-  let tasks = [];
-  try {
-    tasks = parseTaskList(readFileSync3(tasksPath, "utf8"));
-  } catch {
-    tasks = [];
-  }
-  const total = tasks.length;
-  const completed = tasks.reduce((n, task) => n + (task.completed ? 1 : 0), 0);
-  const pending = total - completed;
-  const rawIndex = typeof state?.taskIndex === "number" ? state.taskIndex : completed;
-  const currentIndex = Math.max(0, Math.min(rawIndex, Math.max(total - 1, 0)));
-  const currentTask = tasks[currentIndex];
-  return {
-    total,
-    completed,
-    pending,
-    currentIndex,
-    ...currentTask ? {
-      current: {
-        ...currentTask.id ? { id: currentTask.id } : {},
-        title: currentTask.title,
-        lineStart: currentTask.lineStart,
-        lineEnd: currentTask.lineEnd,
-        ...extractVerify(currentTask.raw) ? { verify: extractVerify(currentTask.raw) } : {},
-        files: extractFiles(currentTask.raw)
+  for (const root of roots) {
+    const rootAbs = rootFsPath(projectRoot, root);
+    const frameworkHits = root.frameworks.filter(
+      (framework) => stack.frameworks.includes(framework)
+    );
+    if (frameworkHits.length > 0) {
+      score += 0.34;
+      evidence.push(`${root.path}: framework ${frameworkHits.join(",")}`);
+    }
+    for (const hint of stack.manifestHints) {
+      if (hasManifestHint(rootAbs, hint)) {
+        score += 0.18;
+        evidence.push(`${root.path}: ${hint}`);
       }
-    } : {}
-  };
-}
-function gitSnapshot(cwd) {
-  try {
-    const branch = execFileSync("git", ["branch", "--show-current"], {
-      cwd,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
-    }).trim();
-    const status = execFileSync("git", ["status", "--porcelain"], {
-      cwd,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
-    }).split(/\r?\n/).filter(Boolean);
-    return {
-      available: true,
-      ...branch ? { branch } : {},
-      dirty: status.length > 0,
-      changedFiles: status.length
-    };
-  } catch {
-    return { available: false, dirty: false, changedFiles: 0 };
+    }
+    if (stack.id === "typescript" && packageJsonContains(rootAbs, /"typescript"\s*:/i)) {
+      score += 0.2;
+      evidence.push(`${root.path}: package.json:typescript`);
+    }
   }
-}
-function compactTopology(topology) {
+  if (score <= 0) return null;
+  const confidence = Math.max(0.1, Math.min(0.99, Number(score.toFixed(2))));
   return {
-    workspaceState: topology.workspaceState,
-    devContextFound: topology.devContextFound,
-    roots: topology.roots,
-    requiredRoots: topology.requiredRoots,
-    missingRoots: topology.missingRoots,
-    ...topology.accessFix ? { accessFix: topology.accessFix } : {},
-    warnings: topology.warnings
+    id: stack.id,
+    name: stack.name,
+    confidence,
+    evidence: [...new Set(evidence)].slice(0, 5)
   };
 }
-function isLiteSpecState(state) {
-  const route = state?.route?.route;
-  return state?.autoPolicy?.executionMode === "spec-lite" || route === "lite-spec";
+function knownStackCapabilities() {
+  return Object.values(STACKS);
 }
-function inferNextAction(state, artifacts, tasks) {
-  if (state?.completed === true) return "Spec is completed. Use /curdx-flow:refactor for follow-up changes.";
-  if (isLiteSpecState(state)) {
-    if (!artifacts.tasks.exists) return "Run /curdx-flow:tasks.";
-    if (tasks.pending > 0) return "Run /curdx-flow:implement.";
-    return "All task checkboxes are complete; run verification/refactor or mark complete.";
+function detectStackProfile(input) {
+  const goal = normalizeText(input.goal);
+  const roots = input.topology.roots;
+  const detected = Object.values(STACKS).map((stack) => scoreStack(stack, roots, input.topology.projectRoot, goal)).filter((item) => item !== null).sort(
+    (a, b) => b.confidence - a.confidence || STACK_PRIORITY[b.id] - STACK_PRIORITY[a.id]
+  );
+  const primary = detected[0]?.id ?? "unknown";
+  const confidence = detected[0]?.confidence ?? 0;
+  const warnings = [];
+  if (primary === "unknown") {
+    warnings.push("No first-class stack profile detected; use repository scripts as the verifier source.");
   }
-  if (!artifacts.research.exists) return "Run /curdx-flow:research.";
-  if (!artifacts.requirements.exists) return "Run /curdx-flow:requirements.";
-  if (!artifacts.design.exists) return "Run /curdx-flow:design.";
-  if (!artifacts.tasks.exists) return "Run /curdx-flow:tasks.";
-  if (tasks.pending > 0) return "Run /curdx-flow:implement.";
-  return "All task checkboxes are complete; run verification/refactor or mark complete.";
+  if (detected.length > 1 && detected[0] && detected[1] && detected[1].confidence > 0.5) {
+    warnings.push("Multiple stack profiles are relevant; keep verification multi-root and avoid single-stack assumptions.");
+  }
+  return {
+    version: 1,
+    primary,
+    detected,
+    confidence,
+    evidence: detected.flatMap((item) => item.evidence).slice(0, 8),
+    warnings
+  };
 }
-function buildGates(stateInfo, artifacts, tasks, topology) {
-  const gates = [];
-  const isLiteSpec = stateInfo.autoPolicy?.executionMode === "spec-lite";
-  if (!stateInfo.exists) gates.push("missing-state");
-  if (stateInfo.exists && !stateInfo.valid) gates.push("invalid-state");
-  if (topology && topology.missingRoots.length > 0) gates.push("missing-code-root");
-  if (isLiteSpec) {
-    if (!artifacts.tasks.exists) gates.push("missing-tasks");
-  } else {
-    if (!artifacts.research.exists) gates.push("missing-research");
-    if (!artifacts.requirements.exists && artifacts.research.exists) gates.push("missing-requirements");
-    if (!artifacts.design.exists && artifacts.requirements.exists) gates.push("missing-design");
-    if (!artifacts.tasks.exists && artifacts.design.exists) gates.push("missing-tasks");
+function stackFor(profile) {
+  return profile.primary === "unknown" ? null : STACKS[profile.primary];
+}
+function selectCommand(commands, roots, projectRoot) {
+  for (const command of commands) {
+    if (command.startsWith("./mvnw") && !roots.some((root) => existsSync3(join2(rootFsPath(projectRoot, root), "mvnw")))) {
+      continue;
+    }
+    if (command.startsWith("./gradlew") && !roots.some((root) => existsSync3(join2(rootFsPath(projectRoot, root), "gradlew")))) {
+      continue;
+    }
+    return command;
   }
-  if (artifacts.tasks.exists && tasks.total === 0) gates.push("empty-tasks");
-  if (tasks.total > 0 && stateInfo.phase === "execution" && tasks.pending === 0 && !stateInfo.completed) {
-    gates.push("completion-unmarked");
+  return commands[0] ?? null;
+}
+function selectQualityGates(input) {
+  const stack = stackFor(input.stackProfile);
+  const route = input.route ?? "";
+  const risk = input.risk ?? "";
+  if (stack === null) {
+    return [
+      {
+        id: "repo-verification",
+        phase: "verification",
+        required: route !== "direct-change",
+        command: null,
+        reason: "No stack profile matched; use the repository's documented verification command."
+      }
+    ];
+  }
+  const primaryCommand = selectCommand(stack.verifierCommands, input.topology.roots, input.topology.projectRoot);
+  const gates = [
+    {
+      id: `${stack.id}-docs`,
+      phase: "before-coding",
+      required: /plugin|hook|skill|agent|latest|official|framework|api|sdk/i.test(input.goal ?? "") || stack.id === "claude-code-plugin",
+      command: null,
+      reason: stack.docsQuery
+    },
+    {
+      id: `${stack.id}-tdd`,
+      phase: "implementation",
+      required: route !== "direct-change" && risk !== "low",
+      command: null,
+      reason: stack.tdd
+    },
+    {
+      id: `${stack.id}-baseline`,
+      phase: "verification",
+      required: true,
+      command: primaryCommand,
+      reason: `Baseline verification for ${stack.name}.`
+    }
+  ];
+  if (stack.browser) {
+    gates.push({
+      id: `${stack.id}-browser`,
+      phase: "verification",
+      required: route !== "direct-change",
+      command: "npm run test:e2e",
+      reason: "Browser-facing behavior needs Playwright or Chrome DevTools MCP evidence."
+    });
+  }
+  if (risk === "high" || risk === "critical" || /auth|security|permission|oauth|secret|release|publish|tag/i.test(input.goal ?? "")) {
+    gates.push({
+      id: `${stack.id}-security-review`,
+      phase: "verification",
+      required: risk === "critical" || /auth|security|permission|oauth|secret/i.test(input.goal ?? ""),
+      command: null,
+      reason: stack.security
+    });
+  }
+  if (route === "epic-split" || /release|publish|tag|npm/i.test(input.goal ?? "")) {
+    gates.push({
+      id: `${stack.id}-release`,
+      phase: "release",
+      required: /release|publish|tag|npm/i.test(input.goal ?? ""),
+      command: selectCommand(stack.releaseCommands, input.topology.roots, input.topology.projectRoot),
+      reason: `Release-facing ${stack.name} work needs the stricter release gate.`
+    });
   }
   return gates;
 }
-function buildWorkflowSnapshot(input = {}) {
-  const cwd = input.cwd ?? process.cwd();
-  const specPath = resolveSpecPath({ ...input, cwd });
-  const topology = compactTopology(discoverProjectTopology({ cwd, goal: input.goal ?? "" }));
-  const git = gitSnapshot(cwd);
-  if (!specPath) {
+function selectSuggestedVerifier(input) {
+  const browserGate = input.qualityGates.find((gate) => gate.id.endsWith("-browser"));
+  if (browserGate && /ui|browser|frontend|page|component|css|layout|交互|页面|前端/i.test(input.goal ?? "")) {
     return {
-      version: 2,
-      cwd,
-      active: false,
-      state: {
-        exists: false,
-        valid: false,
-        completed: false,
-        awaitingApproval: false,
-        quickMode: false,
-        recommendedCapabilities: [],
-        verificationBlocks: {}
-      },
-      artifacts: {
-        research: { exists: false, path: join2(cwd, "research.md") },
-        requirements: { exists: false, path: join2(cwd, "requirements.md") },
-        design: { exists: false, path: join2(cwd, "design.md") },
-        tasks: { exists: false, path: join2(cwd, "tasks.md") },
-        progress: { exists: false, path: join2(cwd, ".progress.md") }
-      },
-      tasks: { total: 0, completed: 0, pending: 0, currentIndex: 0 },
-      topology,
-      git,
-      nextAction: "No active spec. Run /curdx-flow:start <name> <goal>.",
-      gates: ["no-active-spec"]
+      kind: "browser",
+      command: browserGate.command,
+      fallback: "Chrome DevTools MCP",
+      needsRuntime: true,
+      reason: browserGate.reason
     };
   }
-  const specFs = normalizeSpecPath(cwd, specPath);
-  const statePath = join2(specFs, ".curdx-state.json");
-  let state = null;
-  const stateInfo = {
-    exists: existsSync3(statePath),
-    valid: false,
-    completed: false,
-    awaitingApproval: false,
-    quickMode: false,
-    recommendedCapabilities: [],
-    verificationBlocks: {}
-  };
-  if (stateInfo.exists) {
-    const parsed = readJsonFile(statePath);
-    if (parsed.ok) {
-      state = parsed.value;
-      stateInfo.valid = true;
-      stateInfo.version = parsed.value.version;
-      stateInfo.phase = parsed.value.phase;
-      stateInfo.completed = parsed.value.completed === true;
-      stateInfo.awaitingApproval = parsed.value.awaitingApproval === true;
-      stateInfo.quickMode = parsed.value.quickMode === true;
-      stateInfo.autoPolicy = parsed.value.autoPolicy;
-      stateInfo.recommendedCapabilities = parsed.value.recommendedCapabilities ?? [];
-      stateInfo.projectTopology = parsed.value.projectTopology;
-      stateInfo.verificationBlocks = parsed.value.verificationBlocks ?? {};
-    } else {
-      stateInfo.error = parsed.error;
-    }
+  if (input.stackProfile.primary === "claude-code-plugin") {
+    return {
+      kind: "plugin-smoke",
+      command: "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc",
+      fallback: "claude plugin validate ./plugins/curdx-flow",
+      needsRuntime: false,
+      reason: "Claude Code plugin changes need real plugin validation in addition to unit tests."
+    };
   }
-  const artifacts = {
-    research: artifact(specFs, "research.md"),
-    requirements: artifact(specFs, "requirements.md"),
-    design: artifact(specFs, "design.md"),
-    tasks: artifact(specFs, "tasks.md"),
-    progress: artifact(specFs, ".progress.md")
-  };
-  const tasks = buildTaskSnapshot(specFs, state);
+  const baseline = input.qualityGates.find((gate) => gate.id.endsWith("-baseline"));
   return {
-    version: 2,
-    cwd,
-    active: existsSync3(specFs),
-    spec: {
-      name: specNameFromPath(specPath),
-      path: specPath,
-      fsPath: specFs,
-      statePath
-    },
-    state: stateInfo,
-    artifacts,
-    tasks,
-    topology,
-    git,
-    nextAction: inferNextAction(state, artifacts, tasks),
-    gates: buildGates(stateInfo, artifacts, tasks, topology)
+    kind: baseline?.command?.includes("build") ? "build" : "unit",
+    command: baseline?.command ?? null,
+    fallback: "Use the repository's documented verify command.",
+    needsRuntime: false,
+    reason: baseline?.reason ?? "Use local verification evidence before completion."
   };
+}
+function selectContextBudget(input) {
+  const stack = stackFor(input.stackProfile);
+  const route = input.route ?? "full-spec";
+  const routeDefault = route === "direct-change" ? "tiny" : route === "scaffold" || route === "prototype" || route === "lite-spec" ? "focused" : route === "epic-split" ? "expanded" : "standard";
+  const level = stack?.contextBudget[route] ?? routeDefault;
+  const limits = {
+    tiny: 2,
+    focused: 4,
+    standard: 8,
+    expanded: 12
+  };
+  return {
+    level,
+    maxReferenceFiles: limits[level],
+    strategy: level === "tiny" ? "Read only the directly touched files plus one local convention file." : level === "focused" ? "Read the target files, nearest tests, and one relevant reference before editing." : level === "standard" ? "Use bounded discovery across source, tests, docs, and official references." : "Split discovery by subsystem and summarize before implementation."
+  };
+}
+function readArg2(name, argv) {
+  const idx = argv.indexOf(name);
+  return idx === -1 ? void 0 : argv[idx + 1];
 }
 function main2() {
   const argv = process.argv.slice(2);
-  const snapshot = buildWorkflowSnapshot({
-    cwd: readArg2("--cwd", argv),
-    spec: readArg2("--spec", argv),
-    goal: readArg2("--goal", argv)
-  });
-  process.stdout.write(JSON.stringify(snapshot, null, 2) + "\n");
+  const cwd = readArg2("--cwd", argv);
+  const goal = readArg2("--goal", argv) ?? "";
+  const route = readArg2("--route", argv);
+  const risk = readArg2("--risk", argv);
+  const topology = discoverProjectTopology({ cwd, goal });
+  const stackProfile = detectStackProfile({ cwd, goal, topology, route, risk });
+  const qualityGates = selectQualityGates({ cwd, goal, topology, route, risk, stackProfile });
+  const suggestedVerifier = selectSuggestedVerifier({ cwd, goal, topology, route, risk, stackProfile, qualityGates });
+  const contextBudget = selectContextBudget({ cwd, goal, topology, route, risk, stackProfile });
+  process.stdout.write(JSON.stringify({
+    stackProfile,
+    qualityGates,
+    suggestedVerifier,
+    contextBudget
+  }, null, 2) + "\n");
 }
 function isDirectRun2() {
   try {
-    const entry = fileURLToPath2(import.meta.url);
-    return process.argv[1] === entry && basename3(entry).startsWith("workflow-snapshot.");
+    return process.argv[1]?.endsWith("stack-capabilities.mjs") === true;
   } catch {
     return false;
   }
@@ -1115,6 +1150,10 @@ if (isDirectRun2()) {
   main2();
 }
 export {
-  buildWorkflowSnapshot
+  detectStackProfile,
+  knownStackCapabilities,
+  selectContextBudget,
+  selectQualityGates,
+  selectSuggestedVerifier
 };
-//# sourceMappingURL=workflow-snapshot.mjs.map
+//# sourceMappingURL=stack-capabilities.mjs.map

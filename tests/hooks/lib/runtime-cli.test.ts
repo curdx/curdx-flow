@@ -160,6 +160,12 @@ describe("runtime-cli lib", () => {
             chromeInstalled?: boolean;
           };
         };
+        stackProfile?: {
+          primary?: string;
+        };
+        qualityGates?: Array<{ id?: string; command?: string | null }>;
+        suggestedVerifier?: { command?: string | null; fallback?: string | null };
+        hookFreshness?: { fresh?: boolean };
         recommendations?: Array<{ id?: string; command?: string; action?: string }>;
       };
       expect(json.ok).toBe(true);
@@ -185,6 +191,10 @@ describe("runtime-cli lib", () => {
           expect.objectContaining({ id: "plugin-validate" }),
         ]),
       );
+      expect(json.hookFreshness?.fresh).toBe(true);
+      expect(json.stackProfile?.primary).toEqual(expect.any(String));
+      expect(json.qualityGates).toEqual(expect.any(Array));
+      expect(json.suggestedVerifier).toBeDefined();
       expect(json.browserVerification?.project?.devServerScripts).toContain("dev");
       expect(json.browserVerification?.project?.e2eScripts).toContain("test:e2e");
       expect(json.browserVerification?.project?.e2eConfigFiles).toContain("playwright.config.ts");
@@ -198,6 +208,98 @@ describe("runtime-cli lib", () => {
         dependencyDeclared: true,
         chromeInstalled: true,
       });
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("detects local dev runtime commands for split frontend and backend roots", () => {
+    const parent = makeTmpDir("runtime-dev-detect");
+    const backend = path.join(parent, "backend");
+    const frontend = path.join(parent, "frontend");
+    try {
+      mkdirSync(path.join(backend, ".git"), { recursive: true });
+      mkdirSync(frontend, { recursive: true });
+      writeFileSync(path.join(backend, "CLAUDE.md"), "## Dev\n- frontend: ../frontend\n- backend: .\n");
+      writeFileSync(
+        path.join(frontend, "package.json"),
+        JSON.stringify({
+          scripts: {
+            dev: "vite --host 0.0.0.0 --port 5173",
+            typecheck: "vue-tsc --noEmit",
+            test: "vitest",
+            build: "vite build",
+            "test:e2e": "playwright test",
+          },
+          dependencies: { vue: "^3.5.0" },
+          devDependencies: { vite: "^6.0.0", "@playwright/test": "^1.0.0" },
+        }),
+      );
+      writeFileSync(
+        path.join(backend, "pom.xml"),
+        [
+          "<project>",
+          "<dependency><artifactId>spring-boot-starter-web</artifactId></dependency>",
+          "</project>",
+        ].join("\n"),
+      );
+
+      const result = runLib("runtime-cli", ["dev", "detect", "--cwd", backend]);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.json).toMatchObject({
+        version: 1,
+        workspaceState: "split-repo",
+        services: expect.arrayContaining([
+          expect.objectContaining({ root: "../frontend", command: "npm run dev" }),
+          expect.objectContaining({ root: ".", command: "mvn spring-boot:run" }),
+        ]),
+        verification: {
+          baselineCommands: expect.arrayContaining([
+            { root: "../frontend", command: "npm run typecheck" },
+            { root: "../frontend", command: "npm run test" },
+            { root: "../frontend", command: "npm run build" },
+            { root: ".", command: "mvn test" },
+          ]),
+          e2eCommands: [{ root: "../frontend", command: "npm run test:e2e" }],
+        },
+      });
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+  it("prints dev health and verify plans without starting services in dry-run mode", () => {
+    const cwd = makeTmpDir("runtime-dev-dry-run");
+    try {
+      writeFileSync(
+        path.join(cwd, "package.json"),
+        JSON.stringify({
+          scripts: {
+            dev: "vite",
+            test: "vitest",
+          },
+          dependencies: { vue: "^3.5.0" },
+          devDependencies: { vite: "^6.0.0" },
+        }),
+      );
+
+      const health = runLib("runtime-cli", ["dev", "health", "--cwd", cwd, "--dry-run"]);
+      const verify = runLib("runtime-cli", ["dev", "verify", "--cwd", cwd, "--dry-run"]);
+      const down = runLib("runtime-cli", ["dev", "down", "--cwd", cwd]);
+
+      expect(health.exitCode).toBe(0);
+      expect(health.json).toMatchObject({
+        services: [],
+        health: [expect.objectContaining({ skipped: true })],
+      });
+      expect(verify.exitCode).toBe(0);
+      expect(verify.json).toMatchObject({
+        dryRun: true,
+        commands: [{ root: ".", command: "npm run test" }],
+      });
+      expect(down.exitCode).toBe(0);
+      expect(down.json).toMatchObject({ ok: true, stopped: [] });
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

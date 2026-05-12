@@ -401,7 +401,12 @@
         },
         "projectTopology": {
           "type": "object",
-          "description": "Compact topology facts returned by hooks/scripts/lib/smart-route.mjs for multi-root project routing",
+          "description": "Compact topology facts returned by hooks/scripts/lib/smart-route.mjs for multi-root and empty-workspace project routing",
+          "additionalProperties": true
+        },
+        "intent": {
+          "type": "object",
+          "description": "Adaptive start intent facts returned by curdx-flow route: workspace state, intent kind, clarity, stack/artifact signals, delivery expectation, and missing facts",
           "additionalProperties": true
         },
         "recommendedCapabilities": {
@@ -418,22 +423,36 @@
                   "sequential-thinking",
                   "chrome-devtools-mcp",
                   "frontend-design",
-                  "pua"
+                  "pua",
+                  "docs-query",
+                  "browser-verification",
+                  "tdd-cycle",
+                  "security-review",
+                  "stack-specific-verification",
+                  "context-budget"
                 ]
               },
               "name": { "type": "string" },
-              "type": { "type": "string", "enum": ["plugin", "mcp"] },
+              "type": { "type": "string", "enum": ["plugin", "mcp", "workflow", "policy"] },
               "invocation": { "type": "string" },
               "phase": {
                 "type": "string",
                 "enum": ["before-coding", "planning", "implementation", "verification", "recovery"]
+              },
+              "category": {
+                "type": "string",
+                "enum": ["docs", "verification", "tdd", "security", "context", "recovery"]
               },
               "availability": {
                 "type": "string",
                 "enum": ["core-required", "known-available", "check-if-installed"]
               },
               "reason": { "type": "string" },
-              "instruction": { "type": "string" }
+              "instruction": { "type": "string" },
+              "stackIds": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
             },
             "required": ["id", "name", "type", "invocation", "phase", "availability", "reason", "instruction"],
             "additionalProperties": false

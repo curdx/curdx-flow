@@ -34,6 +34,7 @@ const LEGACY_ENTRYPOINT_SKILLS = [
   "implement",
   "index",
   "new",
+  "prompt-optimize",
   "refactor",
   "requirements",
   "research",
@@ -193,6 +194,8 @@ describe("manifest discovery", () => {
     expect(existsSync(REFERENCES_DIR)).toBe(true);
     const refs = listMarkdown(REFERENCES_DIR);
     expect(refs.length).toBeGreaterThanOrEqual(5);
+    expect(existsSync(path.join(REFERENCES_DIR, "intelligent-routing.md"))).toBe(true);
+    expect(existsSync(path.join(REFERENCES_DIR, "prompt-optimization.md"))).toBe(true);
   });
 });
 
@@ -246,6 +249,17 @@ describe("agents frontmatter integrity", () => {
       expect(tools, `${file}: missing tools allowlist`).toBeDefined();
       expect(tools).not.toMatch(/\b(Write|Edit|MultiEdit)\b/);
     }
+  });
+
+  it("executor keeps worktree isolation and release-surface safety rules", () => {
+    const file = path.join(AGENTS_DIR, "spec-executor.md");
+    const body = readFileSync(file, "utf8");
+    const fm = extractFrontmatter(body);
+    const fields = parseFrontmatterFields(fm!);
+
+    expect(fields.get("isolation")).toBe("worktree");
+    expect(body).toContain("Never modify plugin metadata, release files, package versions, changelog, or tags");
+    expect(body).toContain("If a needed file is not listed, stop with TASK_BLOCKED");
   });
 });
 

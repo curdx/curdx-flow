@@ -8,3 +8,4 @@ dist
 specs/.current-spec
 specs/.current-epic
 **/.progress.md
+.curdx/

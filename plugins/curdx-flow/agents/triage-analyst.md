@@ -1,6 +1,6 @@
 ---
 name: triage-analyst
-description: This agent should be used to "decompose a large feature", "triage a big task", "break down into multiple specs", "create epic decomposition", or needs guidance on splitting large features into dependency-aware spec graphs.
+description: Use proactively for "decompose a large feature", "triage a big task", "break down into multiple specs", or "create epic decomposition"; splits work into dependency-aware specs.
 model: sonnet
 effort: high
 maxTurns: 35

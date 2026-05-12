@@ -117,6 +117,146 @@ describe("smart-route classifier", () => {
     }
   });
 
+  it("routes explicit empty-workspace scaffolding to scaffold instead of lite-spec", () => {
+    const cwd = makeTmpDir("smart-route-empty-scaffold");
+    try {
+      const route = classifySmartRoute({
+        cwd,
+        goal: "创建一个 Vue3 Vite TypeScript 项目脚手架",
+      });
+
+      expect(route.route).toBe("scaffold");
+      expect(route.shouldCreateSpec).toBe(false);
+      expect(route.intent).toMatchObject({
+        workspaceState: "empty",
+        intentKind: "scaffold",
+        clarity: "high",
+        stackSpecified: true,
+      });
+      expect(route.topology?.workspaceState).toBe("empty");
+      expect(route.stackProfile.primary).toBe("vue");
+      expect(route.qualityGates).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "vue-docs" }),
+          expect.objectContaining({ id: "vue-baseline" }),
+        ]),
+      );
+      expect(route.contextBudget.level).toBe("focused");
+      expect(route.nextAction).toContain("official/ecosystem scaffold source");
+      expect(route.recommendedCapabilities).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: "context7",
+          phase: "before-coding",
+        }),
+      ]));
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("routes vague empty-workspace product requests to product-inception", () => {
+    const cwd = makeTmpDir("smart-route-empty-product");
+    try {
+      const route = classifySmartRoute({
+        cwd,
+        goal: "开发一套前后端，前端 Vue 全家桶，后端 Spring 全家桶",
+      });
+
+      expect(route.route).toBe("product-inception");
+      expect(route.shouldCreateSpec).toBe(false);
+      expect(route.intent.intentKind).toBe("product");
+      expect(route.intent.missingFacts).toContain(
+        "product domain, target user, MVP acceptance criteria",
+      );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("routes clear empty-workspace product requests to greenfield-spec", () => {
+    const cwd = makeTmpDir("smart-route-empty-greenfield");
+    try {
+      const route = classifySmartRoute({
+        cwd,
+        goal: "开发一个 CRM 客户管理系统，前端 Vue，后端 Spring Boot，MVP 支持客户列表和合同记录",
+      });
+
+      expect(route.route).toBe("greenfield-spec");
+      expect(route.shouldCreateSpec).toBe(true);
+      expect(route.shouldUseSubagent).toBe(true);
+      expect(route.intent).toMatchObject({
+        workspaceState: "empty",
+        intentKind: "product",
+        clarity: "high",
+        stackSpecified: true,
+      });
+      expect(route.intent.missingFacts).toEqual([]);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+
+  it("routes empty-workspace PRD/spec imports to import-spec", () => {
+    const cwd = makeTmpDir("smart-route-empty-import");
+    try {
+      const route = classifySmartRoute({
+        cwd,
+        goal: "这里有 PRD.md，按这个需求文档实现管理后台",
+      });
+
+      expect(route.route).toBe("import-spec");
+      expect(route.shouldCreateSpec).toBe(true);
+      expect(route.intent).toMatchObject({
+        workspaceState: "empty",
+        intentKind: "import-spec",
+        artifactProvided: true,
+      });
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("routes empty-workspace technical POCs to prototype", () => {
+    const cwd = makeTmpDir("smart-route-empty-prototype");
+    try {
+      const route = classifySmartRoute({
+        cwd,
+        goal: "验证 Spring Cloud Gateway OAuth POC 是否能跑通",
+      });
+
+      expect(route.route).toBe("prototype");
+      expect(route.taskCountLimit).toBe(5);
+      expect(route.intent.intentKind).toBe("prototype");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("detects Claude Code plugin stack and recommends plugin smoke for release-sensitive work", () => {
+    const route = classifySmartRoute({
+      goal: "Update Claude Code plugin hooks and publish a new npm tag",
+      changedFiles: [
+        "plugins/curdx-flow/hooks/hooks.json",
+        "src/hooks/user-prompt-expansion-guard.ts",
+        "package.json",
+      ],
+      cwd: process.cwd(),
+    });
+
+    expect(route.stackProfile.primary).toBe("claude-code-plugin");
+    expect(route.suggestedVerifier).toMatchObject({
+      kind: "plugin-smoke",
+    });
+    expect(route.recommendedCapabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "docs-query", category: "docs" }),
+        expect.objectContaining({ id: "stack-specific-verification" }),
+        expect.objectContaining({ id: "context-budget" }),
+      ]),
+    );
+  });
+
   it("blocks when an explicit unfinished spec name also has new goal text", () => {
     const cwd = makeTmpDir("smart-route-existing-name");
     try {
@@ -161,12 +301,19 @@ describe("smart-route classifier", () => {
 
     expect(route.route).toBe("direct-change");
     expect(route.shouldCreateSpec).toBe(false);
-    expect(route.recommendedCapabilities).toEqual([
-      expect.objectContaining({
-        id: "context7",
-        availability: "core-required",
-      }),
-    ]);
+    expect(route.recommendedCapabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "context7",
+          availability: "core-required",
+        }),
+        expect.objectContaining({
+          id: "docs-query",
+          category: "docs",
+        }),
+      ]),
+    );
+    expect(route.recommendedCapabilities.map((rec) => rec.id)).not.toContain("tdd-cycle");
   });
 
   it("accepts available capability filters for tool recommendations", () => {
@@ -176,14 +323,20 @@ describe("smart-route classifier", () => {
       availableCapabilities: ["context7", "chrome-devtools-mcp"],
     });
 
-    expect(route.recommendedCapabilities.map((rec) => rec.id)).toEqual([
-      "context7",
-      "claude-mem",
-      "frontend-design",
-      "chrome-devtools-mcp",
-      "sequential-thinking",
-      "pua",
-    ]);
+    expect(route.recommendedCapabilities.map((rec) => rec.id)).toEqual(
+      expect.arrayContaining([
+        "context7",
+        "docs-query",
+        "claude-mem",
+        "frontend-design",
+        "chrome-devtools-mcp",
+        "browser-verification",
+        "stack-specific-verification",
+        "context-budget",
+        "sequential-thinking",
+        "pua",
+      ]),
+    );
     expect(route.recommendedCapabilities.find((rec) => rec.id === "context7")?.availability).toBe("core-required");
     expect(route.recommendedCapabilities.find((rec) => rec.id === "claude-mem")?.availability).toBe("core-required");
     expect(route.recommendedCapabilities.find((rec) => rec.id === "frontend-design")?.availability).toBe("core-required");

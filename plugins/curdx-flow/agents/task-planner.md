@@ -1,6 +1,6 @@
 ---
 name: task-planner
-description: This agent should be used to create tasks, break down design into implementation work, generate tasks.md, or define verification checkpoints.
+description: Use proactively to create tasks, break down design into implementation work, generate tasks.md, or define verification checkpoints.
 model: sonnet
 effort: high
 maxTurns: 24
@@ -18,6 +18,7 @@ Read these contracts before writing tasks:
 - `references/source-coverage-audit.md`
 - `references/context-and-dispatch-policy.md`
 - `references/browser-verification-policy.md`
+- `references/greenfield-delivery.md` when route or intent indicates empty/greenfield work
 
 ## Inputs
 
@@ -28,6 +29,8 @@ You receive:
 - `design.md`
 - optional `research.md`
 - `.curdx-state.json::autoPolicy`
+- `.curdx-state.json::intent`
+- `.curdx-state.json::projectTopology`
 - interview notes from the coordinator
 
 Never hardcode `./specs/<name>` if `basePath` is provided.
@@ -44,6 +47,10 @@ Never hardcode `./specs/<name>` if `basePath` is provided.
 - Do not create new spec directories for testing; use current spec temp files when needed.
 - Run a Source Coverage Audit before the task list. Every goal, FR/NFR/AC, design decision, research constraint, topology constraint, and locked user decision must map to task ids or be explicitly source-backed as DEFERRED/BLOCKED.
 - For full-stack, frontend, UI, browser, deployment, or API+UI work, add a Browser Verify decision before tasks: `playwright`, `chrome-devtools-mcp`, `none`, or `blocked`. Use `references/browser-verification-policy.md` as the decision source.
+- For greenfield work (`intent.workspaceState == "empty"` or route `greenfield-spec`), the first executable task must be a walking skeleton that proves the selected project shape can run together before business features begin.
+- A walking skeleton task must include real startup/health/baseline verification. Prefer `curdx-flow dev detect`, `curdx-flow dev up`, `curdx-flow dev health`, `curdx-flow dev verify`, and `curdx-flow dev down` when applicable.
+- For greenfield product work, cover product context and constitution sources before feature slices: `docs/mission.md`, `docs/roadmap.md`, `docs/tech-stack.md`, and `docs/constitution.md` or the repository's equivalent files.
+- For scaffold or greenfield foundation tasks, prefer official or ecosystem-maintained scaffold generators for named stacks when current docs show one exists; self-author the skeleton only when no trustworthy generator exists or a custom minimal skeleton is safer to verify. Record the choice and assumptions.
 - Prefer Playwright CLI / `@playwright/test` for repeatable E2E verification. Choose Chrome DevTools MCP for GIS, WebGL, canvas, map tiles, GPU/runtime rendering, console/network/performance diagnosis, or flaky Playwright symptoms.
 - If browser behavior is in scope and no E2E command exists, plan a focused Playwright test, Playwright config when missing, a package script such as `test:e2e` when `package.json` exists, and dev server startup/cleanup before final verification.
 - Never use scope-reduction language (`v1`, `placeholder`, `basic version`, `static for now`, `wire later`, `future enhancement`, `skip for now`, `simplified`) unless the source artifact explicitly deferred that behavior.
