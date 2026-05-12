@@ -125,6 +125,9 @@ try {
   if (doctorParsed.ok !== true) {
     throw new Error(`runtime doctor failed: ${doctor}`);
   }
+  if (!doctorParsed.brain?.path || !doctorParsed.executionBrief?.completionContract) {
+    throw new Error(`runtime doctor missing brain/executionBrief: ${doctor}`);
+  }
 
   const snapshot = runNode('runtime snapshot', [
     join(pluginRoot, 'bin', 'curdx-flow'),
@@ -196,6 +199,33 @@ try {
     if (rec?.phase !== phase) {
       throw new Error(`expected ${expected} phase ${phase}: ${capabilityRoute}`);
     }
+  }
+
+  const compileParent = mkdtempSync(join(tmpdir(), 'curdx-flow-compile-smoke-'));
+  try {
+    writeFileSync(join(compileParent, 'package.json'), JSON.stringify({ scripts: { verify: 'npm test' } }));
+    const compiledRoute = runNode('runtime route compile', [
+      join(pluginRoot, 'bin', 'curdx-flow'),
+      'route',
+      '--compile',
+      '--cwd',
+      compileParent,
+      '--goal',
+      'Update Claude Code plugin hooks and publish',
+      '--files',
+      'plugins/curdx-flow/hooks/hooks.json,src/hooks/lib/runtime-cli.ts',
+    ]);
+    const compiledParsed = JSON.parse(compiledRoute);
+    if (
+      compiledParsed.route !== 'full-spec' ||
+      compiledParsed.stack !== 'claude-code-plugin' ||
+      !String(compiledParsed.completionContract?.join(' ')).includes('fresh verification evidence') ||
+      !String(compiledParsed.brain?.path).includes('.curdx/brain.jsonl')
+    ) {
+      throw new Error(`unexpected compiled route output: ${compiledRoute}`);
+    }
+  } finally {
+    rmSync(compileParent, { recursive: true, force: true });
   }
 
   const splitParent = mkdtempSync(join(tmpdir(), 'curdx-flow-split-smoke-'));

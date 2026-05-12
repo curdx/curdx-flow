@@ -27,6 +27,15 @@ curdx-flow route --goal "$ARGUMENTS"
 
 Use the returned `route`, `intent`, `stackProfile`, `qualityGates`,
 `suggestedVerifier`, `contextBudget`, and `recommendedCapabilities` as facts.
+For non-trivial routes, also run:
+
+```bash
+curdx-flow route --compile --goal "$ARGUMENTS"
+```
+
+Use the execution brief to describe context budget, completion evidence,
+agent/reviewer plan, and `.curdx/brain.jsonl` warnings. Do not execute the
+brief.
 If the command is unavailable, infer conservatively from the prompt and state
 that routing is estimated.
 

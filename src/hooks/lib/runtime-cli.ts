@@ -26,6 +26,8 @@ import {
   selectQualityGates,
   selectSuggestedVerifier,
 } from "./stack-capabilities.js";
+import { buildExecutionBrief } from "./execution-brief.js";
+import { appendBrainEvent, summarizeProjectBrain } from "./project-brain.js";
 import {
   findSpec,
   getDefaultDir,
@@ -57,7 +59,7 @@ function usage(exitCode = 1): never {
     "usage: curdx-flow <command> [args]",
     "",
     "commands:",
-    "  route --goal <text> [--name <spec>] [--flags <args>] [--cwd <dir>]",
+    "  route --goal <text> [--name <spec>] [--flags <args>] [--cwd <dir>] [--compile]",
     "  snapshot [--spec <name-or-path>] [--goal <text>] [--cwd <dir>]",
     "  specs dirs [--cwd <dir>]",
     "  specs list [--cwd <dir>]",
@@ -109,18 +111,21 @@ function runBundled(scriptName: string, args: string[], cwd?: string): never {
 function route(argv: string[]): void {
   const estimatedRaw = readArg("--estimated-files", argv);
   const taskRaw = readArg("--task-count", argv);
-  printJson(
-    classifySmartRoute({
-      goal: readArg("--goal", argv) ?? "",
-      name: readArg("--name", argv),
-      flags: readArg("--flags", argv) ?? "",
-      cwd: readArg("--cwd", argv),
-      changedFiles: parseList(readArg("--files", argv)),
-      availableCapabilities: parseList(readArg("--available-capabilities", argv)),
-      estimatedFiles: estimatedRaw === undefined ? undefined : Number(estimatedRaw),
-      taskCount: taskRaw === undefined ? undefined : Number(taskRaw),
-    }),
-  );
+  const input = {
+    goal: readArg("--goal", argv) ?? "",
+    name: readArg("--name", argv),
+    flags: readArg("--flags", argv) ?? "",
+    cwd: readArg("--cwd", argv),
+    changedFiles: parseList(readArg("--files", argv)),
+    availableCapabilities: parseList(readArg("--available-capabilities", argv)),
+    estimatedFiles: estimatedRaw === undefined ? undefined : Number(estimatedRaw),
+    taskCount: taskRaw === undefined ? undefined : Number(taskRaw),
+  };
+  if (hasFlag(argv, "--compile")) {
+    printJson(buildExecutionBrief({ ...input, record: true }));
+    return;
+  }
+  printJson(classifySmartRoute(input));
 }
 
 function snapshot(argv: string[]): void {
@@ -711,6 +716,13 @@ async function verify(argv: string[]): Promise<void> {
   if (merge.status !== 0) {
     process.exit(merge.status ?? 1);
   }
+  appendBrainEvent(cwd, {
+    type: "verification-run",
+    phase,
+    command,
+    exitCode,
+    reason: exitCode === 0 ? "verification passed" : `command exited ${exitCode}`,
+  });
   process.exit(exitCode);
 }
 
@@ -740,6 +752,8 @@ function doctor(argv: string[]): void {
   const qualityGates = selectQualityGates({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
   const suggestedVerifier = selectSuggestedVerifier({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile, qualityGates });
   const contextBudget = selectContextBudget({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
+  const brain = summarizeProjectBrain(cwd);
+  const executionBrief = buildExecutionBrief({ cwd, goal, routeFacts });
   const expected = [
     join(scriptRoot(), "workflow-snapshot.mjs"),
     join(scriptRoot(), "smart-route.mjs"),
@@ -769,6 +783,8 @@ function doctor(argv: string[]): void {
     qualityGates,
     suggestedVerifier,
     contextBudget,
+    brain,
+    executionBrief,
     browserVerification: browserVerificationDoctor(cwd),
     active: snap.active,
     spec: snap.spec,

@@ -44,6 +44,7 @@ import { readStdinJson } from "./_shared/stdin.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
 import { getVerificationPhase, verifyPhaseBlock } from "./lib/verify-blocks.js";
 import { classifySmartRoute } from "./lib/smart-route.js";
+import { appendBrainEvent } from "./lib/project-brain.js";
 import type { CurdxState } from "./_shared/types.js";
 
 interface TaskCompletedStdin {
@@ -122,13 +123,26 @@ async function main(): Promise<void> {
   const result = await verifyPhaseBlock(state, phase, specDir);
   if (!result.ok) {
     let verifierHint = "";
+    let routeName = "unknown";
+    let stack = "unknown";
+    let verifier: string | undefined;
     try {
       const route = classifySmartRoute({ cwd });
-      const verifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback;
+      routeName = route.route;
+      stack = route.stackProfile.primary;
+      verifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? undefined;
       if (verifier) verifierHint = ` Suggested verifier: ${verifier}.`;
     } catch {
       verifierHint = "";
     }
+    appendBrainEvent(cwd, {
+      type: "verification-blocked",
+      route: routeName,
+      stack,
+      phase,
+      verifier,
+      reason: result.reason ?? "verification failed",
+    });
     emitBlock(`${result.reason ?? "verification failed"}${verifierHint}`);
   }
   process.exit(0);

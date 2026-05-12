@@ -14,6 +14,36 @@ describe("runtime-cli lib", () => {
     });
   });
 
+  it("compiles route output into an execution brief and records project brain", () => {
+    const cwd = makeTmpDir("runtime-route-compile");
+    try {
+      writeFileSync(path.join(cwd, "package.json"), JSON.stringify({ scripts: { verify: "npm test" } }));
+      const result = runLib("runtime-cli", [
+        "route",
+        "--compile",
+        "--cwd",
+        cwd,
+        "--goal",
+        "Update Claude Code plugin hooks and publish",
+      ]);
+      expect(result.exitCode).toBe(0);
+      expect(result.json).toMatchObject({
+        version: 1,
+        route: "full-spec",
+        stack: "claude-code-plugin",
+        execution: {
+          primarySkill: expect.any(String),
+        },
+        brain: {
+          path: expect.stringContaining(".curdx/brain.jsonl"),
+        },
+      });
+      expect(readFileSync(path.join(cwd, ".curdx", "brain.jsonl"), "utf8")).toContain("route-compiled");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("returns workflow snapshot through the runtime command surface", () => {
     const cwd = makeTmpDir("runtime-snapshot");
     try {
@@ -167,6 +197,14 @@ describe("runtime-cli lib", () => {
         suggestedVerifier?: { command?: string | null; fallback?: string | null };
         hookFreshness?: { fresh?: boolean };
         recommendations?: Array<{ id?: string; command?: string; action?: string }>;
+        brain?: {
+          path?: string;
+          totalEvents?: number;
+        };
+        executionBrief?: {
+          route?: string;
+          completionContract?: string[];
+        };
       };
       expect(json.ok).toBe(true);
       expect(json.runtime?.ready).toBe(true);
@@ -195,6 +233,8 @@ describe("runtime-cli lib", () => {
       expect(json.stackProfile?.primary).toEqual(expect.any(String));
       expect(json.qualityGates).toEqual(expect.any(Array));
       expect(json.suggestedVerifier).toBeDefined();
+      expect(json.brain?.path).toContain(".curdx/brain.jsonl");
+      expect(json.executionBrief?.completionContract).toEqual(expect.any(Array));
       expect(json.browserVerification?.project?.devServerScripts).toContain("dev");
       expect(json.browserVerification?.project?.e2eScripts).toContain("test:e2e");
       expect(json.browserVerification?.project?.e2eConfigFiles).toContain("playwright.config.ts");

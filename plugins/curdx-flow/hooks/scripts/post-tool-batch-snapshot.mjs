@@ -2759,6 +2759,284 @@ if (isDirectRun6()) {
   main6();
 }
 
+// src/hooks/lib/project-brain.ts
+import { appendFileSync, existsSync as existsSync6, mkdirSync, readFileSync as readFileSync6 } from "node:fs";
+import { join as join5, resolve as resolve3 } from "node:path";
+var MAX_REASON = 240;
+var MAX_COMMAND = 180;
+function normalizeCwd(cwd) {
+  return resolve3(cwd ?? process.cwd());
+}
+function brainPath(cwd) {
+  return join5(normalizeCwd(cwd), ".curdx", "brain.jsonl");
+}
+function truncate(value, limit) {
+  if (value === void 0) return void 0;
+  const compact = value.trim().replace(/\s+/g, " ");
+  if (compact.length <= limit) return compact;
+  return `${compact.slice(0, Math.max(0, limit - 3))}...`;
+}
+function normalizeEvent(event) {
+  const out = {
+    version: 1,
+    type: event.type,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (event.route) out.route = event.route;
+  if (event.stack) out.stack = event.stack;
+  if (event.phase) out.phase = event.phase;
+  if (event.command) out.command = truncate(event.command, MAX_COMMAND);
+  if (typeof event.exitCode === "number" && Number.isFinite(event.exitCode)) {
+    out.exitCode = event.exitCode;
+  }
+  if (event.verifier) out.verifier = truncate(event.verifier, MAX_COMMAND);
+  if (event.reason) out.reason = truncate(event.reason, MAX_REASON);
+  if (typeof event.files === "number" && Number.isFinite(event.files)) {
+    out.files = Math.max(0, Math.floor(event.files));
+  }
+  return out;
+}
+function appendBrainEvent(cwd, event) {
+  const path2 = brainPath(cwd);
+  if (process.env.CURDX_FLOW_BRAIN === "off") return { ok: true, path: path2 };
+  try {
+    mkdirSync(join5(normalizeCwd(cwd), ".curdx"), { recursive: true });
+    appendFileSync(path2, JSON.stringify(normalizeEvent(event)) + "\n", "utf8");
+    return { ok: true, path: path2 };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, path: path2, error: message };
+  }
+}
+function parseBrainLine(line) {
+  try {
+    const parsed = JSON.parse(line);
+    if (parsed.version !== 1) return null;
+    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked") {
+      return null;
+    }
+    if (typeof parsed.timestamp !== "string") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+function readBrainEvents(cwd, limit = 100) {
+  const path2 = brainPath(cwd);
+  if (!existsSync6(path2)) return [];
+  try {
+    const lines = readFileSync6(path2, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const parsed = lines.slice(Math.max(0, lines.length - Math.max(1, limit))).map(parseBrainLine).filter((event) => event !== null);
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+function uniqueRecent(values, limit) {
+  const out = [];
+  for (const value of values.reverse()) {
+    if (!value || out.includes(value)) continue;
+    out.push(value);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+function summarizeProjectBrain(cwd) {
+  const path2 = brainPath(cwd);
+  const events = readBrainEvents(cwd, 200);
+  const failures = events.filter((event) => event.type === "verification-blocked" || event.exitCode !== void 0 && event.exitCode !== 0).slice(-5).reverse().map((event) => ({
+    timestamp: event.timestamp,
+    type: event.type,
+    phase: event.phase,
+    command: event.command,
+    reason: event.reason
+  }));
+  const verifierHints = uniqueRecent(
+    events.filter((event) => event.type === "verification-run" && event.exitCode === 0).map((event) => event.command ?? event.verifier),
+    5
+  );
+  return {
+    path: path2,
+    exists: existsSync6(path2),
+    totalEvents: events.length,
+    lastUpdated: events.length > 0 ? events[events.length - 1]?.timestamp ?? null : null,
+    stackHints: uniqueRecent(events.map((event) => event.stack), 5),
+    verifierHints,
+    recentFailures: failures
+  };
+}
+
+// src/hooks/lib/execution-brief.ts
+function preferredSkill(route) {
+  switch (route.route) {
+    case "direct-change":
+      return "direct edit in current turn";
+    case "lite-spec":
+      return "/curdx-flow:start with lightweight spec";
+    case "full-spec":
+      return "/curdx-flow:start full spec workflow";
+    case "epic-split":
+      return "/curdx-flow:triage";
+    case "scaffold":
+      return "/curdx-flow:start scaffold path";
+    case "product-inception":
+      return "/curdx-flow:start product inception";
+    case "greenfield-spec":
+      return "/curdx-flow:start greenfield spec";
+    case "prototype":
+      return "/curdx-flow:start prototype spec";
+    case "import-spec":
+      return "/curdx-flow:start import spec";
+    case "resume-current":
+      return "/curdx-flow:implement or next missing phase";
+    case "blocked-ask-user":
+      return "ask one focused question";
+  }
+}
+function agentPlan(route) {
+  if (route.route === "direct-change" || route.route === "blocked-ask-user") return [];
+  if (route.policy.reviewCadence === "strict" || route.policy.reviewCadence === "periodic") {
+    return ["spec-executor", "spec-reviewer", "code-quality-reviewer"];
+  }
+  if (route.shouldUseSubagent) return ["spec-executor", "spec-reviewer"];
+  return ["self-review before completion"];
+}
+function isolationPlan(route) {
+  if (route.policy.risk === "critical" || route.route === "full-spec" || route.route === "epic-split") {
+    return "prefer worktree isolation for executor tasks; do not touch release metadata unless task scope names it";
+  }
+  if (route.route === "direct-change") return "current workspace, minimal touched files";
+  return "current workspace with bounded file ownership";
+}
+function taskShape(route) {
+  if (!route.shouldCreateTasks) return "single bounded change; no tasks.md";
+  const range = route.policy.taskTargetRange;
+  return `${range.min}-${Math.min(range.max, route.taskCountLimit)} value-slice tasks, each with verifier`;
+}
+function readFirst(route, input) {
+  const out = [];
+  const files = input.changedFiles?.slice(0, Math.max(1, route.contextBudget.maxReferenceFiles)) ?? [];
+  out.push(...files);
+  if (route.stackProfile.primary === "claude-code-plugin") {
+    out.push("https://code.claude.com/docs/llms.txt");
+    out.push("plugin manifest, hooks.json, touched skill/agent files");
+  }
+  if (route.qualityGates.some((gate) => gate.phase === "before-coding" && gate.required)) {
+    out.push("official/current docs for the detected stack");
+  }
+  if (route.shouldCreateTasks) {
+    out.push("nearest spec artifacts and tasks.md before editing");
+  }
+  if (route.contextBudget.level === "tiny") {
+    return out.slice(0, Math.max(1, route.contextBudget.maxReferenceFiles));
+  }
+  return [...new Set(out)].slice(0, route.contextBudget.maxReferenceFiles);
+}
+function completionContract(route, brain) {
+  const verifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? void 0;
+  const contract = [
+    "Do not claim completion without fresh verification evidence from this turn."
+  ];
+  if (verifier) {
+    const suffix = /[.!?]$/.test(verifier) ? "" : ".";
+    contract.push(`Run verifier: ${verifier}${suffix}`);
+  }
+  if (route.shouldCreateSpec) {
+    contract.push("Record spec evidence with curdx-flow verify run when a spec phase is completed.");
+  }
+  if (route.policy.reviewCadence === "strict" || route.policy.reviewCadence === "periodic") {
+    contract.push("Run spec-compliance review before code-quality review; fix blocking findings before proceeding.");
+  }
+  if (brain.recentFailures.length > 0) {
+    contract.push("Check .curdx/brain.jsonl recent failures before reusing the same fix path.");
+  }
+  return contract;
+}
+function escalationRules(route) {
+  const rules = [
+    "Ask the user only when missing facts change implementation or access is blocked.",
+    "If verifier fails twice for the same phase, switch to systematic debugging before more edits."
+  ];
+  if (route.route === "blocked-ask-user" && route.blockedReason) {
+    rules.unshift(route.blockedReason);
+  }
+  if (route.policy.risk === "critical") {
+    rules.push("For release/security/plugin metadata changes, run official-docs check and plugin validation before tag/push.");
+  }
+  if (route.topology?.missingRoots && route.topology.missingRoots.length > 0) {
+    rules.push(route.topology.accessFix ?? "Add required code roots before editing.");
+  }
+  return rules;
+}
+function buildExecutionBrief(input) {
+  const route = input.routeFacts ?? classifySmartRoute(input);
+  const cwd = input.cwd;
+  const brain = summarizeProjectBrain(cwd);
+  const verifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? void 0;
+  const brief = {
+    version: 1,
+    generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    goal: input.goal ?? "",
+    route: route.route,
+    reason: route.reason,
+    stack: route.stackProfile.primary,
+    risk: route.policy.risk,
+    context: {
+      budget: route.contextBudget.level,
+      maxReferenceFiles: route.contextBudget.maxReferenceFiles,
+      readFirst: readFirst(route, input),
+      avoid: ["node_modules", "dist/build outputs unless verifying generated artifacts", "old project docs as design authority"]
+    },
+    execution: {
+      mode: route.policy.executionMode,
+      primarySkill: preferredSkill(route),
+      agents: agentPlan(route),
+      isolation: isolationPlan(route),
+      taskShape: taskShape(route)
+    },
+    qualityGates: route.qualityGates.map((gate) => ({
+      id: gate.id,
+      phase: gate.phase,
+      required: gate.required,
+      command: gate.command
+    })),
+    completionContract: completionContract(route, brain),
+    escalationRules: escalationRules(route),
+    brain: {
+      path: brain.path,
+      totalEvents: brain.totalEvents,
+      lastUpdated: brain.lastUpdated,
+      stackHints: brain.stackHints,
+      verifierHints: brain.verifierHints,
+      recentFailures: brain.recentFailures
+    }
+  };
+  if (input.record === true) {
+    appendBrainEvent(cwd, {
+      type: "route-compiled",
+      route: route.route,
+      stack: route.stackProfile.primary,
+      verifier,
+      reason: route.reason,
+      files: input.changedFiles?.length
+    });
+  }
+  return brief;
+}
+function compactExecutionBrief(brief) {
+  const verifier = brief.qualityGates.find((gate) => gate.required && gate.command !== null)?.command ?? "repo verifier";
+  const agents = brief.execution.agents.length > 0 ? brief.execution.agents.join("+") : "none";
+  return [
+    `brief(route=${brief.route}`,
+    `stack=${brief.stack}`,
+    `risk=${brief.risk}`,
+    `read<=${brief.context.maxReferenceFiles}`,
+    `skill=${brief.execution.primarySkill}`,
+    `agents=${agents}`,
+    `verifier=${verifier})`
+  ].join(" ");
+}
+
 // src/hooks/_shared/stdin.ts
 import process2 from "node:process";
 async function readStdinJson() {
@@ -2795,13 +3073,21 @@ async function main7() {
     const snapshot = buildWorkflowSnapshot({ cwd: input.cwd });
     if (!snapshot.active || snapshot.gates.length === 0) return;
     const route = classifySmartRoute({ cwd: input.cwd });
+    const brief = buildExecutionBrief({ cwd: input.cwd, routeFacts: route });
     const missingVerifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? "repo verifier";
     const qualityGateText = route.qualityGates.filter((gate) => gate.required).slice(0, 3).map((gate) => gate.command ? `${gate.id} (${gate.command})` : gate.id).join(", ");
+    appendBrainEvent(input.cwd, {
+      type: "edit-batch",
+      route: route.route,
+      stack: route.stackProfile.primary,
+      verifier: missingVerifier,
+      files: calls.length
+    });
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: "PostToolBatch",
-          additionalContext: `curdx-flow snapshot gates after batch: ${snapshot.gates.join(", ")}. Stack: ${route.stackProfile.primary}. Quality gates: ${qualityGateText || "none"}. Suggested verifier: ${missingVerifier}. Next action: ${snapshot.nextAction}`
+          additionalContext: `curdx-flow snapshot gates after batch: ${snapshot.gates.join(", ")}. Stack: ${route.stackProfile.primary}. Quality gates: ${qualityGateText || "none"}. Suggested verifier: ${missingVerifier}. ${compactExecutionBrief(brief)}. Next action: ${snapshot.nextAction}`
         }
       })
     );

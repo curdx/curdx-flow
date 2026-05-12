@@ -4,6 +4,7 @@
 
 import { buildWorkflowSnapshot } from "./lib/workflow-snapshot.js";
 import { classifySmartRoute } from "./lib/smart-route.js";
+import { buildExecutionBrief, compactExecutionBrief } from "./lib/execution-brief.js";
 import { readStdinJson } from "./_shared/stdin.js";
 
 const KNOWN = new Set([
@@ -68,6 +69,11 @@ async function main(): Promise<void> {
       cwd: input.cwd,
       goal: input.command_args,
     });
+    const brief = buildExecutionBrief({
+      cwd: input.cwd,
+      goal: input.command_args,
+      routeFacts: route,
+    });
     const topGates = route.qualityGates
       .filter((gate) => gate.required)
       .slice(0, 3)
@@ -85,6 +91,7 @@ async function main(): Promise<void> {
       `verifier=${route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? "repo-default"}`,
       `contextBudget=${route.contextBudget.level}`,
       `qualityGates=${topGates || "none"}`,
+      compactExecutionBrief(brief),
       `next=${snapshot.nextAction}`,
       `gates=${snapshot.gates.join(",") || "none"}`,
       promptOptimizeHint.trim(),

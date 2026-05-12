@@ -66,6 +66,7 @@ The compatibility `autoPolicy` is stored in `.curdx-state.json`; behavior routin
 
 - Plugin schema: `claude plugin validate ./plugins/curdx-flow`
 - Runtime health: `curdx-flow doctor`
+- Execution brief: `curdx-flow route --compile --goal "<goal>"`
 - Local dev evidence: `curdx-flow dev detect`, `curdx-flow dev up`, `curdx-flow dev health`, `curdx-flow dev verify`, `curdx-flow dev down`
 - Smoke test: `npm run test:claudecc`
 

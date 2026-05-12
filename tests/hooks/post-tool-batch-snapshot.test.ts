@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,6 +56,9 @@ describe("post-tool-batch-snapshot", () => {
       expect(result.json?.hookSpecificOutput?.hookEventName).toBe("PostToolBatch");
       expect(result.json?.hookSpecificOutput?.additionalContext).toContain("Stack: go");
       expect(result.json?.hookSpecificOutput?.additionalContext).toContain("Suggested verifier");
+      expect(result.json?.hookSpecificOutput?.additionalContext).toContain("brief(route=");
+      expect(existsSync(path.join(cwd, ".curdx", "brain.jsonl"))).toBe(true);
+      expect(readFileSync(path.join(cwd, ".curdx", "brain.jsonl"), "utf8")).toContain("edit-batch");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

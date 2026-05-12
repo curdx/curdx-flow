@@ -2,6 +2,24 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.26 — 2026-05-12
+
+### Added
+
+- **Execution brief compiler.** `curdx-flow route --compile` now turns smart-route facts into a compact execution contract with context budget, read-first hints, primary skill, agent/reviewer plan, isolation boundary, quality gates, completion evidence, and escalation rules.
+- **Project-local brain.** Added `.curdx/brain.jsonl` as a gitignored lightweight event stream for compiled routes, edit batches, verification runs, and verification blocks. The data is advisory only and stores compact stack/verifier/failure facts, not source content or secrets.
+- **Execution brief reference.** Added `references/execution-brief.md` and wired `/curdx-flow:start` and `/curdx-flow:prompt-optimize` to use the brief only when compact route output is insufficient.
+
+### Changed
+
+- **Hooks now carry the last mile contract.** UserPromptExpansion and PostToolBatch include a compact execution brief summary; PostToolBatch also records edit-batch hints in `.curdx/brain.jsonl`.
+- **Verification evidence becomes learnable.** `curdx-flow verify run` records verifier outcomes in project brain, and TaskCompleted records blocked verification reasons before returning the existing block decision.
+- **Doctor is more diagnostic.** `curdx-flow doctor` includes project brain summary and the compiled execution brief alongside stack profile, quality gates, suggested verifier, hook freshness, and docs-sensitive warnings.
+
+### Tests
+
+- Added coverage for project brain persistence, execution brief compilation, `route --compile`, doctor brief/brain output, hook brief injection, PostToolBatch brain events, and TaskCompleted verification-blocked memory.
+
 ## 7.1.25 — 2026-05-12
 
 ### Added

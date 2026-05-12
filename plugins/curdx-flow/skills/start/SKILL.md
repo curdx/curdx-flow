@@ -26,6 +26,14 @@ Users do not need to know `--add-dir`. If routing returns a missing code root, s
      --goal "$goal" \
      --flags "$ARGUMENTS"
    ```
+   For routes that are not `direct-change` or `blocked-ask-user`, compile the
+   execution contract before planning:
+   ```bash
+   curdx-flow route --compile \
+     --name "$name" \
+     --goal "$goal" \
+     --flags "$ARGUMENTS"
+   ```
 3. Treat the returned `route` and `intent` as the source of truth. Do not invent a different workflow unless the router says `blocked-ask-user` and the user's answer changes the facts.
 4. Always read these adaptive facts before acting:
    - `topology.workspaceState`: `empty`, `scaffolded`, `existing`, or `split-repo`
@@ -33,6 +41,7 @@ Users do not need to know `--add-dir`. If routing returns a missing code root, s
    - `intent.clarity`, `intent.stackSpecified`, `intent.artifactProvided`, `intent.deliveryExpectation`, and `intent.missingFacts`
 5. If the router returns `recommendedCapabilities`, treat them as phase-specific hints, not mandatory steps. `availability: core-required` means the curdx-flow bundle expects that companion to be installed by default (`context7`, `claude-mem`, `frontend-design`, `chrome-devtools-mcp`, `sequential-thinking`, `pua`). Workflow/policy hints such as `docs-query`, `tdd-cycle`, `security-review`, `stack-specific-verification`, and `context-budget` need no installation.
 6. For stack profile, quality gates, suggested verifier, and context-budget interpretation, use `${CLAUDE_PLUGIN_ROOT}/references/intelligent-routing.md` only when the compact router output is insufficient.
+7. For execution brief fields, completion contract, and `.curdx/brain.jsonl` interpretation, use `${CLAUDE_PLUGIN_ROOT}/references/execution-brief.md` only when the compact brief output is insufficient.
 
 ## Route Actions
 

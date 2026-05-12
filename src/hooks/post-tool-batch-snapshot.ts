@@ -3,6 +3,8 @@
 
 import { buildWorkflowSnapshot } from "./lib/workflow-snapshot.js";
 import { classifySmartRoute } from "./lib/smart-route.js";
+import { buildExecutionBrief, compactExecutionBrief } from "./lib/execution-brief.js";
+import { appendBrainEvent } from "./lib/project-brain.js";
 import { readStdinJson } from "./_shared/stdin.js";
 
 interface ToolCall {
@@ -32,6 +34,7 @@ async function main(): Promise<void> {
     const snapshot = buildWorkflowSnapshot({ cwd: input.cwd });
     if (!snapshot.active || snapshot.gates.length === 0) return;
     const route = classifySmartRoute({ cwd: input.cwd });
+    const brief = buildExecutionBrief({ cwd: input.cwd, routeFacts: route });
     const missingVerifier =
       route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? "repo verifier";
     const qualityGateText = route.qualityGates
@@ -39,6 +42,13 @@ async function main(): Promise<void> {
       .slice(0, 3)
       .map((gate) => gate.command ? `${gate.id} (${gate.command})` : gate.id)
       .join(", ");
+    appendBrainEvent(input.cwd, {
+      type: "edit-batch",
+      route: route.route,
+      stack: route.stackProfile.primary,
+      verifier: missingVerifier,
+      files: calls.length,
+    });
 
     process.stdout.write(
       JSON.stringify({
@@ -49,6 +59,7 @@ async function main(): Promise<void> {
             `Stack: ${route.stackProfile.primary}. ` +
             `Quality gates: ${qualityGateText || "none"}. ` +
             `Suggested verifier: ${missingVerifier}. ` +
+            `${compactExecutionBrief(brief)}. ` +
             `Next action: ${snapshot.nextAction}`,
         },
       }),

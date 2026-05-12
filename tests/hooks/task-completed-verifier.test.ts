@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -161,6 +161,8 @@ describe("task-completed-verifier (TaskCompleted hook)", () => {
     expect((r.json as any).decision).toBe("block");
     expect((r.json as any).reason).toContain("missing");
     expect((r.json as any).reason).toContain("Suggested verifier");
+    expect(existsSync(path.join(spec.cwd, ".curdx", "brain.jsonl"))).toBe(true);
+    expect(readFileSync(path.join(spec.cwd, ".curdx", "brain.jsonl"), "utf8")).toContain("verification-blocked");
   });
 
   it("(c): stale block (srcMtime > Date.parse(timestamp)) → exit 2, reason starts with 'Stale evidence'", () => {

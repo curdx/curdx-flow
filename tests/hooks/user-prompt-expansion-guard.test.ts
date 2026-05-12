@@ -51,6 +51,7 @@ describe("user-prompt-expansion-guard", () => {
       expect(result.json?.hookSpecificOutput?.hookEventName).toBe("UserPromptExpansion");
       expect(result.json?.hookSpecificOutput?.additionalContext).toContain("route=");
       expect(result.json?.hookSpecificOutput?.additionalContext).toContain("stack=go");
+      expect(result.json?.hookSpecificOutput?.additionalContext).toContain("brief(route=");
       expect(result.json?.hookSpecificOutput?.additionalContext).toContain("advisory-only=true");
     } finally {
       rmSync(cwd, { recursive: true, force: true });

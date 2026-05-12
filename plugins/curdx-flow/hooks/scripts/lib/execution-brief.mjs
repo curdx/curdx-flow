@@ -5,260 +5,14 @@ const require = __ccr(import.meta.url);
 const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
-// src/hooks/task-completed-verifier.ts
-import { existsSync as existsSync6, readFileSync as readFileSync6 } from "node:fs";
-import { join as join6 } from "node:path";
-import process3 from "node:process";
-
-// src/hooks/_shared/stdin.ts
-import process2 from "node:process";
-async function readStdinJson() {
-  const chunks = [];
-  for await (const chunk of process2.stdin) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  const raw = Buffer.concat(chunks).toString("utf-8").trim();
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    process2.stderr.write(`[hook] invalid stdin JSON: ${msg}
-`);
-    throw e;
-  }
-}
-
-// src/hooks/_shared/path-resolver.ts
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { basename, isAbsolute, join, posix } from "node:path";
-var DEFAULT_SPECS_DIR = "./specs";
-var SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
-function resolveCwd(opts) {
-  return opts?.cwd ?? process.env["CURDX_CWD"] ?? process.cwd();
-}
-function warn(msg) {
-  process.stderr.write(`[curdx-warn] ${msg}
-`);
-}
-function isDir(p) {
-  try {
-    return statSync(p).isDirectory();
-  } catch {
-    return false;
-  }
-}
-function normalizePath(input) {
-  if (!input) return ".";
-  let p = input.replace(/\/+$/, "");
-  if (p === "") p = ".";
-  return p;
-}
-function findRepoRoot(start) {
-  const origin = start ?? process.cwd();
-  let cur = origin;
-  for (let i = 0; i < 64; i++) {
-    if (isDir(join(cur, ".git"))) return cur;
-    if (existsSync(join(cur, SETTINGS_REL_PATH))) return cur;
-    const parent = join(cur, "..");
-    if (parent === cur) break;
-    cur = parent;
-  }
-  return origin;
-}
-function parseSpecsDirsFromSettings(settingsPath) {
-  let raw;
-  try {
-    raw = readFileSync(settingsPath, "utf8");
-  } catch {
-    return [];
-  }
-  const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---\s*$/m);
-  const block = fmMatch?.[1] ?? raw;
-  const line = block.split(/\r?\n/).find((l) => /^\s*specs_dirs\s*:/.test(l));
-  if (!line) return [];
-  const value = line.replace(/^\s*specs_dirs\s*:\s*/, "");
-  return value.replace(/[\[\]"']/g, "").split(",").map((s) => s.trim()).filter((s) => s.length > 0);
-}
-function getSpecsDirs(opts) {
-  const cwd = resolveCwd(opts);
-  if (!isDir(cwd)) {
-    warn(`CURDX_CWD does not exist: ${cwd}`);
-    return [DEFAULT_SPECS_DIR];
-  }
-  const settingsPath = join(cwd, SETTINGS_REL_PATH);
-  const raw = existsSync(settingsPath) ? parseSpecsDirsFromSettings(settingsPath) : [];
-  if (raw.length === 0) return [DEFAULT_SPECS_DIR];
-  const validated = [];
-  for (const entry of raw) {
-    const dir = normalizePath(entry);
-    const absoluteOutsideCwd = isAbsolute(dir) && !dir.startsWith(cwd);
-    if (absoluteOutsideCwd) {
-      if (!isDir(dir)) {
-        warn(
-          `Skipping invalid absolute path in specs_dirs: ${dir} (does not exist)`
-        );
-        continue;
-      }
-    } else {
-      const resolved = isAbsolute(dir) ? dir : join(cwd, dir);
-      if (!isDir(resolved)) {
-        warn(
-          `Skipping invalid path in specs_dirs: ${dir} (directory not found at ${resolved})`
-        );
-        continue;
-      }
-    }
-    validated.push(dir);
-  }
-  if (validated.length === 0) {
-    warn(`No valid paths in specs_dirs, using default: ${DEFAULT_SPECS_DIR}`);
-    return [DEFAULT_SPECS_DIR];
-  }
-  return validated;
-}
-function getDefaultDir(opts) {
-  const dirs = getSpecsDirs(opts);
-  return normalizePath(dirs[0] ?? DEFAULT_SPECS_DIR);
-}
-function findSpec(name, opts) {
-  if (!name) {
-    return { ok: false, reason: "not-found", name: "" };
-  }
-  const cwd = resolveCwd(opts);
-  if (!isDir(cwd)) {
-    return { ok: false, reason: "not-found", name };
-  }
-  let cleaned = normalizePath(name);
-  if (cleaned.startsWith("./")) cleaned = cleaned.slice(2);
-  const matches = [];
-  for (const entry of getSpecsDirs(opts)) {
-    const dir = normalizePath(entry);
-    const candidateFs = isAbsolute(dir) ? join(dir, cleaned) : join(cwd, dir, cleaned);
-    if (isDir(candidateFs)) {
-      matches.push(posix.join(dir, cleaned));
-    }
-  }
-  if (matches.length === 0) {
-    return { ok: false, reason: "not-found", name: cleaned };
-  }
-  if (matches.length === 1) {
-    return { ok: true, path: matches[0] };
-  }
-  return { ok: false, reason: "ambiguous", name: cleaned, matches };
-}
-function resolveCurrent(opts) {
-  const cwd = resolveCwd(opts);
-  if (!isDir(cwd)) return null;
-  const defaultDir = getDefaultDir(opts);
-  const markerFs = [
-    join(cwd, defaultDir, ".current-spec"),
-    join(cwd, ".current-spec")
-  ].find((candidate) => existsSync(candidate));
-  if (!markerFs) return null;
-  let content;
-  try {
-    content = readFileSync(markerFs, "utf8");
-  } catch {
-    return null;
-  }
-  content = content.replace(/\s+/g, "");
-  if (!content) {
-    warn(".current-spec file is empty");
-    return null;
-  }
-  const normalized = normalizePath(content);
-  if (normalized.startsWith("./") || normalized.startsWith("../") || normalized.includes("/") || isAbsolute(normalized)) {
-    return normalized;
-  }
-  return posix.join(defaultDir, normalized);
-}
-
-// src/hooks/lib/verify-blocks.ts
-import { promises as fs } from "node:fs";
-import { basename as basename2, join as join2 } from "node:path";
-var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
-  ".git",
-  "node_modules",
-  "dist",
-  ".curdx",
-  ".claude"
-]);
-var WALK_MAX_DEPTH = 6;
-var VERIFICATION_PHASES = [
-  "research",
-  "requirements",
-  "design",
-  "tasks",
-  "execution"
-];
-function getVerificationPhase(state) {
-  const raw = typeof state.phase === "string" ? state.phase : "";
-  if (!VERIFICATION_PHASES.includes(raw)) {
-    return null;
-  }
-  return raw;
-}
-async function verifyPhaseBlock(state, phase, specDir) {
-  const block = state.verificationBlocks?.[phase];
-  if (block === void 0) {
-    return { ok: false, reason: "missing", command: "" };
-  }
-  if (block.exitCode !== 0) {
-    return {
-      ok: false,
-      reason: block.failedReason ?? "verification failed",
-      command: block.command
-    };
-  }
-  void await walkSrcTree(specDir);
-  if (block.srcMtime > Date.parse(block.timestamp)) {
-    const srcIso = new Date(block.srcMtime).toISOString();
-    const specName = basename2(specDir);
-    return {
-      ok: false,
-      reason: `Stale evidence for phase '${phase}': src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}. Spec: ${specName}.`,
-      command: block.command
-    };
-  }
-  return { ok: true };
-}
-async function walkSrcTree(dir) {
-  let maxMtime = 0;
-  async function walk(current, depth) {
-    let entries;
-    try {
-      entries = await fs.readdir(current, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const abs = join2(current, entry.name);
-      if (entry.isDirectory()) {
-        if (WALK_SKIP_DIRS.has(entry.name)) continue;
-        if (depth >= WALK_MAX_DEPTH) continue;
-        await walk(abs, depth + 1);
-        continue;
-      }
-      try {
-        const st = await fs.stat(abs);
-        if (st.mtimeMs > maxMtime) maxMtime = st.mtimeMs;
-      } catch {
-      }
-    }
-  }
-  await walk(dir, 0);
-  return maxMtime;
-}
-
 // src/hooks/lib/smart-route.ts
 import { existsSync as existsSync4, readFileSync as readFileSync4 } from "node:fs";
-import { basename as basename6, join as join4 } from "node:path";
+import { basename as basename5, join as join3 } from "node:path";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
 // src/hooks/lib/auto-policy.ts
 import { fileURLToPath } from "node:url";
-import { basename as basename3 } from "node:path";
+import { basename } from "node:path";
 var LOW_RISK_RE = /\b(readme|docs?|documentation|typo|copy|wording|comment|comments|changelog|license|format text|rename label|css copy|style text)\b/i;
 var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|delete|remove|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
 var CRITICAL_RISK_RE = /\b(payment|billing|security|secret|secrets|password|token|oauth|authorization|permission|migration|data loss|release|publish|tag|hooks?\.json|plugin\.json|claude-plugin)\b/i;
@@ -499,7 +253,7 @@ function main() {
 function isDirectRun() {
   try {
     const entry = fileURLToPath(import.meta.url);
-    return process.argv[1] === entry && basename3(entry).startsWith("auto-policy.");
+    return process.argv[1] === entry && basename(entry).startsWith("auto-policy.");
   } catch {
     return false;
   }
@@ -516,8 +270,155 @@ import {
   statSync as statSync2
 } from "node:fs";
 import { homedir } from "node:os";
-import path, { basename as basename4, isAbsolute as isAbsolute2, relative, resolve } from "node:path";
+import path, { basename as basename3, isAbsolute as isAbsolute2, relative, resolve } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
+
+// src/hooks/_shared/path-resolver.ts
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { basename as basename2, isAbsolute, join, posix } from "node:path";
+var DEFAULT_SPECS_DIR = "./specs";
+var SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
+function resolveCwd(opts) {
+  return opts?.cwd ?? process.env["CURDX_CWD"] ?? process.cwd();
+}
+function warn(msg) {
+  process.stderr.write(`[curdx-warn] ${msg}
+`);
+}
+function isDir(p) {
+  try {
+    return statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
+function normalizePath(input) {
+  if (!input) return ".";
+  let p = input.replace(/\/+$/, "");
+  if (p === "") p = ".";
+  return p;
+}
+function findRepoRoot(start) {
+  const origin = start ?? process.cwd();
+  let cur = origin;
+  for (let i = 0; i < 64; i++) {
+    if (isDir(join(cur, ".git"))) return cur;
+    if (existsSync(join(cur, SETTINGS_REL_PATH))) return cur;
+    const parent = join(cur, "..");
+    if (parent === cur) break;
+    cur = parent;
+  }
+  return origin;
+}
+function parseSpecsDirsFromSettings(settingsPath) {
+  let raw;
+  try {
+    raw = readFileSync(settingsPath, "utf8");
+  } catch {
+    return [];
+  }
+  const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---\s*$/m);
+  const block = fmMatch?.[1] ?? raw;
+  const line = block.split(/\r?\n/).find((l) => /^\s*specs_dirs\s*:/.test(l));
+  if (!line) return [];
+  const value = line.replace(/^\s*specs_dirs\s*:\s*/, "");
+  return value.replace(/[\[\]"']/g, "").split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+}
+function getSpecsDirs(opts) {
+  const cwd = resolveCwd(opts);
+  if (!isDir(cwd)) {
+    warn(`CURDX_CWD does not exist: ${cwd}`);
+    return [DEFAULT_SPECS_DIR];
+  }
+  const settingsPath = join(cwd, SETTINGS_REL_PATH);
+  const raw = existsSync(settingsPath) ? parseSpecsDirsFromSettings(settingsPath) : [];
+  if (raw.length === 0) return [DEFAULT_SPECS_DIR];
+  const validated = [];
+  for (const entry of raw) {
+    const dir = normalizePath(entry);
+    const absoluteOutsideCwd = isAbsolute(dir) && !dir.startsWith(cwd);
+    if (absoluteOutsideCwd) {
+      if (!isDir(dir)) {
+        warn(
+          `Skipping invalid absolute path in specs_dirs: ${dir} (does not exist)`
+        );
+        continue;
+      }
+    } else {
+      const resolved = isAbsolute(dir) ? dir : join(cwd, dir);
+      if (!isDir(resolved)) {
+        warn(
+          `Skipping invalid path in specs_dirs: ${dir} (directory not found at ${resolved})`
+        );
+        continue;
+      }
+    }
+    validated.push(dir);
+  }
+  if (validated.length === 0) {
+    warn(`No valid paths in specs_dirs, using default: ${DEFAULT_SPECS_DIR}`);
+    return [DEFAULT_SPECS_DIR];
+  }
+  return validated;
+}
+function getDefaultDir(opts) {
+  const dirs = getSpecsDirs(opts);
+  return normalizePath(dirs[0] ?? DEFAULT_SPECS_DIR);
+}
+function findSpec(name, opts) {
+  if (!name) {
+    return { ok: false, reason: "not-found", name: "" };
+  }
+  const cwd = resolveCwd(opts);
+  if (!isDir(cwd)) {
+    return { ok: false, reason: "not-found", name };
+  }
+  let cleaned = normalizePath(name);
+  if (cleaned.startsWith("./")) cleaned = cleaned.slice(2);
+  const matches = [];
+  for (const entry of getSpecsDirs(opts)) {
+    const dir = normalizePath(entry);
+    const candidateFs = isAbsolute(dir) ? join(dir, cleaned) : join(cwd, dir, cleaned);
+    if (isDir(candidateFs)) {
+      matches.push(posix.join(dir, cleaned));
+    }
+  }
+  if (matches.length === 0) {
+    return { ok: false, reason: "not-found", name: cleaned };
+  }
+  if (matches.length === 1) {
+    return { ok: true, path: matches[0] };
+  }
+  return { ok: false, reason: "ambiguous", name: cleaned, matches };
+}
+function resolveCurrent(opts) {
+  const cwd = resolveCwd(opts);
+  if (!isDir(cwd)) return null;
+  const defaultDir = getDefaultDir(opts);
+  const markerFs = [
+    join(cwd, defaultDir, ".current-spec"),
+    join(cwd, ".current-spec")
+  ].find((candidate) => existsSync(candidate));
+  if (!markerFs) return null;
+  let content;
+  try {
+    content = readFileSync(markerFs, "utf8");
+  } catch {
+    return null;
+  }
+  content = content.replace(/\s+/g, "");
+  if (!content) {
+    warn(".current-spec file is empty");
+    return null;
+  }
+  const normalized = normalizePath(content);
+  if (normalized.startsWith("./") || normalized.startsWith("../") || normalized.includes("/") || isAbsolute(normalized)) {
+    return normalized;
+  }
+  return posix.join(defaultDir, normalized);
+}
+
+// src/hooks/lib/project-topology.ts
 var FRONTEND_KEY_RE = /^(frontend|front-end|web|ui|client|admin|前端)$/i;
 var BACKEND_KEY_RE = /^(backend|back-end|api|server|service|后端)$/i;
 var SHARED_KEY_RE = /^(shared|common|contracts?|types?|sdk|共享|协议)$/i;
@@ -586,7 +487,7 @@ function roleFromKey(key) {
 }
 function rootNameFromRole(role, fallbackPath) {
   if (role !== "auto" && role !== "unknown") return role;
-  const base = basename4(fallbackPath);
+  const base = basename3(fallbackPath);
   return base === "." || base === ".." || base.length === 0 ? "current" : base;
 }
 function extractFrontmatter(raw) {
@@ -914,7 +815,7 @@ function addOrMergeRoot(map, root, projectRoot) {
   }
 }
 function siblingCandidates(projectRoot) {
-  const currentBase = basename4(projectRoot).toLowerCase();
+  const currentBase = basename3(projectRoot).toLowerCase();
   const parent = resolve(projectRoot, "..");
   if (!isDir2(parent)) return [];
   const currentLooksBackend = /^(backend|api|server|service|services)$/.test(currentBase);
@@ -1123,7 +1024,7 @@ function main2() {
 function isDirectRun2() {
   try {
     const entry = fileURLToPath2(import.meta.url);
-    return process.argv[1] === entry && basename4(entry).startsWith("project-topology.");
+    return process.argv[1] === entry && basename3(entry).startsWith("project-topology.");
   } catch {
     return false;
   }
@@ -1133,7 +1034,7 @@ if (isDirectRun2()) {
 }
 
 // src/hooks/lib/tool-capabilities.ts
-import { basename as basename5 } from "node:path";
+import { basename as basename4 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 var CAPABILITIES = {
   "context7": {
@@ -1495,7 +1396,7 @@ function main3() {
 function isDirectRun3() {
   try {
     const entry = fileURLToPath3(import.meta.url);
-    return process.argv[1] === entry && basename5(entry).startsWith("tool-capabilities.");
+    return process.argv[1] === entry && basename4(entry).startsWith("tool-capabilities.");
   } catch {
     return false;
   }
@@ -1506,7 +1407,7 @@ if (isDirectRun3()) {
 
 // src/hooks/lib/stack-capabilities.ts
 import { existsSync as existsSync3, readFileSync as readFileSync3, readdirSync as readdirSync3 } from "node:fs";
-import { isAbsolute as isAbsolute3, join as join3, resolve as resolve2 } from "node:path";
+import { isAbsolute as isAbsolute3, join as join2, resolve as resolve2 } from "node:path";
 var STACKS = {
   "typescript": {
     id: "typescript",
@@ -1750,27 +1651,27 @@ function readText2(file) {
   }
 }
 function packageJsonContains(rootAbs, pattern) {
-  return pattern.test(readText2(join3(rootAbs, "package.json")));
+  return pattern.test(readText2(join2(rootAbs, "package.json")));
 }
 function hasManifestHint(rootAbs, hint) {
   if (hint.includes(":")) {
     const [file, needle] = hint.split(":", 2);
     if (!file || !needle) return false;
-    return readText2(join3(rootAbs, file)).toLowerCase().includes(needle.toLowerCase());
+    return readText2(join2(rootAbs, file)).toLowerCase().includes(needle.toLowerCase());
   }
   if (hint.includes("*")) {
     const pattern = new RegExp(`^${hint.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`);
     const dir = hint.includes("/") ? hint.split("/").slice(0, -1).join("/") : ".";
     const base = rootAbs === "" ? "." : rootAbs;
     try {
-      return existsSync3(join3(base, dir)) && readdirSync3(join3(base, dir)).some(
+      return existsSync3(join2(base, dir)) && readdirSync3(join2(base, dir)).some(
         (name) => pattern.test(dir === "." ? name : `${dir}/${name}`)
       );
     } catch {
       return false;
     }
   }
-  return existsSync3(join3(rootAbs, hint));
+  return existsSync3(join2(rootAbs, hint));
 }
 function scoreStack(stack, roots, projectRoot, goal) {
   const evidence = [];
@@ -1837,10 +1738,10 @@ function stackFor(profile) {
 }
 function selectCommand(commands, roots, projectRoot) {
   for (const command of commands) {
-    if (command.startsWith("./mvnw") && !roots.some((root) => existsSync3(join3(rootFsPath(projectRoot, root), "mvnw")))) {
+    if (command.startsWith("./mvnw") && !roots.some((root) => existsSync3(join2(rootFsPath(projectRoot, root), "mvnw")))) {
       continue;
     }
-    if (command.startsWith("./gradlew") && !roots.some((root) => existsSync3(join3(rootFsPath(projectRoot, root), "gradlew")))) {
+    if (command.startsWith("./gradlew") && !roots.some((root) => existsSync3(join2(rootFsPath(projectRoot, root), "gradlew")))) {
       continue;
     }
     return command;
@@ -2017,7 +1918,7 @@ function specNameFromPath(specPath) {
   return parts[parts.length - 1] ?? specPath;
 }
 function loadActiveSpecFromPath(cwd, specPath) {
-  const statePath = join4(cwd, specPath, ".curdx-state.json");
+  const statePath = join3(cwd, specPath, ".curdx-state.json");
   let phase = "unknown";
   let completed = false;
   if (existsSync4(statePath)) {
@@ -2030,13 +1931,13 @@ function loadActiveSpecFromPath(cwd, specPath) {
     } catch {
       phase = "unknown";
     }
-  } else if (existsSync4(join4(cwd, specPath, "tasks.md"))) {
+  } else if (existsSync4(join3(cwd, specPath, "tasks.md"))) {
     phase = "execution";
-  } else if (existsSync4(join4(cwd, specPath, "design.md"))) {
+  } else if (existsSync4(join3(cwd, specPath, "design.md"))) {
     phase = "tasks";
-  } else if (existsSync4(join4(cwd, specPath, "requirements.md"))) {
+  } else if (existsSync4(join3(cwd, specPath, "requirements.md"))) {
     phase = "design";
-  } else if (existsSync4(join4(cwd, specPath, "research.md"))) {
+  } else if (existsSync4(join3(cwd, specPath, "research.md"))) {
     phase = "requirements";
   }
   return {
@@ -2510,7 +2411,7 @@ function main5() {
 function isDirectRun5() {
   try {
     const entry = fileURLToPath4(import.meta.url);
-    return process.argv[1] === entry && basename6(entry).startsWith("smart-route.");
+    return process.argv[1] === entry && basename5(entry).startsWith("smart-route.");
   } catch {
     return false;
   }
@@ -2521,14 +2422,14 @@ if (isDirectRun5()) {
 
 // src/hooks/lib/project-brain.ts
 import { appendFileSync, existsSync as existsSync5, mkdirSync, readFileSync as readFileSync5 } from "node:fs";
-import { join as join5, resolve as resolve3 } from "node:path";
+import { join as join4, resolve as resolve3 } from "node:path";
 var MAX_REASON = 240;
 var MAX_COMMAND = 180;
 function normalizeCwd(cwd) {
   return resolve3(cwd ?? process.cwd());
 }
 function brainPath(cwd) {
-  return join5(normalizeCwd(cwd), ".curdx", "brain.jsonl");
+  return join4(normalizeCwd(cwd), ".curdx", "brain.jsonl");
 }
 function truncate(value, limit) {
   if (value === void 0) return void 0;
@@ -2560,7 +2461,7 @@ function appendBrainEvent(cwd, event) {
   const path2 = brainPath(cwd);
   if (process.env.CURDX_FLOW_BRAIN === "off") return { ok: true, path: path2 };
   try {
-    mkdirSync(join5(normalizeCwd(cwd), ".curdx"), { recursive: true });
+    mkdirSync(join4(normalizeCwd(cwd), ".curdx"), { recursive: true });
     appendFileSync(path2, JSON.stringify(normalizeEvent(event)) + "\n", "utf8");
     return { ok: true, path: path2 };
   } catch (err) {
@@ -2568,80 +2469,236 @@ function appendBrainEvent(cwd, event) {
     return { ok: false, path: path2, error: message };
   }
 }
-
-// src/hooks/task-completed-verifier.ts
-function passThrough() {
-  process3.stdout.write(JSON.stringify({ continue: true }));
-  process3.exit(0);
-}
-function emitBlock(reason) {
-  process3.stdout.write(JSON.stringify({ decision: "block", reason }));
-  process3.exit(2);
-}
-async function main6() {
-  let input;
+function parseBrainLine(line) {
   try {
-    input = await readStdinJson();
-  } catch {
-    passThrough();
-  }
-  if (input.hook_event_name !== "TaskCompleted") {
-    passThrough();
-  }
-  if (typeof input.task_id !== "string" || input.task_id.length === 0) {
-    passThrough();
-  }
-  const cwd = typeof input.cwd === "string" && input.cwd.length > 0 ? input.cwd : process3.cwd();
-  const specPath = resolveCurrent({ cwd });
-  if (!specPath) {
-    passThrough();
-  }
-  const specDir = join6(cwd, specPath);
-  const stateFile = join6(specDir, ".curdx-state.json");
-  if (!existsSync6(stateFile)) {
-    passThrough();
-  }
-  let state;
-  try {
-    state = JSON.parse(readFileSync6(stateFile, "utf8"));
-  } catch {
-    passThrough();
-  }
-  const phase = getVerificationPhase(state);
-  if (phase === null) {
-    passThrough();
-  }
-  const result = await verifyPhaseBlock(state, phase, specDir);
-  if (!result.ok) {
-    let verifierHint = "";
-    let routeName = "unknown";
-    let stack = "unknown";
-    let verifier;
-    try {
-      const route = classifySmartRoute({ cwd });
-      routeName = route.route;
-      stack = route.stackProfile.primary;
-      verifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? void 0;
-      if (verifier) verifierHint = ` Suggested verifier: ${verifier}.`;
-    } catch {
-      verifierHint = "";
+    const parsed = JSON.parse(line);
+    if (parsed.version !== 1) return null;
+    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked") {
+      return null;
     }
-    appendBrainEvent(cwd, {
-      type: "verification-blocked",
-      route: routeName,
-      stack,
-      phase,
-      verifier,
-      reason: result.reason ?? "verification failed"
-    });
-    emitBlock(`${result.reason ?? "verification failed"}${verifierHint}`);
+    if (typeof parsed.timestamp !== "string") return null;
+    return parsed;
+  } catch {
+    return null;
   }
-  process3.exit(0);
 }
-main6().catch((err) => {
-  const stack = err instanceof Error ? err.stack ?? err.message : String(err);
-  process3.stderr.write(`[task-completed-verifier] ${stack}
-`);
-  emitBlock("internal error in verify-blocks; see logs");
-});
-//# sourceMappingURL=task-completed-verifier.mjs.map
+function readBrainEvents(cwd, limit = 100) {
+  const path2 = brainPath(cwd);
+  if (!existsSync5(path2)) return [];
+  try {
+    const lines = readFileSync5(path2, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const parsed = lines.slice(Math.max(0, lines.length - Math.max(1, limit))).map(parseBrainLine).filter((event) => event !== null);
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+function uniqueRecent(values, limit) {
+  const out = [];
+  for (const value of values.reverse()) {
+    if (!value || out.includes(value)) continue;
+    out.push(value);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+function summarizeProjectBrain(cwd) {
+  const path2 = brainPath(cwd);
+  const events = readBrainEvents(cwd, 200);
+  const failures = events.filter((event) => event.type === "verification-blocked" || event.exitCode !== void 0 && event.exitCode !== 0).slice(-5).reverse().map((event) => ({
+    timestamp: event.timestamp,
+    type: event.type,
+    phase: event.phase,
+    command: event.command,
+    reason: event.reason
+  }));
+  const verifierHints = uniqueRecent(
+    events.filter((event) => event.type === "verification-run" && event.exitCode === 0).map((event) => event.command ?? event.verifier),
+    5
+  );
+  return {
+    path: path2,
+    exists: existsSync5(path2),
+    totalEvents: events.length,
+    lastUpdated: events.length > 0 ? events[events.length - 1]?.timestamp ?? null : null,
+    stackHints: uniqueRecent(events.map((event) => event.stack), 5),
+    verifierHints,
+    recentFailures: failures
+  };
+}
+
+// src/hooks/lib/execution-brief.ts
+function preferredSkill(route) {
+  switch (route.route) {
+    case "direct-change":
+      return "direct edit in current turn";
+    case "lite-spec":
+      return "/curdx-flow:start with lightweight spec";
+    case "full-spec":
+      return "/curdx-flow:start full spec workflow";
+    case "epic-split":
+      return "/curdx-flow:triage";
+    case "scaffold":
+      return "/curdx-flow:start scaffold path";
+    case "product-inception":
+      return "/curdx-flow:start product inception";
+    case "greenfield-spec":
+      return "/curdx-flow:start greenfield spec";
+    case "prototype":
+      return "/curdx-flow:start prototype spec";
+    case "import-spec":
+      return "/curdx-flow:start import spec";
+    case "resume-current":
+      return "/curdx-flow:implement or next missing phase";
+    case "blocked-ask-user":
+      return "ask one focused question";
+  }
+}
+function agentPlan(route) {
+  if (route.route === "direct-change" || route.route === "blocked-ask-user") return [];
+  if (route.policy.reviewCadence === "strict" || route.policy.reviewCadence === "periodic") {
+    return ["spec-executor", "spec-reviewer", "code-quality-reviewer"];
+  }
+  if (route.shouldUseSubagent) return ["spec-executor", "spec-reviewer"];
+  return ["self-review before completion"];
+}
+function isolationPlan(route) {
+  if (route.policy.risk === "critical" || route.route === "full-spec" || route.route === "epic-split") {
+    return "prefer worktree isolation for executor tasks; do not touch release metadata unless task scope names it";
+  }
+  if (route.route === "direct-change") return "current workspace, minimal touched files";
+  return "current workspace with bounded file ownership";
+}
+function taskShape(route) {
+  if (!route.shouldCreateTasks) return "single bounded change; no tasks.md";
+  const range = route.policy.taskTargetRange;
+  return `${range.min}-${Math.min(range.max, route.taskCountLimit)} value-slice tasks, each with verifier`;
+}
+function readFirst(route, input) {
+  const out = [];
+  const files = input.changedFiles?.slice(0, Math.max(1, route.contextBudget.maxReferenceFiles)) ?? [];
+  out.push(...files);
+  if (route.stackProfile.primary === "claude-code-plugin") {
+    out.push("https://code.claude.com/docs/llms.txt");
+    out.push("plugin manifest, hooks.json, touched skill/agent files");
+  }
+  if (route.qualityGates.some((gate) => gate.phase === "before-coding" && gate.required)) {
+    out.push("official/current docs for the detected stack");
+  }
+  if (route.shouldCreateTasks) {
+    out.push("nearest spec artifacts and tasks.md before editing");
+  }
+  if (route.contextBudget.level === "tiny") {
+    return out.slice(0, Math.max(1, route.contextBudget.maxReferenceFiles));
+  }
+  return [...new Set(out)].slice(0, route.contextBudget.maxReferenceFiles);
+}
+function completionContract(route, brain) {
+  const verifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? void 0;
+  const contract = [
+    "Do not claim completion without fresh verification evidence from this turn."
+  ];
+  if (verifier) {
+    const suffix = /[.!?]$/.test(verifier) ? "" : ".";
+    contract.push(`Run verifier: ${verifier}${suffix}`);
+  }
+  if (route.shouldCreateSpec) {
+    contract.push("Record spec evidence with curdx-flow verify run when a spec phase is completed.");
+  }
+  if (route.policy.reviewCadence === "strict" || route.policy.reviewCadence === "periodic") {
+    contract.push("Run spec-compliance review before code-quality review; fix blocking findings before proceeding.");
+  }
+  if (brain.recentFailures.length > 0) {
+    contract.push("Check .curdx/brain.jsonl recent failures before reusing the same fix path.");
+  }
+  return contract;
+}
+function escalationRules(route) {
+  const rules = [
+    "Ask the user only when missing facts change implementation or access is blocked.",
+    "If verifier fails twice for the same phase, switch to systematic debugging before more edits."
+  ];
+  if (route.route === "blocked-ask-user" && route.blockedReason) {
+    rules.unshift(route.blockedReason);
+  }
+  if (route.policy.risk === "critical") {
+    rules.push("For release/security/plugin metadata changes, run official-docs check and plugin validation before tag/push.");
+  }
+  if (route.topology?.missingRoots && route.topology.missingRoots.length > 0) {
+    rules.push(route.topology.accessFix ?? "Add required code roots before editing.");
+  }
+  return rules;
+}
+function buildExecutionBrief(input) {
+  const route = input.routeFacts ?? classifySmartRoute(input);
+  const cwd = input.cwd;
+  const brain = summarizeProjectBrain(cwd);
+  const verifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? void 0;
+  const brief = {
+    version: 1,
+    generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    goal: input.goal ?? "",
+    route: route.route,
+    reason: route.reason,
+    stack: route.stackProfile.primary,
+    risk: route.policy.risk,
+    context: {
+      budget: route.contextBudget.level,
+      maxReferenceFiles: route.contextBudget.maxReferenceFiles,
+      readFirst: readFirst(route, input),
+      avoid: ["node_modules", "dist/build outputs unless verifying generated artifacts", "old project docs as design authority"]
+    },
+    execution: {
+      mode: route.policy.executionMode,
+      primarySkill: preferredSkill(route),
+      agents: agentPlan(route),
+      isolation: isolationPlan(route),
+      taskShape: taskShape(route)
+    },
+    qualityGates: route.qualityGates.map((gate) => ({
+      id: gate.id,
+      phase: gate.phase,
+      required: gate.required,
+      command: gate.command
+    })),
+    completionContract: completionContract(route, brain),
+    escalationRules: escalationRules(route),
+    brain: {
+      path: brain.path,
+      totalEvents: brain.totalEvents,
+      lastUpdated: brain.lastUpdated,
+      stackHints: brain.stackHints,
+      verifierHints: brain.verifierHints,
+      recentFailures: brain.recentFailures
+    }
+  };
+  if (input.record === true) {
+    appendBrainEvent(cwd, {
+      type: "route-compiled",
+      route: route.route,
+      stack: route.stackProfile.primary,
+      verifier,
+      reason: route.reason,
+      files: input.changedFiles?.length
+    });
+  }
+  return brief;
+}
+function compactExecutionBrief(brief) {
+  const verifier = brief.qualityGates.find((gate) => gate.required && gate.command !== null)?.command ?? "repo verifier";
+  const agents = brief.execution.agents.length > 0 ? brief.execution.agents.join("+") : "none";
+  return [
+    `brief(route=${brief.route}`,
+    `stack=${brief.stack}`,
+    `risk=${brief.risk}`,
+    `read<=${brief.context.maxReferenceFiles}`,
+    `skill=${brief.execution.primarySkill}`,
+    `agents=${agents}`,
+    `verifier=${verifier})`
+  ].join(" ");
+}
+export {
+  buildExecutionBrief,
+  compactExecutionBrief
+};
+//# sourceMappingURL=execution-brief.mjs.map
