@@ -29,7 +29,8 @@ Do not route browser verification through `/ultrareview`. Do not make Claude Cod
 - Every full-stack or frontend task plan must include a **Browser Verify** decision: `playwright`, `chrome-devtools-mcp`, `none`, or `blocked`.
 - `none` is allowed only for backend-only, CLI-only, library-only, or documentation work; include a short reason.
 - Prefer existing project commands from `package.json`, CI, or research notes: `npm run test:e2e`, `pnpm test:e2e`, `npx playwright test`, etc.
-- If no browser automation exists but UI/full-stack behavior is in scope, add a focused Playwright test or script before final verification.
+- If no browser automation exists but UI/full-stack behavior is in scope, add a focused Playwright test before final verification.
+- If the project has `package.json` and no E2E script exists, add a repeatable script such as `"test:e2e": "playwright test"` or the repo's naming equivalent. Do not leave the only rerun command as ad hoc `npx playwright test ...` unless the project has no package script surface.
 - Escalate to Chrome DevTools MCP for the high-fidelity cases in the matrix.
 - Browser proof must include the dev server command, target URL, tool used, checked flow, and evidence artifact or observation.
 

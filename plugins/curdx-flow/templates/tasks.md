@@ -8,7 +8,7 @@ Total tasks: {{N}}
 
 - **Decision**: playwright | chrome-devtools-mcp | none | blocked
 - **Reason**: {{why this feature does or does not need browser verification}}
-- **Command/Tool**: {{E2E command, Chrome DevTools MCP actions, or none}}
+- **Command/Tool**: {{E2E command, preferably package script such as `npm run test:e2e`; Chrome DevTools MCP actions; or none}}
 - **Dev Server**: {{command + URL, or none}}
 
 <!-- Select workflow based on Intent Classification in .progress.md -->

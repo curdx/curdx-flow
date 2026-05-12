@@ -572,6 +572,8 @@ describe("skills frontmatter integrity", () => {
     const planner = readFileSync(path.join(AGENTS_DIR, "task-planner.md"), "utf8");
     const executor = readFileSync(path.join(AGENTS_DIR, "spec-executor.md"), "utf8");
     const qa = readFileSync(path.join(AGENTS_DIR, "qa-engineer.md"), "utf8");
+    expect(policy).toContain('"test:e2e": "playwright test"');
+    expect(planner).toContain("test:e2e");
     for (const [label, body] of [
       ["task-planner", planner],
       ["spec-executor", executor],

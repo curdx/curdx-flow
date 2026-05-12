@@ -113,6 +113,7 @@ Direct path:
    - Each task = one commit, tasks must be executable without human interaction
    - Count total tasks, output to `./specs/$spec/tasks.md`
    - If quick mode and policy verification is strict: auto-enable VE tasks. Otherwise keep VE tasks risk-triggered. For UI/full-stack work, Browser Verify must select Playwright CLI or Chrome DevTools MCP.
+   - When Browser Verify selects Playwright and no E2E package script exists, include a task to add `test:e2e` or the repo's equivalent script before final verification.
 3. Wait for the Task result. Require `TASKS_READY` before proceeding; if `TASKS_BLOCKED`, surface the blocking source items and stop.
 4. Read `$SPEC_PATH/tasks.md`.
 

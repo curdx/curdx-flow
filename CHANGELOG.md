@@ -2,6 +2,17 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.23 — 2026-05-11
+
+### Changed
+
+- **Playwright verification now requires a repeatable package-script entry when possible.** Browser-facing specs that need new Playwright coverage should add a focused test, config when missing, and `test:e2e` or the repo's equivalent script instead of leaving only an ad hoc `npx playwright test ...` rerun command.
+
+### Tests
+
+- Real Claude Code plugin smoke in a temporary React/Vite fixture generated `playwright.config.ts`, `tests/e2e/login.spec.ts`, installed Chromium, and passed 2 Playwright scenarios. The test also exposed the missing package-script gap fixed in this release.
+- Verified with `npx vitest run tests/runner/manifest-integrity.test.ts` and `npm run typecheck`.
+
 ## 7.1.22 — 2026-05-11
 
 ### Added

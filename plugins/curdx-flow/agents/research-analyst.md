@@ -247,7 +247,7 @@ If no automated E2E tooling detected, output:
 ```markdown
 ## Verification Tooling
 
-No automated E2E tooling detected. Browser-facing work should add a focused Playwright test or script before final verification. Non-browser work falls back to build + import check only.
+No automated E2E tooling detected. Browser-facing work should add a focused Playwright test, Playwright config when missing, and a package script such as `test:e2e` when `package.json` exists before final verification. Non-browser work falls back to build + import check only.
 
 **Project Type**: Library
 **Browser Verify**: none

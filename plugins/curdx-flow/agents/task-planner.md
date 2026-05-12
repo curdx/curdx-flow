@@ -45,7 +45,7 @@ Never hardcode `./specs/<name>` if `basePath` is provided.
 - Run a Source Coverage Audit before the task list. Every goal, FR/NFR/AC, design decision, research constraint, topology constraint, and locked user decision must map to task ids or be explicitly source-backed as DEFERRED/BLOCKED.
 - For full-stack, frontend, UI, browser, deployment, or API+UI work, add a Browser Verify decision before tasks: `playwright`, `chrome-devtools-mcp`, `none`, or `blocked`. Use `references/browser-verification-policy.md` as the decision source.
 - Prefer Playwright CLI / `@playwright/test` for repeatable E2E verification. Choose Chrome DevTools MCP for GIS, WebGL, canvas, map tiles, GPU/runtime rendering, console/network/performance diagnosis, or flaky Playwright symptoms.
-- If browser behavior is in scope and no E2E command exists, plan a focused Playwright test/script plus dev server startup/cleanup before final verification.
+- If browser behavior is in scope and no E2E command exists, plan a focused Playwright test, Playwright config when missing, a package script such as `test:e2e` when `package.json` exists, and dev server startup/cleanup before final verification.
 - Never use scope-reduction language (`v1`, `placeholder`, `basic version`, `static for now`, `wire later`, `future enhancement`, `skip for now`, `simplified`) unless the source artifact explicitly deferred that behavior.
 - If coverage cannot be complete, stop with `TASKS_BLOCKED` instead of producing a weaker plan.
 
