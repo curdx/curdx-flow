@@ -2,7 +2,7 @@
 name: research
 description: Use when running or re-running discovery research for the active spec.
 argument-hint: "[spec-name]"
-allowed-tools: "Read Write Edit Bash Task AskUserQuestion"
+allowed-tools: "Read Write Edit Bash Agent AskUserQuestion"
 disable-model-invocation: true
 ---
 
@@ -73,7 +73,7 @@ Append to `.progress.md` under "Interview Responses":
 
 Pass combined context to subagent delegation as "Interview Context".
 
-## Step 3: Execute Parallel Research (Direct Task, Teams Optional)
+## Step 3: Execute Parallel Research (Direct Agent, Teams Optional)
 
 <mandatory>
 **PARALLEL EXECUTION IS MANDATORY - NO EXCEPTIONS.**
@@ -82,7 +82,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md` and follow 
 
 Key rules:
 - Minimum 2 agents (1 research-analyst + 1 Explore). There are ZERO exceptions.
-- ALL Task calls MUST be in ONE message for true parallelism
+- ALL Agent calls MUST be in ONE message for true parallelism
 - Each research-analyst handles ONE external topic; each Explore handles ONE codebase concern
 - Break external research into MULTIPLE research-analyst teammates (do NOT combine)
 
@@ -94,12 +94,12 @@ Research topics identified for parallel execution:
 ...
 ```
 
-Default to direct `Task(...)` calls. Agent Teams are experimental and disabled by default in Claude Code; use the team lifecycle only when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set and the `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` tools are visible. If team tools are unavailable or fail, continue with direct Task dispatch; this is normal, not degraded.
+Default to direct `Agent(...)` calls. Agent Teams are experimental and disabled by default in Claude Code; use the team lifecycle only when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set and the `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` tools are visible. If team tools are unavailable or fail, continue with direct Agent dispatch; this is normal, not degraded.
 
 Direct path:
 - Optional `TaskCreate` for each research topic. If unavailable or failing, continue without it.
-- Spawn ALL research-analyst and Explore `Task(...)` calls in ONE message, without `team_name`.
-- Wait for Task results, collect partial files, then continue to Step 4.
+- Spawn ALL research-analyst and Explore `Agent(...)` calls in ONE message, without `team_name`.
+- Wait for Agent results, collect partial files, then continue to Step 4.
 
 Optional Agent Teams path:
 - `TeamDelete()` once -> `TeamCreate(team_name: "research-$spec")` -> optional `TaskCreate` per topic.
@@ -122,7 +122,7 @@ After merge, delete partial files: `rm ./specs/$spec/.research-*.md`
 
 If NOT `--quick`, skip to Step 6.
 
-Invoke `spec-reviewer` via Task tool to validate research.md. Follow the standard review loop:
+Invoke `spec-reviewer` via Agent tool to validate research.md. Follow the standard review loop:
 - REVIEW_PASS: log to .progress.md, proceed to walkthrough
 - REVIEW_FAIL (iteration < 3): log, extract feedback, re-invoke research-analyst with revision prompt, re-read, loop
 - REVIEW_FAIL (iteration >= 3): log warning to .progress.md (graceful degradation), proceed
@@ -169,7 +169,7 @@ Ask ONE question: "How do you want to proceed?" with these options via AskUserQu
 3. **Request changes** -- Provide specific feedback to revise the artifact
 
 **If "Approve"**: proceed to Step 7.
-**If "Run review"**: Invoke spec-reviewer via Task tool with full research.md content (upstream: none). Display findings table. If REVIEW_PASS, note it. If REVIEW_FAIL, show feedback. Then loop back to this same 3-choice question (user decides next action).
+**If "Run review"**: Invoke spec-reviewer via Agent tool with full research.md content (upstream: none). Display findings table. If REVIEW_PASS, note it. If REVIEW_FAIL, show feedback. Then loop back to this same 3-choice question (user decides next action).
 **If "Request changes" or "Other"**: Ask what to change, invoke subagents with feedback, re-merge, re-display walkthrough, ask again with same 3 choices. Loop until approved.
 
 ## Step 7: Finalize

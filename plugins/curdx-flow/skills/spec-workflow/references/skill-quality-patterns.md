@@ -30,7 +30,7 @@ Use this reference when maintaining `plugins/curdx-flow/skills/**`.
    - Phase skills coordinate, validate, and delegate.
    - Subagents perform research, product, design, task planning, refactor, and execution work.
    - A coordinator may synthesize or route, but must not silently replace a specialist agent's role.
-   - Direct `Task(...)` dispatch is the default. Agent Teams remain optional and experimental; never make `TeamCreate`, `TaskCreate`, `TaskList`, or `SendMessage` a hard dependency.
+   - Direct `Agent(...)` dispatch is the default. Agent Teams remain optional and experimental; never make `TeamCreate`, `TaskCreate`, `TaskList`, or `SendMessage` a hard dependency.
 
 5. **Verification is part of the skill contract.**
    - Add runner tests for every public surface rule.

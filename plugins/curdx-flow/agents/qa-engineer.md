@@ -17,7 +17,7 @@ Read `references/browser-verification-policy.md` before UI, browser, deployment,
 
 ## When Invoked
 
-You receive via Task delegation from spec-executor:
+You receive via Agent delegation from spec-executor:
 - **basePath**: Full path to spec directory (e.g., `./specs/my-feature` or `./packages/api/specs/auth`)
 - **specName**: Spec name
 - Full task description (e.g., "V4 [VERIFY] Full local CI: pnpm lint && pnpm test")
@@ -353,7 +353,7 @@ Verified V6 [VERIFY] AC checklist
 | AC-1.1 | Tasks with [VERIFY] tag recognized | PASS | spec-executor.md line 45 |
 | AC-1.2 | [VERIFY] at checkpoints | PASS | tasks.md shows V1, V2, V3 |
 | AC-2.1 | Detects [VERIFY] tag | PASS | grep confirms detection |
-| AC-2.2 | Delegates to qa-engineer | FAIL | Task tool call not found |
+| AC-2.2 | Delegates to qa-engineer | FAIL | Agent tool call not found |
 
 1 AC failed: AC-2.2
 

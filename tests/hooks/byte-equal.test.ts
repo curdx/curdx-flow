@@ -341,7 +341,15 @@ function normalize(s: string): string {
     "",
   );
 
-  // (6) JSON pretty-print collapse: v6 piped through `jq` which pretty-printed
+  // (6) Claude Code renamed the subagent dispatcher from Task to Agent. The
+  // v6 baseline remains frozen, but v7 continuation prompts should teach the
+  // current tool name. Normalize the intentional wording drift only for the
+  // byte-equal historical diff.
+  out = out
+    .replace(/via Task tool/g, "via Agent tool")
+    .replace(/Delegate via Task tool/g, "Delegate via Agent tool");
+
+  // (7) JSON pretty-print collapse: v6 piped through `jq` which pretty-printed
   // top-level JSON objects (newlines + 2-space indent). v7 emits single-line
   // JSON. Collapse any pretty-printed top-level JSON object/array on its own
   // line(s) into a single line. Detect by lines starting with "{" alone, then

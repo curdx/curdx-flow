@@ -1,11 +1,11 @@
 # Research Dispatch Template
 
-> Used by: research.md
+> Used by: skills/research
 > Placeholders: {SPEC_NAME}, {GOAL}, {TOPIC}, {TOPIC_SLUG}, {BASE_PATH}, {EXISTING_SPECS}, {CODEBASE_CONTEXT}
 
-## Task Tool Parameters
+## Agent Tool Parameters
 
-- **subagent_type:** `curdx-flow:research-analyst`
+- **agent_type:** `curdx-flow:research-analyst`
 - **description:** `Research {TOPIC} for {SPEC_NAME}`
 
 ## Prompt

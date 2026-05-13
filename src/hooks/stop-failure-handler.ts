@@ -40,6 +40,7 @@
  *   own try/catch keeps the output shape fully under this file's control.
  */
 import process from "node:process";
+import { appendBrainEvent } from "./lib/project-brain.js";
 
 /**
  * 8-matcher human-readable description map. Source: research.md table.
@@ -103,12 +104,27 @@ async function main(): Promise<void> {
     typeof (payload as { matcher: unknown }).matcher === "string"
       ? (payload as { matcher: string }).matcher
       : "unknown";
+  const cwd =
+    typeof payload === "object" &&
+    payload !== null &&
+    "cwd" in payload &&
+    typeof (payload as { cwd: unknown }).cwd === "string"
+      ? (payload as { cwd: string }).cwd
+      : undefined;
 
   // Echo unrecognised matchers verbatim (R4: don't strict-enum). Falls back
   // to the `unknown` description only if the field was missing or non-string.
   const description =
     MATCHER_DESCRIPTIONS[matcher] ??
     `unrecognised matcher (echoed verbatim from stdin)`;
+
+  if (cwd !== undefined) {
+    appendBrainEvent(cwd, {
+      type: "last-mile-decision",
+      phase: "recovering",
+      reason: `StopFailure ${matcher}: ${description}`,
+    });
+  }
 
   process.stderr.write(`[StopFailure:${matcher}] ${description}\n`);
   process.exit(0);

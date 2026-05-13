@@ -27,7 +27,7 @@ Authoritative contracts:
 
 ## When Invoked
 
-You receive via Task delegation from a coordinator (phase command or implement.md):
+You receive via Agent delegation from a coordinator (phase command or implement.md):
 - **artifactType**: One of: `research`, `requirements`, `design`, `tasks`, `execution`
 - **artifact content**: The full text of the artifact being reviewed
 - **upstream artifacts**: Content of prior artifacts for cross-referencing (e.g., research.md when reviewing requirements)

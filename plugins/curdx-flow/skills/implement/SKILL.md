@@ -2,7 +2,7 @@
 name: implement
 description: Use when a spec has tasks.md and should enter autonomous task execution.
 argument-hint: "[--max-task-iterations 5] [--max-global-iterations 30] [--recovery-mode]"
-allowed-tools: "Read Write Edit Task Bash Skill"
+allowed-tools: "Read Write Edit Agent Bash Skill"
 disable-model-invocation: true
 ---
 
@@ -106,6 +106,19 @@ The stop-hook continues the loop only when policy allows it. `autoPolicy.stopHoo
 - `short-continuation`: hook injects only current task + next action.
 - `full-loop`: legacy long coordinator prompt.
 
+Before dispatching the first task, run:
+
+```bash
+curdx-flow last-mile --cwd "$PWD" --spec "$SPEC_PATH" --record
+```
+
+Treat the JSON as the execution autopilot contract:
+- `phase` tells whether the coordinator is planning, implementing, verifying, recovering, or releasing.
+- `problemTypes` tells what is currently risky: missing context, UI quality, browser evidence, repeated failure, release risk, verification gap, scope drift, or missing dependency.
+- `capabilityPlan` tells when to use dependency wheels. Use `claude-mem`, `pua`, `frontend-design`, or Chrome DevTools MCP only when their `availabilityState` is available/expected; if missing, follow `fallbackWhenMissing` and do not reimplement the wheel inside curdx-flow.
+- `evidenceRequired` and `blockingGates` are completion gates. Do not output `ALL_TASKS_COMPLETE` while they are unsatisfied.
+- `coordinatorInstruction` is the next action for this loop iteration.
+
 ### Coordinator Prompt
 
 Output this prompt directly to start execution:
@@ -119,16 +132,19 @@ Then Read and follow these references in order. They contain the complete coordi
 1. **Core delegation pattern**: Read `${CLAUDE_PLUGIN_ROOT}/references/coordinator-pattern.md` and follow it.
    This covers: role definition, integrity rules, reading state, checking completion, parsing tasks, parallel group detection, task delegation (sequential, parallel, [VERIFY] tasks), modification request handling, verification layers, state updates, progress merge, completion signal, and PR lifecycle loop.
 
-2. **Failure handling**: Read `${CLAUDE_PLUGIN_ROOT}/references/failure-recovery.md` and follow it.
+2. **Last-mile autopilot**: Read `${CLAUDE_PLUGIN_ROOT}/references/last-mile-autopilot.md` and follow it.
+   This covers automatic phase detection, capability routing, dependency plugin use, evidence gates, and recovery escalation.
+
+3. **Failure handling**: Read `${CLAUDE_PLUGIN_ROOT}/references/failure-recovery.md` and follow it.
    This covers: parsing failure output, fix task generation, fix task limits and depth checks, iterative recovery orchestrator, fix task insertion into tasks.md, fixTaskMap state tracking, and progress logging for fix chains.
 
-3. **Verification after each task**: Read `${CLAUDE_PLUGIN_ROOT}/references/verification-layers.md` and follow it.
+4. **Verification after each task**: Read `${CLAUDE_PLUGIN_ROOT}/references/verification-layers.md` and follow it.
    This covers: 3 layers (contradiction detection, TASK_COMPLETE signal, periodic artifact review via spec-reviewer). All must pass before advancing.
 
-4. **Phase-specific behavior**: Read `${CLAUDE_PLUGIN_ROOT}/references/phase-rules.md` and follow it.
+5. **Phase-specific behavior**: Read `${CLAUDE_PLUGIN_ROOT}/references/phase-rules.md` and follow it.
    This covers: POC-first workflow (Phase 1-4), phase distribution, quality checkpoints, and phase-specific constraints.
 
-5. **Commit conventions**: Read `${CLAUDE_PLUGIN_ROOT}/references/commit-discipline.md` and follow it.
+6. **Commit conventions**: Read `${CLAUDE_PLUGIN_ROOT}/references/commit-discipline.md` and follow it.
    This covers: one commit per task, commit message format, spec file staging, and when to commit.
 
 Before dispatching any task, read `.curdx-state.json::autoPolicy` and obey:
@@ -136,9 +152,9 @@ Before dispatching any task, read `.curdx-state.json::autoPolicy` and obey:
 - `reviewCadence`: artifact review only at the cadence selected by policy.
 - `verificationLevel`: targeted/standard/strict verification depth.
 
-### Pre-Dispatch Cap Check (MANDATORY — runs every iteration, before any Task(...) call)
+### Pre-Dispatch Cap Check (MANDATORY — runs every iteration, before any Agent(...) call)
 
-CRITICAL: At the top of every iteration loop body, immediately after reading `.curdx-state.json` and BEFORE any `Task(...)` delegation call, the coordinator MUST evaluate the cost-runaway caps. This is the coordinator-side enforcement of `maxGlobalIterations` / `maxTaskIterations` (spec-cost-runaway-guards FR-E1 / US-1 / US-2 / AC-1.1 / AC-2.2). The stop-watcher hook is the last-mile safety net; this pre-check is the first-line defense and avoids burning a dispatch round-trip when the cap is already breached.
+CRITICAL: At the top of every iteration loop body, immediately after reading `.curdx-state.json` and BEFORE any `Agent(...)` delegation call, the coordinator MUST evaluate the cost-runaway caps. This is the coordinator-side enforcement of `maxGlobalIterations` / `maxTaskIterations` (spec-cost-runaway-guards FR-E1 / US-1 / US-2 / AC-1.1 / AC-2.2). The stop-watcher hook is the last-mile safety net; this pre-check is the first-line defense and avoids burning a dispatch round-trip when the cap is already breached.
 
 **Step A: Read caps from state**
 
@@ -151,7 +167,7 @@ After reading `.curdx-state.json`, extract:
 **Step B: Global cap pre-check (halts loop entirely)**
 
 If `globalIteration >= maxGlobalIterations`:
-1. Do NOT delegate. Do NOT call `Task(...)`. Do NOT advance `taskIndex`.
+1. Do NOT delegate. Do NOT call `Agent(...)`. Do NOT advance `taskIndex`.
 2. Output the D4 cost-runaway STOP message verbatim (mirrors `buildCostRunawayBlock` in `src/hooks/stop-watcher.ts` so user sees identical wording from either surface):
 
    ```text
@@ -192,11 +208,11 @@ Only when both `globalIteration < maxGlobalIterations` AND `taskIteration < maxT
 
 ### Key Coordinator Behaviors (quick reference — see coordinator-pattern.md for authoritative details)
 
-- **You are a COORDINATOR, not an implementer.** Delegate via Task tool. Never implement yourself.
+- **You are a COORDINATOR, not an implementer.** Delegate via Agent tool. Never implement yourself.
 - **Fully autonomous.** Never ask questions or wait for user input.
 - **State-driven loop.** Read .curdx-state.json each iteration to determine current task.
 - **Completion check.** If taskIndex >= totalTasks, verify all [x] marks, delete state file, output ALL_TASKS_COMPLETE.
-- **Task delegation.** Extract full task block from tasks.md, delegate to spec-executor (or qa-engineer for [VERIFY] tasks).
+- **Agent delegation.** Extract full task block from tasks.md, delegate to spec-executor (or qa-engineer for [VERIFY] tasks).
 - **After TASK_COMPLETE.** Run all 3 verification layers, then update state (advance taskIndex, reset taskIteration).
 - **On failure.** Parse failure output, increment taskIteration. If recovery-mode: generate fix task. If max retries exceeded: error and stop.
 - **Modification requests.** If TASK_MODIFICATION_REQUEST in output, process SPLIT_TASK / ADD_PREREQUISITE / ADD_FOLLOWUP per coordinator-pattern.md.

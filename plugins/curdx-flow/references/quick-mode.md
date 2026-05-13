@@ -108,7 +108,7 @@ Validation Sequence:
          - WARNING: Reproduction command exited 0; bug may not be reproducible with this command
          - Timestamp: <ISO 8601>
          ```
-11. Research Phase: TaskCreate("Research for $spec", activeForm: "Researching") if available, run direct parallel Task research flow (Agent Teams optional only when enabled), skip walkthrough, clear awaitingApproval, TaskUpdate(completed) if available
+11. Research Phase: TaskCreate("Research for $spec", activeForm: "Researching") if available, run direct parallel Agent research flow (Agent Teams optional only when enabled), skip walkthrough, clear awaitingApproval, TaskUpdate(completed) if available
 12. Skill Discovery Pass 2: re-scan skills using goal + research Executive Summary, invoke new matches
 13. Requirements Phase: TaskCreate("Requirements for $spec", activeForm: "Generating requirements") if available, delegate to product-manager with Quick Mode Directive, review loop, TaskUpdate(completed) if available
 14. Design Phase: TaskCreate("Design for $spec", activeForm: "Generating design") if available, delegate to architect-reviewer with Quick Mode Directive, review loop, TaskUpdate(completed) if available
@@ -184,7 +184,7 @@ Re-scan skills with enriched context after research completes:
 
 ## Quick Mode Directive
 
-Each agent delegation in steps 11-15 includes this directive in the Task prompt:
+Each agent delegation in steps 11-15 includes this directive in the Agent prompt:
 
 ```text
 Quick Mode Context:
@@ -206,8 +206,8 @@ Set iteration = 1
 
 WHILE iteration <= 3:
   1. Read the artifact content from $basePath/<artifact>.md
-  2. Invoke spec-reviewer via Task tool:
-     subagent_type: spec-reviewer
+  2. Invoke spec-reviewer via Agent tool:
+     agent_type: spec-reviewer
      Review the $artifactType artifact for spec: $name
      Spec path: $basePath/
      Review iteration: $iteration of 3

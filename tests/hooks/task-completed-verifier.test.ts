@@ -160,8 +160,10 @@ describe("task-completed-verifier (TaskCompleted hook)", () => {
     expect(r.stdout).toBe("");
     expect(r.stderr).toContain("missing");
     expect(r.stderr).toContain("Suggested verifier");
+    expect(r.stderr).toContain("Last-mile recovery");
     expect(existsSync(path.join(spec.cwd, ".curdx", "brain.jsonl"))).toBe(true);
     expect(readFileSync(path.join(spec.cwd, ".curdx", "brain.jsonl"), "utf8")).toContain("verification-blocked");
+    expect(readFileSync(path.join(spec.cwd, ".curdx", "brain.jsonl"), "utf8")).toContain("last-mile-decision");
   });
 
   it("(c): stale block (srcMtime > Date.parse(timestamp)) → exit 2, reason starts with 'Stale evidence'", () => {

@@ -27,6 +27,7 @@ import {
   selectSuggestedVerifier,
 } from "./stack-capabilities.js";
 import { buildExecutionBrief } from "./execution-brief.js";
+import { decideLastMile } from "./last-mile-orchestrator.js";
 import { appendBrainEvent, summarizeProjectBrain } from "./project-brain.js";
 import {
   findSpec,
@@ -60,6 +61,7 @@ function usage(exitCode = 1): never {
     "",
     "commands:",
     "  route --goal <text> [--name <spec>] [--flags <args>] [--cwd <dir>] [--compile] [--record]",
+    "  last-mile --goal <text> [--spec <name-or-path>] [--cwd <dir>] [--record]",
     "  snapshot [--spec <name-or-path>] [--goal <text>] [--cwd <dir>]",
     "  specs dirs [--cwd <dir>]",
     "  specs list [--cwd <dir>]",
@@ -135,6 +137,21 @@ function snapshot(argv: string[]): void {
       cwd: readArg("--cwd", argv),
       spec: readArg("--spec", argv),
       goal: readArg("--goal", argv),
+    }),
+  );
+}
+
+function lastMile(argv: string[]): void {
+  const available = parseList(readArg("--available-capabilities", argv));
+  printJson(
+    decideLastMile({
+      cwd: readArg("--cwd", argv),
+      goal: readArg("--goal", argv) ?? "",
+      name: readArg("--spec", argv) ?? readArg("--name", argv),
+      changedFiles: parseList(readArg("--files", argv)),
+      availableCapabilities: available.length > 0 ? available : undefined,
+      hookEvent: "runtime",
+      record: hasFlag(argv, "--record"),
     }),
   );
 }
@@ -769,12 +786,14 @@ function hookFreshnessDoctor(): unknown {
   const bundleRoot = join(pluginRoot(), "hooks", "scripts");
   const pairs: Array<[string, string]> = [
     ["user-prompt-expansion-guard.ts", "user-prompt-expansion-guard.mjs"],
+    ["user-prompt-submit-autopilot.ts", "user-prompt-submit-autopilot.mjs"],
     ["post-tool-batch-snapshot.ts", "post-tool-batch-snapshot.mjs"],
     ["task-completed-verifier.ts", "task-completed-verifier.mjs"],
     [join("lib", "smart-route.ts"), join("lib", "smart-route.mjs")],
     [join("lib", "tool-capabilities.ts"), join("lib", "tool-capabilities.mjs")],
     [join("lib", "stack-capabilities.ts"), join("lib", "stack-capabilities.mjs")],
     [join("lib", "dev-runtime.ts"), join("lib", "dev-runtime.mjs")],
+    [join("lib", "last-mile-orchestrator.ts"), join("lib", "last-mile-orchestrator.mjs")],
     [join("lib", "runtime-cli.ts"), join("lib", "runtime-cli.mjs")],
   ];
   const entries = pairs.map(([srcRel, bundleRel]) => {
@@ -1020,9 +1039,11 @@ function doctor(argv: string[]): void {
   const contextBudget = selectContextBudget({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
   const brain = summarizeProjectBrain(cwd);
   const executionBrief = buildExecutionBrief({ cwd, goal, routeFacts });
+  const lastMileDecision = decideLastMile({ cwd, goal, routeFacts });
   const expected = [
     join(scriptRoot(), "workflow-snapshot.mjs"),
     join(scriptRoot(), "smart-route.mjs"),
+    join(scriptRoot(), "last-mile-orchestrator.mjs"),
     join(scriptRoot(), "stack-capabilities.mjs"),
     join(scriptRoot(), "merge-state.mjs"),
     join(scriptRoot(), "count-tasks.mjs"),
@@ -1058,6 +1079,7 @@ function doctor(argv: string[]): void {
     contextBudget,
     brain,
     executionBrief,
+    lastMile: lastMileDecision,
     externalMcp: externalMcpDoctor(),
     browserVerification: browserVerificationDoctor(cwd),
     active: snap.active,
@@ -1080,6 +1102,9 @@ async function main(): Promise<void> {
   switch (command) {
     case "route":
       route(argv);
+      return;
+    case "last-mile":
+      lastMile(argv);
       return;
     case "snapshot":
       snapshot(argv);

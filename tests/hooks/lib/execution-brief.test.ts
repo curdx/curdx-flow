@@ -34,8 +34,14 @@ describe("execution-brief", () => {
         expect.arrayContaining(["spec-executor", "spec-reviewer"]),
       );
       expect(brief.completionContract.join(" ")).toContain("fresh verification evidence");
+      expect(brief.lastMile).toMatchObject({
+        phase: "releasing",
+        problemType: "release-risk",
+      });
       expect(brief.brain.verifierHints).toContain("CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc");
       expect(compactExecutionBrief(brief)).toContain("brief(route=full-spec");
+      expect(compactExecutionBrief(brief)).toContain("lastMile(");
+      expect(compactExecutionBrief(brief, { includeLastMile: false })).not.toContain("lastMile(");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

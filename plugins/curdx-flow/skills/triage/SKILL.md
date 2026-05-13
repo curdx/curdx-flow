@@ -2,7 +2,7 @@
 name: triage
 description: Use when a large feature should be decomposed into dependency-aware specs.
 argument-hint: "[epic-name] [goal]"
-allowed-tools: "Read Write Bash Task AskUserQuestion"
+allowed-tools: "Read Write Bash Agent AskUserQuestion"
 disable-model-invocation: true
 ---
 
@@ -97,7 +97,7 @@ You MUST delegate ALL work to subagents:
 
 | Work Type | Subagent |
 |-----------|----------|
-| Exploration research | `research-analyst` and Explore-style research subagents via direct Task dispatch |
+| Exploration research | `research-analyst` and Explore-style research subagents via direct Agent dispatch |
 | Brainstorming/Decomposition | `triage-analyst` agent |
 | Validation research | `research-analyst` agent |
 

@@ -57,8 +57,14 @@ describe("post-tool-batch-snapshot", () => {
       expect(result.json?.hookSpecificOutput?.additionalContext).toContain("Stack: go");
       expect(result.json?.hookSpecificOutput?.additionalContext).toContain("Suggested verifier");
       expect(result.json?.hookSpecificOutput?.additionalContext).toContain("brief(route=");
+      expect(result.json?.hookSpecificOutput?.additionalContext).toContain("lastMile(");
+      expect(
+        result.json?.hookSpecificOutput?.additionalContext.match(/lastMile\(/g) ?? [],
+      ).toHaveLength(1);
+      expect(result.json?.hookSpecificOutput?.additionalContext).toContain("Autopilot:");
       expect(existsSync(path.join(cwd, ".curdx", "brain.jsonl"))).toBe(true);
       expect(readFileSync(path.join(cwd, ".curdx", "brain.jsonl"), "utf8")).toContain("edit-batch");
+      expect(readFileSync(path.join(cwd, ".curdx", "brain.jsonl"), "utf8")).toContain("last-mile-decision");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

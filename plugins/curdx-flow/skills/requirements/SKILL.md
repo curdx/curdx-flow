@@ -2,7 +2,7 @@
 name: requirements
 description: Use when a spec has research or goal context and needs requirements.
 argument-hint: "[spec-name]"
-allowed-tools: "Read Write Edit Bash Task AskUserQuestion"
+allowed-tools: "Read Write Edit Bash Agent AskUserQuestion"
 disable-model-invocation: true
 ---
 
@@ -17,7 +17,7 @@ Complete these coordination steps in order; do not create user-facing implementa
 
 1. **Gather context** -- resolve spec, read research and goal
 2. **Interview** -- brainstorming dialogue (skip if `--quick`)
-3. **Execute requirements** -- dispatch product-manager via direct Task; Agent Teams optional
+3. **Execute requirements** -- dispatch product-manager via direct Agent; Agent Teams optional
 4. **Artifact review** -- spec-reviewer validation loop (only if `--quick`)
 5. **Walkthrough & approval** -- display summary, get user approval
 6. **Finalize** -- update state, commit, stop
@@ -74,25 +74,25 @@ Append to `.progress.md` under "Interview Responses":
 
 Pass combined context to delegation prompt as "Interview Context".
 
-## Step 3: Execute Requirements (Task-Based, Teams Optional)
+## Step 3: Execute Requirements (Agent-Based, Teams Optional)
 
 <mandatory>
-**Default path: use the normal `Task` tool with `product-manager`. Do not require Agent Teams.**
+**Default path: use the normal `Agent` tool with `product-manager`. Do not require Agent Teams.**
 
-Agent Teams are experimental and disabled by default in Claude Code. Use the team lifecycle only when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set and the `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` tools are visible in the current session. If any team tool is unavailable or fails, immediately continue with the direct `Task(subagent_type: product-manager)` path. Treat this as the normal path, not a degraded path.
+Agent Teams are experimental and disabled by default in Claude Code. Use the team lifecycle only when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set and the `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` tools are visible in the current session. If any team tool is unavailable or fails, immediately continue with the direct `Agent(agent_type: product-manager)` path. Treat this as the normal path, not a degraded path.
 
 Direct path:
 
 1. Optionally create a visible native task with `TaskCreate(subject: "Generate requirements for $spec", activeForm: "Generating requirements")`. If unavailable or failing, continue without it.
-2. Dispatch `Task(subagent_type: product-manager)` with research context, goal, and interview context. Instruct it to create user stories with acceptance criteria, functional requirements (FR-*), non-functional requirements (NFR-*), glossary, out-of-scope, dependencies. Output to `./specs/$spec/requirements.md`.
-3. Wait for the Task result, then read `./specs/$spec/requirements.md`.
+2. Dispatch `Agent(agent_type: product-manager)` with research context, goal, and interview context. Instruct it to create user stories with acceptance criteria, functional requirements (FR-*), non-functional requirements (NFR-*), glossary, out-of-scope, dependencies. Output to `./specs/$spec/requirements.md`.
+3. Wait for the Agent result, then read `./specs/$spec/requirements.md`.
 
 Optional Agent Teams path:
 
 1. `TeamDelete()` once to release any stale team; errors are harmless.
 2. `TeamCreate(team_name: "requirements-$spec")`
 3. `TaskCreate(subject: "Generate requirements for $spec", activeForm: "Generating requirements")`
-4. `Task(subagent_type: product-manager, team_name: "requirements-$spec", name: "pm-1")` with the same prompt as the direct path.
+4. `Agent(agent_type: product-manager, team_name: "requirements-$spec", name: "pm-1")` with the same prompt as the direct path.
 5. Wait via automatic teammate messages or a single `TaskList` check.
 6. `SendMessage(type: "shutdown_request", recipient: "pm-1")`
 7. Read `./specs/$spec/requirements.md`, then `TeamDelete()`.
@@ -105,7 +105,7 @@ Optional Agent Teams path:
 
 If NOT `--quick`, skip to Step 5.
 
-Invoke `spec-reviewer` via Task tool. Follow the standard review loop:
+Invoke `spec-reviewer` via Agent tool. Follow the standard review loop:
 - REVIEW_PASS: log to .progress.md, proceed
 - REVIEW_FAIL (iteration < 3): log, re-invoke product-manager with feedback, loop
 - REVIEW_FAIL (iteration >= 3): graceful degradation, log warning, proceed
@@ -153,10 +153,10 @@ Ask ONE question: "How do you want to proceed?" with these options via AskUserQu
 3. **Request changes** -- Provide specific feedback to revise the artifact
 
 **If "Approve"**: proceed to Step 6.
-**If "Run review"**: Invoke spec-reviewer via Task tool with full requirements.md content (upstream: research.md). Display findings table. If REVIEW_PASS, note it. If REVIEW_FAIL, show feedback. Then loop back to this same 3-choice question (user decides next action).
+**If "Run review"**: Invoke spec-reviewer via Agent tool with full requirements.md content (upstream: research.md). Display findings table. If REVIEW_PASS, note it. If REVIEW_FAIL, show feedback. Then loop back to this same 3-choice question (user decides next action).
 **If "Request changes" or "Other"**:
 1. Ask what to change
-2. Re-invoke product-manager with direct `Task(subagent_type: product-manager)` and feedback; use the optional team lifecycle only if Agent Teams are enabled and available
+2. Re-invoke product-manager with direct `Agent(agent_type: product-manager)` and feedback; use the optional team lifecycle only if Agent Teams are enabled and available
 3. Re-display walkthrough, ask again with same 3 choices. Loop until approved.
 
 ## Step 6: Finalize

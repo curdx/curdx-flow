@@ -127,9 +127,9 @@ A single layer of defense is not enough — prose-only role boundaries get compa
 sessions, and prompt-only exclusions get rationalized through. The protocol therefore stacks three
 independent layers; **each one has to fail for drift to occur**.
 
-### Layer 1 — Independent judge (separate Task subagent thread)
+### Layer 1 — Independent judge (separate Agent subagent thread)
 
-The coordinator dispatches `code-quality-reviewer` via `Task(subagent_type: code-quality-reviewer, ...)`,
+The coordinator dispatches `code-quality-reviewer` via `Agent(agent_type: code-quality-reviewer, ...)`,
 which spawns a **fresh thread**. The reviewer does NOT run inline in the coordinator's context.
 This means:
 
@@ -138,7 +138,7 @@ This means:
 - The reviewer's own context window is bounded; it cannot grow into territory adjacent to
   `specCompliance` simply by sitting in a long-running coordinator turn.
 - Implementation: see `skills/design/SKILL.md` Step 4 and `skills/tasks/SKILL.md` Step 4 — both follow the
-  ONE-message dual-Task dispatch pattern from [`bounded-parallel-dispatch.md`](./bounded-parallel-dispatch.md).
+  ONE-message dual-Agent dispatch pattern from [`bounded-parallel-dispatch.md`](./bounded-parallel-dispatch.md).
 
 ### Layer 2 — Isolated context (no cross-pollination)
 
@@ -223,8 +223,8 @@ do NOT satisfy the gate. This rigidity is the price of compaction resilience.
 - `plugins/curdx-flow/agents/code-quality-reviewer.md` — independent reviewer covering `codeQuality`
 
 **Coordinator entrypoint skills** (where parallel dispatch lives):
-- `plugins/curdx-flow/skills/design/SKILL.md` — Step 4 Artifact Review, dual-Task dispatch
-- `plugins/curdx-flow/skills/tasks/SKILL.md` — Step 4 Artifact Review, dual-Task dispatch
+- `plugins/curdx-flow/skills/design/SKILL.md` — Step 4 Artifact Review, dual-Agent dispatch
+- `plugins/curdx-flow/skills/tasks/SKILL.md` — Step 4 Artifact Review, dual-Agent dispatch
 
 **Schema and types**:
 - `src/hooks/_shared/types.ts` — `VerificationBlock.reviews` field + `ReviewVerdict` interface

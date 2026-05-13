@@ -2,7 +2,7 @@
 name: status
 description: Use when inspecting curdx-flow specs, active state, progress, or index status.
 argument-hint: "[--update-index]"
-allowed-tools: "Read Bash Glob Task"
+allowed-tools: "Read Bash Glob Agent"
 disable-model-invocation: true
 ---
 

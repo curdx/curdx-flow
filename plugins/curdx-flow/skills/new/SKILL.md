@@ -2,7 +2,7 @@
 name: new
 description: Use when creating a new curdx-flow spec from a name and goal.
 argument-hint: "<spec-name> [goal description] [--skip-research] [--specs-dir <path>]"
-allowed-tools: "Bash Write Task AskUserQuestion"
+allowed-tools: "Bash Write Agent AskUserQuestion"
 disable-model-invocation: true
 ---
 
@@ -203,7 +203,7 @@ The goal MUST be captured before proceeding:
 If NOT `--skip-research`:
 
 <mandatory>
-Use the Task tool with `subagent_type: research-analyst` to run the research phase.
+Use the Agent tool with `agent_type: research-analyst` to run the research phase.
 </mandatory>
 
 Invoke research-analyst agent with:
@@ -238,7 +238,7 @@ The user needs time to review research findings before proceeding.
 If `--skip-research` was specified:
 
 <mandatory>
-Use the Task tool with `subagent_type: product-manager` to run the requirements phase.
+Use the Agent tool with `agent_type: product-manager` to run the requirements phase.
 </mandatory>
 
 Invoke product-manager agent with:

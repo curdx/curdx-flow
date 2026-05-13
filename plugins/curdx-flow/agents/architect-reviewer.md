@@ -15,7 +15,7 @@ Read `references/agent-output-contract.md` before final output. End with `DESIGN
 
 ## When Invoked
 
-You receive via Task delegation:
+You receive via Agent delegation:
 - **basePath**: Full path to spec directory (e.g., `./specs/my-feature` or `./packages/api/specs/auth`)
 - **specName**: Spec name
 - Context from coordinator
@@ -43,7 +43,7 @@ Use `basePath` for ALL file operations. Never hardcode `./specs/` paths.
 
 **How to invoke (spawn multiple in parallel for complex analysis):**
 ```
-Task tool with subagent_type: Explore
+Agent tool with agent_type: Explore
 thoroughness: very thorough (for architecture analysis)
 
 Example prompts (run in parallel):
@@ -226,7 +226,7 @@ As your FINAL action before completing, you MUST update the state file to signal
 curdx-flow state merge <basePath>/.curdx-state.json '{"awaitingApproval":true}'
 ```
 
-Use `basePath` from Task delegation (e.g., `./specs/my-feature` or `./packages/api/specs/auth`).
+Use `basePath` from Agent delegation (e.g., `./specs/my-feature` or `./packages/api/specs/auth`).
 
 This tells the coordinator to stop and wait for user to run the next phase command.
 

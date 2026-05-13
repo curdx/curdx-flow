@@ -1611,7 +1611,7 @@ function capabilityAvailability(id, available) {
 }
 function pushRecommendation(out, available, id, phase, reason, instruction, extra = {}) {
   const availability = capabilityAvailability(id, available);
-  if (out.some((rec) => rec.id === id)) return;
+  if (out.some((rec2) => rec2.id === id)) return;
   const cap = CAPABILITIES[id];
   out.push({
     id,
@@ -1629,7 +1629,10 @@ function pushRecommendation(out, available, id, phase, reason, instruction, extr
     expectedByDefault: cap.expectedByDefault,
     ...availability.availabilityState === "missing" && cap.missingAction ? { missingAction: cap.missingAction } : {},
     reason,
-    instruction
+    instruction,
+    triggerReason: reason,
+    requiredWhen: cap.curdxRole.includes("gate") ? "Required when this route reaches its matching quality gate." : "Use when the coordinator is in the matching phase and the task context still fits this reason.",
+    fallbackWhenMissing: cap.missingAction ?? (cap.doNotReimplement ? "Do not rebuild this capability inside curdx-flow; continue with the local workflow only if the evidence gate can still be satisfied." : "Use the local curdx-flow workflow path for this capability.")
   });
 }
 function sortRecommendations(recs) {
@@ -1896,7 +1899,7 @@ function parseBrainLine(line) {
   try {
     const parsed = JSON.parse(line);
     if (parsed.version !== 1) return null;
-    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked") {
+    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked" && parsed.type !== "last-mile-decision") {
       return null;
     }
     if (typeof parsed.timestamp !== "string") return null;
@@ -2993,6 +2996,258 @@ if (isDirectRun6()) {
   main6();
 }
 
+// src/hooks/lib/last-mile-orchestrator.ts
+import { basename as basename7 } from "node:path";
+import { fileURLToPath as fileURLToPath6 } from "node:url";
+var RELEASE_RE2 = /\b(release|publish|deploy|ship|tag|npm|version|changelog)\b|发布|部署|上线|打包|版本|标签/i;
+var FAILURE_RE = /\b(fail|failed|failure|error|stuck|retry|debug|broken|regression)\b|失败|报错|卡住|重试|排查|定位|回归/i;
+function normalize3(value) {
+  return (value ?? "").trim().replace(/\s+/g, " ");
+}
+function unique(values) {
+  return [...new Set(values.filter((value) => value.trim().length > 0))];
+}
+function rec(route, id) {
+  return route.recommendedCapabilities.find((item) => item.id === id);
+}
+function hasRec(route, id) {
+  return rec(route, id) !== void 0;
+}
+function missingCapabilityIds(route) {
+  return route.recommendedCapabilities.filter((item) => item.availabilityState === "missing" && item.expectedByDefault).map((item) => item.id);
+}
+function isReleaseSensitive(goal, route) {
+  return route.intent.intentKind === "release" || RELEASE_RE2.test(goal) || route.qualityGates.some((gate) => gate.id.endsWith("-release")) || route.stackProfile.primary === "claude-code-plugin" && RELEASE_RE2.test(goal);
+}
+function hasVerificationGap(input, snapshot) {
+  if (input.verification?.ok === false) return true;
+  if (input.hookEvent === "TaskCompleted") return true;
+  return snapshot.gates.some(
+    (gate) => gate === "completion-unmarked" || gate === "missing-tasks" || gate === "empty-tasks" || gate === "invalid-state"
+  );
+}
+function inferPhase(input, route, snapshot, brain) {
+  const goal = normalize3(input.goal);
+  if (isReleaseSensitive(goal, route)) return "releasing";
+  if (input.verification?.ok === false || brain.recentFailures.length >= 2) return "recovering";
+  if (input.hookEvent === "TaskCompleted") return "verifying";
+  if (FAILURE_RE.test(goal)) return "debugging";
+  const statePhase = snapshot.state.phase;
+  if (statePhase === "execution") return "implementing";
+  if (statePhase === "research") return "discovering";
+  if (statePhase === "requirements" || statePhase === "design" || statePhase === "tasks") {
+    return "planning";
+  }
+  if (route.route === "blocked-ask-user" || route.route === "product-inception") return "discovering";
+  if (route.shouldCreateSpec) return "planning";
+  return "implementing";
+}
+function inferProblemTypes(input, route, snapshot, brain) {
+  const goal = normalize3(input.goal);
+  const out = [];
+  if (route.route === "blocked-ask-user" || route.intent.missingFacts.length > 0) {
+    out.push("missing-context");
+  }
+  if (hasRec(route, "frontend-design")) out.push("ui-quality-risk");
+  if (hasRec(route, "chrome-devtools-mcp") || hasRec(route, "browser-verification")) {
+    out.push("browser-evidence-needed");
+  }
+  if (brain.recentFailures.length >= 2 || hasRec(route, "pua") || /\b(repeated|twice|again)\b|反复|连续|又失败|多次/i.test(goal)) {
+    out.push("repeated-failure");
+  }
+  if (isReleaseSensitive(goal, route)) out.push("release-risk");
+  if (hasVerificationGap(input, snapshot)) out.push("verification-gap");
+  if (snapshot.git.dirty && snapshot.git.changedFiles > 8 || snapshot.gates.includes("missing-code-root")) {
+    out.push("scope-drift");
+  }
+  if (missingCapabilityIds(route).length > 0) out.push("dependency-missing");
+  return unique(out);
+}
+function capabilityAction(recItem) {
+  const required = recItem.curdxRole.includes("gate") || recItem.category === "docs" || recItem.category === "verification" || recItem.category === "security" || recItem.id === "pua";
+  return {
+    id: recItem.id,
+    name: recItem.name,
+    invocation: recItem.invocation,
+    phase: recItem.phase,
+    availabilityState: recItem.availabilityState,
+    required,
+    triggerReason: recItem.triggerReason,
+    action: recItem.availabilityState === "missing" ? recItem.fallbackWhenMissing : recItem.instruction,
+    fallbackWhenMissing: recItem.fallbackWhenMissing
+  };
+}
+function evidenceRequired(input, route, snapshot, problems) {
+  const out = route.qualityGates.filter((gate) => gate.required).map((gate) => gate.command ? `${gate.id}: ${gate.command}` : gate.id);
+  const verifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback;
+  if (verifier) out.push(`suggested-verifier: ${verifier}`);
+  if (problems.includes("browser-evidence-needed")) {
+    out.push("browser evidence: Playwright pass or Chrome DevTools MCP console/network/DOM proof");
+  }
+  if (problems.includes("release-risk")) {
+    out.push("release evidence: curdx-flow doctor, plugin validate, hook freshness, version/tag parity");
+  }
+  if (problems.includes("verification-gap")) {
+    const phase = input.verification?.phase ?? snapshot.state.phase ?? "execution";
+    out.push(`fresh verification block for phase '${phase}'`);
+  }
+  return unique(out).slice(0, 8);
+}
+function evidenceSatisfied(snapshot, brain) {
+  const verified = Object.entries(snapshot.state.verificationBlocks).filter(([, block]) => block?.exitCode === 0 && typeof block.command === "string").map(([phase, block]) => `${phase}: ${block?.command}`);
+  return unique([...verified, ...brain.verifierHints.map((hint) => `brain: ${hint}`)]).slice(0, 6);
+}
+function blockingGates(route, snapshot, problems) {
+  const out = [...snapshot.gates];
+  if (route.blockedReason) out.push(`route-blocked: ${route.blockedReason}`);
+  for (const id of missingCapabilityIds(route)) {
+    out.push(`dependency-missing: ${id}`);
+  }
+  if (problems.includes("release-risk")) out.push("release-gate-required");
+  return unique(out);
+}
+function firstCapability(plan, id) {
+  return plan.find((item) => item.id === id);
+}
+function instructionFor(phase, problems, plan, route, snapshot) {
+  if (problems.includes("dependency-missing")) {
+    const missing = plan.filter((item) => item.availabilityState === "missing").map((item) => item.id).join(", ");
+    return `Run curdx-flow doctor and fix missing expected capabilities before relying on them: ${missing}.`;
+  }
+  if (problems.includes("repeated-failure")) {
+    const memory = firstCapability(plan, "claude-mem");
+    const pua = firstCapability(plan, "pua");
+    const parts = [
+      memory ? `${memory.invocation} for prior decisions/failures` : "read .curdx/brain.jsonl for recent failures",
+      pua ? `${pua.invocation} for structured recovery or parallel diagnosis` : "switch to systematic recovery before another edit"
+    ];
+    return `Stop the same edit loop; ${parts.join(", ")}.`;
+  }
+  if (problems.includes("ui-quality-risk")) {
+    return "Apply frontend-design guidance before changing visible UI, then keep browser evidence as the completion gate.";
+  }
+  if (problems.includes("browser-evidence-needed")) {
+    return "After implementation, collect browser runtime evidence with Playwright or Chrome DevTools MCP before claiming completion.";
+  }
+  if (problems.includes("release-risk")) {
+    return "Before tag, push, or publish, run the release gate: official Claude Code docs check, curdx-flow doctor, plugin validate, hook freshness, and npm/plugin tag parity.";
+  }
+  if (problems.includes("verification-gap")) {
+    return `Do not finish yet; satisfy the verifier for ${snapshot.spec?.name ?? "the active spec"} and record fresh evidence.`;
+  }
+  if (phase === "planning") return "Create or resume the smallest spec/task plan that satisfies the route, then enter implementation.";
+  return route.nextAction;
+}
+function recoveryFor(problems, plan, input) {
+  if (!problems.includes("repeated-failure") && !problems.includes("verification-gap")) return null;
+  const phase = input.verification?.phase ?? "current phase";
+  const reason = input.verification?.reason ?? "missing or failed evidence";
+  const memory = firstCapability(plan, "claude-mem");
+  const pua = firstCapability(plan, "pua");
+  return [
+    `Recovery for ${phase}: ${reason}.`,
+    memory ? `First search memory with ${memory.invocation}.` : "First inspect .curdx/brain.jsonl and the failing verifier output.",
+    pua ? `If the same fix path already failed, use ${pua.invocation} for decomposition/retry discipline.` : "If the same fix path already failed, decompose before editing again.",
+    "Then run the suggested verifier and record the result before completion."
+  ].join(" ");
+}
+function decideLastMile(input = {}) {
+  const cwd = input.cwd;
+  const goal = normalize3(input.goal);
+  const snapshot = input.snapshot ?? buildWorkflowSnapshot({ cwd, goal, spec: input.name });
+  const route = input.routeFacts ?? classifySmartRoute(input);
+  const brain = summarizeProjectBrain(cwd);
+  const phase = inferPhase(input, route, snapshot, brain);
+  const problemTypes = inferProblemTypes(input, route, snapshot, brain);
+  const capabilityPlan = route.recommendedCapabilities.map(capabilityAction);
+  const blocking = blockingGates(route, snapshot, problemTypes);
+  const coordinatorInstruction = instructionFor(phase, problemTypes, capabilityPlan, route, snapshot);
+  const recoveryInstruction = recoveryFor(problemTypes, capabilityPlan, input);
+  const decision = {
+    version: 1,
+    generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    phase,
+    problemType: problemTypes[0] ?? null,
+    problemTypes,
+    task: {
+      goal,
+      route: route.route,
+      stack: route.stackProfile.primary,
+      risk: route.policy.risk,
+      activeSpec: snapshot.spec?.name ?? route.activeSpec?.name ?? null,
+      currentTask: snapshot.tasks.current?.title ?? null
+    },
+    capabilityPlan,
+    evidenceRequired: evidenceRequired(input, route, snapshot, problemTypes),
+    evidenceSatisfied: evidenceSatisfied(snapshot, brain),
+    blockingGates: blocking,
+    coordinatorInstruction,
+    recoveryInstruction
+  };
+  if (input.record === true) {
+    appendBrainEvent(cwd, {
+      type: "last-mile-decision",
+      route: route.route,
+      stack: route.stackProfile.primary,
+      phase,
+      reason: [
+        `problem=${decision.problemType ?? "none"}`,
+        `instruction=${coordinatorInstruction}`
+      ].join(" "),
+      files: input.toolNames?.length
+    });
+  }
+  return decision;
+}
+function compactLastMileDecision(decision) {
+  const caps = decision.capabilityPlan.slice(0, 5).map(
+    (item) => item.availabilityState === "missing" ? `${item.id}:missing` : item.id
+  ).join(",");
+  const evidence = decision.evidenceRequired.slice(0, 3).join(" | ") || "none";
+  return [
+    `lastMile(phase=${decision.phase}`,
+    `problem=${decision.problemType ?? "none"}`,
+    `route=${decision.task.route}`,
+    `stack=${decision.task.stack}`,
+    `caps=${caps || "none"}`,
+    `evidence=${evidence})`
+  ].join(" ");
+}
+function readArg7(name, argv) {
+  const idx = argv.indexOf(name);
+  if (idx === -1) return void 0;
+  return argv[idx + 1];
+}
+function parseList4(value) {
+  if (!value) return [];
+  return value.split(/[,;\n]/).map((part) => part.trim()).filter(Boolean);
+}
+function main7() {
+  const argv = process.argv.slice(2);
+  const available = parseList4(readArg7("--available-capabilities", argv));
+  const decision = decideLastMile({
+    cwd: readArg7("--cwd", argv),
+    goal: readArg7("--goal", argv) ?? "",
+    name: readArg7("--spec", argv) ?? readArg7("--name", argv),
+    changedFiles: parseList4(readArg7("--files", argv)),
+    availableCapabilities: available.length > 0 ? available : void 0,
+    hookEvent: "runtime",
+    record: argv.includes("--record")
+  });
+  process.stdout.write(JSON.stringify(decision, null, 2) + "\n");
+}
+function isDirectRun7() {
+  try {
+    const entry = fileURLToPath6(import.meta.url);
+    return process.argv[1] === entry && basename7(entry).startsWith("last-mile-orchestrator.");
+  } catch {
+    return false;
+  }
+}
+if (isDirectRun7()) {
+  main7();
+}
+
 // src/hooks/lib/execution-brief.ts
 function preferredSkill(route) {
   switch (route.route) {
@@ -3100,6 +3355,7 @@ function buildExecutionBrief(input) {
   const cwd = input.cwd;
   const brain = summarizeProjectBrain(cwd);
   const verifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? void 0;
+  const lastMile = decideLastMile({ ...input, routeFacts: route });
   const brief = {
     version: 1,
     generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -3129,6 +3385,16 @@ function buildExecutionBrief(input) {
     })),
     completionContract: completionContract(route, brain),
     escalationRules: escalationRules(route),
+    lastMile: {
+      phase: lastMile.phase,
+      problemType: lastMile.problemType,
+      problemTypes: lastMile.problemTypes,
+      capabilityPlan: lastMile.capabilityPlan,
+      evidenceRequired: lastMile.evidenceRequired,
+      blockingGates: lastMile.blockingGates,
+      coordinatorInstruction: lastMile.coordinatorInstruction,
+      recoveryInstruction: lastMile.recoveryInstruction
+    },
     brain: {
       path: brain.path,
       totalEvents: brain.totalEvents,
@@ -3150,10 +3416,11 @@ function buildExecutionBrief(input) {
   }
   return brief;
 }
-function compactExecutionBrief(brief) {
+function compactExecutionBrief(brief, options = {}) {
   const verifier = brief.qualityGates.find((gate) => gate.required && gate.command !== null)?.command ?? "repo verifier";
   const agents = brief.execution.agents.length > 0 ? brief.execution.agents.join("+") : "none";
-  return [
+  const includeLastMile = options.includeLastMile ?? true;
+  const parts = [
     `brief(route=${brief.route}`,
     `stack=${brief.stack}`,
     `risk=${brief.risk}`,
@@ -3161,7 +3428,31 @@ function compactExecutionBrief(brief) {
     `skill=${brief.execution.primarySkill}`,
     `agents=${agents}`,
     `verifier=${verifier})`
-  ].join(" ");
+  ];
+  if (includeLastMile) {
+    parts.push(compactLastMileDecision({
+      version: 1,
+      generatedAt: brief.generatedAt,
+      phase: brief.lastMile.phase,
+      problemType: brief.lastMile.problemType,
+      problemTypes: brief.lastMile.problemTypes,
+      task: {
+        goal: brief.goal,
+        route: brief.route,
+        stack: brief.stack,
+        risk: brief.risk,
+        activeSpec: null,
+        currentTask: null
+      },
+      capabilityPlan: brief.lastMile.capabilityPlan,
+      evidenceRequired: brief.lastMile.evidenceRequired,
+      evidenceSatisfied: [],
+      blockingGates: brief.lastMile.blockingGates,
+      coordinatorInstruction: brief.lastMile.coordinatorInstruction,
+      recoveryInstruction: brief.lastMile.recoveryInstruction
+    }));
+  }
+  return parts.join(" ");
 }
 
 // src/hooks/_shared/stdin.ts
@@ -3189,7 +3480,7 @@ function limitContext(value) {
   if (value.length <= MAX_ADDITIONAL_CONTEXT_CHARS) return value;
   return `${value.slice(0, MAX_ADDITIONAL_CONTEXT_CHARS - 15)} ...[truncated]`;
 }
-async function main7() {
+async function main8() {
   let input;
   try {
     input = await readStdinJson();
@@ -3203,9 +3494,16 @@ async function main7() {
   if (!touchedWriteTool) return;
   try {
     const snapshot = buildWorkflowSnapshot({ cwd: input.cwd });
-    if (!snapshot.active || snapshot.gates.length === 0) return;
     const route = classifySmartRoute({ cwd: input.cwd });
     const brief = buildExecutionBrief({ cwd: input.cwd, routeFacts: route });
+    const lastMile = decideLastMile({
+      cwd: input.cwd,
+      snapshot,
+      routeFacts: route,
+      hookEvent: "PostToolBatch",
+      toolNames: calls.map((call) => call.tool_name ?? "unknown"),
+      record: true
+    });
     const missingVerifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? "repo verifier";
     const qualityGateText = route.qualityGates.filter((gate) => gate.required).slice(0, 3).map((gate) => gate.command ? `${gate.id} (${gate.command})` : gate.id).join(", ");
     appendBrainEvent(input.cwd, {
@@ -3215,7 +3513,7 @@ async function main7() {
       verifier: missingVerifier,
       files: calls.length
     });
-    const additionalContext = `curdx-flow snapshot gates after batch: ${snapshot.gates.join(", ")}. Stack: ${route.stackProfile.primary}. Quality gates: ${qualityGateText || "none"}. Suggested verifier: ${missingVerifier}. ${compactExecutionBrief(brief)}. Next action: ${snapshot.nextAction}`;
+    const additionalContext = `curdx-flow snapshot gates after batch: ${snapshot.gates.join(", ")}. Stack: ${route.stackProfile.primary}. Quality gates: ${qualityGateText || "none"}. Suggested verifier: ${missingVerifier}. ${compactExecutionBrief(brief, { includeLastMile: false })}. ${compactLastMileDecision(lastMile)}. Autopilot: ${lastMile.coordinatorInstruction}. Next action: ${snapshot.nextAction}`;
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
@@ -3227,5 +3525,5 @@ async function main7() {
   } catch {
   }
 }
-void main7();
+void main8();
 //# sourceMappingURL=post-tool-batch-snapshot.mjs.map

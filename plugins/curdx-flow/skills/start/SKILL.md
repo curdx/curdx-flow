@@ -2,7 +2,7 @@
 name: start
 description: Use when starting curdx-flow, creating a spec, resuming work, or routing intent.
 argument-hint: "[name] [goal] [--fresh] [--quick] [--mode auto|fast|deep] [--tasks-size auto|coarse|standard|fine] [--review minimal|standard|strict] [--commit-spec] [--no-commit-spec] [--specs-dir <path>]"
-allowed-tools: "Read Write Edit Bash Task Skill AskUserQuestion"
+allowed-tools: "Read Write Edit Bash Agent Skill AskUserQuestion"
 disable-model-invocation: true
 ---
 
@@ -34,14 +34,25 @@ Users do not need to know `--add-dir`. If routing returns a missing code root, s
      --goal "$goal" \
      --flags "$ARGUMENTS"
    ```
-3. Treat the returned `route` and `intent` as the source of truth. Do not invent a different workflow unless the router says `blocked-ask-user` and the user's answer changes the facts.
+3. Run the last-mile autopilot:
+   ```bash
+   curdx-flow last-mile \
+     --name "$name" \
+     --goal "$goal"
+   ```
+   Treat `phase`, `problemTypes`, `capabilityPlan`, `evidenceRequired`, and
+   `coordinatorInstruction` as the automatic execution policy. Do not ask the
+   user which skill to run when the autopilot already identifies the needed
+   capability.
+4. Treat the returned `route` and `intent` as the source of truth. Do not invent a different workflow unless the router says `blocked-ask-user` and the user's answer changes the facts.
 4. Always read these adaptive facts before acting:
    - `topology.workspaceState`: `empty`, `scaffolded`, `existing`, or `split-repo`
    - `intent.intentKind`: `scaffold`, `product`, `prototype`, `import-spec`, `feature`, `fix`, `refactor`, `release`, or `unknown`
    - `intent.clarity`, `intent.stackSpecified`, `intent.artifactProvided`, `intent.deliveryExpectation`, and `intent.missingFacts`
 5. If the router returns `recommendedCapabilities`, treat them as phase-specific hints, not mandatory steps. `availabilityState` is the operational signal: `available` means visible now, `expected` means the environment should provide it, and `missing` means skip or fix setup before relying on it. `availability: plugin-dependency` means a Claude Code plugin dependency; `availability: external-expected` means an MCP provided by the user's external setup such as `context7` or `sequential-thinking`. curdx-flow recommends existing wheels (`context7`, `claude-mem`, `frontend-design`, `chrome-devtools-mcp`, `sequential-thinking`, `pua`) and must not reimplement or bundle duplicate MCP config for them. Workflow/policy hints such as `docs-query`, `tdd-cycle`, `security-review`, `stack-specific-verification`, and `context-budget` need no installation.
-6. For stack profile, quality gates, suggested verifier, and context-budget interpretation, use `${CLAUDE_PLUGIN_ROOT}/references/intelligent-routing.md` only when the compact router output is insufficient.
-7. For execution brief fields, completion contract, and `.curdx/brain.jsonl` interpretation, use `${CLAUDE_PLUGIN_ROOT}/references/execution-brief.md` only when the compact brief output is insufficient.
+6. For last-mile phase/capability/evidence interpretation, use `${CLAUDE_PLUGIN_ROOT}/references/last-mile-autopilot.md`.
+7. For stack profile, quality gates, suggested verifier, and context-budget interpretation, use `${CLAUDE_PLUGIN_ROOT}/references/intelligent-routing.md` only when the compact router output is insufficient.
+8. For execution brief fields, completion contract, and `.curdx/brain.jsonl` interpretation, use `${CLAUDE_PLUGIN_ROOT}/references/execution-brief.md` only when the compact brief output is insufficient.
 
 ## Route Actions
 
@@ -200,7 +211,7 @@ For `prototype`, keep tasks bounded to the success criterion.
 For `import-spec`, keep traceability to the imported source artifact in every
 phase artifact.
 
-When a spec state is created and router output includes `topology`, `intent`, or `recommendedCapabilities`, store compact copies in `.curdx-state.json` as `projectTopology`, `intent`, and `recommendedCapabilities`.
+When a spec state is created and router output includes `topology`, `intent`, or `recommendedCapabilities`, store compact copies in `.curdx-state.json` as `projectTopology`, `intent`, and `recommendedCapabilities`. If last-mile output is available, store a compact `lastMile` object with `phase`, `problemType`, `problemTypes`, `capabilityPlan`, `evidenceRequired`, and `lastDecisionAt`.
 
 ## Quick Artifact Contract
 

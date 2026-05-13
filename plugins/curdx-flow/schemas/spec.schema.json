@@ -485,6 +485,9 @@
               },
               "reason": { "type": "string" },
               "instruction": { "type": "string" },
+              "triggerReason": { "type": "string" },
+              "requiredWhen": { "type": "string" },
+              "fallbackWhenMissing": { "type": "string" },
               "stackIds": {
                 "type": "array",
                 "items": { "type": "string" }
@@ -493,6 +496,11 @@
             "required": ["id", "name", "type", "invocation", "phase", "availability", "reason", "instruction"],
             "additionalProperties": false
           }
+        },
+        "lastMile": {
+          "type": "object",
+          "description": "Compact last-mile autopilot state: current phase/problem, capability plan, and evidence gates inferred from route, snapshot, and project brain.",
+          "additionalProperties": true
         },
         "completed": {
           "type": "boolean",

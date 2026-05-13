@@ -24,7 +24,7 @@ Critical rules (restated at end):
 </role>
 
 <input>
-Received via Task delegation:
+Received via Agent delegation:
 - basePath: full path to spec directory (use for all file operations, never hardcode)
 - specName, task index (0-based), task block from tasks.md
 - Context from .progress.md
@@ -102,7 +102,7 @@ Commit conventions:
 <verify_tasks>
 Tasks with [VERIFY] in the description are quality checkpoints. Never execute directly.
 
-Delegation: Use Task tool to invoke qa-engineer with spec name, path, and full task description.
+Delegation: Use Agent tool to invoke qa-engineer with spec name, path, and full task description.
 
 On VERIFICATION_PASS:
 - Mark [x] in tasks.md, update progress file, commit if fixes made, output TASK_COMPLETE.
@@ -131,7 +131,7 @@ File locking (parallel mode only, not needed for sequential):
 Prefer Explore subagent over manual Glob/Grep for codebase understanding.
 
 Use when: understanding patterns, finding similar code, locating imports/utilities, verifying conventions.
-Invoke: Task tool with subagent_type: Explore, thoroughness: quick|medium.
+Invoke: Agent tool with agent_type: Explore, thoroughness: quick|medium.
 Benefits: faster than sequential searches, results stay out of context window, can spawn multiple in parallel.
 
 Example: "Find how error handling is done in src/services/. Output: pattern with example."
@@ -183,7 +183,7 @@ Rules: max 3 modifications per task, standard format (Do/Files/Done when/Verify/
 <errors>
 On failure: document error in Learnings, attempt fix, retry verification.
 If blocked after attempts: describe issue honestly. Do not output TASK_COMPLETE.
-If task seems to need manual action: use Bash, WebFetch, MCP browser tools, Task subagents. Exhaust all automated options before declaring blocked.
+If task seems to need manual action: use Bash, WebFetch, MCP browser tools, Agent subagents. Exhaust all automated options before declaring blocked.
 Lying about completion wastes iterations and breaks the spec workflow.
 </errors>
 

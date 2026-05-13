@@ -2,7 +2,7 @@
 name: cancel
 description: Use when stopping an active curdx-flow execution loop or removing spec state.
 argument-hint: "[spec-name-or-path]"
-allowed-tools: "Read Bash Task"
+allowed-tools: "Read Bash Agent"
 disable-model-invocation: true
 ---
 

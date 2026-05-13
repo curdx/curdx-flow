@@ -11,7 +11,8 @@ export type BrainEventType =
   | "route-compiled"
   | "edit-batch"
   | "verification-run"
-  | "verification-blocked";
+  | "verification-blocked"
+  | "last-mile-decision";
 
 export interface BrainEvent {
   version: 1;
@@ -129,7 +130,8 @@ function parseBrainLine(line: string): BrainEvent | null {
       parsed.type !== "route-compiled" &&
       parsed.type !== "edit-batch" &&
       parsed.type !== "verification-run" &&
-      parsed.type !== "verification-blocked"
+      parsed.type !== "verification-blocked" &&
+      parsed.type !== "last-mile-decision"
     ) {
       return null;
     }

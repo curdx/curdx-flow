@@ -82,6 +82,38 @@ describe("runtime-cli lib", () => {
     }
   });
 
+  it("returns last-mile autopilot decisions through the runtime command surface", () => {
+    const cwd = makeTmpDir("runtime-last-mile");
+    try {
+      writeFileSync(
+        path.join(cwd, "package.json"),
+        JSON.stringify({ dependencies: { react: "^19.0.0" }, scripts: { test: "vitest" } }),
+      );
+
+      const result = runLib("runtime-cli", [
+        "last-mile",
+        "--cwd",
+        cwd,
+        "--goal",
+        "Fix React browser regression after failed twice",
+        "--available-capabilities",
+        "claude-mem,pua,frontend-design,chrome-devtools-mcp",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.json).toMatchObject({
+        version: 1,
+        problemTypes: expect.arrayContaining(["browser-evidence-needed"]),
+        capabilityPlan: expect.arrayContaining([
+          expect.objectContaining({ id: "frontend-design" }),
+          expect.objectContaining({ id: "chrome-devtools-mcp" }),
+        ]),
+      });
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("resolves and lists specs through the runtime command surface", () => {
     const cwd = makeTmpDir("runtime-specs");
     try {

@@ -13,7 +13,8 @@
 //      • from assistant_turn.attributionSkill
 //      • fallback: <command-name>...</command-name> XML in user_turn.content
 //   3. Subagents                     — AC-3.1
-//      • from tool_call where name === 'Agent', read input.subagent_type
+//      • from tool_call where name === 'Agent', read input.agent_type
+//        (fallback to legacy input.subagent_type)
 //   4. Spec Funnel                   — AC-4.1
 //      • specStates passed in by orchestrator (it scans ./specs/*/.curdx-state.json)
 //   5. Hook Duration P50/P95/P99     — AC-5.1 (linear-interpolation percentiles,
@@ -344,9 +345,18 @@ function renderSlashCommands(rows: SlashRow[], limit: number): string {
 /**
  * Section 3 — Subagents.
  *
- * Counts tool_call events whose tool is the Task/Agent dispatcher and pulls
- * input.subagent_type out of the message envelope.
+ * Counts tool_call events whose tool is the Agent dispatcher and pulls
+ * input.agent_type out of the message envelope. Legacy transcripts may still
+ * carry input.subagent_type, so keep a fallback for historical analysis.
  */
+function getAgentType(input: unknown): string | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const value = input as { agent_type?: unknown; subagent_type?: unknown };
+  if (typeof value.agent_type === 'string') return value.agent_type;
+  if (typeof value.subagent_type === 'string') return value.subagent_type;
+  return undefined;
+}
+
 function rollupSubagents(events: Event[], limit: number): SubagentRow[] {
   const counts = new Map<string, number>();
   for (const ev of events) {
@@ -364,8 +374,7 @@ function rollupSubagents(events: Event[], limit: number): SubagentRow[] {
           const p = part as { type?: unknown; name?: unknown; input?: unknown };
           if (p.type !== 'tool_use') continue;
           if (p.name !== 'Agent' && p.name !== 'Task') continue;
-          const input = p.input as { subagent_type?: unknown } | undefined;
-          const sub = input && typeof input.subagent_type === 'string' ? input.subagent_type : undefined;
+          const sub = getAgentType(p.input);
           if (sub) counts.set(sub, (counts.get(sub) ?? 0) + 1);
         }
       }
@@ -373,8 +382,7 @@ function rollupSubagents(events: Event[], limit: number): SubagentRow[] {
     // Also handle the flatter shape where the raw row already is a tool_use line.
     const direct = ev.payload as { name?: unknown; input?: unknown };
     if (direct.name === 'Agent' || direct.name === 'Task') {
-      const input = direct.input as { subagent_type?: unknown } | undefined;
-      const sub = input && typeof input.subagent_type === 'string' ? input.subagent_type : undefined;
+      const sub = getAgentType(direct.input);
       if (sub) counts.set(sub, (counts.get(sub) ?? 0) + 1);
     }
   }

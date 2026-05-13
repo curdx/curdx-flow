@@ -66,6 +66,7 @@ import { getSpecsDirs, resolveCurrent } from "./_shared/path-resolver.js";
 import { writeFileAtomic } from "./_shared/atomic-write.js";
 import { extractTaskBlock } from "./_shared/markdown-task-parser.js";
 import { getVerificationPhase, verifyPhaseBlock } from "./lib/verify-blocks.js";
+import { compactLastMileDecision, decideLastMile } from "./lib/last-mile-orchestrator.js";
 import type { BlockDecisionOutput } from "./_shared/types.js";
 import type { CurdxState } from "./_shared/types.js";
 
@@ -633,6 +634,7 @@ function buildContinuationBlock(args: {
   nativeSync: boolean;
   taskBlock: string;
   isParallel: boolean;
+  lastMileSummary?: string;
   stopHookPolicy?: "disabled" | "short-continuation" | "full-loop";
 }): BlockDecision {
   const taskHeader = args.isParallel
@@ -644,7 +646,7 @@ function buildContinuationBlock(args: {
   // is empty, leaving the heredoc's two adjacent newlines visible (one from
   // the empty-var line, one from the explicit blank above `## Resume`).
   const parallelInstructions = args.isParallel
-    ? `\nPARALLEL: These are [P] tasks -- dispatch ALL in ONE message via Task tool. Each gets progressFile: .progress-task-$INDEX.md. After all complete: merge progress, advance taskIndex past group.`
+    ? `\nPARALLEL: These are [P] tasks -- dispatch ALL in ONE message via Agent tool. Each gets progressFile: .progress-task-$INDEX.md. After all complete: merge progress, advance taskIndex past group.`
     : "";
 
   if (args.stopHookPolicy === "short-continuation") {
@@ -654,6 +656,7 @@ function buildContinuationBlock(args: {
       `${taskHeader}\n` +
       `${args.taskBlock}\n` +
       `${parallelInstructions}\n\n` +
+      `${args.lastMileSummary ? `Autopilot: ${args.lastMileSummary}\n` : ""}` +
       `Next: delegate this vertical-slice task, run its Verify command, update tasks.md and .curdx-state.json, then continue. Output ALL_TASKS_COMPLETE only after every task is [x].`;
 
     let systemMessage =
@@ -681,7 +684,7 @@ function buildContinuationBlock(args: {
     `4. On TASK_COMPLETE: verify, update state, advance. Then TaskUpdate task to completed (if NativeSync != false)\n` +
     `5. If taskIndex >= totalTasks: finalize all native tasks to completed (if NativeSync != false), read ${args.specPath}/tasks.md to verify all [x], delete state file, output ALL_TASKS_COMPLETE\n\n` +
     `## Critical\n` +
-    `- Delegate via Task tool - do NOT implement yourself\n` +
+    `- Delegate via Agent tool - do NOT implement yourself\n` +
     `- Verify all 3 layers before advancing (see verification-layers.md)\n` +
     `- Do NOT push after every commit - batch pushes per phase or every 5 commits (see coordinator-pattern.md § 'Git Push Strategy')\n` +
     `- On failure: increment taskIteration, retry or generate fix task if recoveryMode\n` +
@@ -692,6 +695,18 @@ function buildContinuationBlock(args: {
   if (args.isParallel) systemMessage += " (PARALLEL GROUP)";
 
   return { decision: "block", reason, systemMessage };
+}
+
+function buildStopLastMileSummary(cwd: string): string | undefined {
+  try {
+    const decision = decideLastMile({
+      cwd,
+      hookEvent: "Stop",
+    });
+    return `${compactLastMileDecision(decision)} ${decision.coordinatorInstruction}`;
+  } catch {
+    return undefined;
+  }
 }
 
 runHook(async (input) => {
@@ -994,6 +1009,9 @@ runHook(async (input) => {
       nativeSync,
       taskBlock,
       isParallel,
+      lastMileSummary: state.autoPolicy?.stopHookPolicy === "short-continuation"
+        ? buildStopLastMileSummary(cwd)
+        : undefined,
       stopHookPolicy: state.autoPolicy?.stopHookPolicy,
     });
   }

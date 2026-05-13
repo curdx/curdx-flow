@@ -2,6 +2,25 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.31 — 2026-05-13
+
+### Added
+
+- **Last-mile autopilot context.** Added a UserPromptSubmit autopilot hook and `last-mile-orchestrator` runtime support so normal coding prompts, not only `/curdx-flow:*` slash invocations, can receive compact capability, evidence, and recovery guidance.
+- **Claude Code transcript compatibility for Agent dispatch.** Analyze now reads current `input.agent_type` while preserving fallback support for legacy `input.subagent_type` transcript rows.
+
+### Changed
+
+- **Claude Code subagent dispatch terminology now follows current docs.** Plugin skills, agents, references, templates, tests, and stop-watcher continuation prompts now use the `Agent` dispatcher and `agent_type` examples instead of legacy `Task(subagent_type: ...)` wording. Native task-list tools such as `TaskCreate`, `TaskList`, and `TaskUpdate` remain unchanged.
+
+### Fixed
+
+- **Duplicate last-mile hook context.** UserPromptExpansion and PostToolBatch now include the execution brief and the live last-mile decision once, avoiding repeated `lastMile(...)` summaries in injected context.
+
+### Tests
+
+- Added regression coverage for single last-mile injection, `agent_type`/`subagent_type` analyze compatibility, updated direct-Agent dispatch docs, and the skills-only implement entrypoint path. Verified with `npm run verify`, `claude plugin validate ./plugins/curdx-flow`, and `CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc`.
+
 ## 7.1.30 — 2026-05-13
 
 ### Added

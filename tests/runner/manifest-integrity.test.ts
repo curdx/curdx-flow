@@ -409,7 +409,7 @@ describe("skills frontmatter integrity", () => {
     }
   });
 
-  it("phase entrypoint docs use direct Task as the default, not Agent Teams", () => {
+  it("phase entrypoint docs use direct Agent as the default, not Agent Teams", () => {
     for (const name of ["research", "requirements", "design", "tasks", "triage"] as const) {
       const file = path.join(SKILLS_DIR, name, "SKILL.md");
       const body = readFileSync(file, "utf8");
@@ -417,8 +417,8 @@ describe("skills frontmatter integrity", () => {
       expect(body, `${file}: should not describe team dispatch as the default`).not.toMatch(
         /via team|Team Research Phase|Research Team \(multiple parallel teammates\)/,
       );
-      expect(body, `${file}: should document direct Task dispatch`).toMatch(
-        /direct Task|Direct Task/,
+      expect(body, `${file}: should document direct Agent dispatch`).toMatch(
+        /direct Agent|Direct Agent/,
       );
     }
   });
@@ -434,7 +434,7 @@ describe("skills frontmatter integrity", () => {
 
     for (const file of files) {
       const body = readFileSync(file, "utf8");
-      expect(body, `${file}: use direct Task dispatch language instead`).not.toMatch(
+      expect(body, `${file}: use direct Agent dispatch language instead`).not.toMatch(
         /Research Team|research team|create research team|spawn parallel teammates/,
       );
     }

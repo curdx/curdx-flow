@@ -14,6 +14,11 @@ import {
   summarizeProjectBrain,
   type BrainSummary,
 } from "./project-brain.js";
+import {
+  compactLastMileDecision,
+  decideLastMile,
+  type LastMileDecision,
+} from "./last-mile-orchestrator.js";
 
 export interface ExecutionBrief {
   version: 1;
@@ -44,6 +49,10 @@ export interface ExecutionBrief {
   }>;
   completionContract: string[];
   escalationRules: string[];
+  lastMile: Pick<
+    LastMileDecision,
+    "phase" | "problemType" | "problemTypes" | "capabilityPlan" | "evidenceRequired" | "blockingGates" | "coordinatorInstruction" | "recoveryInstruction"
+  >;
   brain: Pick<BrainSummary, "path" | "totalEvents" | "lastUpdated" | "stackHints" | "verifierHints" | "recentFailures">;
 }
 
@@ -165,6 +174,7 @@ export function buildExecutionBrief(input: ExecutionBriefInput): ExecutionBrief 
   const cwd = input.cwd;
   const brain = summarizeProjectBrain(cwd);
   const verifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? undefined;
+  const lastMile = decideLastMile({ ...input, routeFacts: route });
   const brief: ExecutionBrief = {
     version: 1,
     generatedAt: new Date().toISOString(),
@@ -194,6 +204,16 @@ export function buildExecutionBrief(input: ExecutionBriefInput): ExecutionBrief 
     })),
     completionContract: completionContract(route, brain),
     escalationRules: escalationRules(route),
+    lastMile: {
+      phase: lastMile.phase,
+      problemType: lastMile.problemType,
+      problemTypes: lastMile.problemTypes,
+      capabilityPlan: lastMile.capabilityPlan,
+      evidenceRequired: lastMile.evidenceRequired,
+      blockingGates: lastMile.blockingGates,
+      coordinatorInstruction: lastMile.coordinatorInstruction,
+      recoveryInstruction: lastMile.recoveryInstruction,
+    },
     brain: {
       path: brain.path,
       totalEvents: brain.totalEvents,
@@ -217,12 +237,20 @@ export function buildExecutionBrief(input: ExecutionBriefInput): ExecutionBrief 
   return brief;
 }
 
-export function compactExecutionBrief(brief: ExecutionBrief): string {
+export interface CompactExecutionBriefOptions {
+  includeLastMile?: boolean;
+}
+
+export function compactExecutionBrief(
+  brief: ExecutionBrief,
+  options: CompactExecutionBriefOptions = {},
+): string {
   const verifier =
     brief.qualityGates.find((gate) => gate.required && gate.command !== null)?.command ??
     "repo verifier";
   const agents = brief.execution.agents.length > 0 ? brief.execution.agents.join("+") : "none";
-  return [
+  const includeLastMile = options.includeLastMile ?? true;
+  const parts = [
     `brief(route=${brief.route}`,
     `stack=${brief.stack}`,
     `risk=${brief.risk}`,
@@ -230,5 +258,31 @@ export function compactExecutionBrief(brief: ExecutionBrief): string {
     `skill=${brief.execution.primarySkill}`,
     `agents=${agents}`,
     `verifier=${verifier})`,
-  ].join(" ");
+  ];
+
+  if (includeLastMile) {
+    parts.push(compactLastMileDecision({
+      version: 1,
+      generatedAt: brief.generatedAt,
+      phase: brief.lastMile.phase,
+      problemType: brief.lastMile.problemType,
+      problemTypes: brief.lastMile.problemTypes,
+      task: {
+        goal: brief.goal,
+        route: brief.route,
+        stack: brief.stack,
+        risk: brief.risk,
+        activeSpec: null,
+        currentTask: null,
+      },
+      capabilityPlan: brief.lastMile.capabilityPlan,
+      evidenceRequired: brief.lastMile.evidenceRequired,
+      evidenceSatisfied: [],
+      blockingGates: brief.lastMile.blockingGates,
+      coordinatorInstruction: brief.lastMile.coordinatorInstruction,
+      recoveryInstruction: brief.lastMile.recoveryInstruction,
+    }));
+  }
+
+  return parts.join(" ");
 }

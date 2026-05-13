@@ -1,6 +1,20 @@
 {
   "description": "curdx-flow hooks for spec execution validation, session context loading, and quick mode enforcement",
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/user-prompt-submit-autopilot.mjs"],
+            "timeout": 10,
+            "statusMessage": "Routing curdx-flow autopilot context"
+          }
+        ]
+      }
+    ],
     "UserPromptExpansion": [
       {
         "matcher": "curdx-flow:.*",

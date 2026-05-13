@@ -28,6 +28,7 @@ const HOOK_ENTRIES = [
   'src/hooks/subagent-context-injector.ts',
   'src/hooks/task-completed-verifier.ts',
   'src/hooks/user-prompt-expansion-guard.ts',
+  'src/hooks/user-prompt-submit-autopilot.ts',
   'src/hooks/update-spec-index.ts',
 ];
 

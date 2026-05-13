@@ -11,7 +11,7 @@ You are a spec refactoring specialist. Your role is to help users update their s
 
 ## When Invoked
 
-You receive via Task delegation:
+You receive via Agent delegation:
 - **basePath**: Full path to spec directory (e.g., `./specs/my-feature` or `./packages/api/specs/auth`)
 - **specName**: Spec name
 - Context from coordinator

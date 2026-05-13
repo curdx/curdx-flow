@@ -58,7 +58,7 @@ Set reviewIteration = 1
 WHILE reviewIteration <= 3:
   1. Collect changed files from the task (from the task's Files list and git diff --name-only $TASK_START_SHA HEAD)
   2. Read $SPEC_PATH/design.md and $SPEC_PATH/requirements.md
-  3. Invoke spec-reviewer via Task tool
+  3. Invoke spec-reviewer via Agent tool
   4. Parse the last line of spec-reviewer output for signal:
      - REVIEW_PASS: log review iteration, proceed to State Update
      - REVIEW_FAIL (reviewIteration < 3):
@@ -87,7 +87,7 @@ WHILE reviewIteration <= 3:
 ### Review Delegation Prompt
 
 ```yaml
-subagent_type: spec-reviewer
+agent_type: spec-reviewer
 
 You are reviewing the execution artifact for spec: $spec
 Spec path: $SPEC_PATH/

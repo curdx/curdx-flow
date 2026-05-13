@@ -2,7 +2,7 @@
 name: refactor
 description: Use when updating requirements, design, or tasks after implementation learnings.
 argument-hint: "[spec-name] [--file=requirements|design|tasks]"
-allowed-tools: "Read Write Edit Task Bash AskUserQuestion"
+allowed-tools: "Read Write Edit Agent Bash AskUserQuestion"
 disable-model-invocation: true
 ---
 
@@ -89,7 +89,7 @@ For sections marked for update, ask: "What specific changes for [section]?" with
 ## Step 4: Delegate to Specialist
 
 <mandatory>
-Use `Task(subagent_type: refactor-specialist)` for each file update.
+Use `Agent(agent_type: refactor-specialist)` for each file update.
 
 Include in prompt:
 - Full current file content

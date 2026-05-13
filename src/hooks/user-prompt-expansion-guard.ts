@@ -5,6 +5,7 @@
 import { buildWorkflowSnapshot } from "./lib/workflow-snapshot.js";
 import { classifySmartRoute } from "./lib/smart-route.js";
 import { buildExecutionBrief, compactExecutionBrief } from "./lib/execution-brief.js";
+import { compactLastMileDecision, decideLastMile } from "./lib/last-mile-orchestrator.js";
 import { readStdinJson } from "./_shared/stdin.js";
 
 const KNOWN = new Set([
@@ -81,6 +82,13 @@ async function main(): Promise<void> {
       goal: input.command_args,
       routeFacts: route,
     });
+    const lastMile = decideLastMile({
+      cwd: input.cwd,
+      goal: input.command_args,
+      routeFacts: route,
+      snapshot,
+      hookEvent: "UserPromptExpansion",
+    });
     const topGates = route.qualityGates
       .filter((gate) => gate.required)
       .slice(0, 3)
@@ -98,7 +106,9 @@ async function main(): Promise<void> {
       `verifier=${route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? "repo-default"}`,
       `contextBudget=${route.contextBudget.level}`,
       `qualityGates=${topGates || "none"}`,
-      compactExecutionBrief(brief),
+      compactExecutionBrief(brief, { includeLastMile: false }),
+      compactLastMileDecision(lastMile),
+      `autopilot=${lastMile.coordinatorInstruction}`,
       `next=${snapshot.nextAction}`,
       `gates=${snapshot.gates.join(",") || "none"}`,
       promptOptimizeHint.trim(),

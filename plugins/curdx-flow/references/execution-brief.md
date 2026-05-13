@@ -24,6 +24,8 @@ use `--record` during prompt optimization.
 - `completionContract`: evidence required before claiming completion.
 - `escalationRules`: when to ask, switch to debugging, add directories, or run
   official release validation.
+- `lastMile`: current phase/problem, automatic capability plan, evidence
+  requirements, blocking gates, and coordinator instruction.
 - `brain`: recent project-local learning from `.curdx/brain.jsonl`.
 
 ## Rules
@@ -39,3 +41,6 @@ use `--record` during prompt optimization.
   verification evidence always win.
 - Never store secrets, full prompts, source contents, or user private data in
   brain events.
+- Treat `lastMile.coordinatorInstruction` as the immediate next-step policy.
+  Do not turn `capabilityPlan` into a manual checklist for the user; the
+  coordinator applies available dependency wheels automatically.

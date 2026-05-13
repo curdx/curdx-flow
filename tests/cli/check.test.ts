@@ -198,7 +198,7 @@ describe("CLI `check` subcommand (Task 3.9)", () => {
  * iterations <N>` subcommand) — it is parsed inside the `/curdx-flow:implement`
  * slash command, which lives in `plugins/curdx-flow/skills/implement/SKILL.md`.
  * design.md learning #6 makes this a hard constraint: "CLI flag 设计无 top-
- * level subcommand — 沿用 implement.md 现有 flag-parsing pattern, src/index.ts
+ * level subcommand — 沿用 skills/implement/SKILL.md 现有 flag-parsing pattern, src/index.ts
  * 不动".
  *
  * So the load-bearing assertion here is documentation drift: the slash command
@@ -212,8 +212,9 @@ describe("--max-global-iterations CLI flag (spec-cost-runaway-guards Task 3.5)",
     REPO_ROOT,
     "plugins",
     "curdx-flow",
-    "commands",
-    "implement.md",
+    "skills",
+    "implement",
+    "SKILL.md",
   );
 
   function readImplement(): string {

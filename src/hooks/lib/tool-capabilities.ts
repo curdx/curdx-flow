@@ -120,6 +120,9 @@ export interface CapabilityRecommendation {
   missingAction?: string;
   reason: string;
   instruction: string;
+  triggerReason: string;
+  requiredWhen: string;
+  fallbackWhenMissing: string;
   stackIds?: string[];
 }
 
@@ -410,6 +413,14 @@ function pushRecommendation(
       : {}),
     reason,
     instruction,
+    triggerReason: reason,
+    requiredWhen: cap.curdxRole.includes("gate")
+      ? "Required when this route reaches its matching quality gate."
+      : "Use when the coordinator is in the matching phase and the task context still fits this reason.",
+    fallbackWhenMissing: cap.missingAction ??
+      (cap.doNotReimplement
+        ? "Do not rebuild this capability inside curdx-flow; continue with the local workflow only if the evidence gate can still be satisfied."
+        : "Use the local curdx-flow workflow path for this capability."),
   });
 }
 

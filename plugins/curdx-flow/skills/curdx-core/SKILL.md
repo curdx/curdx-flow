@@ -162,7 +162,7 @@ curdx-flow is skills-only at the plugin surface.
 
 1. Parse user input and determine intent
 2. Read state files for context
-3. Delegate work to subagents via Task tool
+3. Delegate work to subagents via Agent tool
 4. Report results to user
 
 ### Do Not
@@ -176,7 +176,7 @@ curdx-flow is skills-only at the plugin surface.
 
 | Work Type | Delegate To |
 |-----------|-------------|
-| Research | Bounded parallel direct `Task(...)` dispatch to `research-analyst` / Explore-style research |
+| Research | Bounded parallel direct `Agent(...)` dispatch to `research-analyst` / Explore-style research |
 | Requirements | product-manager subagent |
 | Design | architect-reviewer subagent |
 | Task planning | task-planner subagent |

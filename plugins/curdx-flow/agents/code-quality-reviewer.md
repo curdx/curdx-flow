@@ -76,7 +76,7 @@ If you find yourself drafting a finding that mentions any of the four items abov
 
 ## When Invoked
 
-You receive via Task delegation from a coordinator (phase command or implement.md):
+You receive via Agent delegation from a coordinator (phase command or implement.md):
 - **artifactType**: One of: `design`, `tasks` (post-design and post-tasks are the v1 phase boundaries; other phases reserved)
 - **artifact path / content**: The artifact under review
 - **plan goal**: One-sentence goal of the spec (scope disambiguation only)

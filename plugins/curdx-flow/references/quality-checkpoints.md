@@ -193,7 +193,7 @@ Using both PID and port-based kill ensures no orphaned processes remain, even if
 
 ## Execution: How [VERIFY] Tasks Are Handled
 
-The spec-executor does NOT execute [VERIFY] tasks directly. It delegates them to the `qa-engineer` subagent via Task tool:
+The spec-executor does NOT execute [VERIFY] tasks directly. It delegates them to the `qa-engineer` subagent via Agent tool:
 
 1. Detect `[VERIFY]` tag in task description
 2. Delegate to qa-engineer with spec name, path, and full task body

@@ -175,11 +175,11 @@ describe('bounded-parallel-dispatch.md drift detection', () => {
 
   test('5-step-pattern-preserved: doc retains the dispatch-pattern heading and all 5 step markers', () => {
     const doc = readDoc();
-    // Direct Task dispatch is the stable default; Agent Teams are optional
+    // Direct Agent dispatch is the stable default; Agent Teams are optional
     // because Claude Code currently gates them behind an experimental flag.
-    expect(doc).toContain('## Dispatch Pattern (Direct Task Default, Teams Optional)');
+    expect(doc).toContain('## Dispatch Pattern (Direct Agent Default, Teams Optional)');
     expect(doc).toContain('Agent Teams are experimental and disabled by default');
-    expect(doc).toContain('Direct `Task(...)` dispatch is the baseline contract');
+    expect(doc).toContain('Direct `Agent(...)` dispatch is the baseline contract');
     // All 5 step markers must remain — drift in step ordering or count
     // breaks downstream skills that read the doc procedurally.
     for (let i = 1; i <= 5; i++) {

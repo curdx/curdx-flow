@@ -1,7 +1,7 @@
 # Intelligent Routing
 
 Use this reference when route output includes `stackProfile`, `qualityGates`,
-`suggestedVerifier`, `contextBudget`, or `recommendedCapabilities`.
+`suggestedVerifier`, `contextBudget`, `recommendedCapabilities`, or `lastMile`.
 
 ## Route Facts
 
@@ -71,7 +71,24 @@ when it is required for the task.
 
 `context7` and `sequential-thinking` are external MCP wheels in this setup.
 Do not add plugin-local `.mcp.json` files or `mcpServers` manifest entries for
-them; `doctor` should diagnose whether Claude Code can see them.
+  them; `doctor` should diagnose whether Claude Code can see them.
+
+## Last-Mile Autopilot
+
+`lastMile` is the automatic orchestration layer above route facts. It decides
+the current phase, the risky problem type, capability plan, evidence gates, and
+coordinator instruction. Do not ask the user which skill to run when
+`lastMile.capabilityPlan` already identifies the relevant wheel.
+
+Use dependency wheels as capabilities, not as copied assets:
+
+- `claude-mem` for history, previous decisions, and repeated failures.
+- `pua` for repeated-failure recovery or genuinely independent decomposition.
+- `frontend-design` for UI/visual/interaction work.
+- `chrome-devtools-mcp` for browser console/network/DOM/performance/evidence.
+
+If a required capability is missing, follow its `fallbackWhenMissing` and run
+`curdx-flow doctor`; never implement a duplicate wheel inside curdx-flow.
 
 ## Context Budget
 

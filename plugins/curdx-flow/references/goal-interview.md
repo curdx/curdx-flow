@@ -91,7 +91,7 @@ After interview and approach selection, update `.progress.md`:
 
 ## Pass Context to Research Tasks
 
-Include goal interview context in each direct research `Task(...)` prompt:
+Include goal interview context in each direct research `Agent(...)` prompt:
 
 ```text
 Each research task prompt should include:

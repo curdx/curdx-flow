@@ -8,7 +8,7 @@ The triage flow decomposes a large feature into multiple specs. It uses two rese
 
 ## Step 1: Exploration Research
 
-Run the same bounded parallel direct `Task(...)` research pattern as `/curdx-flow:start`, using triage-focused prompts.
+Run the same bounded parallel direct `Agent(...)` research pattern as `/curdx-flow:start`, using triage-focused prompts.
 
 ### Research Prompt Customization
 
@@ -49,7 +49,7 @@ Follow `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md` but with:
 
 ## Step 2: Brainstorming & Decomposition
 
-Delegate to `triage-analyst` agent via Task tool:
+Delegate to `triage-analyst` agent via Agent tool:
 - Pass basePath, epicName, goal, and the research output
 - The agent runs the brainstorming dialogue and produces `epic.md`
 - Wait for the agent to complete

@@ -117,26 +117,26 @@ describe('two-stage-review drift detection', () => {
     expect(cqDoc).toContain('REVIEW_FAIL');
   });
 
-  test('skills/design/SKILL.md wires bounded-parallel-dispatch + dual reviewer Task calls (FR-D1, AC-8.1)', () => {
+  test('skills/design/SKILL.md wires bounded-parallel-dispatch + dual reviewer Agent calls (FR-D1, AC-8.1)', () => {
     const doc = readFile(DESIGN_SKILL_PATH);
 
     // Phase boundary review must reference the bounded-parallel-dispatch
-    // contract — that's the only place "ALL Task calls in ONE message" is
+    // contract — that's the only place "ALL Agent calls in ONE message" is
     // defined. If this link is gone, the coordinator silently regresses
     // to sequential dispatch.
     expect(doc).toContain('bounded-parallel-dispatch');
-    expect(doc).toContain('direct `Task(subagent_type: architect-reviewer)`');
+    expect(doc).toContain('direct `Agent(agent_type: architect-reviewer)`');
     expect(doc).toContain('Agent Teams are experimental and disabled by default');
 
-    // Both reviewers must be invoked via Task subagent. The literal
-    // `subagent_type: <name>` form is what the dispatcher matches; a prose
+    // Both reviewers must be invoked via Agent subagent. The literal
+    // `agent_type: <name>` form is what the dispatcher matches; a prose
     // mention alone (e.g. just "spec-reviewer reviews ...") would not
     // actually trigger dual dispatch.
-    expect(doc).toMatch(/subagent_type:\s*spec-reviewer/);
-    expect(doc).toMatch(/subagent_type:\s*code-quality-reviewer/);
+    expect(doc).toMatch(/agent_type:\s*spec-reviewer/);
+    expect(doc).toMatch(/agent_type:\s*code-quality-reviewer/);
   });
 
-  test('skills/tasks/SKILL.md wires bounded-parallel-dispatch + dual reviewer Task calls (FR-D1, AC-8.2)', () => {
+  test('skills/tasks/SKILL.md wires bounded-parallel-dispatch + dual reviewer Agent calls (FR-D1, AC-8.2)', () => {
     const doc = readFile(TASKS_SKILL_PATH);
 
     // Mirror of the design skill contract — tasks skill phase boundary uses the
@@ -144,10 +144,10 @@ describe('two-stage-review drift detection', () => {
     // skill files (e.g. tasks forgets one reviewer) silently breaks
     // the post-tasks gate while post-design still passes.
     expect(doc).toContain('bounded-parallel-dispatch');
-    expect(doc).toContain('direct `Task(subagent_type: task-planner)`');
+    expect(doc).toContain('direct `Agent(agent_type: task-planner)`');
     expect(doc).toContain('Agent Teams are experimental and disabled by default');
-    expect(doc).toMatch(/subagent_type:\s*spec-reviewer/);
-    expect(doc).toMatch(/subagent_type:\s*code-quality-reviewer/);
+    expect(doc).toMatch(/agent_type:\s*spec-reviewer/);
+    expect(doc).toMatch(/agent_type:\s*code-quality-reviewer/);
   });
 
   test('REVIEW_PASS / REVIEW_FAIL verdict lines are byte-equal across both agent files (NFR-1, FR-X3)', () => {

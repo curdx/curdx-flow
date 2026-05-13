@@ -8,8 +8,8 @@ const __dirname = __ccd(__filename);
 // src/hooks/lib/runtime-cli.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync9, readFileSync as readFileSync9, statSync as statSync6 } from "node:fs";
-import { basename as basename9, dirname, isAbsolute as isAbsolute6, join as join8, resolve as resolve5 } from "node:path";
-import { fileURLToPath as fileURLToPath6 } from "node:url";
+import { basename as basename10, dirname, isAbsolute as isAbsolute6, join as join8, resolve as resolve5 } from "node:path";
+import { fileURLToPath as fileURLToPath7 } from "node:url";
 
 // src/hooks/lib/smart-route.ts
 import { existsSync as existsSync5, readFileSync as readFileSync5 } from "node:fs";
@@ -1304,7 +1304,7 @@ function capabilityAvailability(id, available) {
 }
 function pushRecommendation(out, available, id, phase, reason, instruction, extra = {}) {
   const availability = capabilityAvailability(id, available);
-  if (out.some((rec) => rec.id === id)) return;
+  if (out.some((rec2) => rec2.id === id)) return;
   const cap = CAPABILITIES[id];
   out.push({
     id,
@@ -1322,7 +1322,10 @@ function pushRecommendation(out, available, id, phase, reason, instruction, extr
     expectedByDefault: cap.expectedByDefault,
     ...availability.availabilityState === "missing" && cap.missingAction ? { missingAction: cap.missingAction } : {},
     reason,
-    instruction
+    instruction,
+    triggerReason: reason,
+    requiredWhen: cap.curdxRole.includes("gate") ? "Required when this route reaches its matching quality gate." : "Use when the coordinator is in the matching phase and the task context still fits this reason.",
+    fallbackWhenMissing: cap.missingAction ?? (cap.doNotReimplement ? "Do not rebuild this capability inside curdx-flow; continue with the local workflow only if the evidence gate can still be satisfied." : "Use the local curdx-flow workflow path for this capability.")
   });
 }
 function sortRecommendations(recs) {
@@ -1589,7 +1592,7 @@ function parseBrainLine(line) {
   try {
     const parsed = JSON.parse(line);
     if (parsed.version !== 1) return null;
-    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked") {
+    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked" && parsed.type !== "last-mile-decision") {
       return null;
     }
     if (typeof parsed.timestamp !== "string") return null;
@@ -3611,6 +3614,244 @@ function stopDevRuntime(input = {}) {
   };
 }
 
+// src/hooks/lib/last-mile-orchestrator.ts
+import { basename as basename9 } from "node:path";
+import { fileURLToPath as fileURLToPath6 } from "node:url";
+var RELEASE_RE2 = /\b(release|publish|deploy|ship|tag|npm|version|changelog)\b|发布|部署|上线|打包|版本|标签/i;
+var FAILURE_RE = /\b(fail|failed|failure|error|stuck|retry|debug|broken|regression)\b|失败|报错|卡住|重试|排查|定位|回归/i;
+function normalize3(value) {
+  return (value ?? "").trim().replace(/\s+/g, " ");
+}
+function unique(values) {
+  return [...new Set(values.filter((value) => value.trim().length > 0))];
+}
+function rec(route2, id) {
+  return route2.recommendedCapabilities.find((item) => item.id === id);
+}
+function hasRec(route2, id) {
+  return rec(route2, id) !== void 0;
+}
+function missingCapabilityIds(route2) {
+  return route2.recommendedCapabilities.filter((item) => item.availabilityState === "missing" && item.expectedByDefault).map((item) => item.id);
+}
+function isReleaseSensitive(goal, route2) {
+  return route2.intent.intentKind === "release" || RELEASE_RE2.test(goal) || route2.qualityGates.some((gate) => gate.id.endsWith("-release")) || route2.stackProfile.primary === "claude-code-plugin" && RELEASE_RE2.test(goal);
+}
+function hasVerificationGap(input, snapshot2) {
+  if (input.verification?.ok === false) return true;
+  if (input.hookEvent === "TaskCompleted") return true;
+  return snapshot2.gates.some(
+    (gate) => gate === "completion-unmarked" || gate === "missing-tasks" || gate === "empty-tasks" || gate === "invalid-state"
+  );
+}
+function inferPhase(input, route2, snapshot2, brain) {
+  const goal = normalize3(input.goal);
+  if (isReleaseSensitive(goal, route2)) return "releasing";
+  if (input.verification?.ok === false || brain.recentFailures.length >= 2) return "recovering";
+  if (input.hookEvent === "TaskCompleted") return "verifying";
+  if (FAILURE_RE.test(goal)) return "debugging";
+  const statePhase = snapshot2.state.phase;
+  if (statePhase === "execution") return "implementing";
+  if (statePhase === "research") return "discovering";
+  if (statePhase === "requirements" || statePhase === "design" || statePhase === "tasks") {
+    return "planning";
+  }
+  if (route2.route === "blocked-ask-user" || route2.route === "product-inception") return "discovering";
+  if (route2.shouldCreateSpec) return "planning";
+  return "implementing";
+}
+function inferProblemTypes(input, route2, snapshot2, brain) {
+  const goal = normalize3(input.goal);
+  const out = [];
+  if (route2.route === "blocked-ask-user" || route2.intent.missingFacts.length > 0) {
+    out.push("missing-context");
+  }
+  if (hasRec(route2, "frontend-design")) out.push("ui-quality-risk");
+  if (hasRec(route2, "chrome-devtools-mcp") || hasRec(route2, "browser-verification")) {
+    out.push("browser-evidence-needed");
+  }
+  if (brain.recentFailures.length >= 2 || hasRec(route2, "pua") || /\b(repeated|twice|again)\b|反复|连续|又失败|多次/i.test(goal)) {
+    out.push("repeated-failure");
+  }
+  if (isReleaseSensitive(goal, route2)) out.push("release-risk");
+  if (hasVerificationGap(input, snapshot2)) out.push("verification-gap");
+  if (snapshot2.git.dirty && snapshot2.git.changedFiles > 8 || snapshot2.gates.includes("missing-code-root")) {
+    out.push("scope-drift");
+  }
+  if (missingCapabilityIds(route2).length > 0) out.push("dependency-missing");
+  return unique(out);
+}
+function capabilityAction(recItem) {
+  const required = recItem.curdxRole.includes("gate") || recItem.category === "docs" || recItem.category === "verification" || recItem.category === "security" || recItem.id === "pua";
+  return {
+    id: recItem.id,
+    name: recItem.name,
+    invocation: recItem.invocation,
+    phase: recItem.phase,
+    availabilityState: recItem.availabilityState,
+    required,
+    triggerReason: recItem.triggerReason,
+    action: recItem.availabilityState === "missing" ? recItem.fallbackWhenMissing : recItem.instruction,
+    fallbackWhenMissing: recItem.fallbackWhenMissing
+  };
+}
+function evidenceRequired(input, route2, snapshot2, problems) {
+  const out = route2.qualityGates.filter((gate) => gate.required).map((gate) => gate.command ? `${gate.id}: ${gate.command}` : gate.id);
+  const verifier = route2.suggestedVerifier.command ?? route2.suggestedVerifier.fallback;
+  if (verifier) out.push(`suggested-verifier: ${verifier}`);
+  if (problems.includes("browser-evidence-needed")) {
+    out.push("browser evidence: Playwright pass or Chrome DevTools MCP console/network/DOM proof");
+  }
+  if (problems.includes("release-risk")) {
+    out.push("release evidence: curdx-flow doctor, plugin validate, hook freshness, version/tag parity");
+  }
+  if (problems.includes("verification-gap")) {
+    const phase = input.verification?.phase ?? snapshot2.state.phase ?? "execution";
+    out.push(`fresh verification block for phase '${phase}'`);
+  }
+  return unique(out).slice(0, 8);
+}
+function evidenceSatisfied(snapshot2, brain) {
+  const verified = Object.entries(snapshot2.state.verificationBlocks).filter(([, block]) => block?.exitCode === 0 && typeof block.command === "string").map(([phase, block]) => `${phase}: ${block?.command}`);
+  return unique([...verified, ...brain.verifierHints.map((hint) => `brain: ${hint}`)]).slice(0, 6);
+}
+function blockingGates(route2, snapshot2, problems) {
+  const out = [...snapshot2.gates];
+  if (route2.blockedReason) out.push(`route-blocked: ${route2.blockedReason}`);
+  for (const id of missingCapabilityIds(route2)) {
+    out.push(`dependency-missing: ${id}`);
+  }
+  if (problems.includes("release-risk")) out.push("release-gate-required");
+  return unique(out);
+}
+function firstCapability(plan, id) {
+  return plan.find((item) => item.id === id);
+}
+function instructionFor(phase, problems, plan, route2, snapshot2) {
+  if (problems.includes("dependency-missing")) {
+    const missing = plan.filter((item) => item.availabilityState === "missing").map((item) => item.id).join(", ");
+    return `Run curdx-flow doctor and fix missing expected capabilities before relying on them: ${missing}.`;
+  }
+  if (problems.includes("repeated-failure")) {
+    const memory = firstCapability(plan, "claude-mem");
+    const pua = firstCapability(plan, "pua");
+    const parts = [
+      memory ? `${memory.invocation} for prior decisions/failures` : "read .curdx/brain.jsonl for recent failures",
+      pua ? `${pua.invocation} for structured recovery or parallel diagnosis` : "switch to systematic recovery before another edit"
+    ];
+    return `Stop the same edit loop; ${parts.join(", ")}.`;
+  }
+  if (problems.includes("ui-quality-risk")) {
+    return "Apply frontend-design guidance before changing visible UI, then keep browser evidence as the completion gate.";
+  }
+  if (problems.includes("browser-evidence-needed")) {
+    return "After implementation, collect browser runtime evidence with Playwright or Chrome DevTools MCP before claiming completion.";
+  }
+  if (problems.includes("release-risk")) {
+    return "Before tag, push, or publish, run the release gate: official Claude Code docs check, curdx-flow doctor, plugin validate, hook freshness, and npm/plugin tag parity.";
+  }
+  if (problems.includes("verification-gap")) {
+    return `Do not finish yet; satisfy the verifier for ${snapshot2.spec?.name ?? "the active spec"} and record fresh evidence.`;
+  }
+  if (phase === "planning") return "Create or resume the smallest spec/task plan that satisfies the route, then enter implementation.";
+  return route2.nextAction;
+}
+function recoveryFor(problems, plan, input) {
+  if (!problems.includes("repeated-failure") && !problems.includes("verification-gap")) return null;
+  const phase = input.verification?.phase ?? "current phase";
+  const reason = input.verification?.reason ?? "missing or failed evidence";
+  const memory = firstCapability(plan, "claude-mem");
+  const pua = firstCapability(plan, "pua");
+  return [
+    `Recovery for ${phase}: ${reason}.`,
+    memory ? `First search memory with ${memory.invocation}.` : "First inspect .curdx/brain.jsonl and the failing verifier output.",
+    pua ? `If the same fix path already failed, use ${pua.invocation} for decomposition/retry discipline.` : "If the same fix path already failed, decompose before editing again.",
+    "Then run the suggested verifier and record the result before completion."
+  ].join(" ");
+}
+function decideLastMile(input = {}) {
+  const cwd = input.cwd;
+  const goal = normalize3(input.goal);
+  const snapshot2 = input.snapshot ?? buildWorkflowSnapshot({ cwd, goal, spec: input.name });
+  const route2 = input.routeFacts ?? classifySmartRoute(input);
+  const brain = summarizeProjectBrain(cwd);
+  const phase = inferPhase(input, route2, snapshot2, brain);
+  const problemTypes = inferProblemTypes(input, route2, snapshot2, brain);
+  const capabilityPlan = route2.recommendedCapabilities.map(capabilityAction);
+  const blocking = blockingGates(route2, snapshot2, problemTypes);
+  const coordinatorInstruction = instructionFor(phase, problemTypes, capabilityPlan, route2, snapshot2);
+  const recoveryInstruction = recoveryFor(problemTypes, capabilityPlan, input);
+  const decision = {
+    version: 1,
+    generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    phase,
+    problemType: problemTypes[0] ?? null,
+    problemTypes,
+    task: {
+      goal,
+      route: route2.route,
+      stack: route2.stackProfile.primary,
+      risk: route2.policy.risk,
+      activeSpec: snapshot2.spec?.name ?? route2.activeSpec?.name ?? null,
+      currentTask: snapshot2.tasks.current?.title ?? null
+    },
+    capabilityPlan,
+    evidenceRequired: evidenceRequired(input, route2, snapshot2, problemTypes),
+    evidenceSatisfied: evidenceSatisfied(snapshot2, brain),
+    blockingGates: blocking,
+    coordinatorInstruction,
+    recoveryInstruction
+  };
+  if (input.record === true) {
+    appendBrainEvent(cwd, {
+      type: "last-mile-decision",
+      route: route2.route,
+      stack: route2.stackProfile.primary,
+      phase,
+      reason: [
+        `problem=${decision.problemType ?? "none"}`,
+        `instruction=${coordinatorInstruction}`
+      ].join(" "),
+      files: input.toolNames?.length
+    });
+  }
+  return decision;
+}
+function readArg7(name, argv) {
+  const idx = argv.indexOf(name);
+  if (idx === -1) return void 0;
+  return argv[idx + 1];
+}
+function parseList4(value) {
+  if (!value) return [];
+  return value.split(/[,;\n]/).map((part) => part.trim()).filter(Boolean);
+}
+function main7() {
+  const argv = process.argv.slice(2);
+  const available = parseList4(readArg7("--available-capabilities", argv));
+  const decision = decideLastMile({
+    cwd: readArg7("--cwd", argv),
+    goal: readArg7("--goal", argv) ?? "",
+    name: readArg7("--spec", argv) ?? readArg7("--name", argv),
+    changedFiles: parseList4(readArg7("--files", argv)),
+    availableCapabilities: available.length > 0 ? available : void 0,
+    hookEvent: "runtime",
+    record: argv.includes("--record")
+  });
+  process.stdout.write(JSON.stringify(decision, null, 2) + "\n");
+}
+function isDirectRun7() {
+  try {
+    const entry = fileURLToPath6(import.meta.url);
+    return process.argv[1] === entry && basename9(entry).startsWith("last-mile-orchestrator.");
+  } catch {
+    return false;
+  }
+}
+if (isDirectRun7()) {
+  main7();
+}
+
 // src/hooks/lib/execution-brief.ts
 function preferredSkill(route2) {
   switch (route2.route) {
@@ -3718,6 +3959,7 @@ function buildExecutionBrief(input) {
   const cwd = input.cwd;
   const brain = summarizeProjectBrain(cwd);
   const verifier = route2.suggestedVerifier.command ?? route2.suggestedVerifier.fallback ?? void 0;
+  const lastMile2 = decideLastMile({ ...input, routeFacts: route2 });
   const brief = {
     version: 1,
     generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -3747,6 +3989,16 @@ function buildExecutionBrief(input) {
     })),
     completionContract: completionContract(route2, brain),
     escalationRules: escalationRules(route2),
+    lastMile: {
+      phase: lastMile2.phase,
+      problemType: lastMile2.problemType,
+      problemTypes: lastMile2.problemTypes,
+      capabilityPlan: lastMile2.capabilityPlan,
+      evidenceRequired: lastMile2.evidenceRequired,
+      blockingGates: lastMile2.blockingGates,
+      coordinatorInstruction: lastMile2.coordinatorInstruction,
+      recoveryInstruction: lastMile2.recoveryInstruction
+    },
     brain: {
       path: brain.path,
       totalEvents: brain.totalEvents,
@@ -3770,12 +4022,12 @@ function buildExecutionBrief(input) {
 }
 
 // src/hooks/lib/runtime-cli.ts
-function readArg7(name, argv) {
+function readArg8(name, argv) {
   const idx = argv.indexOf(name);
   if (idx === -1) return void 0;
   return argv[idx + 1];
 }
-function parseList4(value) {
+function parseList5(value) {
   if (!value) return [];
   return value.split(/[,;\n]/).map((part) => part.trim()).filter(Boolean);
 }
@@ -3788,6 +4040,7 @@ function usage(exitCode = 1) {
     "",
     "commands:",
     "  route --goal <text> [--name <spec>] [--flags <args>] [--cwd <dir>] [--compile] [--record]",
+    "  last-mile --goal <text> [--spec <name-or-path>] [--cwd <dir>] [--record]",
     "  snapshot [--spec <name-or-path>] [--goal <text>] [--cwd <dir>]",
     "  specs dirs [--cwd <dir>]",
     "  specs list [--cwd <dir>]",
@@ -3808,7 +4061,7 @@ function usage(exitCode = 1) {
   process.exit(exitCode);
 }
 function scriptRoot() {
-  return dirname(fileURLToPath6(import.meta.url));
+  return dirname(fileURLToPath7(import.meta.url));
 }
 function pluginRoot() {
   return process.env.CLAUDE_PLUGIN_ROOT || resolve5(scriptRoot(), "..", "..", "..");
@@ -3833,16 +4086,16 @@ function runBundled(scriptName, args, cwd) {
   process.exit(result.status ?? 1);
 }
 function route(argv) {
-  const estimatedRaw = readArg7("--estimated-files", argv);
-  const taskRaw = readArg7("--task-count", argv);
-  const availableRaw = readArg7("--available-capabilities", argv);
+  const estimatedRaw = readArg8("--estimated-files", argv);
+  const taskRaw = readArg8("--task-count", argv);
+  const availableRaw = readArg8("--available-capabilities", argv);
   const input = {
-    goal: readArg7("--goal", argv) ?? "",
-    name: readArg7("--name", argv),
-    flags: readArg7("--flags", argv) ?? "",
-    cwd: readArg7("--cwd", argv),
-    changedFiles: parseList4(readArg7("--files", argv)),
-    availableCapabilities: availableRaw === void 0 ? void 0 : parseList4(availableRaw),
+    goal: readArg8("--goal", argv) ?? "",
+    name: readArg8("--name", argv),
+    flags: readArg8("--flags", argv) ?? "",
+    cwd: readArg8("--cwd", argv),
+    changedFiles: parseList5(readArg8("--files", argv)),
+    availableCapabilities: availableRaw === void 0 ? void 0 : parseList5(availableRaw),
     estimatedFiles: estimatedRaw === void 0 ? void 0 : Number(estimatedRaw),
     taskCount: taskRaw === void 0 ? void 0 : Number(taskRaw)
   };
@@ -3855,9 +4108,23 @@ function route(argv) {
 function snapshot(argv) {
   printJson(
     buildWorkflowSnapshot({
-      cwd: readArg7("--cwd", argv),
-      spec: readArg7("--spec", argv),
-      goal: readArg7("--goal", argv)
+      cwd: readArg8("--cwd", argv),
+      spec: readArg8("--spec", argv),
+      goal: readArg8("--goal", argv)
+    })
+  );
+}
+function lastMile(argv) {
+  const available = parseList5(readArg8("--available-capabilities", argv));
+  printJson(
+    decideLastMile({
+      cwd: readArg8("--cwd", argv),
+      goal: readArg8("--goal", argv) ?? "",
+      name: readArg8("--spec", argv) ?? readArg8("--name", argv),
+      changedFiles: parseList5(readArg8("--files", argv)),
+      availableCapabilities: available.length > 0 ? available : void 0,
+      hookEvent: "runtime",
+      record: hasFlag2(argv, "--record")
     })
   );
 }
@@ -4341,12 +4608,14 @@ function hookFreshnessDoctor() {
   const bundleRoot = join8(pluginRoot(), "hooks", "scripts");
   const pairs = [
     ["user-prompt-expansion-guard.ts", "user-prompt-expansion-guard.mjs"],
+    ["user-prompt-submit-autopilot.ts", "user-prompt-submit-autopilot.mjs"],
     ["post-tool-batch-snapshot.ts", "post-tool-batch-snapshot.mjs"],
     ["task-completed-verifier.ts", "task-completed-verifier.mjs"],
     [join8("lib", "smart-route.ts"), join8("lib", "smart-route.mjs")],
     [join8("lib", "tool-capabilities.ts"), join8("lib", "tool-capabilities.mjs")],
     [join8("lib", "stack-capabilities.ts"), join8("lib", "stack-capabilities.mjs")],
     [join8("lib", "dev-runtime.ts"), join8("lib", "dev-runtime.mjs")],
+    [join8("lib", "last-mile-orchestrator.ts"), join8("lib", "last-mile-orchestrator.mjs")],
     [join8("lib", "runtime-cli.ts"), join8("lib", "runtime-cli.mjs")]
   ];
   const entries = pairs.map(([srcRel, bundleRel]) => {
@@ -4380,7 +4649,7 @@ function resolveSpecPathForOutput(cwd, path3) {
 }
 function specs(argv) {
   const [sub, ...rest] = argv;
-  const cwd = resolve5(readArg7("--cwd", rest) ?? process.cwd());
+  const cwd = resolve5(readArg8("--cwd", rest) ?? process.cwd());
   if (sub === "dirs") {
     printJson({
       defaultDir: getDefaultDir({ cwd }),
@@ -4417,7 +4686,7 @@ function specs(argv) {
         printJson({ ok: false, reason: "not-found", path: target });
         process.exit(1);
       }
-      printJson({ ok: true, name: basename9(target), ...resolved2 });
+      printJson({ ok: true, name: basename10(target), ...resolved2 });
       return;
     }
     const found = findSpec(target, { cwd });
@@ -4426,7 +4695,7 @@ function specs(argv) {
       process.exit(found.reason === "ambiguous" ? 2 : 1);
     }
     const resolved = resolveSpecPathForOutput(cwd, found.path);
-    printJson({ ok: true, name: basename9(found.path), ...resolved });
+    printJson({ ok: true, name: basename10(found.path), ...resolved });
     return;
   }
   usage();
@@ -4448,7 +4717,7 @@ function tasks(argv) {
 }
 function dev(argv) {
   const [sub, ...rest] = argv;
-  const cwd = readArg7("--cwd", rest);
+  const cwd = readArg8("--cwd", rest);
   switch (sub) {
     case "detect":
       printJson(detectDevRuntime({ cwd }));
@@ -4479,10 +4748,10 @@ function dev(argv) {
 async function verify(argv) {
   const [sub, ...rest] = argv;
   if (sub !== "run") usage();
-  const command = readArg7("--command", rest);
+  const command = readArg8("--command", rest);
   if (!command) usage();
-  const cwd = resolve5(readArg7("--cwd", rest) ?? process.cwd());
-  const phase = readArg7("--phase", rest) ?? "execution";
+  const cwd = resolve5(readArg8("--cwd", rest) ?? process.cwd());
+  const phase = readArg8("--phase", rest) ?? "execution";
   if (!["research", "requirements", "design", "tasks", "execution"].includes(phase)) {
     process.stderr.write(`verify run: unsupported phase: ${phase}
 `);
@@ -4490,7 +4759,7 @@ async function verify(argv) {
   }
   const snap = buildWorkflowSnapshot({
     cwd,
-    spec: readArg7("--spec", rest)
+    spec: readArg8("--spec", rest)
   });
   if (!snap.spec?.fsPath || !snap.spec.statePath) {
     process.stderr.write("verify run: no active spec\n");
@@ -4514,7 +4783,7 @@ async function verify(argv) {
     exitCode,
     timestamp,
     srcMtime,
-    description: readArg7("--description", rest) ?? `Verification for ${phase}`
+    description: readArg8("--description", rest) ?? `Verification for ${phase}`
   };
   if (exitCode !== 0) {
     block.failedReason = result.error ? result.error.message : `command exited ${exitCode}`;
@@ -4548,10 +4817,10 @@ async function verify(argv) {
   process.exit(exitCode);
 }
 async function verifyBlocks(argv) {
-  const cwd = readArg7("--cwd", argv);
+  const cwd = readArg8("--cwd", argv);
   const snap = buildWorkflowSnapshot({
     cwd,
-    spec: readArg7("--spec", argv)
+    spec: readArg8("--spec", argv)
   });
   if (!snap.spec?.fsPath) {
     process.stderr.write("verify-blocks: no active spec\n");
@@ -4563,9 +4832,9 @@ async function verifyBlocks(argv) {
   process.exit(result.code);
 }
 function doctor(argv) {
-  const cwd = resolve5(readArg7("--cwd", argv) ?? process.cwd());
-  const snap = buildWorkflowSnapshot({ cwd, spec: readArg7("--spec", argv) });
-  const goal = readArg7("--goal", argv) ?? "";
+  const cwd = resolve5(readArg8("--cwd", argv) ?? process.cwd());
+  const snap = buildWorkflowSnapshot({ cwd, spec: readArg8("--spec", argv) });
+  const goal = readArg8("--goal", argv) ?? "";
   const routeFacts = classifySmartRoute({ cwd, goal });
   const topology = discoverProjectTopology({ cwd, goal });
   const stackProfile = detectStackProfile({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk });
@@ -4574,9 +4843,11 @@ function doctor(argv) {
   const contextBudget = selectContextBudget({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
   const brain = summarizeProjectBrain(cwd);
   const executionBrief = buildExecutionBrief({ cwd, goal, routeFacts });
+  const lastMileDecision = decideLastMile({ cwd, goal, routeFacts });
   const expected = [
     join8(scriptRoot(), "workflow-snapshot.mjs"),
     join8(scriptRoot(), "smart-route.mjs"),
+    join8(scriptRoot(), "last-mile-orchestrator.mjs"),
     join8(scriptRoot(), "stack-capabilities.mjs"),
     join8(scriptRoot(), "merge-state.mjs"),
     join8(scriptRoot(), "count-tasks.mjs")
@@ -4589,10 +4860,10 @@ function doctor(argv) {
   printJson({
     ok: runtimeReady && plugin.ready === true && release.ready !== false && (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
     cwd,
-    scripts: Object.fromEntries(expected.map((p) => [basename9(p), existsSync9(p)])),
+    scripts: Object.fromEntries(expected.map((p) => [basename10(p), existsSync9(p)])),
     runtime: {
       ready: runtimeReady,
-      scripts: Object.fromEntries(expected.map((p) => [basename9(p), existsSync9(p)]))
+      scripts: Object.fromEntries(expected.map((p) => [basename10(p), existsSync9(p)]))
     },
     plugin,
     hookFreshness,
@@ -4608,6 +4879,7 @@ function doctor(argv) {
     contextBudget,
     brain,
     executionBrief,
+    lastMile: lastMileDecision,
     externalMcp: externalMcpDoctor(),
     browserVerification: browserVerificationDoctor(cwd),
     active: snap.active,
@@ -4624,11 +4896,14 @@ function doctor(argv) {
     ]
   });
 }
-async function main7() {
+async function main8() {
   const [command, ...argv] = process.argv.slice(2);
   switch (command) {
     case "route":
       route(argv);
+      return;
+    case "last-mile":
+      lastMile(argv);
       return;
     case "snapshot":
       snapshot(argv);
@@ -4663,15 +4938,15 @@ async function main7() {
 `);
   usage();
 }
-function isDirectRun7() {
+function isDirectRun8() {
   try {
-    const entry = fileURLToPath6(import.meta.url);
-    return process.argv[1] === entry && basename9(entry).startsWith("runtime-cli.");
+    const entry = fileURLToPath7(import.meta.url);
+    return process.argv[1] === entry && basename10(entry).startsWith("runtime-cli.");
   } catch {
     return false;
   }
 }
-if (isDirectRun7()) {
-  void main7();
+if (isDirectRun8()) {
+  void main8();
 }
 //# sourceMappingURL=runtime-cli.mjs.map

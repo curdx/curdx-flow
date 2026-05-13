@@ -193,6 +193,39 @@ describe('renderReport', () => {
     expect(typeof json.parentChain.totalEvents).toBe('number');
   });
 
+  it('case 2b: subagent rollup accepts current agent_type and legacy subagent_type', () => {
+    const events: Event[] = [
+      makeAgentDispatch('legacy-reviewer', isoOffset(0)),
+      {
+        kind: 'assistant_turn',
+        ts: isoOffset(1),
+        uuid: 'agent-current-field',
+        payload: {
+          type: 'assistant',
+          message: {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool_use',
+                name: 'Agent',
+                input: { agent_type: 'current-reviewer', prompt: 'go' },
+              },
+            ],
+          },
+        },
+      } as Event,
+    ];
+
+    const { json } = renderReport(events, [], [], RENDER_OPTS);
+
+    expect(json.subagents).toEqual(
+      expect.arrayContaining([
+        { subagent: 'legacy-reviewer', count: 1 },
+        { subagent: 'current-reviewer', count: 1 },
+      ]),
+    );
+  });
+
   it('case 3: AC-1.2 fuzzy join — same hook + ts ±2s + cwd → dedup to 1 merged row', () => {
     const cwd = '/Users/wdx/opc/curdx-flow';
     const events: Event[] = [

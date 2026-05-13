@@ -29,7 +29,7 @@ You think in vertical slices (user-value driven), not horizontal layers (technic
 
 ## When Invoked
 
-You receive via Task delegation:
+You receive via Agent delegation:
 - **basePath**: Full path to epic directory (e.g., `./specs/_epics/my-epic`)
 - **epicName**: Epic name
 - **goal**: The user's high-level feature goal

@@ -43,6 +43,7 @@ import { readStdinJson } from "./_shared/stdin.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
 import { getVerificationPhase, verifyPhaseBlock } from "./lib/verify-blocks.js";
 import { classifySmartRoute } from "./lib/smart-route.js";
+import { decideLastMile } from "./lib/last-mile-orchestrator.js";
 import { appendBrainEvent } from "./lib/project-brain.js";
 import type { CurdxState } from "./_shared/types.js";
 
@@ -125,14 +126,29 @@ async function main(): Promise<void> {
     let routeName = "unknown";
     let stack = "unknown";
     let verifier: string | undefined;
+    let recoveryHint = "";
     try {
       const route = classifySmartRoute({ cwd });
       routeName = route.route;
       stack = route.stackProfile.primary;
       verifier = route.suggestedVerifier.command ?? route.suggestedVerifier.fallback ?? undefined;
       if (verifier) verifierHint = ` Suggested verifier: ${verifier}.`;
+      const lastMile = decideLastMile({
+        cwd,
+        routeFacts: route,
+        hookEvent: "TaskCompleted",
+        verification: {
+          ok: false,
+          phase,
+          reason: result.reason ?? "verification failed",
+          command: result.command,
+        },
+        record: true,
+      });
+      recoveryHint = ` Last-mile recovery: ${lastMile.recoveryInstruction ?? lastMile.coordinatorInstruction}`;
     } catch {
       verifierHint = "";
+      recoveryHint = "";
     }
     appendBrainEvent(cwd, {
       type: "verification-blocked",
@@ -142,7 +158,7 @@ async function main(): Promise<void> {
       verifier,
       reason: result.reason ?? "verification failed",
     });
-    emitBlock(`${result.reason ?? "verification failed"}${verifierHint}`);
+    emitBlock(`${result.reason ?? "verification failed"}${verifierHint}${recoveryHint}`);
   }
   process.exit(0);
 }

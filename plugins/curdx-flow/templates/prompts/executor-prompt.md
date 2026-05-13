@@ -1,11 +1,11 @@
 # Executor Dispatch Template
 
-> Used by: implement.md coordinator
+> Used by: skills/implement coordinator
 > Placeholders: {SPEC_NAME}, {TASK_TEXT}, {TASK_INDEX}, {CONTEXT}, {PROGRESS}
 
-## Task Tool Parameters
+## Agent Tool Parameters
 
-- **subagent_type:** `curdx-flow:spec-executor`
+- **agent_type:** `curdx-flow:spec-executor`
 - **description:** `Execute task {TASK_INDEX} for {SPEC_NAME}`
 
 ## Prompt

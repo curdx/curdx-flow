@@ -262,7 +262,10 @@ function pushRecommendation(out, available, id, phase, reason, instruction, extr
     expectedByDefault: cap.expectedByDefault,
     ...availability.availabilityState === "missing" && cap.missingAction ? { missingAction: cap.missingAction } : {},
     reason,
-    instruction
+    instruction,
+    triggerReason: reason,
+    requiredWhen: cap.curdxRole.includes("gate") ? "Required when this route reaches its matching quality gate." : "Use when the coordinator is in the matching phase and the task context still fits this reason.",
+    fallbackWhenMissing: cap.missingAction ?? (cap.doNotReimplement ? "Do not rebuild this capability inside curdx-flow; continue with the local workflow only if the evidence gate can still be satisfied." : "Use the local curdx-flow workflow path for this capability.")
   });
 }
 function sortRecommendations(recs) {

@@ -47,7 +47,7 @@ const BUILTIN_SCHEMA_MAP: SchemaMap = {
   },
   tool_use: {
     action: 'tool_call',
-    fields: ['name', 'input.subagent_type'],
+    fields: ['name', 'input.agent_type', 'input.subagent_type'],
     filter: { name: ['Agent', 'Task'] },
   },
   assistant: {

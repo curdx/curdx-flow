@@ -41,8 +41,8 @@ Pre-flight checklist. Before dispatching N agents in parallel, **ALL THREE** mus
    *Coordinator: do this instead* — one research-analyst per external topic; one Explore per codebase concern.
 2. **Multi-topic Explore** — assigning one Explore agent to "find everything related to the spec" mixes orthogonal codebase concerns into one report.
    *Coordinator: do this instead* — break codebase exploration into multiple Explore teammates, one per component or concern.
-3. **Sequential Task spawn** — spawning Task calls one at a time across separate messages runs them sequentially, defeating parallelism.
-   *Coordinator: do this instead* — issue ALL Task calls in ONE message so the runtime executes them in true parallel.
+3. **Sequential Agent spawn** — spawning Agent calls one at a time across separate messages runs them sequentially, defeating parallelism.
+   *Coordinator: do this instead* — issue ALL Agent calls in ONE message so the runtime executes them in true parallel.
 
 ### Review domain (5 — new)
 
@@ -104,9 +104,9 @@ Before invoking any subagents, analyze the goal and break it into independent re
 - Example: "Add OAuth with rate limiting" becomes 3 research-analyst agents (OAuth patterns, rate limiting strategies, security best practices)
 - When NOT to split: topics are tightly coupled and depend on each other, or splitting would create redundant searches
 
-## Dispatch Pattern (Direct Task Default, Teams Optional)
+## Dispatch Pattern (Direct Agent Default, Teams Optional)
 
-Agent Teams are experimental and disabled by default in Claude Code. Direct `Task(...)` dispatch is the baseline contract. Use `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` only when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set and those tools are visible in the current session. If any team step fails, continue with the direct Task path; the outputs and merge contract stay the same.
+Agent Teams are experimental and disabled by default in Claude Code. Direct `Agent(...)` dispatch is the baseline contract. Use `TeamCreate` / `TaskCreate` / `TaskList` / `SendMessage` only when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set and those tools are visible in the current session. If any team step fails, continue with the direct Agent path; the outputs and merge contract stay the same.
 
 ### Step 1: Optional Progress Tasks
 
@@ -128,14 +128,14 @@ Skip this step unless Agent Teams are enabled and available.
 
 1. `TeamDelete()` once to release any stale team; errors are harmless.
 2. `TeamCreate(team_name: "research-$spec", description: "Parallel research for $spec")`
-3. If setup fails, continue with direct Task dispatch and omit `team_name` / `name` fields in Step 3.
+3. If setup fails, continue with direct Agent dispatch and omit `team_name` / `name` fields in Step 3.
 
 ### Step 3: Spawn Agents (ALL in ONE Message)
 
-ALL Task calls MUST be in ONE message to ensure true parallel execution. Spawning one at a time across separate messages runs them sequentially.
+ALL Agent calls MUST be in ONE message to ensure true parallel execution. Spawning one at a time across separate messages runs them sequentially.
 
 ```
-Task(subagent_type: research-analyst,
+Agent(agent_type: research-analyst,
   prompt: "You are a research teammate.
     Topic: [External best practices for topic]
     Spec: $spec | Path: ./specs/$spec/
@@ -150,20 +150,20 @@ Task(subagent_type: research-analyst,
     Do NOT explore codebase -- Explore teammates handle that.
     When done, mark your task complete via TaskUpdate.")
 
-Task(subagent_type: Explore,
+Agent(agent_type: Explore,
   prompt: "Analyze codebase for spec: $spec
     Output: ./specs/$spec/.research-codebase.md
     Find existing patterns, dependencies, constraints related to [goal].
     Write findings to output file with sections: Existing Patterns, Dependencies, Constraints, Recommendations.")
 ```
 
-When Agent Teams are enabled, add `team_name: "research-$spec"` and unique `name` fields (`researcher-1`, `explorer-1`, etc.) to the same Task calls. Without Agent Teams, omit both fields.
+When Agent Teams are enabled, add `team_name: "research-$spec"` and unique `name` fields (`researcher-1`, `explorer-1`, etc.) to the same Agent calls. Without Agent Teams, omit both fields.
 
 For more topics, add more `researcher-N` and `explorer-N` teammates in the same message.
 
 ### Step 4: Wait and Collect
 
-- Wait for Task results. If using Agent Teams, wait for automatic teammate messages and use `TaskList` at most once to check progress.
+- Wait for Agent results. If using Agent Teams, wait for automatic teammate messages and use `TaskList` at most once to check progress.
 - Timeout: If a teammate stalls, proceed with partial results and note incomplete topics.
 
 ### Step 5: Optional Team Shutdown

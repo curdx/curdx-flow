@@ -200,7 +200,7 @@ export interface VerificationBlock {
  * `state.completed === true` equality, never truthiness.
  *
  * NOTE: this interface is for hook readers. Writers (coordinator /
- * `commands/implement.md` via the runtime state merge command) are not type-checked
+ * `skills/implement/SKILL.md` via the runtime state merge command) are not type-checked
  * against this — the persistent schema lives in
  * `plugins/curdx-flow/schemas/spec.schema.json`.
  */
@@ -303,8 +303,45 @@ export interface CurdxState {
     missingAction?: string;
     reason?: string;
     instruction?: string;
+    triggerReason?: string;
+    requiredWhen?: string;
+    fallbackWhenMissing?: string;
     stackIds?: string[];
   }>;
+  lastMile?: {
+    phase?:
+      | "discovering"
+      | "planning"
+      | "implementing"
+      | "debugging"
+      | "verifying"
+      | "recovering"
+      | "releasing";
+    problemType?:
+      | "missing-context"
+      | "ui-quality-risk"
+      | "browser-evidence-needed"
+      | "repeated-failure"
+      | "release-risk"
+      | "verification-gap"
+      | "scope-drift"
+      | "dependency-missing";
+    problemTypes?: Array<
+      | "missing-context"
+      | "ui-quality-risk"
+      | "browser-evidence-needed"
+      | "repeated-failure"
+      | "release-risk"
+      | "verification-gap"
+      | "scope-drift"
+      | "dependency-missing"
+    >;
+    capabilityPlan?: Array<Record<string, unknown>>;
+    evidenceRequired?: string[];
+    evidenceSatisfied?: string[];
+    failureCount?: number;
+    lastDecisionAt?: string;
+  };
   epicName?: string;
   // verification iron-law (design D2): per-phase Verify command outcomes
   verificationBlocks?: Partial<Record<VerificationPhase, VerificationBlock>>;
