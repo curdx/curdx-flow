@@ -29,7 +29,8 @@ describe("tool capability router", () => {
         expect.objectContaining({
           id: "context7",
           phase: "before-coding",
-          availability: "core-required",
+          availability: "external-expected",
+          provisioning: "external-mcp",
         }),
         expect.objectContaining({
           id: "docs-query",
@@ -40,7 +41,7 @@ describe("tool capability router", () => {
     );
   });
 
-  it("treats bundled companion capabilities as core required even when filters are narrow", () => {
+  it("marks expected wheels by source without reimplementing them", () => {
     const recs = recommendToolCapabilities({
       goal: "Again debug the same auth failure after multiple failed attempts using latest docs",
       route: "full-spec",
@@ -50,12 +51,32 @@ describe("tool capability router", () => {
 
     expect(recs).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: "claude-mem", availability: "core-required" }),
-        expect.objectContaining({ id: "context7", availability: "core-required" }),
-        expect.objectContaining({ id: "sequential-thinking", availability: "core-required" }),
-        expect.objectContaining({ id: "pua", availability: "core-required" }),
+        expect.objectContaining({
+          id: "claude-mem",
+          availability: "plugin-dependency",
+          provisioning: "plugin-dependency",
+        }),
+        expect.objectContaining({
+          id: "context7",
+          availability: "known-available",
+          availabilityState: "available",
+          ownedBy: "context7",
+          provisioning: "external-mcp",
+          doNotReimplement: true,
+        }),
+        expect.objectContaining({
+          id: "sequential-thinking",
+          availability: "external-expected",
+          provisioning: "external-mcp",
+        }),
+        expect.objectContaining({
+          id: "pua",
+          availability: "plugin-dependency",
+          provisioning: "plugin-dependency",
+        }),
       ]),
     );
+    expect(recs.find((rec) => rec.id === "claude-mem")?.availabilityState).toBe("missing");
   });
 
   it("routes frontend runtime work to UI design and browser verification tools", () => {
@@ -79,14 +100,14 @@ describe("tool capability router", () => {
     );
     expect(recs.find((rec) => rec.id === "frontend-design")?.phase).toBe("implementation");
     expect(recs.find((rec) => rec.id === "chrome-devtools-mcp")?.phase).toBe("verification");
-    expect(recs.find((rec) => rec.id === "context7")?.availability).toBe("core-required");
-    expect(recs.find((rec) => rec.id === "frontend-design")?.availability).toBe("core-required");
-    expect(recs.find((rec) => rec.id === "chrome-devtools-mcp")?.availability).toBe("core-required");
+    expect(recs.find((rec) => rec.id === "context7")?.availabilityState).toBe("available");
+    expect(recs.find((rec) => rec.id === "frontend-design")?.availabilityState).toBe("available");
+    expect(recs.find((rec) => rec.id === "chrome-devtools-mcp")?.availabilityState).toBe("available");
   });
 
   it("routes repeated high-risk backend work to memory, docs, and explicit reasoning", () => {
     const recs = recommendToolCapabilities({
-      goal: "Again debug Spring Boot OAuth authorization failure using latest official docs",
+      goal: "Again debug Spring Boot OAuth authorization failure after failed twice using latest official docs",
       route: "full-spec",
       risk: "high",
       topologyKinds: ["backend-service"],
@@ -109,10 +130,10 @@ describe("tool capability router", () => {
         "pua",
       ]),
     );
-    expect(recs.find((rec) => rec.id === "claude-mem")?.availability).toBe("core-required");
-    expect(recs.find((rec) => rec.id === "context7")?.availability).toBe("core-required");
-    expect(recs.find((rec) => rec.id === "sequential-thinking")?.availability).toBe("core-required");
-    expect(recs.find((rec) => rec.id === "pua")?.availability).toBe("core-required");
+    expect(recs.find((rec) => rec.id === "claude-mem")?.availabilityState).toBe("available");
+    expect(recs.find((rec) => rec.id === "context7")?.availabilityState).toBe("available");
+    expect(recs.find((rec) => rec.id === "sequential-thinking")?.availabilityState).toBe("available");
+    expect(recs.find((rec) => rec.id === "pua")?.availabilityState).toBe("available");
   });
 
   it("does not recommend tools while missing code roots block the route", () => {
@@ -135,6 +156,18 @@ describe("tool capability router", () => {
     expect(rules.join("\n")).toContain("/claude-mem:mem-search");
     expect(rules.join("\n")).not.toContain("Chrome DevTools MCP");
     expect(tree.join("\n")).toContain("use the Context7 MCP before editing");
+  });
+
+  it("does not treat companion capability names as frontend/browser stack intent", () => {
+    const recs = recommendToolCapabilities({
+      goal: "Use claude-mem pua context7 sequential-thinking chrome-devtools-mcp frontend-design for better routing",
+      route: "lite-spec",
+      risk: "medium",
+    });
+
+    expect(recs.map((rec) => rec.id)).not.toContain("frontend-design");
+    expect(recs.map((rec) => rec.id)).not.toContain("chrome-devtools-mcp");
+    expect(recs.map((rec) => rec.id)).not.toContain("browser-verification");
   });
 
   it("CLI emits the same compact JSON recommendations", () => {

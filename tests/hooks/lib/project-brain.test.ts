@@ -46,4 +46,27 @@ describe("project-brain", () => {
       rmSync(cwd, { recursive: true, force: true });
     }
   });
+
+  it("compacts oversized brain files instead of growing without bound", () => {
+    const cwd = makeTmpDir("brain-compact");
+    try {
+      for (let i = 0; i < 700; i++) {
+        const result = appendBrainEvent(cwd, {
+          type: "verification-run",
+          stack: "typescript",
+          phase: "execution",
+          command: `npm test -- --case ${i}`,
+          exitCode: 0,
+          reason: "x".repeat(180),
+        });
+        expect(result.ok).toBe(true);
+      }
+
+      const events = readBrainEvents(cwd, 1000);
+      expect(events.length).toBeLessThanOrEqual(400);
+      expect(summarizeProjectBrain(cwd).totalEvents).toBeLessThanOrEqual(400);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
 });

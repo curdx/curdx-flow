@@ -59,7 +59,7 @@ function usage(exitCode = 1): never {
     "usage: curdx-flow <command> [args]",
     "",
     "commands:",
-    "  route --goal <text> [--name <spec>] [--flags <args>] [--cwd <dir>] [--compile]",
+    "  route --goal <text> [--name <spec>] [--flags <args>] [--cwd <dir>] [--compile] [--record]",
     "  snapshot [--spec <name-or-path>] [--goal <text>] [--cwd <dir>]",
     "  specs dirs [--cwd <dir>]",
     "  specs list [--cwd <dir>]",
@@ -111,18 +111,19 @@ function runBundled(scriptName: string, args: string[], cwd?: string): never {
 function route(argv: string[]): void {
   const estimatedRaw = readArg("--estimated-files", argv);
   const taskRaw = readArg("--task-count", argv);
+  const availableRaw = readArg("--available-capabilities", argv);
   const input = {
     goal: readArg("--goal", argv) ?? "",
     name: readArg("--name", argv),
     flags: readArg("--flags", argv) ?? "",
     cwd: readArg("--cwd", argv),
     changedFiles: parseList(readArg("--files", argv)),
-    availableCapabilities: parseList(readArg("--available-capabilities", argv)),
+    availableCapabilities: availableRaw === undefined ? undefined : parseList(availableRaw),
     estimatedFiles: estimatedRaw === undefined ? undefined : Number(estimatedRaw),
     taskCount: taskRaw === undefined ? undefined : Number(taskRaw),
   };
   if (hasFlag(argv, "--compile")) {
-    printJson(buildExecutionBrief({ ...input, record: true }));
+    printJson(buildExecutionBrief({ ...input, record: hasFlag(argv, "--record") }));
     return;
   }
   printJson(classifySmartRoute(input));
@@ -189,8 +190,33 @@ interface HooksConfig {
 interface PluginManifest {
   name?: string;
   version?: string;
-  dependencies?: Array<{ name?: string; marketplace?: string }>;
+  dependencies?: Array<{ name?: string; marketplace?: string; version?: string }>;
 }
+
+interface MarketplaceManifest {
+  allowCrossMarketplaceDependenciesOn?: string[];
+  plugins?: Array<{ name?: string; version?: string }>;
+}
+
+const EXPECTED_PLUGIN_DEPENDENCIES = [
+  { name: "pua", marketplace: "pua-skills" },
+  { name: "claude-mem", marketplace: "thedotmack" },
+  { name: "chrome-devtools-mcp", marketplace: "chrome-devtools-plugins" },
+  { name: "frontend-design", marketplace: "claude-plugins-official" },
+] as const;
+
+const EXPECTED_EXTERNAL_MCPS = [
+  {
+    id: "context7",
+    match: /context7|mcp\.context7\.com/i,
+    installHint: "Installed externally by setup script; expected to appear in `claude mcp list`.",
+  },
+  {
+    id: "sequential-thinking",
+    match: /sequential[- ]thinking|server-sequential-thinking/i,
+    installHint: "Installed externally by setup script; expected to appear in `claude mcp list`.",
+  },
+] as const;
 
 function detectPackageManager(cwd: string): string | null {
   if (existsSync(join(cwd, "pnpm-lock.yaml"))) return "pnpm";
@@ -214,12 +240,147 @@ function scriptCommand(packageManager: string | null, scriptName: string): strin
   }
 }
 
+function shellToken(value: string): string {
+  return /^[A-Za-z0-9_@%+=:,./-]+$/.test(value)
+    ? value
+    : `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function pluginDependencyDoctor(): unknown {
+  const manifest = readJsonFile<PluginManifest>(join(pluginRoot(), ".claude-plugin", "plugin.json"));
+  const marketplace = readJsonFile<MarketplaceManifest>(
+    join(repoRootFromPlugin(), ".claude-plugin", "marketplace.json"),
+  );
+  const declared = manifest?.dependencies ?? [];
+  const allowlist = new Set(marketplace?.allowCrossMarketplaceDependenciesOn ?? []);
+  const dependencies = EXPECTED_PLUGIN_DEPENDENCIES.map((expected) => {
+    const actual = declared.find((item) => item.name === expected.name);
+    const marketplaceName = actual?.marketplace ?? null;
+    return {
+      name: expected.name,
+      type: "plugin",
+      expectedMarketplace: expected.marketplace,
+      declared: actual !== undefined,
+      marketplace: marketplaceName,
+      marketplaceMatches: marketplaceName === expected.marketplace,
+      crossMarketplaceAllowlisted: allowlist.has(expected.marketplace),
+      versionConstraint: actual?.version ?? null,
+      wheelFirst: true,
+      curdxRole: "recommend/gate; do not reimplement",
+    };
+  });
+  return {
+    ready: dependencies.every((item) =>
+      item.declared &&
+      item.marketplaceMatches &&
+      item.crossMarketplaceAllowlisted,
+    ),
+    dependencies,
+    warnings: dependencies
+      .filter((item) => item.versionConstraint === null)
+      .map((item) =>
+        `${item.name} has no dependency version constraint; keep this intentional unless upstream tags are confirmed.`,
+      ),
+  };
+}
+
+function externalMcpDoctor(): unknown {
+  const envOutput = process.env.CURDX_FLOW_MCP_LIST_OUTPUT;
+  const bin = process.env.CURDX_FLOW_CLAUDE_BIN ?? "claude";
+  let source = "claude mcp list";
+  let output = "";
+  let exitCode: number | null = null;
+  let error: string | null = null;
+
+  if (envOutput !== undefined) {
+    source = "CURDX_FLOW_MCP_LIST_OUTPUT";
+    output = envOutput;
+    exitCode = 0;
+  } else {
+    const result = spawnSync("zsh", ["-lic", `${shellToken(bin)} mcp list`], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      timeout: 5000,
+      maxBuffer: 1024 * 1024,
+    });
+    output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+    exitCode = result.status ?? null;
+    if (result.error) {
+      error = (result.error as Error).message;
+    }
+  }
+
+  const commandWorked = exitCode === 0;
+  const servers = EXPECTED_EXTERNAL_MCPS.map((expected) => {
+    const configured = commandWorked ? expected.match.test(output) : null;
+    return {
+      id: expected.id,
+      type: "mcp",
+      expectedExternal: true,
+      bundledByCurdxFlow: false,
+      configured,
+      status: configured === true ? "available" : configured === false ? "missing" : "unknown",
+      installHint: expected.installHint,
+    };
+  });
+
+  return {
+    ready: servers.every((server) => server.configured === true),
+    source,
+    command: `${bin} mcp list`,
+    exitCode,
+    error,
+    servers,
+    note: "curdx-flow does not bundle these MCP servers; setup scripts or user MCP config own installation.",
+  };
+}
+
+function releaseDoctor(): unknown {
+  const pkg = readJsonFile<{ version?: string }>(join(repoRootFromPlugin(), "package.json"));
+  const lock = readJsonFile<{ version?: string; packages?: Record<string, { version?: string }> }>(
+    join(repoRootFromPlugin(), "package-lock.json"),
+  );
+  const manifest = readJsonFile<PluginManifest>(join(pluginRoot(), ".claude-plugin", "plugin.json"));
+  const marketplace = readJsonFile<MarketplaceManifest>(
+    join(repoRootFromPlugin(), ".claude-plugin", "marketplace.json"),
+  );
+  const marketplaceEntry = marketplace?.plugins?.find((item) => item.name === "curdx-flow");
+  const versions = {
+    packageJson: pkg?.version ?? null,
+    packageLockRoot: lock?.version ?? null,
+    packageLockPackage: lock?.packages?.[""]?.version ?? null,
+    pluginManifest: manifest?.version ?? null,
+    marketplace: marketplaceEntry?.version ?? null,
+  };
+  const values = Object.values(versions);
+  const aligned = values.every((value) => value !== null && value === values[0]);
+  const version = aligned ? values[0] : null;
+  return {
+    ready: aligned,
+    versions,
+    expectedNpmTag: version ? `v${version}` : null,
+    expectedPluginTag: version ? `curdx-flow--v${version}` : null,
+    commands: [
+      "npm run check-versions",
+      "claude plugin validate ./plugins/curdx-flow",
+      "npm run verify",
+      "claude plugin tag --push",
+      version ? `git tag v${version} && git push origin v${version}` : "git tag vX.Y.Z && git push origin vX.Y.Z",
+    ],
+  };
+}
+
+function isPluginSmokeScript(name: string, command: string): boolean {
+  return /claudecc|claude-code|claude code|plugin[-:]?smoke|plugin validate/i.test(`${name} ${command}`);
+}
+
 function detectProjectScripts(cwd: string): {
   packageJson: boolean;
   packageManager: string | null;
   e2e: string[];
   devServer: string[];
   playwrightScripts: string[];
+  pluginSmokeScripts: string[];
   dependencies: string[];
 } {
   const pkg = readJsonFile<{
@@ -235,8 +396,10 @@ function detectProjectScripts(cwd: string): {
   );
 
   const entries = Object.entries(scripts);
+  const browserEntries = entries.filter(([name, command]) => !isPluginSmokeScript(name, command));
   const e2e = entries
     .filter(([name, command]) =>
+      !isPluginSmokeScript(name, command) &&
       /(^|:|-)(e2e|browser|ui|acceptance)(:|-|$)|playwright|cypress|puppeteer|selenium/i.test(
         `${name} ${command}`,
       ),
@@ -245,8 +408,11 @@ function detectProjectScripts(cwd: string): {
   const devServer = entries
     .filter(([name]) => /^(dev|start|serve|preview)$|(^|:|-)(dev|serve|preview)(:|-|$)/i.test(name))
     .map(([name]) => name);
-  const playwrightScripts = entries
+  const playwrightScripts = browserEntries
     .filter(([name, command]) => /playwright/i.test(`${name} ${command}`))
+    .map(([name]) => name);
+  const pluginSmokeScripts = entries
+    .filter(([name, command]) => isPluginSmokeScript(name, command))
     .map(([name]) => name);
 
   return {
@@ -255,6 +421,7 @@ function detectProjectScripts(cwd: string): {
     e2e,
     devServer,
     playwrightScripts,
+    pluginSmokeScripts,
     dependencies: dependencyNames,
   };
 }
@@ -355,6 +522,7 @@ function browserVerificationDoctor(cwd: string): unknown {
       packageManager: scripts.packageManager,
       devServerScripts: scripts.devServer,
       e2eScripts: scripts.e2e,
+      pluginSmokeScripts: scripts.pluginSmokeScripts,
       browserAutomationDependencies: scripts.dependencies,
       e2eConfigFiles,
     },
@@ -473,6 +641,7 @@ function pluginHealthDoctor(): unknown {
       name: manifest?.name ?? null,
       version: manifest?.version ?? null,
     },
+    dependencies: pluginDependencyDoctor(),
     hooks: {
       path: hooksPath,
       exists: existsSync(hooksPath),
@@ -775,8 +944,10 @@ function doctor(argv: string[]): void {
     },
     plugin,
     hookFreshness,
+    release: releaseDoctor(),
     docsSensitiveWarnings: [
       "Claude Code plugin, skill, agent, hook, dependency, marketplace, and tag behavior must be verified against https://code.claude.com/docs/llms.txt before release-facing changes.",
+      "context7 and sequential-thinking are expected external MCP servers in this environment; curdx-flow should diagnose them but not bundle duplicate MCP config.",
     ],
     route: routeFacts.route,
     stackProfile,
@@ -785,6 +956,7 @@ function doctor(argv: string[]): void {
     contextBudget,
     brain,
     executionBrief,
+    externalMcp: externalMcpDoctor(),
     browserVerification: browserVerificationDoctor(cwd),
     active: snap.active,
     spec: snap.spec,

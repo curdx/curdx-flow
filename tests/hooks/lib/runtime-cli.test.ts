@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { makeTmpDir, runLib } from "./_lib-helpers.js";
@@ -14,7 +14,7 @@ describe("runtime-cli lib", () => {
     });
   });
 
-  it("compiles route output into an execution brief and records project brain", () => {
+  it("compiles route output read-only by default and records project brain only with --record", () => {
     const cwd = makeTmpDir("runtime-route-compile");
     try {
       writeFileSync(path.join(cwd, "package.json"), JSON.stringify({ scripts: { verify: "npm test" } }));
@@ -38,6 +38,18 @@ describe("runtime-cli lib", () => {
           path: expect.stringContaining(".curdx/brain.jsonl"),
         },
       });
+      expect(existsSync(path.join(cwd, ".curdx", "brain.jsonl"))).toBe(false);
+
+      const recorded = runLib("runtime-cli", [
+        "route",
+        "--compile",
+        "--record",
+        "--cwd",
+        cwd,
+        "--goal",
+        "Update Claude Code plugin hooks and publish",
+      ]);
+      expect(recorded.exitCode).toBe(0);
       expect(readFileSync(path.join(cwd, ".curdx", "brain.jsonl"), "utf8")).toContain("route-compiled");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
@@ -135,6 +147,7 @@ describe("runtime-cli lib", () => {
             scripts: {
               dev: "vite --host 0.0.0.0 --port 5173",
               "test:e2e": "playwright test",
+              "test:claudecc:e2e": "node scripts/claudecc-e2e-flow.mjs",
               test: "vitest",
             },
             devDependencies: {
@@ -149,7 +162,10 @@ describe("runtime-cli lib", () => {
       writeFileSync(fakeChrome, "");
 
       const result = runLib("runtime-cli", ["doctor", "--cwd", cwd], {
-        env: { CHROME_PATH: fakeChrome },
+        env: {
+          CHROME_PATH: fakeChrome,
+          CURDX_FLOW_MCP_LIST_OUTPUT: "context7 https://mcp.context7.com/mcp\nsequential-thinking npx @modelcontextprotocol/server-sequential-thinking",
+        },
       });
       expect(result.exitCode).toBe(0);
       const json = result.json as {
@@ -163,6 +179,15 @@ describe("runtime-cli lib", () => {
             name?: string | null;
             version?: string | null;
           };
+          dependencies?: {
+            ready?: boolean;
+            warnings?: string[];
+            dependencies?: Array<{
+              name?: string;
+              declared?: boolean;
+              crossMarketplaceAllowlisted?: boolean;
+            }>;
+          };
           hooks?: {
             commandHookCount?: number;
             execForm?: boolean;
@@ -173,10 +198,24 @@ describe("runtime-cli lib", () => {
             curdxFlow?: boolean;
           };
         };
+        externalMcp?: {
+          ready?: boolean;
+          servers?: Array<{
+            id?: string;
+            configured?: boolean;
+            bundledByCurdxFlow?: boolean;
+          }>;
+        };
+        release?: {
+          ready?: boolean;
+          expectedNpmTag?: string | null;
+          expectedPluginTag?: string | null;
+        };
         browserVerification?: {
           project?: {
             devServerScripts?: string[];
             e2eScripts?: string[];
+            pluginSmokeScripts?: string[];
             e2eConfigFiles?: string[];
           };
           playwright?: {
@@ -223,6 +262,20 @@ describe("runtime-cli lib", () => {
         },
       });
       expect(json.plugin?.hooks?.commandHookCount).toBeGreaterThan(0);
+      expect(json.plugin?.dependencies?.ready).toBe(true);
+      expect(json.plugin?.dependencies?.warnings?.join("\n")).toContain("version constraint");
+      expect(json.externalMcp).toMatchObject({
+        ready: true,
+        servers: expect.arrayContaining([
+          expect.objectContaining({ id: "context7", configured: true, bundledByCurdxFlow: false }),
+          expect.objectContaining({ id: "sequential-thinking", configured: true, bundledByCurdxFlow: false }),
+        ]),
+      });
+      expect(json.release).toMatchObject({
+        ready: true,
+        expectedNpmTag: expect.stringMatching(/^v\d+\.\d+\.\d+/),
+        expectedPluginTag: expect.stringMatching(/^curdx-flow--v\d+\.\d+\.\d+/),
+      });
       expect(json.recommendations).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ id: "workflow" }),
@@ -237,6 +290,8 @@ describe("runtime-cli lib", () => {
       expect(json.executionBrief?.completionContract).toEqual(expect.any(Array));
       expect(json.browserVerification?.project?.devServerScripts).toContain("dev");
       expect(json.browserVerification?.project?.e2eScripts).toContain("test:e2e");
+      expect(json.browserVerification?.project?.e2eScripts).not.toContain("test:claudecc:e2e");
+      expect(json.browserVerification?.project?.pluginSmokeScripts).toContain("test:claudecc:e2e");
       expect(json.browserVerification?.project?.e2eConfigFiles).toContain("playwright.config.ts");
       expect(json.browserVerification?.playwright).toMatchObject({
         ready: true,

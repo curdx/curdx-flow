@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../../../src/hooks/lib/capability-normalization.ts"],
+  "sourcesContent": ["// Known companion capability names are routing inputs, not product stack facts.\n// Strip them before running goal regexes that infer frontend/browser/runtime\n// intent, otherwise names such as \"frontend-design\" look like UI work.\n\nconst KNOWN_CAPABILITY_TOKEN_RE =\n  /\\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|frontend-design|pua)\\b/gi;\n\nexport function stripKnownCapabilityTokens(input: string | undefined): string {\n  return (input ?? \"\").replace(KNOWN_CAPABILITY_TOKEN_RE, \" \");\n}\n\n"],
+  "mappings": ";;;;;;;;AAIA,IAAM,4BACJ;AAEK,SAAS,2BAA2B,OAAmC;AAC5E,UAAQ,SAAS,IAAI,QAAQ,2BAA2B,GAAG;AAC7D;",
+  "names": []
+}

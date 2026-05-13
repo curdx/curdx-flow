@@ -20,6 +20,8 @@ import {
   recommendToolCapabilities,
   type CapabilityRecommendation,
 } from "./tool-capabilities.js";
+import { stripKnownCapabilityTokens } from "./capability-normalization.js";
+import { summarizeProjectBrain } from "./project-brain.js";
 import {
   detectStackProfile,
   selectContextBudget,
@@ -285,21 +287,22 @@ const DEMO_RE = /\b(demo|prototype|poc|演示|原型)\b/i;
 const PRODUCTION_RE = /\b(production|prod|ship|launch|deploy|release|上线|生产|发布|可用|能用)\b/i;
 
 function classifyIntent(goal: string, topology: ProjectTopology): SmartIntent {
-  const artifactProvided = ARTIFACT_RE.test(goal);
-  const stackSpecified = STACK_RE.test(goal);
+  const semanticGoal = stripKnownCapabilityTokens(goal);
+  const artifactProvided = ARTIFACT_RE.test(semanticGoal);
+  const stackSpecified = STACK_RE.test(semanticGoal);
   let intentKind: IntentKind = "unknown";
   if (artifactProvided) intentKind = "import-spec";
-  else if (SCAFFOLD_RE.test(goal)) intentKind = "scaffold";
-  else if (PROTOTYPE_RE.test(goal)) intentKind = "prototype";
-  else if (RELEASE_RE.test(goal)) intentKind = "release";
-  else if (FIX_RE.test(goal)) intentKind = "fix";
-  else if (REFACTOR_RE.test(goal)) intentKind = "refactor";
-  else if (PRODUCT_RE.test(goal)) intentKind = "product";
+  else if (SCAFFOLD_RE.test(semanticGoal)) intentKind = "scaffold";
+  else if (PROTOTYPE_RE.test(semanticGoal)) intentKind = "prototype";
+  else if (RELEASE_RE.test(semanticGoal)) intentKind = "release";
+  else if (FIX_RE.test(semanticGoal)) intentKind = "fix";
+  else if (REFACTOR_RE.test(semanticGoal)) intentKind = "refactor";
+  else if (PRODUCT_RE.test(semanticGoal)) intentKind = "product";
   else if (goal.length > 0) intentKind = "feature";
 
   let deliveryExpectation: DeliveryExpectation = "maintenance";
-  if (DEMO_RE.test(goal)) deliveryExpectation = "demo";
-  else if (PRODUCTION_RE.test(goal)) deliveryExpectation = "production";
+  if (DEMO_RE.test(semanticGoal)) deliveryExpectation = "demo";
+  else if (PRODUCTION_RE.test(semanticGoal)) deliveryExpectation = "production";
   else if (intentKind === "product" || topology.workspaceState === "empty") {
     deliveryExpectation = "usable-app";
   }
@@ -309,7 +312,7 @@ function classifyIntent(goal: string, topology: ProjectTopology): SmartIntent {
     topology.workspaceState === "empty" &&
     intentKind === "product" &&
     !artifactProvided &&
-    !PRODUCT_DOMAIN_HINT_RE.test(goal)
+    !PRODUCT_DOMAIN_HINT_RE.test(semanticGoal)
   ) {
     missingFacts.push("product domain, target user, MVP acceptance criteria");
   }
@@ -320,7 +323,7 @@ function classifyIntent(goal: string, topology: ProjectTopology): SmartIntent {
   ) {
     missingFacts.push("preferred stack or permission to choose defaults");
   }
-  if (intentKind === "prototype" && !/success|metric|prove|验证|成功|标准/i.test(goal)) {
+  if (intentKind === "prototype" && !/success|metric|prove|验证|成功|标准/i.test(semanticGoal)) {
     missingFacts.push("prototype success criterion");
   }
 
@@ -330,7 +333,7 @@ function classifyIntent(goal: string, topology: ProjectTopology): SmartIntent {
   else if (stackSpecified || intentKind === "fix" || intentKind === "refactor") clarity = "high";
 
   let confidence = 0.62;
-  if (artifactProvided || SCAFFOLD_RE.test(goal) || PROTOTYPE_RE.test(goal)) confidence += 0.22;
+  if (artifactProvided || SCAFFOLD_RE.test(semanticGoal) || PROTOTYPE_RE.test(semanticGoal)) confidence += 0.22;
   if (stackSpecified) confidence += 0.08;
   if (missingFacts.length > 0) confidence -= 0.18;
   confidence = Math.max(0.1, Math.min(0.98, Number(confidence.toFixed(2))));
@@ -567,6 +570,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
     risk: policy.risk,
     stackProfile,
   });
+  const brain = summarizeProjectBrain(cwd);
   const recommendations = recommendToolCapabilities({
     goal,
     route: routeCandidate,
@@ -578,6 +582,7 @@ export function classifySmartRoute(input: SmartRouteInput): SmartRoute {
     contextBudget,
     missingRoots: topology.missingRoots.length,
     availableCapabilities: input.availableCapabilities,
+    recentFailures: brain.recentFailures.length,
   });
 
   if (activeSpec !== undefined && !activeSpec.completed && goal.length === 0) {

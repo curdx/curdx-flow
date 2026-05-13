@@ -4,7 +4,7 @@
 // Stored under .curdx/ so it is ignored by git and never written into the
 // plugin installation directory.
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 export type BrainEventType =
@@ -51,6 +51,8 @@ export interface BrainSummary {
 
 const MAX_REASON = 240;
 const MAX_COMMAND = 180;
+const MAX_BRAIN_BYTES = 64 * 1024;
+const MAX_BRAIN_LINES = 400;
 
 function normalizeCwd(cwd?: string): string {
   return resolve(cwd ?? process.cwd());
@@ -97,10 +99,25 @@ export function appendBrainEvent(
   try {
     mkdirSync(join(normalizeCwd(cwd), ".curdx"), { recursive: true });
     appendFileSync(path, JSON.stringify(normalizeEvent(event)) + "\n", "utf8");
+    compactBrainIfNeeded(path);
     return { ok: true, path };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, path, error: message };
+  }
+}
+
+function compactBrainIfNeeded(path: string): void {
+  try {
+    if (statSync(path).size <= MAX_BRAIN_BYTES) return;
+    const lines = readFileSync(path, "utf8")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(-MAX_BRAIN_LINES);
+    writeFileSync(path, lines.join("\n") + (lines.length > 0 ? "\n" : ""), "utf8");
+  } catch {
+    // Brain is advisory; never fail the caller because compaction failed.
   }
 }
 

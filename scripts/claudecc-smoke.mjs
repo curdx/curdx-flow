@@ -169,17 +169,16 @@ try {
   const capabilityParsed = JSON.parse(capabilityRoute);
   const capabilityRecs = capabilityParsed.recommendedCapabilities ?? [];
   const capabilityById = new Map(capabilityRecs.map((rec) => [rec.id, rec]));
-  for (const [expected, availability] of [
-    ['context7', 'core-required'],
-    ['claude-mem', 'core-required'],
-    ['frontend-design', 'core-required'],
-    ['chrome-devtools-mcp', 'core-required'],
-    ['sequential-thinking', 'core-required'],
-    ['pua', 'core-required'],
-    ['docs-query', 'known-available'],
-    ['browser-verification', 'known-available'],
-    ['stack-specific-verification', 'known-available'],
-    ['context-budget', 'known-available'],
+  for (const [expected, availability, availabilityState, provisioning] of [
+    ['context7', 'known-available', 'available', 'external-mcp'],
+    ['claude-mem', 'plugin-dependency', 'missing', 'plugin-dependency'],
+    ['frontend-design', 'known-available', 'available', 'plugin-dependency'],
+    ['chrome-devtools-mcp', 'known-available', 'available', 'plugin-dependency'],
+    ['sequential-thinking', 'known-available', 'available', 'external-mcp'],
+    ['docs-query', 'known-available', 'workflow', 'workflow'],
+    ['browser-verification', 'known-available', 'workflow', 'workflow'],
+    ['stack-specific-verification', 'known-available', 'workflow', 'workflow'],
+    ['context-budget', 'known-available', 'workflow', 'workflow'],
   ]) {
     const rec = capabilityById.get(expected);
     if (!rec) {
@@ -188,6 +187,15 @@ try {
     if (rec.availability !== availability) {
       throw new Error(`expected ${expected} availability ${availability}: ${capabilityRoute}`);
     }
+    if (rec.availabilityState !== availabilityState) {
+      throw new Error(`expected ${expected} availabilityState ${availabilityState}: ${capabilityRoute}`);
+    }
+    if (rec.provisioning !== provisioning) {
+      throw new Error(`expected ${expected} provisioning ${provisioning}: ${capabilityRoute}`);
+    }
+  }
+  if (capabilityById.has('pua')) {
+    throw new Error(`pua should not be recommended before repeated failures or parallel decomposition: ${capabilityRoute}`);
   }
   for (const [expected, phase] of [
     ['docs-query', 'before-coding'],

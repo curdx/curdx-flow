@@ -26,12 +26,19 @@ const KNOWN = new Set([
   "curdx-flow:triage",
 ]);
 
+const MAX_ADDITIONAL_CONTEXT_CHARS = 1200;
+
 interface ExpansionInput {
   cwd?: string;
   hook_event_name?: string;
   expansion_type?: string;
   command_name?: string;
   command_args?: string;
+}
+
+function limitContext(value: string): string {
+  if (value.length <= MAX_ADDITIONAL_CONTEXT_CHARS) return value;
+  return `${value.slice(0, MAX_ADDITIONAL_CONTEXT_CHARS - 15)} ...[truncated]`;
 }
 
 async function main(): Promise<void> {
@@ -100,7 +107,7 @@ async function main(): Promise<void> {
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: "UserPromptExpansion",
-          additionalContext: context,
+          additionalContext: limitContext(context),
         },
       }),
     );

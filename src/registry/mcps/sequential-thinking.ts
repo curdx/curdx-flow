@@ -9,7 +9,7 @@ const sequentialThinking: Pkg = {
   name: 'sequential-thinking',
   description: 'modelcontextprotocol/server-sequential-thinking — structured reasoning helper',
   type: 'mcp',
-  required: true,
+  required: false,
   whenToUse:
     'for complex multi-step problems where assumptions may shift (architecture comparison, risk-assessed migrations, prod-only debugging). Skip for simple queries.',
   isInstalled: () => isMcpInstalled(MCP_NAME),

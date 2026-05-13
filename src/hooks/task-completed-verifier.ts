@@ -12,10 +12,9 @@
  * Departures from `runHook` (used by the other 4 hooks):
  *   - Output contract differs: this hook intentionally writes a flat
  *     `{continue: true}` JSON for the pass-through paths (per AC-2.4 defensive
- *     guard) and a flat `{decision:"block", reason}` for the fail path. The
- *     `runHook` wrapper assumes one of the typed `HookOutput` variants and
- *     always exits 0; we need EXIT 2 on block to signal Claude Code that the
- *     TaskCompleted event must be intercepted (Anthropic TaskCompleted contract).
+ *     guard). On block, it writes the reason to stderr and exits 2. Claude Code
+ *     ignores stdout JSON for exit 2 hooks, so stderr is the user/model-visible
+ *     channel.
  *   - Therefore stdin parsing, output emission, and exit-code control live
  *     directly in this file rather than going through the wrapper.
  *
@@ -29,9 +28,9 @@
  *      (legacy / unknown phase — fail-open per FR-8)
  *
  * Block paths (exit 2, signals Claude Code to intercept):
- *   6. `verifyPhaseBlock` returns `!ok`          → `{decision:"block", reason}`
+ *   6. `verifyPhaseBlock` returns `!ok`          → stderr reason + exit 2
  *   7. Unexpected throw in any of the above      → `{decision:"block", reason:
- *      "internal error in verify-blocks; see logs"}` + stack to stderr
+ *      "internal error in verify-blocks; see logs" + stack to stderr
  *
  * Spec: specs/spec-verification-iron-law/tasks.md Task 2.9 + design.md
  * "Two-Layer Verification" + AC-2.4.
@@ -60,9 +59,9 @@ function passThrough(): never {
   process.exit(0);
 }
 
-/** Emit `{decision:"block", reason}` and exit 2 — gate the TaskCompleted event. */
+/** Emit a visible block reason and exit 2 — gate the TaskCompleted event. */
 function emitBlock(reason: string): never {
-  process.stdout.write(JSON.stringify({ decision: "block", reason }));
+  process.stderr.write(`${reason}\n`);
   process.exit(2);
 }
 

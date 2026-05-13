@@ -13,6 +13,12 @@ Use this reference when route output includes `stackProfile`, `qualityGates`,
 - Treat `suggestedVerifier` as the preferred final proof before completion.
 - Treat `contextBudget` as a cap on reference loading, not a license to skip
   required files.
+- Treat `recommendedCapabilities` as phase-specific hints. Check
+  `availabilityState` before relying on an external plugin or MCP.
+  `availability` names the provisioning class: `plugin-dependency` for Claude
+  Code plugin dependencies, `external-expected` for MCPs installed outside this
+  plugin, and `known-available` for capabilities already visible in the current
+  tool surface.
 
 ## Stack Profile
 
@@ -49,6 +55,24 @@ one stack's test command as proof for a different root.
   injection, dependency, and release risk.
 - `*-release`: run the stricter release gate before push/tag/publish work.
 
+## Capability Availability
+
+- `availabilityState: available`: the capability is visible in the current
+  tool/plugin/MCP surface.
+- `availabilityState: expected`: curdx-flow expects the environment to provide
+  it through plugin dependencies or external MCP setup scripts, but the route
+  did not prove it.
+- `availabilityState: missing`: do not rely on the wheel until setup is fixed.
+- `availabilityState: workflow`: no external install is needed.
+
+If `doNotReimplement: true`, curdx-flow must not build a duplicate. Use the
+named wheel when available, skip it when optional, or surface setup remediation
+when it is required for the task.
+
+`context7` and `sequential-thinking` are external MCP wheels in this setup.
+Do not add plugin-local `.mcp.json` files or `mcpServers` manifest entries for
+them; `doctor` should diagnose whether Claude Code can see them.
+
 ## Context Budget
 
 - `tiny`: read only the directly touched files and one convention file.
@@ -71,3 +95,6 @@ For `claude-code-plugin` stack work:
   `CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc`.
 - Before release, align package, lockfile, plugin manifest, marketplace entry,
   changelog, and tag behavior.
+- For plugin dependency version resolution, Claude Code uses
+  `{plugin-name}--v{version}` tags. The repository's existing `vX.Y.Z` tag is
+  the npm publish trigger, not a substitute for the plugin dependency tag.

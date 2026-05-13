@@ -8,6 +8,9 @@ curdx-flow route --compile --goal "<goal>"
 ```
 
 The brief turns router facts into a bounded execution contract.
+It is read-only by default. Use `--record` only for real execution flows that
+should append a compact `route-compiled` event to `.curdx/brain.jsonl`; do not
+use `--record` during prompt optimization.
 
 ## Fields
 

@@ -2,6 +2,26 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.27 — 2026-05-13
+
+### Added
+
+- **Wheel-source-aware capability recommendations.** `recommendedCapabilities` now carries `availabilityState`, `ownedBy`, `provisioning`, `curdxRole`, `doNotReimplement`, `expectedByDefault`, and `missingAction` so route consumers can distinguish Claude Code plugin dependencies from externally configured MCP wheels and curdx-flow-owned workflow gates.
+- **External MCP diagnostics.** `curdx-flow doctor` reports `context7` and `sequential-thinking` as expected external MCP servers, including whether Claude Code can see them and confirming they are not bundled by curdx-flow.
+- **Capability-token normalization.** Smart-route and stack profiling strip known wheel names before inferring stack/runtime intent, so prompts that mention `frontend-design`, `chrome-devtools-mcp`, `context7`, or `sequential-thinking` do not accidentally route as UI/browser work.
+
+### Changed
+
+- **Context7 and sequential-thinking are selectable, not required installer items.** The CLI registry keeps them available for explicit setup, but the default required set is now limited to curdx-flow and Claude Code plugin dependencies.
+- **Route compile is read-only by default.** `curdx-flow route --compile` no longer writes `.curdx/brain.jsonl`; real execution flows must pass `--record`.
+- **Hook context budgets are tighter and more explicit.** UserPromptExpansion and PostToolBatch now inject bounded route/brief context while project brain compacts itself when it grows past the advisory size cap.
+- **TaskCompleted block feedback follows the current hook contract.** Blocking verification feedback is written to stderr with exit code 2 instead of stdout JSON.
+
+### Tests
+
+- Added and updated coverage for external MCP doctor output, plugin-manifest MCP exclusion, registry required/optional split, route compile `--record`, project-brain compaction, capability-source metadata, stack-intent normalization, and TaskCompleted stderr blocking.
+- Verified targeted hook/runner suites and smoke-tested route/doctor behavior against external MCP fixtures.
+
 ## 7.1.26 — 2026-05-12
 
 ### Added

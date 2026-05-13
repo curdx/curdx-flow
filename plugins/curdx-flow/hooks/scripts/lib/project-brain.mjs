@@ -6,10 +6,12 @@ const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
 // src/hooks/lib/project-brain.ts
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 var MAX_REASON = 240;
 var MAX_COMMAND = 180;
+var MAX_BRAIN_BYTES = 64 * 1024;
+var MAX_BRAIN_LINES = 400;
 function normalizeCwd(cwd) {
   return resolve(cwd ?? process.cwd());
 }
@@ -48,10 +50,19 @@ function appendBrainEvent(cwd, event) {
   try {
     mkdirSync(join(normalizeCwd(cwd), ".curdx"), { recursive: true });
     appendFileSync(path, JSON.stringify(normalizeEvent(event)) + "\n", "utf8");
+    compactBrainIfNeeded(path);
     return { ok: true, path };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, path, error: message };
+  }
+}
+function compactBrainIfNeeded(path) {
+  try {
+    if (statSync(path).size <= MAX_BRAIN_BYTES) return;
+    const lines = readFileSync(path, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-MAX_BRAIN_LINES);
+    writeFileSync(path, lines.join("\n") + (lines.length > 0 ? "\n" : ""), "utf8");
+  } catch {
   }
 }
 function parseBrainLine(line) {

@@ -6,8 +6,8 @@ const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
 // src/hooks/lib/smart-route.ts
-import { existsSync as existsSync4, readFileSync as readFileSync4 } from "node:fs";
-import { basename as basename5, join as join3 } from "node:path";
+import { existsSync as existsSync5, readFileSync as readFileSync5 } from "node:fs";
+import { basename as basename5, join as join4 } from "node:path";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
 // src/hooks/lib/auto-policy.ts
@@ -1036,65 +1036,114 @@ if (isDirectRun2()) {
 // src/hooks/lib/tool-capabilities.ts
 import { basename as basename4 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
+
+// src/hooks/lib/capability-normalization.ts
+var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|frontend-design|pua)\b/gi;
+function stripKnownCapabilityTokens(input) {
+  return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
+}
+
+// src/hooks/lib/tool-capabilities.ts
 var CAPABILITIES = {
   "context7": {
     id: "context7",
     name: "Context7",
     type: "mcp",
+    ownedBy: "context7",
+    provisioning: "external-mcp",
+    curdxRole: ["recommend", "gate"],
+    doNotReimplement: true,
+    expectedByDefault: true,
     invocation: "Context7 MCP",
-    summary: "current official docs for libraries, SDKs, APIs, and Claude Code",
-    useWhen: "use the Context7 MCP before implementation when external library, SDK, API, framework, or Claude Code behavior matters.",
-    skipWhen: "Skip for pure local logic, typos, and code paths fully understood from this repository."
+    summary: "current docs for libraries, SDKs, APIs, and frameworks",
+    useWhen: "use the Context7 MCP before implementation when external library, SDK, API, or framework behavior matters.",
+    skipWhen: "Skip for pure local logic, typos, and code paths fully understood from this repository.",
+    missingAction: "Enable the external context7 MCP server from your setup script or configure https://mcp.context7.com/mcp."
   },
   "claude-mem": {
     id: "claude-mem",
     name: "claude-mem",
     type: "plugin",
+    ownedBy: "claude-mem",
+    provisioning: "plugin-dependency",
+    curdxRole: ["recommend"],
+    doNotReimplement: true,
+    expectedByDefault: true,
     invocation: "/claude-mem:mem-search",
     summary: "cross-session memory search and phased plan/execution commands",
     useWhen: "Use /claude-mem:mem-search when similar work, prior decisions, or repeated failures may exist; use /claude-mem:make-plan only for genuinely phased work.",
-    skipWhen: "Skip when the task is new, obvious, and smaller than a short local edit."
+    skipWhen: "Skip when the task is new, obvious, and smaller than a short local edit.",
+    missingAction: "Install/enable claude-mem from the thedotmack marketplace dependency."
   },
   "sequential-thinking": {
     id: "sequential-thinking",
     name: "sequential-thinking",
     type: "mcp",
+    ownedBy: "sequential-thinking",
+    provisioning: "external-mcp",
+    curdxRole: ["recommend"],
+    doNotReimplement: true,
+    expectedByDefault: true,
     invocation: "sequential-thinking MCP",
     summary: "structured hypothesis breakdown for hard architecture and debugging problems",
     useWhen: "Use for architecture tradeoffs, migrations, security/data/release risk, or debugging where assumptions may change.",
-    skipWhen: "Skip for direct edits, simple lookups, and deterministic fixes."
+    skipWhen: "Skip for direct edits, simple lookups, and deterministic fixes.",
+    missingAction: "Enable the external sequential-thinking MCP server from your setup script."
   },
   "chrome-devtools-mcp": {
     id: "chrome-devtools-mcp",
     name: "Chrome DevTools MCP",
     type: "plugin",
+    ownedBy: "chrome-devtools-mcp",
+    provisioning: "plugin-dependency",
+    curdxRole: ["recommend", "gate"],
+    doNotReimplement: true,
+    expectedByDefault: true,
     invocation: "Chrome DevTools MCP",
     summary: "real browser console, network, DOM, performance, and screenshot/snapshot verification",
     useWhen: "Use for browser runtime behavior, UI regressions, DOM/CSS issues, network failures, and frontend verification.",
-    skipWhen: "Skip for backend-only code with no browser-facing behavior."
+    skipWhen: "Skip for backend-only code with no browser-facing behavior.",
+    missingAction: "Install/enable chrome-devtools-mcp and make sure Chrome is installed."
   },
   "frontend-design": {
     id: "frontend-design",
     name: "frontend-design",
     type: "plugin",
+    ownedBy: "frontend-design",
+    provisioning: "plugin-dependency",
+    curdxRole: ["recommend"],
+    doNotReimplement: true,
+    expectedByDefault: true,
     invocation: "frontend-design plugin skills",
     summary: "frontend UX/design guidance for UI pages, components, and interaction polish",
     useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
-    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work."
+    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
+    missingAction: "Install/enable frontend-design from the official plugin marketplace."
   },
   "pua": {
     id: "pua",
     name: "pua",
     type: "plugin",
+    ownedBy: "pua",
+    provisioning: "plugin-dependency",
+    curdxRole: ["recommend"],
+    doNotReimplement: true,
+    expectedByDefault: true,
     invocation: "/pua:pua-loop or /pua:p9",
     summary: "structured retries and parallel task decomposition",
     useWhen: "Use after multiple failed attempts or for truly independent parallel work slices.",
-    skipWhen: "Skip on first-attempt failures, known fixes, and work that is sequential by dependency."
+    skipWhen: "Skip on first-attempt failures, known fixes, and work that is sequential by dependency.",
+    missingAction: "Install/enable pua from the pua-skills marketplace dependency."
   },
   "docs-query": {
     id: "docs-query",
     name: "Docs query",
     type: "workflow",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["gate"],
+    doNotReimplement: false,
+    expectedByDefault: true,
     invocation: "Context7 or official docs",
     summary: "phase-specific grounding against current documentation",
     useWhen: "Use before implementation when quality gates mark docs as required.",
@@ -1104,6 +1153,11 @@ var CAPABILITIES = {
     id: "browser-verification",
     name: "Browser verification",
     type: "workflow",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["gate", "record-evidence"],
+    doNotReimplement: false,
+    expectedByDefault: true,
     invocation: "Playwright or Chrome DevTools MCP",
     summary: "repeatable browser/runtime proof for UI and full-stack behavior",
     useWhen: "Use when browser-facing quality gates are required or suggested.",
@@ -1113,6 +1167,11 @@ var CAPABILITIES = {
     id: "tdd-cycle",
     name: "TDD cycle",
     type: "workflow",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["gate"],
+    doNotReimplement: false,
+    expectedByDefault: true,
     invocation: "RED/GREEN/VERIFY loop",
     summary: "test-first implementation for behavior changes",
     useWhen: "Use when route/risk indicates implementation should be protected by a regression test.",
@@ -1122,6 +1181,11 @@ var CAPABILITIES = {
     id: "security-review",
     name: "Security review",
     type: "workflow",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["gate"],
+    doNotReimplement: false,
+    expectedByDefault: true,
     invocation: "read-only security review",
     summary: "focused review of auth, secrets, injection, release, and dependency risk",
     useWhen: "Use when quality gates indicate auth/security/release risk.",
@@ -1131,6 +1195,11 @@ var CAPABILITIES = {
     id: "stack-specific-verification",
     name: "Stack-specific verification",
     type: "workflow",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["gate", "record-evidence"],
+    doNotReimplement: false,
+    expectedByDefault: true,
     invocation: "curdx-flow route qualityGates",
     summary: "run the verifier that matches the detected stack profile",
     useWhen: "Use before completion whenever smart-route returns a suggestedVerifier.",
@@ -1140,6 +1209,11 @@ var CAPABILITIES = {
     id: "context-budget",
     name: "Context budget",
     type: "policy",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["route", "compile-brief"],
+    doNotReimplement: false,
+    expectedByDefault: true,
     invocation: "curdx-flow route contextBudget",
     summary: "limit reference loading by route and stack confidence",
     useWhen: "Use for every non-trivial route to keep the session focused.",
@@ -1160,20 +1234,13 @@ var ORDER = [
   "sequential-thinking",
   "pua"
 ];
-var CORE_REQUIRED = /* @__PURE__ */ new Set([
-  "context7",
-  "claude-mem",
-  "frontend-design",
-  "chrome-devtools-mcp",
-  "sequential-thinking",
-  "pua"
-]);
 var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|scaffold|starter|template|generator|initializer|initializr|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node|go|python|rust|cargo|maven|gradle|cookiecutter)\b|最新|依赖|框架|插件|官方|联网|搜索|文档|脚手架|初始化|生成器|模板/i;
 var MEMORY_RE = /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
 var UI_RE = /\b(ui|ux|frontend|front-end|browser|chrome|dom|css|html|layout|component|page|form|modal|responsive|visual|render|react|vue|vite|next\.?js|screenshot|interaction)\b|前端|页面|浏览器|样式|交互|组件|布局|视觉|截图/i;
 var BROWSER_VERIFY_RE = /\b(browser|chrome|dom|css|network|console|performance|render|screenshot|e2e|playwright|visual regression|interaction)\b|浏览器|控制台|网络|性能|渲染|截图|端到端/i;
 var COMPLEX_RE = /\b(architecture|architect|migration|migrate|security|auth|authentication|authorization|permission|oauth|payment|billing|database|schema|release|publish|npm|tag|hook|subagent|multi[- ]?repo|monorepo|cross[- ]?system|concurrency|race|cache|rewrite|refactor)\b|架构|迁移|安全|权限|认证|数据库|发布|重写|并发|跨仓库|多仓库/i;
 var STUCK_RE = /\b(stuck|failed|failure|fails|flaky|retry|debug|investigate|root cause|not working|broken|regression)\b|卡住|失败|报错|不行|修不好|定位|排查/i;
+var REPEATED_FAILURE_RE = /\b(repeated|multiple failed|failed twice|failed 2|again failed|keeps failing|stuck again)\b|连续失败|多次失败|失败两次|又失败|反复失败|一直失败/i;
 var PARALLEL_RE = /\b(parallel|multi-agent|team|decompose|split|epic|multiple subsystems|large refactor)\b|并行|多智能体|拆分|史诗|多模块/i;
 var LOW_RISK_LOCAL_RE = /\b(typo|readme|docs?|comment|comments|copy|wording|rename label|format text)\b|错别字|注释|文案/i;
 function normalize(input) {
@@ -1184,15 +1251,27 @@ function hasAny(values, candidates) {
   return candidates.some((candidate) => set.has(candidate.toLowerCase()));
 }
 function capabilityAvailability(id, available) {
-  if (CORE_REQUIRED.has(id)) return "core-required";
   const cap = CAPABILITIES[id];
-  if (cap.type === "workflow" || cap.type === "policy") return "known-available";
-  if (available === null) return "check-if-installed";
-  return available.has(id) ? "known-available" : null;
+  if (cap.type === "workflow" || cap.type === "policy") {
+    return { availability: "known-available", availabilityState: "workflow" };
+  }
+  const expectedAvailability = cap.provisioning === "external-mcp" ? "external-expected" : "plugin-dependency";
+  if (available === null) {
+    return {
+      availability: cap.expectedByDefault ? expectedAvailability : "check-if-installed",
+      availabilityState: cap.expectedByDefault ? "expected" : "missing"
+    };
+  }
+  if (available.has(id)) {
+    return { availability: "known-available", availabilityState: "available" };
+  }
+  return {
+    availability: cap.expectedByDefault ? expectedAvailability : "check-if-installed",
+    availabilityState: "missing"
+  };
 }
 function pushRecommendation(out, available, id, phase, reason, instruction, extra = {}) {
   const availability = capabilityAvailability(id, available);
-  if (availability === null) return;
   if (out.some((rec) => rec.id === id)) return;
   const cap = CAPABILITIES[id];
   out.push({
@@ -1202,7 +1281,14 @@ function pushRecommendation(out, available, id, phase, reason, instruction, extr
     invocation: cap.invocation,
     phase,
     ...extra,
-    availability,
+    availability: availability.availability,
+    availabilityState: availability.availabilityState,
+    ownedBy: cap.ownedBy,
+    provisioning: cap.provisioning,
+    curdxRole: cap.curdxRole,
+    doNotReimplement: cap.doNotReimplement,
+    expectedByDefault: cap.expectedByDefault,
+    ...availability.availabilityState === "missing" && cap.missingAction ? { missingAction: cap.missingAction } : {},
     reason,
     instruction
   });
@@ -1212,6 +1298,7 @@ function sortRecommendations(recs) {
 }
 function recommendToolCapabilities(input) {
   const goal = normalize(input.goal);
+  const semanticGoal = normalize(stripKnownCapabilityTokens(goal));
   const route = normalize(input.route);
   const risk = normalize(input.risk);
   const topologyKinds2 = input.topologyKinds ?? [];
@@ -1225,16 +1312,17 @@ function recommendToolCapabilities(input) {
   if (missingRoots > 0) {
     return recs;
   }
-  const externalDocsRelevant = EXTERNAL_DOCS_RE.test(goal);
-  const localLowRisk = LOW_RISK_LOCAL_RE.test(goal) && route === "direct-change" && !externalDocsRelevant;
+  const externalDocsRelevant = EXTERNAL_DOCS_RE.test(semanticGoal);
+  const localLowRisk = LOW_RISK_LOCAL_RE.test(semanticGoal) && route === "direct-change" && !externalDocsRelevant;
   if (localLowRisk) {
     return recs;
   }
-  const hasFrontend = UI_RE.test(goal) || hasAny(topologyKinds2, ["frontend-app"]) || hasAny(topologyFrameworks2, ["react", "vue", "next.js", "vite"]);
-  const browserRuntime = BROWSER_VERIFY_RE.test(goal) || hasFrontend;
-  const complex = COMPLEX_RE.test(goal) && route !== "direct-change" || risk === "high" || risk === "critical" || route === "full-spec" || route === "epic-split";
-  const stuck = STUCK_RE.test(goal);
-  const parallel = PARALLEL_RE.test(goal) || route === "epic-split";
+  const hasFrontend = UI_RE.test(semanticGoal) || hasAny(topologyKinds2, ["frontend-app"]) || hasAny(topologyFrameworks2, ["react", "vue", "next.js", "vite"]);
+  const browserRuntime = BROWSER_VERIFY_RE.test(semanticGoal) || hasFrontend;
+  const complex = COMPLEX_RE.test(semanticGoal) && route !== "direct-change" || risk === "high" || risk === "critical" || route === "full-spec" || route === "epic-split";
+  const stuck = STUCK_RE.test(semanticGoal);
+  const repeatedFailure = REPEATED_FAILURE_RE.test(semanticGoal) || (input.recentFailures ?? 0) >= 2;
+  const parallel = PARALLEL_RE.test(semanticGoal) || route === "epic-split";
   const stackIds = stackProfile?.detected.map((stack) => stack.id) ?? [];
   const docsGate = qualityGates.find((gate) => gate.id.endsWith("-docs"));
   const browserGate = qualityGates.find((gate) => gate.id.endsWith("-browser"));
@@ -1248,7 +1336,7 @@ function recommendToolCapabilities(input) {
       "context7",
       "before-coding",
       docsGate?.reason ?? "external documentation or current API behavior is likely relevant",
-      "Use Context7 before editing so version-specific behavior is grounded in current docs.",
+      stackProfile?.primary === "claude-code-plugin" ? "Start from official Claude Code docs; use Context7 only for external library/framework docs." : "Use Context7 before editing so version-specific library behavior is grounded in current docs.",
       { category: "docs", stackIds }
     );
     pushRecommendation(
@@ -1261,7 +1349,7 @@ function recommendToolCapabilities(input) {
       { category: "docs", stackIds }
     );
   }
-  if (MEMORY_RE.test(goal) || stuck || route === "full-spec" || route === "epic-split") {
+  if (MEMORY_RE.test(semanticGoal) || stuck || route === "full-spec" || route === "epic-split") {
     pushRecommendation(
       recs,
       available,
@@ -1314,7 +1402,7 @@ function recommendToolCapabilities(input) {
       { category: "tdd", stackIds }
     );
   }
-  if (securityGate !== void 0 || COMPLEX_RE.test(goal)) {
+  if (securityGate !== void 0 || COMPLEX_RE.test(semanticGoal)) {
     pushRecommendation(
       recs,
       available,
@@ -1358,7 +1446,7 @@ function recommendToolCapabilities(input) {
       { category: "context", stackIds }
     );
   }
-  if (stuck || parallel) {
+  if (stuck && repeatedFailure || parallel) {
     pushRecommendation(
       recs,
       available,
@@ -1405,9 +1493,77 @@ if (isDirectRun3()) {
   main3();
 }
 
+// src/hooks/lib/project-brain.ts
+import { appendFileSync, existsSync as existsSync3, mkdirSync, readFileSync as readFileSync3, statSync as statSync3, writeFileSync } from "node:fs";
+import { join as join2, resolve as resolve2 } from "node:path";
+var MAX_BRAIN_BYTES = 64 * 1024;
+function normalizeCwd(cwd) {
+  return resolve2(cwd ?? process.cwd());
+}
+function brainPath(cwd) {
+  return join2(normalizeCwd(cwd), ".curdx", "brain.jsonl");
+}
+function parseBrainLine(line) {
+  try {
+    const parsed = JSON.parse(line);
+    if (parsed.version !== 1) return null;
+    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked") {
+      return null;
+    }
+    if (typeof parsed.timestamp !== "string") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+function readBrainEvents(cwd, limit = 100) {
+  const path2 = brainPath(cwd);
+  if (!existsSync3(path2)) return [];
+  try {
+    const lines = readFileSync3(path2, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const parsed = lines.slice(Math.max(0, lines.length - Math.max(1, limit))).map(parseBrainLine).filter((event) => event !== null);
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+function uniqueRecent(values, limit) {
+  const out = [];
+  for (const value of values.reverse()) {
+    if (!value || out.includes(value)) continue;
+    out.push(value);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+function summarizeProjectBrain(cwd) {
+  const path2 = brainPath(cwd);
+  const events = readBrainEvents(cwd, 200);
+  const failures = events.filter((event) => event.type === "verification-blocked" || event.exitCode !== void 0 && event.exitCode !== 0).slice(-5).reverse().map((event) => ({
+    timestamp: event.timestamp,
+    type: event.type,
+    phase: event.phase,
+    command: event.command,
+    reason: event.reason
+  }));
+  const verifierHints = uniqueRecent(
+    events.filter((event) => event.type === "verification-run" && event.exitCode === 0).map((event) => event.command ?? event.verifier),
+    5
+  );
+  return {
+    path: path2,
+    exists: existsSync3(path2),
+    totalEvents: events.length,
+    lastUpdated: events.length > 0 ? events[events.length - 1]?.timestamp ?? null : null,
+    stackHints: uniqueRecent(events.map((event) => event.stack), 5),
+    verifierHints,
+    recentFailures: failures
+  };
+}
+
 // src/hooks/lib/stack-capabilities.ts
-import { existsSync as existsSync3, readFileSync as readFileSync3, readdirSync as readdirSync3 } from "node:fs";
-import { isAbsolute as isAbsolute3, join as join2, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync4, readFileSync as readFileSync4, readdirSync as readdirSync3 } from "node:fs";
+import { isAbsolute as isAbsolute3, join as join3, resolve as resolve3 } from "node:path";
 var STACKS = {
   "typescript": {
     id: "typescript",
@@ -1641,37 +1797,37 @@ function normalizeText(input) {
   return (input ?? "").trim().replace(/\s+/g, " ");
 }
 function rootFsPath(projectRoot, root) {
-  return isAbsolute3(root.path) ? resolve2(root.path) : resolve2(projectRoot, root.path);
+  return isAbsolute3(root.path) ? resolve3(root.path) : resolve3(projectRoot, root.path);
 }
 function readText2(file) {
   try {
-    return readFileSync3(file, "utf8");
+    return readFileSync4(file, "utf8");
   } catch {
     return "";
   }
 }
 function packageJsonContains(rootAbs, pattern) {
-  return pattern.test(readText2(join2(rootAbs, "package.json")));
+  return pattern.test(readText2(join3(rootAbs, "package.json")));
 }
 function hasManifestHint(rootAbs, hint) {
   if (hint.includes(":")) {
     const [file, needle] = hint.split(":", 2);
     if (!file || !needle) return false;
-    return readText2(join2(rootAbs, file)).toLowerCase().includes(needle.toLowerCase());
+    return readText2(join3(rootAbs, file)).toLowerCase().includes(needle.toLowerCase());
   }
   if (hint.includes("*")) {
     const pattern = new RegExp(`^${hint.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`);
     const dir = hint.includes("/") ? hint.split("/").slice(0, -1).join("/") : ".";
     const base = rootAbs === "" ? "." : rootAbs;
     try {
-      return existsSync3(join2(base, dir)) && readdirSync3(join2(base, dir)).some(
+      return existsSync4(join3(base, dir)) && readdirSync3(join3(base, dir)).some(
         (name) => pattern.test(dir === "." ? name : `${dir}/${name}`)
       );
     } catch {
       return false;
     }
   }
-  return existsSync3(join2(rootAbs, hint));
+  return existsSync4(join3(rootAbs, hint));
 }
 function scoreStack(stack, roots, projectRoot, goal) {
   const evidence = [];
@@ -1710,7 +1866,7 @@ function scoreStack(stack, roots, projectRoot, goal) {
   };
 }
 function detectStackProfile(input) {
-  const goal = normalizeText(input.goal);
+  const goal = normalizeText(stripKnownCapabilityTokens(input.goal));
   const roots = input.topology.roots;
   const detected = Object.values(STACKS).map((stack) => scoreStack(stack, roots, input.topology.projectRoot, goal)).filter((item) => item !== null).sort(
     (a, b) => b.confidence - a.confidence || STACK_PRIORITY[b.id] - STACK_PRIORITY[a.id]
@@ -1738,10 +1894,10 @@ function stackFor(profile) {
 }
 function selectCommand(commands, roots, projectRoot) {
   for (const command of commands) {
-    if (command.startsWith("./mvnw") && !roots.some((root) => existsSync3(join2(rootFsPath(projectRoot, root), "mvnw")))) {
+    if (command.startsWith("./mvnw") && !roots.some((root) => existsSync4(join3(rootFsPath(projectRoot, root), "mvnw")))) {
       continue;
     }
-    if (command.startsWith("./gradlew") && !roots.some((root) => existsSync3(join2(rootFsPath(projectRoot, root), "gradlew")))) {
+    if (command.startsWith("./gradlew") && !roots.some((root) => existsSync4(join3(rootFsPath(projectRoot, root), "gradlew")))) {
       continue;
     }
     return command;
@@ -1768,7 +1924,9 @@ function selectQualityGates(input) {
     {
       id: `${stack.id}-docs`,
       phase: "before-coding",
-      required: /plugin|hook|skill|agent|latest|official|framework|api|sdk/i.test(input.goal ?? "") || stack.id === "claude-code-plugin",
+      required: /plugin|hook|skill|agent|latest|official|framework|api|sdk/i.test(
+        stripKnownCapabilityTokens(input.goal)
+      ) || stack.id === "claude-code-plugin",
       command: null,
       reason: stack.docsQuery
     },
@@ -1796,20 +1954,21 @@ function selectQualityGates(input) {
       reason: "Browser-facing behavior needs Playwright or Chrome DevTools MCP evidence."
     });
   }
-  if (risk === "high" || risk === "critical" || /auth|security|permission|oauth|secret|release|publish|tag/i.test(input.goal ?? "")) {
+  const semanticGoal = stripKnownCapabilityTokens(input.goal);
+  if (risk === "high" || risk === "critical" || /auth|security|permission|oauth|secret|release|publish|tag/i.test(semanticGoal)) {
     gates.push({
       id: `${stack.id}-security-review`,
       phase: "verification",
-      required: risk === "critical" || /auth|security|permission|oauth|secret/i.test(input.goal ?? ""),
+      required: risk === "critical" || /auth|security|permission|oauth|secret/i.test(semanticGoal),
       command: null,
       reason: stack.security
     });
   }
-  if (route === "epic-split" || /release|publish|tag|npm/i.test(input.goal ?? "")) {
+  if (route === "epic-split" || /release|publish|tag|npm/i.test(semanticGoal)) {
     gates.push({
       id: `${stack.id}-release`,
       phase: "release",
-      required: /release|publish|tag|npm/i.test(input.goal ?? ""),
+      required: /release|publish|tag|npm/i.test(semanticGoal),
       command: selectCommand(stack.releaseCommands, input.topology.roots, input.topology.projectRoot),
       reason: `Release-facing ${stack.name} work needs the stricter release gate.`
     });
@@ -1818,7 +1977,8 @@ function selectQualityGates(input) {
 }
 function selectSuggestedVerifier(input) {
   const browserGate = input.qualityGates.find((gate) => gate.id.endsWith("-browser"));
-  if (browserGate && /ui|browser|frontend|page|component|css|layout|交互|页面|前端/i.test(input.goal ?? "")) {
+  const semanticGoal = stripKnownCapabilityTokens(input.goal);
+  if (browserGate && /ui|browser|frontend|page|component|css|layout|交互|页面|前端/i.test(semanticGoal)) {
     return {
       kind: "browser",
       command: browserGate.command,
@@ -1918,12 +2078,12 @@ function specNameFromPath(specPath) {
   return parts[parts.length - 1] ?? specPath;
 }
 function loadActiveSpecFromPath(cwd, specPath) {
-  const statePath = join3(cwd, specPath, ".curdx-state.json");
+  const statePath = join4(cwd, specPath, ".curdx-state.json");
   let phase = "unknown";
   let completed = false;
-  if (existsSync4(statePath)) {
+  if (existsSync5(statePath)) {
     try {
-      const parsed = JSON.parse(readFileSync4(statePath, "utf8"));
+      const parsed = JSON.parse(readFileSync5(statePath, "utf8"));
       if (typeof parsed.phase === "string" && parsed.phase.trim().length > 0) {
         phase = parsed.phase;
       }
@@ -1931,13 +2091,13 @@ function loadActiveSpecFromPath(cwd, specPath) {
     } catch {
       phase = "unknown";
     }
-  } else if (existsSync4(join3(cwd, specPath, "tasks.md"))) {
+  } else if (existsSync5(join4(cwd, specPath, "tasks.md"))) {
     phase = "execution";
-  } else if (existsSync4(join3(cwd, specPath, "design.md"))) {
+  } else if (existsSync5(join4(cwd, specPath, "design.md"))) {
     phase = "tasks";
-  } else if (existsSync4(join3(cwd, specPath, "requirements.md"))) {
+  } else if (existsSync5(join4(cwd, specPath, "requirements.md"))) {
     phase = "design";
-  } else if (existsSync4(join3(cwd, specPath, "research.md"))) {
+  } else if (existsSync5(join4(cwd, specPath, "research.md"))) {
     phase = "requirements";
   }
   return {
@@ -2016,31 +2176,32 @@ var RELEASE_RE = /\b(release|publish|deploy|ship|tag|npm|上线|发布|部署|�
 var DEMO_RE = /\b(demo|prototype|poc|演示|原型)\b/i;
 var PRODUCTION_RE = /\b(production|prod|ship|launch|deploy|release|上线|生产|发布|可用|能用)\b/i;
 function classifyIntent(goal, topology) {
-  const artifactProvided = ARTIFACT_RE.test(goal);
-  const stackSpecified = STACK_RE.test(goal);
+  const semanticGoal = stripKnownCapabilityTokens(goal);
+  const artifactProvided = ARTIFACT_RE.test(semanticGoal);
+  const stackSpecified = STACK_RE.test(semanticGoal);
   let intentKind = "unknown";
   if (artifactProvided) intentKind = "import-spec";
-  else if (SCAFFOLD_RE.test(goal)) intentKind = "scaffold";
-  else if (PROTOTYPE_RE.test(goal)) intentKind = "prototype";
-  else if (RELEASE_RE.test(goal)) intentKind = "release";
-  else if (FIX_RE.test(goal)) intentKind = "fix";
-  else if (REFACTOR_RE.test(goal)) intentKind = "refactor";
-  else if (PRODUCT_RE.test(goal)) intentKind = "product";
+  else if (SCAFFOLD_RE.test(semanticGoal)) intentKind = "scaffold";
+  else if (PROTOTYPE_RE.test(semanticGoal)) intentKind = "prototype";
+  else if (RELEASE_RE.test(semanticGoal)) intentKind = "release";
+  else if (FIX_RE.test(semanticGoal)) intentKind = "fix";
+  else if (REFACTOR_RE.test(semanticGoal)) intentKind = "refactor";
+  else if (PRODUCT_RE.test(semanticGoal)) intentKind = "product";
   else if (goal.length > 0) intentKind = "feature";
   let deliveryExpectation = "maintenance";
-  if (DEMO_RE.test(goal)) deliveryExpectation = "demo";
-  else if (PRODUCTION_RE.test(goal)) deliveryExpectation = "production";
+  if (DEMO_RE.test(semanticGoal)) deliveryExpectation = "demo";
+  else if (PRODUCTION_RE.test(semanticGoal)) deliveryExpectation = "production";
   else if (intentKind === "product" || topology.workspaceState === "empty") {
     deliveryExpectation = "usable-app";
   }
   const missingFacts = [];
-  if (topology.workspaceState === "empty" && intentKind === "product" && !artifactProvided && !PRODUCT_DOMAIN_HINT_RE.test(goal)) {
+  if (topology.workspaceState === "empty" && intentKind === "product" && !artifactProvided && !PRODUCT_DOMAIN_HINT_RE.test(semanticGoal)) {
     missingFacts.push("product domain, target user, MVP acceptance criteria");
   }
   if (topology.workspaceState === "empty" && (intentKind === "product" || intentKind === "feature") && !stackSpecified) {
     missingFacts.push("preferred stack or permission to choose defaults");
   }
-  if (intentKind === "prototype" && !/success|metric|prove|验证|成功|标准/i.test(goal)) {
+  if (intentKind === "prototype" && !/success|metric|prove|验证|成功|标准/i.test(semanticGoal)) {
     missingFacts.push("prototype success criterion");
   }
   let clarity = "medium";
@@ -2048,7 +2209,7 @@ function classifyIntent(goal, topology) {
   else if (missingFacts.length > 0) clarity = "low";
   else if (stackSpecified || intentKind === "fix" || intentKind === "refactor") clarity = "high";
   let confidence = 0.62;
-  if (artifactProvided || SCAFFOLD_RE.test(goal) || PROTOTYPE_RE.test(goal)) confidence += 0.22;
+  if (artifactProvided || SCAFFOLD_RE.test(semanticGoal) || PROTOTYPE_RE.test(semanticGoal)) confidence += 0.22;
   if (stackSpecified) confidence += 0.08;
   if (missingFacts.length > 0) confidence -= 0.18;
   confidence = Math.max(0.1, Math.min(0.98, Number(confidence.toFixed(2))));
@@ -2258,6 +2419,7 @@ function classifySmartRoute(input) {
     risk: policy.risk,
     stackProfile
   });
+  const brain = summarizeProjectBrain(cwd);
   const recommendations = recommendToolCapabilities({
     goal,
     route: routeCandidate,
@@ -2268,7 +2430,8 @@ function classifySmartRoute(input) {
     qualityGates,
     contextBudget,
     missingRoots: topology.missingRoots.length,
-    availableCapabilities: input.availableCapabilities
+    availableCapabilities: input.availableCapabilities,
+    recentFailures: brain.recentFailures.length
   });
   if (activeSpec !== void 0 && !activeSpec.completed && goal.length === 0) {
     return {

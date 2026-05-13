@@ -15,6 +15,7 @@ import {
   type CodeRoot,
   type ProjectTopology,
 } from "./project-topology.js";
+import { stripKnownCapabilityTokens } from "./capability-normalization.js";
 
 export type StackCapabilityId =
   | "typescript"
@@ -437,7 +438,7 @@ export function knownStackCapabilities(): StackCapability[] {
 }
 
 export function detectStackProfile(input: StackCapabilityInput): StackProfile {
-  const goal = normalizeText(input.goal);
+  const goal = normalizeText(stripKnownCapabilityTokens(input.goal));
   const roots = input.topology.roots;
   const detected = Object.values(STACKS)
     .map((stack) => scoreStack(stack, roots, input.topology.projectRoot, goal))
@@ -505,7 +506,9 @@ export function selectQualityGates(input: StackCapabilityInput & { stackProfile:
     {
       id: `${stack.id}-docs`,
       phase: "before-coding",
-      required: /plugin|hook|skill|agent|latest|official|framework|api|sdk/i.test(input.goal ?? "") ||
+      required: /plugin|hook|skill|agent|latest|official|framework|api|sdk/i.test(
+        stripKnownCapabilityTokens(input.goal),
+      ) ||
         stack.id === "claude-code-plugin",
       command: null,
       reason: stack.docsQuery,
@@ -536,21 +539,22 @@ export function selectQualityGates(input: StackCapabilityInput & { stackProfile:
     });
   }
 
-  if (risk === "high" || risk === "critical" || /auth|security|permission|oauth|secret|release|publish|tag/i.test(input.goal ?? "")) {
+  const semanticGoal = stripKnownCapabilityTokens(input.goal);
+  if (risk === "high" || risk === "critical" || /auth|security|permission|oauth|secret|release|publish|tag/i.test(semanticGoal)) {
     gates.push({
       id: `${stack.id}-security-review`,
       phase: "verification",
-      required: risk === "critical" || /auth|security|permission|oauth|secret/i.test(input.goal ?? ""),
+      required: risk === "critical" || /auth|security|permission|oauth|secret/i.test(semanticGoal),
       command: null,
       reason: stack.security,
     });
   }
 
-  if (route === "epic-split" || /release|publish|tag|npm/i.test(input.goal ?? "")) {
+  if (route === "epic-split" || /release|publish|tag|npm/i.test(semanticGoal)) {
     gates.push({
       id: `${stack.id}-release`,
       phase: "release",
-      required: /release|publish|tag|npm/i.test(input.goal ?? ""),
+      required: /release|publish|tag|npm/i.test(semanticGoal),
       command: selectCommand(stack.releaseCommands, input.topology.roots, input.topology.projectRoot),
       reason: `Release-facing ${stack.name} work needs the stricter release gate.`,
     });
@@ -566,7 +570,8 @@ export function selectSuggestedVerifier(
   },
 ): SuggestedVerifier {
   const browserGate = input.qualityGates.find((gate) => gate.id.endsWith("-browser"));
-  if (browserGate && /ui|browser|frontend|page|component|css|layout|交互|页面|前端/i.test(input.goal ?? "")) {
+  const semanticGoal = stripKnownCapabilityTokens(input.goal);
+  if (browserGate && /ui|browser|frontend|page|component|css|layout|交互|页面|前端/i.test(semanticGoal)) {
     return {
       kind: "browser",
       command: browserGate.command,

@@ -281,7 +281,26 @@ export interface CurdxState {
     invocation?: string;
     phase?: "before-coding" | "planning" | "implementation" | "verification" | "recovery";
     category?: "docs" | "verification" | "tdd" | "security" | "context" | "recovery";
-    availability?: "core-required" | "known-available" | "check-if-installed";
+    availability?:
+      | "plugin-dependency"
+      | "external-expected"
+      | "core-required"
+      | "known-available"
+      | "check-if-installed";
+    availabilityState?: "available" | "expected" | "missing" | "workflow";
+    ownedBy?:
+      | "claude-mem"
+      | "context7"
+      | "sequential-thinking"
+      | "chrome-devtools-mcp"
+      | "frontend-design"
+      | "pua"
+      | "curdx-flow";
+    provisioning?: "plugin-dependency" | "external-mcp" | "workflow";
+    curdxRole?: Array<"recommend" | "gate" | "record-evidence" | "compile-brief" | "route">;
+    doNotReimplement?: boolean;
+    expectedByDefault?: boolean;
+    missingAction?: string;
     reason?: string;
     instruction?: string;
     stackIds?: string[];

@@ -7,6 +7,8 @@ import { buildExecutionBrief, compactExecutionBrief } from "./lib/execution-brie
 import { appendBrainEvent } from "./lib/project-brain.js";
 import { readStdinJson } from "./_shared/stdin.js";
 
+const MAX_ADDITIONAL_CONTEXT_CHARS = 1000;
+
 interface ToolCall {
   tool_name?: string;
 }
@@ -14,6 +16,11 @@ interface ToolCall {
 interface PostToolBatchInput {
   cwd?: string;
   tool_calls?: ToolCall[];
+}
+
+function limitContext(value: string): string {
+  if (value.length <= MAX_ADDITIONAL_CONTEXT_CHARS) return value;
+  return `${value.slice(0, MAX_ADDITIONAL_CONTEXT_CHARS - 15)} ...[truncated]`;
 }
 
 async function main(): Promise<void> {
@@ -50,17 +57,19 @@ async function main(): Promise<void> {
       files: calls.length,
     });
 
+    const additionalContext =
+      `curdx-flow snapshot gates after batch: ${snapshot.gates.join(", ")}. ` +
+      `Stack: ${route.stackProfile.primary}. ` +
+      `Quality gates: ${qualityGateText || "none"}. ` +
+      `Suggested verifier: ${missingVerifier}. ` +
+      `${compactExecutionBrief(brief)}. ` +
+      `Next action: ${snapshot.nextAction}`;
+
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: "PostToolBatch",
-          additionalContext:
-            `curdx-flow snapshot gates after batch: ${snapshot.gates.join(", ")}. ` +
-            `Stack: ${route.stackProfile.primary}. ` +
-            `Quality gates: ${qualityGateText || "none"}. ` +
-            `Suggested verifier: ${missingVerifier}. ` +
-            `${compactExecutionBrief(brief)}. ` +
-            `Next action: ${snapshot.nextAction}`,
+          additionalContext: limitContext(additionalContext),
         },
       }),
     );

@@ -23,7 +23,7 @@ import {
 // Five paths exercised, mapped to the canonical defensive-guard ladder in
 // `src/hooks/task-completed-verifier.ts`:
 //   (a) valid block present                  → exit 0, {continue:true}
-//   (b) verificationBlocks missing for phase → exit 2, decision=block
+//   (b) verificationBlocks missing for phase → exit 2, stderr block reason
 //   (c) stale (srcMtime > timestamp)         → exit 2, "Stale evidence"
 //   (d) malformed stdin (no task_id)         → exit 0 pass-through
 //   (e) absent `.curdx-state.json`           → exit 0 pass-through
@@ -140,7 +140,7 @@ describe("task-completed-verifier (TaskCompleted hook)", () => {
     }
   });
 
-  it("(b): verificationBlocks missing for phase → exit 2, decision=block reason='missing'", () => {
+  it("(b): verificationBlocks missing for phase → exit 2, stderr reason='missing'", () => {
     spec = createFixtureSpec({
       state: {
         phase: "execution",
@@ -157,10 +157,9 @@ describe("task-completed-verifier (TaskCompleted hook)", () => {
     });
     const r = spawnHook(stdin, spec.cwd);
     expect(r.exitCode).toBe(2);
-    expect(r.json).toBeDefined();
-    expect((r.json as any).decision).toBe("block");
-    expect((r.json as any).reason).toContain("missing");
-    expect((r.json as any).reason).toContain("Suggested verifier");
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toContain("missing");
+    expect(r.stderr).toContain("Suggested verifier");
     expect(existsSync(path.join(spec.cwd, ".curdx", "brain.jsonl"))).toBe(true);
     expect(readFileSync(path.join(spec.cwd, ".curdx", "brain.jsonl"), "utf8")).toContain("verification-blocked");
   });
@@ -191,13 +190,12 @@ describe("task-completed-verifier (TaskCompleted hook)", () => {
     });
     const r = spawnHook(stdin, spec.cwd);
     expect(r.exitCode).toBe(2);
-    expect(r.json).toBeDefined();
-    expect((r.json as any).decision).toBe("block");
+    expect(r.stdout).toBe("");
     // Task 4.2 (NFR-3): stale message embeds phase id + fix command + spec.
-    expect((r.json as any).reason).toMatch(/^Stale evidence for phase '/);
-    expect((r.json as any).reason).toContain("phase 'execution'");
-    expect((r.json as any).reason).toContain("Re-run: npm run typecheck");
-    expect((r.json as any).reason).toMatch(/Spec: \S+/);
+    expect(r.stderr).toMatch(/^Stale evidence for phase '/);
+    expect(r.stderr).toContain("phase 'execution'");
+    expect(r.stderr).toContain("Re-run: npm run typecheck");
+    expect(r.stderr).toMatch(/Spec: \S+/);
   });
 
   it("(d): malformed stdin (missing task_id) → exit 0 pass-through {continue:true}", () => {

@@ -116,6 +116,7 @@ describe("manifest discovery", () => {
       commands?: string | string[];
       agents?: string | string[];
       hooks?: string | string[];
+      mcpServers?: string | string[] | Record<string, unknown>;
       dependencies?: Array<{ name?: string; marketplace?: string }>;
     };
 
@@ -128,6 +129,10 @@ describe("manifest discovery", () => {
     expect(
       manifest.hooks,
       "standard hooks/hooks.json is auto-discovered; plugin.json must not redeclare it",
+    ).toBeUndefined();
+    expect(
+      manifest.mcpServers,
+      "context7/sequential-thinking are installed externally by setup scripts; curdx-flow must not bundle duplicate MCP config",
     ).toBeUndefined();
 
     for (const key of ["skills", "agents"] as const) {

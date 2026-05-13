@@ -411,7 +411,7 @@
         },
         "recommendedCapabilities": {
           "type": "array",
-          "description": "Tool-use hints returned by smart-route; core-required capabilities are expected from the default bundle and phases should still use them only when relevant",
+          "description": "Stage-aware capability hints returned by smart-route. Plugin wheels are provided by plugin dependencies, context7/sequential-thinking are external MCPs configured outside this plugin, and workflow/policy hints need no installation.",
           "items": {
             "type": "object",
             "properties": {
@@ -445,7 +445,43 @@
               },
               "availability": {
                 "type": "string",
-                "enum": ["core-required", "known-available", "check-if-installed"]
+                "enum": ["plugin-dependency", "external-expected", "core-required", "known-available", "check-if-installed"]
+              },
+              "availabilityState": {
+                "type": "string",
+                "enum": ["available", "expected", "missing", "workflow"]
+              },
+              "ownedBy": {
+                "type": "string",
+                "enum": [
+                  "claude-mem",
+                  "context7",
+                  "sequential-thinking",
+                  "chrome-devtools-mcp",
+                  "frontend-design",
+                  "pua",
+                  "curdx-flow"
+                ]
+              },
+              "provisioning": {
+                "type": "string",
+                "enum": ["plugin-dependency", "external-mcp", "workflow"]
+              },
+              "curdxRole": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["recommend", "gate", "record-evidence", "compile-brief", "route"]
+                }
+              },
+              "doNotReimplement": {
+                "type": "boolean"
+              },
+              "expectedByDefault": {
+                "type": "boolean"
+              },
+              "missingAction": {
+                "type": "string"
               },
               "reason": { "type": "string" },
               "instruction": { "type": "string" },

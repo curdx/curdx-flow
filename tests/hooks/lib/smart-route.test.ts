@@ -305,7 +305,8 @@ describe("smart-route classifier", () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: "context7",
-          availability: "core-required",
+          availability: "external-expected",
+          provisioning: "external-mcp",
         }),
         expect.objectContaining({
           id: "docs-query",
@@ -334,15 +335,44 @@ describe("smart-route classifier", () => {
         "stack-specific-verification",
         "context-budget",
         "sequential-thinking",
-        "pua",
       ]),
     );
-    expect(route.recommendedCapabilities.find((rec) => rec.id === "context7")?.availability).toBe("core-required");
-    expect(route.recommendedCapabilities.find((rec) => rec.id === "claude-mem")?.availability).toBe("core-required");
-    expect(route.recommendedCapabilities.find((rec) => rec.id === "frontend-design")?.availability).toBe("core-required");
-    expect(route.recommendedCapabilities.find((rec) => rec.id === "chrome-devtools-mcp")?.availability).toBe("core-required");
-    expect(route.recommendedCapabilities.find((rec) => rec.id === "sequential-thinking")?.availability).toBe("core-required");
-    expect(route.recommendedCapabilities.find((rec) => rec.id === "pua")?.availability).toBe("core-required");
+    expect(route.recommendedCapabilities.map((rec) => rec.id)).not.toContain("pua");
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "context7")?.availabilityState).toBe("available");
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "claude-mem")?.availabilityState).toBe("missing");
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "frontend-design")?.availabilityState).toBe("missing");
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "chrome-devtools-mcp")?.availabilityState).toBe("available");
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "sequential-thinking")?.availabilityState).toBe("missing");
+  });
+
+  it("recommends PUA only for repeated failure recovery or parallel slices", () => {
+    const route = classifySmartRoute({
+      goal: "Again debug React network error after failed twice using latest docs",
+      changedFiles: ["src/Login.tsx", "tests/login.test.ts"],
+      availableCapabilities: ["pua"],
+    });
+
+    expect(route.recommendedCapabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "pua",
+          phase: "recovery",
+          availabilityState: "available",
+        }),
+      ]),
+    );
+  });
+
+  it("does not infer UI stacks from companion capability names alone", () => {
+    const route = classifySmartRoute({
+      goal: "Use claude-mem pua context7 sequential-thinking chrome-devtools-mcp frontend-design to improve routing",
+      cwd: process.cwd(),
+    });
+
+    expect(route.stackProfile.detected.map((stack) => stack.id)).not.toEqual(
+      expect.arrayContaining(["react", "vue"]),
+    );
+    expect(route.recommendedCapabilities.map((rec) => rec.id)).not.toContain("browser-verification");
   });
 
   it("blocks UI work when CLAUDE.md declares a frontend root outside current access", () => {
