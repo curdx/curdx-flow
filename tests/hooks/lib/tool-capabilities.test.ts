@@ -160,7 +160,7 @@ describe("tool capability router", () => {
 
   it("does not treat companion capability names as frontend/browser stack intent", () => {
     const recs = recommendToolCapabilities({
-      goal: "Use claude-mem pua context7 sequential-thinking chrome-devtools-mcp ui-ux-pro-max for better routing",
+      goal: "Use claude-mem pua context7 sequential-thinking chrome-devtools-mcp ui-ux-pro-max uiuxmax ui ux pro max for better routing",
       route: "lite-spec",
       risk: "medium",
     });

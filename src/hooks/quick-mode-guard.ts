@@ -38,7 +38,7 @@ runHook(async (input) => {
     return;
   }
 
-  const specPath = resolveCurrent({ cwd });
+  const specPath = resolveCurrent({ cwd, sessionId: input.session_id });
   if (!specPath) {
     return;
   }

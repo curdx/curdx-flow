@@ -365,7 +365,7 @@ describe("smart-route classifier", () => {
 
   it("does not infer UI stacks from companion capability names alone", () => {
     const route = classifySmartRoute({
-      goal: "Use claude-mem pua context7 sequential-thinking chrome-devtools-mcp ui-ux-pro-max to improve routing",
+      goal: "Use claude-mem pua context7 sequential-thinking chrome-devtools-mcp ui-ux-pro-max uiuxmax ui ux pro max to improve routing",
       cwd: process.cwd(),
     });
 

@@ -21,8 +21,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import process from "node:process";
 import { runHook } from "./_shared/run-hook.js";
-import { resolveCurrent } from "./_shared/path-resolver.js";
+import { bindSessionSpec, resolveCurrent } from "./_shared/path-resolver.js";
 import { buildContextPayload } from "./lib/build-context-payload.js";
+import { buildContextCapsule } from "./lib/build-context-payload.js";
+import { buildWorkflowSnapshot } from "./lib/workflow-snapshot.js";
 import type { ContextBlockOutput } from "./_shared/types.js";
 import type { CurdxState } from "./_shared/types.js";
 
@@ -96,9 +98,16 @@ runHook(async (input) => {
   }
 
   // Resolve current spec relative path.
-  const specRelativePath = resolveCurrent({ cwd });
+  const specRelativePath = resolveCurrent({ cwd, sessionId: input.session_id });
   if (!specRelativePath) {
     return INACTIVE;
+  }
+  if (typeof input.session_id === "string" && input.session_id.length > 0) {
+    bindSessionSpec(specRelativePath, {
+      cwd,
+      sessionId: input.session_id,
+      source: "SessionStart",
+    });
   }
 
   const specPath = join(cwd, specRelativePath);
@@ -219,6 +228,14 @@ runHook(async (input) => {
       block.goal = goal;
       process.stderr.write(`[curdx-flow] Goal: ${goal}\n`);
     }
+  }
+
+  try {
+    block.contextCapsule = buildContextCapsule(
+      buildWorkflowSnapshot({ cwd, spec: specRelativePath, sessionId: input.session_id }),
+    );
+  } catch {
+    // Capsule is advisory; preserve the existing SessionStart contract.
   }
 
   return block;

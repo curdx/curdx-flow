@@ -72,6 +72,7 @@ export interface ContextBlockOutput {
   totalTasks?: number;
   awaitingApproval?: boolean;
   goal?: string;
+  contextCapsule?: string;
 }
 
 /**

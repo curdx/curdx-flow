@@ -17,8 +17,20 @@ export const PKGS: Pkg[] = [
   context7,
 ];
 
+const PKG_ALIASES: Record<string, string> = {
+  uiuxmax: 'ui-ux-pro-max',
+  'ui-ux-max': 'ui-ux-pro-max',
+  'ui ux pro max': 'ui-ux-pro-max',
+};
+
+function canonicalPkgId(id: string): string {
+  const normalized = id.trim().toLowerCase().replace(/_/g, '-');
+  return PKG_ALIASES[normalized] ?? normalized;
+}
+
 export function findPkg(id: string): Pkg | undefined {
-  return PKGS.find((p) => p.id === id);
+  const canonical = canonicalPkgId(id);
+  return PKGS.find((p) => p.id === canonical);
 }
 
 export type { Pkg } from './types.ts';

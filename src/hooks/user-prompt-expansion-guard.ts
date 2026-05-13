@@ -31,6 +31,7 @@ const MAX_ADDITIONAL_CONTEXT_CHARS = 1200;
 
 interface ExpansionInput {
   cwd?: string;
+  session_id?: string;
   hook_event_name?: string;
   expansion_type?: string;
   command_name?: string;
@@ -72,6 +73,7 @@ async function main(): Promise<void> {
     const snapshot = buildWorkflowSnapshot({
       cwd: input.cwd,
       goal: input.command_args,
+      sessionId: input.session_id,
     });
     const route = classifySmartRoute({
       cwd: input.cwd,

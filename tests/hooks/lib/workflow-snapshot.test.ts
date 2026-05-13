@@ -175,4 +175,45 @@ describe("workflow-snapshot lib", () => {
       rmSync(cwd, { recursive: true, force: true });
     }
   });
+
+  it("prefers a session-scoped active spec over the global current-spec marker", () => {
+    const cwd = makeTmpDir("snapshot-session");
+    try {
+      const alpha = path.join(cwd, "specs", "alpha");
+      const beta = path.join(cwd, "specs", "beta");
+      mkdirSync(alpha, { recursive: true });
+      mkdirSync(beta, { recursive: true });
+      writeFileSync(path.join(cwd, "specs", ".current-spec"), "alpha\n");
+      writeFileSync(
+        path.join(alpha, ".curdx-state.json"),
+        JSON.stringify({ version: 2, source: "spec", name: "alpha", phase: "research" }),
+      );
+      writeFileSync(
+        path.join(beta, ".curdx-state.json"),
+        JSON.stringify({ version: 2, source: "spec", name: "beta", phase: "design" }),
+      );
+      mkdirSync(path.join(cwd, ".curdx", "sessions"), { recursive: true });
+      writeFileSync(
+        path.join(cwd, ".curdx", "sessions", "sess-1.json"),
+        JSON.stringify({
+          version: 1,
+          sessionId: "sess-1",
+          specPath: "specs/beta",
+          specName: "beta",
+          lastSeenAt: "2026-05-13T00:00:00.000Z",
+          source: "test",
+        }),
+      );
+
+      const result = runLib("workflow-snapshot", ["--cwd", cwd, "--session-id", "sess-1"]);
+      expect(result.exitCode).toBe(0);
+      expect(result.json).toMatchObject({
+        active: true,
+        spec: { name: "beta", path: "specs/beta" },
+        state: { phase: "design" },
+      });
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
 });

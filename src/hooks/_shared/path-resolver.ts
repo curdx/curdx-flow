@@ -1,4 +1,11 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
 
 /**
@@ -68,6 +75,17 @@ const SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
 export interface ResolverOptions {
   /** Working directory; falls back to `CURDX_CWD` env then `process.cwd()`. */
   cwd?: string;
+  /** Claude Code session id. When present, session-scoped spec binding wins. */
+  sessionId?: string;
+}
+
+export interface SessionSpecBinding {
+  version: 1;
+  sessionId: string;
+  specPath: string;
+  specName: string;
+  lastSeenAt: string;
+  source: string;
 }
 
 function resolveCwd(opts: ResolverOptions | undefined): string {
@@ -83,6 +101,77 @@ function isDir(p: string): boolean {
     return statSync(p).isDirectory();
   } catch {
     return false;
+  }
+}
+
+function sanitizeSessionId(sessionId: string | undefined): string | null {
+  const raw = sessionId?.trim();
+  if (!raw) return null;
+  const safe = raw.replace(/[^A-Za-z0-9_.-]/g, "-").slice(0, 120);
+  return safe.length > 0 ? safe : null;
+}
+
+function specPathExists(cwd: string, specPath: string): boolean {
+  const fsPath = isAbsolute(specPath) ? specPath : join(cwd, specPath);
+  return isDir(fsPath);
+}
+
+export function sessionBindingPath(opts?: ResolverOptions): string | null {
+  const cwd = resolveCwd(opts);
+  const sessionId = sanitizeSessionId(opts?.sessionId);
+  if (!sessionId) return null;
+  return join(cwd, ".curdx", "sessions", `${sessionId}.json`);
+}
+
+export function readSessionSpecBinding(opts?: ResolverOptions): SessionSpecBinding | null {
+  const cwd = resolveCwd(opts);
+  const path = sessionBindingPath(opts);
+  if (!path || !existsSync(path)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as Partial<SessionSpecBinding>;
+    if (parsed.version !== 1) return null;
+    if (typeof parsed.sessionId !== "string" || typeof parsed.specPath !== "string") return null;
+    if (!specPathExists(cwd, parsed.specPath)) return null;
+    return {
+      version: 1,
+      sessionId: parsed.sessionId,
+      specPath: parsed.specPath,
+      specName: typeof parsed.specName === "string" ? parsed.specName : basename(parsed.specPath),
+      lastSeenAt: typeof parsed.lastSeenAt === "string" ? parsed.lastSeenAt : "",
+      source: typeof parsed.source === "string" ? parsed.source : "unknown",
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function bindSessionSpec(
+  specPath: string,
+  opts?: ResolverOptions & { source?: string },
+): { ok: true; path: string } | { ok: false; reason: string; path?: string } {
+  const cwd = resolveCwd(opts);
+  const sessionId = sanitizeSessionId(opts?.sessionId);
+  if (!sessionId) return { ok: false, reason: "missing-session-id" };
+  if (!specPath || !specPathExists(cwd, specPath)) {
+    return { ok: false, reason: "spec-not-found" };
+  }
+  const bindingPath = sessionBindingPath({ cwd, sessionId });
+  if (!bindingPath) return { ok: false, reason: "missing-session-id" };
+  const binding: SessionSpecBinding = {
+    version: 1,
+    sessionId,
+    specPath,
+    specName: basename(specPath),
+    lastSeenAt: new Date().toISOString(),
+    source: opts?.source ?? "runtime",
+  };
+  try {
+    mkdirSync(join(cwd, ".curdx", "sessions"), { recursive: true });
+    writeFileSync(bindingPath, JSON.stringify(binding, null, 2) + "\n", "utf8");
+    return { ok: true, path: bindingPath };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return { ok: false, reason, path: bindingPath };
   }
 }
 
@@ -256,6 +345,9 @@ export function findSpec(name: string, opts?: ResolverOptions): FindSpecResult {
 export function resolveCurrent(opts?: ResolverOptions): string | null {
   const cwd = resolveCwd(opts);
   if (!isDir(cwd)) return null;
+
+  const sessionBinding = readSessionSpecBinding(opts);
+  if (sessionBinding) return sessionBinding.specPath;
 
   const defaultDir = getDefaultDir(opts);
   const markerFs = [

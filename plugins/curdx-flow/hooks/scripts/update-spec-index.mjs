@@ -6,7 +6,7 @@ const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
 // src/hooks/update-spec-index.ts
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync3, readdirSync as readdirSync3, statSync as statSync3 } from "node:fs";
+import { existsSync as existsSync2, mkdirSync as mkdirSync3, readFileSync as readFileSync3, readdirSync as readdirSync3, statSync as statSync3 } from "node:fs";
 import { join as join2, posix as posix2 } from "node:path";
 import process5 from "node:process";
 
@@ -20,7 +20,14 @@ function writeFileAtomic(path3, data) {
 }
 
 // src/hooks/_shared/path-resolver.ts
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync as writeFileSync2
+} from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
 var DEFAULT_SPECS_DIR = "./specs";
 var SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
@@ -146,7 +153,7 @@ import process4 from "node:process";
 import {
   appendFileSync,
   copyFileSync,
-  mkdirSync,
+  mkdirSync as mkdirSync2,
   readdirSync as readdirSync2,
   readFileSync as readFileSync2,
   renameSync as renameSync2,
@@ -324,7 +331,7 @@ function logHookEvent(input, err) {
       line = JSON.stringify(record);
     }
     try {
-      mkdirSync(ERRORS_DIR, { recursive: true });
+      mkdirSync2(ERRORS_DIR, { recursive: true });
     } catch {
     }
     rotateIfNeeded(ERRORS_LOG);
@@ -655,7 +662,7 @@ runHook(
     }
     const defaultDir = getDefaultDir({ cwd });
     const indexDirFs = join2(cwd, defaultDir, ".index");
-    mkdirSync2(indexDirFs, { recursive: true });
+    mkdirSync3(indexDirFs, { recursive: true });
     const jsonOut = join2(indexDirFs, "index-state.json");
     const mdOut = join2(indexDirFs, "index.md");
     writeFileAtomic(jsonOut, jsonText);

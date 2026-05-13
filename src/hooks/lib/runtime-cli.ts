@@ -31,6 +31,7 @@ import { decideLastMile } from "./last-mile-orchestrator.js";
 import { appendBrainEvent, summarizeProjectBrain } from "./project-brain.js";
 import {
   findSpec,
+  bindSessionSpec,
   getDefaultDir,
   getSpecsDirs,
   listSpecs,
@@ -62,11 +63,12 @@ function usage(exitCode = 1): never {
     "commands:",
     "  route --goal <text> [--name <spec>] [--flags <args>] [--cwd <dir>] [--compile] [--record]",
     "  last-mile --goal <text> [--spec <name-or-path>] [--cwd <dir>] [--record]",
-    "  snapshot [--spec <name-or-path>] [--goal <text>] [--cwd <dir>]",
+    "  snapshot [--spec <name-or-path>] [--goal <text>] [--cwd <dir>] [--session-id <id>]",
     "  specs dirs [--cwd <dir>]",
     "  specs list [--cwd <dir>]",
     "  specs find <name> [--cwd <dir>]",
-    "  specs resolve [name-or-path] [--cwd <dir>]",
+    "  specs resolve [name-or-path] [--cwd <dir>] [--session-id <id>]",
+    "  specs bind-session <name-or-path> --session-id <id> [--cwd <dir>]",
     "  state merge <state-file> <json-patch>",
     "  tasks count <tasks.md>",
     "  dev detect [--cwd <dir>]",
@@ -137,6 +139,7 @@ function snapshot(argv: string[]): void {
       cwd: readArg("--cwd", argv),
       spec: readArg("--spec", argv),
       goal: readArg("--goal", argv),
+      sessionId: readArg("--session-id", argv),
     }),
   );
 }
@@ -788,6 +791,7 @@ function hookFreshnessDoctor(): unknown {
     ["user-prompt-expansion-guard.ts", "user-prompt-expansion-guard.mjs"],
     ["user-prompt-submit-autopilot.ts", "user-prompt-submit-autopilot.mjs"],
     ["post-tool-batch-snapshot.ts", "post-tool-batch-snapshot.mjs"],
+    ["post-compact-recorder.ts", "post-compact-recorder.mjs"],
     ["task-completed-verifier.ts", "task-completed-verifier.mjs"],
     [join("lib", "smart-route.ts"), join("lib", "smart-route.mjs")],
     [join("lib", "tool-capabilities.ts"), join("lib", "tool-capabilities.mjs")],
@@ -842,7 +846,7 @@ function specs(argv: string[]): void {
   if (sub === "list") {
     printJson({
       defaultDir: getDefaultDir({ cwd }),
-      active: resolveCurrent({ cwd }),
+      active: resolveCurrent({ cwd, sessionId: readArg("--session-id", rest) }),
       specs: listSpecs({ cwd }),
     });
     return;
@@ -859,7 +863,7 @@ function specs(argv: string[]): void {
 
   if (sub === "resolve") {
     const input = firstPositional(rest);
-    const target = input ?? resolveCurrent({ cwd }) ?? undefined;
+    const target = input ?? resolveCurrent({ cwd, sessionId: readArg("--session-id", rest) }) ?? undefined;
     if (!target) {
       printJson({ ok: false, reason: "no-current" });
       process.exit(1);
@@ -882,6 +886,29 @@ function specs(argv: string[]): void {
     }
     const resolved = resolveSpecPathForOutput(cwd, found.path);
     printJson({ ok: true, name: basename(found.path), ...resolved });
+    return;
+  }
+
+  if (sub === "bind-session") {
+    const sessionId = readArg("--session-id", rest);
+    const input = firstPositional(rest);
+    if (!sessionId || !input) usage();
+    let specPath = input;
+    if (!(input.startsWith("./") || input.startsWith("../") || input.includes("/") || isAbsolute(input))) {
+      const found = findSpec(input, { cwd });
+      if (!found.ok) {
+        printJson(found);
+        process.exit(found.reason === "ambiguous" ? 2 : 1);
+      }
+      specPath = found.path;
+    }
+    const result = bindSessionSpec(specPath, {
+      cwd,
+      sessionId,
+      source: "runtime-cli",
+    });
+    printJson(result);
+    if (!result.ok) process.exit(1);
     return;
   }
 
@@ -951,6 +978,7 @@ async function verify(argv: string[]): Promise<void> {
   const snap = buildWorkflowSnapshot({
     cwd,
     spec: readArg("--spec", rest),
+    sessionId: readArg("--session-id", rest),
   });
   if (!snap.spec?.fsPath || !snap.spec.statePath) {
     process.stderr.write("verify run: no active spec\n");
@@ -1016,6 +1044,7 @@ async function verifyBlocks(argv: string[]): Promise<void> {
   const snap = buildWorkflowSnapshot({
     cwd,
     spec: readArg("--spec", argv),
+    sessionId: readArg("--session-id", argv),
   });
   if (!snap.spec?.fsPath) {
     process.stderr.write("verify-blocks: no active spec\n");
@@ -1029,7 +1058,11 @@ async function verifyBlocks(argv: string[]): Promise<void> {
 
 function doctor(argv: string[]): void {
   const cwd = resolve(readArg("--cwd", argv) ?? process.cwd());
-  const snap = buildWorkflowSnapshot({ cwd, spec: readArg("--spec", argv) });
+  const snap = buildWorkflowSnapshot({
+    cwd,
+    spec: readArg("--spec", argv),
+    sessionId: readArg("--session-id", argv),
+  });
   const goal = readArg("--goal", argv) ?? "";
   const routeFacts = classifySmartRoute({ cwd, goal });
   const topology = discoverProjectTopology({ cwd, goal });

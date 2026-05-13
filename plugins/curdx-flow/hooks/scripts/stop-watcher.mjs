@@ -287,7 +287,14 @@ async function runHook(handler, options = {}) {
 }
 
 // src/hooks/_shared/path-resolver.ts
-import { existsSync, readFileSync as readFileSync2, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
+import {
+  existsSync,
+  mkdirSync as mkdirSync2,
+  readFileSync as readFileSync2,
+  readdirSync as readdirSync2,
+  statSync as statSync2,
+  writeFileSync
+} from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
 var DEFAULT_SPECS_DIR = "./specs";
 var SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
@@ -303,6 +310,43 @@ function isDir(p) {
     return statSync2(p).isDirectory();
   } catch {
     return false;
+  }
+}
+function sanitizeSessionId(sessionId) {
+  const raw = sessionId?.trim();
+  if (!raw) return null;
+  const safe = raw.replace(/[^A-Za-z0-9_.-]/g, "-").slice(0, 120);
+  return safe.length > 0 ? safe : null;
+}
+function specPathExists(cwd, specPath) {
+  const fsPath = isAbsolute(specPath) ? specPath : join(cwd, specPath);
+  return isDir(fsPath);
+}
+function sessionBindingPath(opts) {
+  const cwd = resolveCwd(opts);
+  const sessionId = sanitizeSessionId(opts?.sessionId);
+  if (!sessionId) return null;
+  return join(cwd, ".curdx", "sessions", `${sessionId}.json`);
+}
+function readSessionSpecBinding(opts) {
+  const cwd = resolveCwd(opts);
+  const path4 = sessionBindingPath(opts);
+  if (!path4 || !existsSync(path4)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync2(path4, "utf8"));
+    if (parsed.version !== 1) return null;
+    if (typeof parsed.sessionId !== "string" || typeof parsed.specPath !== "string") return null;
+    if (!specPathExists(cwd, parsed.specPath)) return null;
+    return {
+      version: 1,
+      sessionId: parsed.sessionId,
+      specPath: parsed.specPath,
+      specName: typeof parsed.specName === "string" ? parsed.specName : basename(parsed.specPath),
+      lastSeenAt: typeof parsed.lastSeenAt === "string" ? parsed.lastSeenAt : "",
+      source: typeof parsed.source === "string" ? parsed.source : "unknown"
+    };
+  } catch {
+    return null;
   }
 }
 function normalizePath(input) {
@@ -407,6 +451,8 @@ function findSpec(name, opts) {
 function resolveCurrent(opts) {
   const cwd = resolveCwd(opts);
   if (!isDir(cwd)) return null;
+  const sessionBinding = readSessionSpecBinding(opts);
+  if (sessionBinding) return sessionBinding.specPath;
   const defaultDir = getDefaultDir(opts);
   const markerFs = [
     join(cwd, defaultDir, ".current-spec"),
@@ -432,11 +478,11 @@ function resolveCurrent(opts) {
 }
 
 // src/hooks/_shared/atomic-write.ts
-import { writeFileSync, renameSync as renameSync2 } from "node:fs";
+import { writeFileSync as writeFileSync2, renameSync as renameSync2 } from "node:fs";
 import { randomBytes } from "node:crypto";
 function writeFileAtomic(path4, data) {
   const tmp = `${path4}.tmp.${process.pid}.${randomBytes(6).toString("hex")}`;
-  writeFileSync(tmp, data);
+  writeFileSync2(tmp, data);
   renameSync2(tmp, path4);
 }
 
@@ -615,8 +661,8 @@ import { fileURLToPath as fileURLToPath6 } from "node:url";
 
 // src/hooks/lib/workflow-snapshot.ts
 import { execFileSync } from "node:child_process";
-import { existsSync as existsSync3, readFileSync as readFileSync4, statSync as statSync4 } from "node:fs";
-import { basename as basename4, isAbsolute as isAbsolute3, join as join3 } from "node:path";
+import { existsSync as existsSync4, readFileSync as readFileSync5, statSync as statSync5 } from "node:fs";
+import { basename as basename4, isAbsolute as isAbsolute3, join as join4 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // src/hooks/lib/project-topology.ts
@@ -1243,6 +1289,133 @@ if (isDirectRun()) {
   main();
 }
 
+// src/hooks/lib/project-brain.ts
+import { appendFileSync as appendFileSync2, existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync4, statSync as statSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join3, resolve as resolve2 } from "node:path";
+var MAX_REASON = 240;
+var MAX_COMMAND = 180;
+var MAX_SUMMARY = 900;
+var MAX_BRAIN_BYTES = 64 * 1024;
+var MAX_BRAIN_LINES = 400;
+function normalizeCwd(cwd) {
+  return resolve2(cwd ?? process.cwd());
+}
+function brainPath(cwd) {
+  return join3(normalizeCwd(cwd), ".curdx", "brain.jsonl");
+}
+function truncate(value, limit) {
+  if (value === void 0) return void 0;
+  const compact = value.trim().replace(/\s+/g, " ");
+  if (compact.length <= limit) return compact;
+  return `${compact.slice(0, Math.max(0, limit - 3))}...`;
+}
+function normalizeEvent(event) {
+  const out = {
+    version: 1,
+    type: event.type,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (event.route) out.route = event.route;
+  if (event.stack) out.stack = event.stack;
+  if (event.phase) out.phase = event.phase;
+  if (event.command) out.command = truncate(event.command, MAX_COMMAND);
+  if (typeof event.exitCode === "number" && Number.isFinite(event.exitCode)) {
+    out.exitCode = event.exitCode;
+  }
+  if (event.verifier) out.verifier = truncate(event.verifier, MAX_COMMAND);
+  if (event.reason) out.reason = truncate(event.reason, MAX_REASON);
+  if (event.summary) out.summary = truncate(event.summary, MAX_SUMMARY);
+  if (typeof event.files === "number" && Number.isFinite(event.files)) {
+    out.files = Math.max(0, Math.floor(event.files));
+  }
+  return out;
+}
+function appendBrainEvent(cwd, event) {
+  const path4 = brainPath(cwd);
+  if (process.env.CURDX_FLOW_BRAIN === "off") return { ok: true, path: path4 };
+  try {
+    mkdirSync3(join3(normalizeCwd(cwd), ".curdx"), { recursive: true });
+    appendFileSync2(path4, JSON.stringify(normalizeEvent(event)) + "\n", "utf8");
+    compactBrainIfNeeded(path4);
+    return { ok: true, path: path4 };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, path: path4, error: message };
+  }
+}
+function compactBrainIfNeeded(path4) {
+  try {
+    if (statSync4(path4).size <= MAX_BRAIN_BYTES) return;
+    const lines = readFileSync4(path4, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-MAX_BRAIN_LINES);
+    writeFileSync3(path4, lines.join("\n") + (lines.length > 0 ? "\n" : ""), "utf8");
+  } catch {
+  }
+}
+function parseBrainLine(line) {
+  try {
+    const parsed = JSON.parse(line);
+    if (parsed.version !== 1) return null;
+    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked" && parsed.type !== "last-mile-decision" && parsed.type !== "compact-summary") {
+      return null;
+    }
+    if (typeof parsed.timestamp !== "string") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+function readBrainEvents(cwd, limit = 100) {
+  const path4 = brainPath(cwd);
+  if (!existsSync3(path4)) return [];
+  try {
+    const lines = readFileSync4(path4, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const parsed = lines.slice(Math.max(0, lines.length - Math.max(1, limit))).map(parseBrainLine).filter((event) => event !== null);
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+function uniqueRecent(values, limit) {
+  const out = [];
+  for (const value of values.reverse()) {
+    if (!value || out.includes(value)) continue;
+    out.push(value);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+function summarizeProjectBrain(cwd) {
+  const path4 = brainPath(cwd);
+  const events = readBrainEvents(cwd, 200);
+  const failures = events.filter((event) => event.type === "verification-blocked" || event.exitCode !== void 0 && event.exitCode !== 0).slice(-5).reverse().map((event) => ({
+    timestamp: event.timestamp,
+    type: event.type,
+    phase: event.phase,
+    command: event.command,
+    reason: event.reason
+  }));
+  const verifierHints = uniqueRecent(
+    events.filter((event) => event.type === "verification-run" && event.exitCode === 0).map((event) => event.command ?? event.verifier),
+    5
+  );
+  const compactEvent = events.filter((event) => event.type === "compact-summary" && event.summary).at(-1);
+  return {
+    path: path4,
+    exists: existsSync3(path4),
+    totalEvents: events.length,
+    lastUpdated: events.length > 0 ? events[events.length - 1]?.timestamp ?? null : null,
+    stackHints: uniqueRecent(events.map((event) => event.stack), 5),
+    verifierHints,
+    recentFailures: failures,
+    ...compactEvent?.summary ? {
+      lastCompactSummary: {
+        timestamp: compactEvent.timestamp,
+        summary: compactEvent.summary
+      }
+    } : {}
+  };
+}
+
 // src/hooks/lib/workflow-snapshot.ts
 function readArg2(name, argv) {
   const idx = argv.indexOf(name);
@@ -1251,7 +1424,7 @@ function readArg2(name, argv) {
 }
 function normalizeSpecPath(cwd, specPath) {
   if (isAbsolute3(specPath)) return specPath;
-  return join3(cwd, specPath);
+  return join4(cwd, specPath);
 }
 function specNameFromPath(specPath) {
   const parts = specPath.split(/[\\/]+/).filter(Boolean);
@@ -1268,20 +1441,20 @@ function resolveSpecPath(input) {
     if (found.ok) return found.path;
     return explicit;
   }
-  return resolveCurrent({ cwd }) ?? void 0;
+  return resolveCurrent({ cwd, sessionId: input.sessionId }) ?? void 0;
 }
 function readJsonFile(path4) {
   try {
-    return { ok: true, value: JSON.parse(readFileSync4(path4, "utf8")) };
+    return { ok: true, value: JSON.parse(readFileSync5(path4, "utf8")) };
   } catch (err) {
     return { ok: false, error: err.message };
   }
 }
 function artifact(specFs, filename) {
-  const p = join3(specFs, filename);
-  if (!existsSync3(p)) return { exists: false, path: p };
+  const p = join4(specFs, filename);
+  if (!existsSync4(p)) return { exists: false, path: p };
   try {
-    const st = statSync4(p);
+    const st = statSync5(p);
     return {
       exists: true,
       path: p,
@@ -1303,13 +1476,13 @@ function extractFiles(raw) {
   return value.split(/[,;]/).map((part) => part.trim().replace(/^`|`$/g, "")).filter(Boolean);
 }
 function buildTaskSnapshot(specFs, state) {
-  const tasksPath = join3(specFs, "tasks.md");
-  if (!existsSync3(tasksPath)) {
+  const tasksPath = join4(specFs, "tasks.md");
+  if (!existsSync4(tasksPath)) {
     return { total: 0, completed: 0, pending: 0, currentIndex: 0 };
   }
   let tasks = [];
   try {
-    tasks = parseTaskList(readFileSync4(tasksPath, "utf8"));
+    tasks = parseTaskList(readFileSync5(tasksPath, "utf8"));
   } catch {
     tasks = [];
   }
@@ -1412,6 +1585,7 @@ function buildWorkflowSnapshot(input = {}) {
   const specPath = resolveSpecPath({ ...input, cwd });
   const topology = compactTopology(discoverProjectTopology({ cwd, goal: input.goal ?? "" }));
   const git = gitSnapshot(cwd);
+  const brain = summarizeProjectBrain(cwd);
   if (!specPath) {
     return {
       version: 2,
@@ -1427,24 +1601,28 @@ function buildWorkflowSnapshot(input = {}) {
         verificationBlocks: {}
       },
       artifacts: {
-        research: { exists: false, path: join3(cwd, "research.md") },
-        requirements: { exists: false, path: join3(cwd, "requirements.md") },
-        design: { exists: false, path: join3(cwd, "design.md") },
-        tasks: { exists: false, path: join3(cwd, "tasks.md") },
-        progress: { exists: false, path: join3(cwd, ".progress.md") }
+        research: { exists: false, path: join4(cwd, "research.md") },
+        requirements: { exists: false, path: join4(cwd, "requirements.md") },
+        design: { exists: false, path: join4(cwd, "design.md") },
+        tasks: { exists: false, path: join4(cwd, "tasks.md") },
+        progress: { exists: false, path: join4(cwd, ".progress.md") }
       },
       tasks: { total: 0, completed: 0, pending: 0, currentIndex: 0 },
       topology,
       git,
+      recovery: {
+        recentFailures: brain.recentFailures,
+        ...brain.lastCompactSummary ? { lastCompactSummary: brain.lastCompactSummary } : {}
+      },
       nextAction: "No active spec. Run /curdx-flow:start <name> <goal>.",
       gates: ["no-active-spec"]
     };
   }
   const specFs = normalizeSpecPath(cwd, specPath);
-  const statePath = join3(specFs, ".curdx-state.json");
+  const statePath = join4(specFs, ".curdx-state.json");
   let state = null;
   const stateInfo = {
-    exists: existsSync3(statePath),
+    exists: existsSync4(statePath),
     valid: false,
     completed: false,
     awaitingApproval: false,
@@ -1481,7 +1659,7 @@ function buildWorkflowSnapshot(input = {}) {
   return {
     version: 2,
     cwd,
-    active: existsSync3(specFs),
+    active: existsSync4(specFs),
     spec: {
       name: specNameFromPath(specPath),
       path: specPath,
@@ -1493,6 +1671,10 @@ function buildWorkflowSnapshot(input = {}) {
     tasks,
     topology,
     git,
+    recovery: {
+      recentFailures: brain.recentFailures,
+      ...brain.lastCompactSummary ? { lastCompactSummary: brain.lastCompactSummary } : {}
+    },
     nextAction: inferNextAction(state, artifacts, tasks),
     gates: buildGates(stateInfo, artifacts, tasks, topology)
   };
@@ -1502,7 +1684,8 @@ function main2() {
   const snapshot = buildWorkflowSnapshot({
     cwd: readArg2("--cwd", argv),
     spec: readArg2("--spec", argv),
-    goal: readArg2("--goal", argv)
+    goal: readArg2("--goal", argv),
+    sessionId: readArg2("--session-id", argv)
   });
   process.stdout.write(JSON.stringify(snapshot, null, 2) + "\n");
 }
@@ -1780,7 +1963,7 @@ import { basename as basename6 } from "node:path";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
 // src/hooks/lib/capability-normalization.ts
-var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui-ux-pro-max|pua)\b/gi;
+var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b/gi;
 function stripKnownCapabilityTokens(input) {
   return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
 }
@@ -2236,124 +2419,6 @@ function isDirectRun4() {
 }
 if (isDirectRun4()) {
   main4();
-}
-
-// src/hooks/lib/project-brain.ts
-import { appendFileSync as appendFileSync2, existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync5, statSync as statSync5, writeFileSync as writeFileSync2 } from "node:fs";
-import { join as join4, resolve as resolve2 } from "node:path";
-var MAX_REASON = 240;
-var MAX_COMMAND = 180;
-var MAX_BRAIN_BYTES = 64 * 1024;
-var MAX_BRAIN_LINES = 400;
-function normalizeCwd(cwd) {
-  return resolve2(cwd ?? process.cwd());
-}
-function brainPath(cwd) {
-  return join4(normalizeCwd(cwd), ".curdx", "brain.jsonl");
-}
-function truncate(value, limit) {
-  if (value === void 0) return void 0;
-  const compact = value.trim().replace(/\s+/g, " ");
-  if (compact.length <= limit) return compact;
-  return `${compact.slice(0, Math.max(0, limit - 3))}...`;
-}
-function normalizeEvent(event) {
-  const out = {
-    version: 1,
-    type: event.type,
-    timestamp: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  if (event.route) out.route = event.route;
-  if (event.stack) out.stack = event.stack;
-  if (event.phase) out.phase = event.phase;
-  if (event.command) out.command = truncate(event.command, MAX_COMMAND);
-  if (typeof event.exitCode === "number" && Number.isFinite(event.exitCode)) {
-    out.exitCode = event.exitCode;
-  }
-  if (event.verifier) out.verifier = truncate(event.verifier, MAX_COMMAND);
-  if (event.reason) out.reason = truncate(event.reason, MAX_REASON);
-  if (typeof event.files === "number" && Number.isFinite(event.files)) {
-    out.files = Math.max(0, Math.floor(event.files));
-  }
-  return out;
-}
-function appendBrainEvent(cwd, event) {
-  const path4 = brainPath(cwd);
-  if (process.env.CURDX_FLOW_BRAIN === "off") return { ok: true, path: path4 };
-  try {
-    mkdirSync2(join4(normalizeCwd(cwd), ".curdx"), { recursive: true });
-    appendFileSync2(path4, JSON.stringify(normalizeEvent(event)) + "\n", "utf8");
-    compactBrainIfNeeded(path4);
-    return { ok: true, path: path4 };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, path: path4, error: message };
-  }
-}
-function compactBrainIfNeeded(path4) {
-  try {
-    if (statSync5(path4).size <= MAX_BRAIN_BYTES) return;
-    const lines = readFileSync5(path4, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-MAX_BRAIN_LINES);
-    writeFileSync2(path4, lines.join("\n") + (lines.length > 0 ? "\n" : ""), "utf8");
-  } catch {
-  }
-}
-function parseBrainLine(line) {
-  try {
-    const parsed = JSON.parse(line);
-    if (parsed.version !== 1) return null;
-    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked" && parsed.type !== "last-mile-decision") {
-      return null;
-    }
-    if (typeof parsed.timestamp !== "string") return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-function readBrainEvents(cwd, limit = 100) {
-  const path4 = brainPath(cwd);
-  if (!existsSync4(path4)) return [];
-  try {
-    const lines = readFileSync5(path4, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-    const parsed = lines.slice(Math.max(0, lines.length - Math.max(1, limit))).map(parseBrainLine).filter((event) => event !== null);
-    return parsed;
-  } catch {
-    return [];
-  }
-}
-function uniqueRecent(values, limit) {
-  const out = [];
-  for (const value of values.reverse()) {
-    if (!value || out.includes(value)) continue;
-    out.push(value);
-    if (out.length >= limit) break;
-  }
-  return out;
-}
-function summarizeProjectBrain(cwd) {
-  const path4 = brainPath(cwd);
-  const events = readBrainEvents(cwd, 200);
-  const failures = events.filter((event) => event.type === "verification-blocked" || event.exitCode !== void 0 && event.exitCode !== 0).slice(-5).reverse().map((event) => ({
-    timestamp: event.timestamp,
-    type: event.type,
-    phase: event.phase,
-    command: event.command,
-    reason: event.reason
-  }));
-  const verifierHints = uniqueRecent(
-    events.filter((event) => event.type === "verification-run" && event.exitCode === 0).map((event) => event.command ?? event.verifier),
-    5
-  );
-  return {
-    path: path4,
-    exists: existsSync4(path4),
-    totalEvents: events.length,
-    lastUpdated: events.length > 0 ? events[events.length - 1]?.timestamp ?? null : null,
-    stackHints: uniqueRecent(events.map((event) => event.stack), 5),
-    verifierHints,
-    recentFailures: failures
-  };
 }
 
 // src/hooks/lib/stack-capabilities.ts
@@ -4013,7 +4078,7 @@ runHook(async (input) => {
     const enabled = readEnabledSetting(settingsPath);
     if (enabled === "false") return;
   }
-  const rawSpecPath = resolveCurrent({ cwd });
+  const rawSpecPath = resolveCurrent({ cwd, sessionId: input.session_id });
   if (!rawSpecPath) return;
   const specPath = preserveDotPrefix(rawSpecPath, getSpecsDirs({ cwd }));
   const specName = basename9(specPath);

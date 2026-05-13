@@ -10,6 +10,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFil
 import { join, resolve } from "node:path";
 var MAX_REASON = 240;
 var MAX_COMMAND = 180;
+var MAX_SUMMARY = 900;
 var MAX_BRAIN_BYTES = 64 * 1024;
 var MAX_BRAIN_LINES = 400;
 function normalizeCwd(cwd) {
@@ -39,6 +40,7 @@ function normalizeEvent(event) {
   }
   if (event.verifier) out.verifier = truncate(event.verifier, MAX_COMMAND);
   if (event.reason) out.reason = truncate(event.reason, MAX_REASON);
+  if (event.summary) out.summary = truncate(event.summary, MAX_SUMMARY);
   if (typeof event.files === "number" && Number.isFinite(event.files)) {
     out.files = Math.max(0, Math.floor(event.files));
   }
@@ -69,7 +71,7 @@ function parseBrainLine(line) {
   try {
     const parsed = JSON.parse(line);
     if (parsed.version !== 1) return null;
-    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked" && parsed.type !== "last-mile-decision") {
+    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked" && parsed.type !== "last-mile-decision" && parsed.type !== "compact-summary") {
       return null;
     }
     if (typeof parsed.timestamp !== "string") return null;
@@ -112,6 +114,7 @@ function summarizeProjectBrain(cwd) {
     events.filter((event) => event.type === "verification-run" && event.exitCode === 0).map((event) => event.command ?? event.verifier),
     5
   );
+  const compactEvent = events.filter((event) => event.type === "compact-summary" && event.summary).at(-1);
   return {
     path,
     exists: existsSync(path),
@@ -119,7 +122,13 @@ function summarizeProjectBrain(cwd) {
     lastUpdated: events.length > 0 ? events[events.length - 1]?.timestamp ?? null : null,
     stackHints: uniqueRecent(events.map((event) => event.stack), 5),
     verifierHints,
-    recentFailures: failures
+    recentFailures: failures,
+    ...compactEvent?.summary ? {
+      lastCompactSummary: {
+        timestamp: compactEvent.timestamp,
+        summary: compactEvent.summary
+      }
+    } : {}
   };
 }
 export {

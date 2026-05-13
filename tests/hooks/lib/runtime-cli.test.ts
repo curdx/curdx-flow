@@ -144,6 +144,35 @@ describe("runtime-cli lib", () => {
         name: "login",
         path: "specs/login",
       });
+
+      const bound = runLib("runtime-cli", [
+        "specs",
+        "bind-session",
+        "auth",
+        "--cwd",
+        cwd,
+        "--session-id",
+        "sess-rt",
+      ]);
+      expect(bound.exitCode).toBe(0);
+      expect(bound.json).toMatchObject({
+        ok: true,
+      });
+
+      const sessionResolved = runLib("runtime-cli", [
+        "specs",
+        "resolve",
+        "--cwd",
+        cwd,
+        "--session-id",
+        "sess-rt",
+      ]);
+      expect(sessionResolved.exitCode).toBe(0);
+      expect(sessionResolved.json).toMatchObject({
+        ok: true,
+        name: "auth",
+        path: "packages/api/specs/auth",
+      });
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

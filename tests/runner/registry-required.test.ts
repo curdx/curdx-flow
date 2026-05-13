@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { PKGS } from '../../src/registry/index.ts';
+import { findPkg, PKGS } from '../../src/registry/index.ts';
 
 describe('default companion bundle', () => {
   test('installer treats plugin dependencies as required and external MCPs as selectable', () => {
@@ -20,5 +20,11 @@ describe('default companion bundle', () => {
     const uiUxProMax = PKGS.find((pkg) => pkg.id === 'ui-ux-pro-max');
 
     expect(uiUxProMax?.marketplaces?.()).toEqual(['ui-ux-pro-max-skill']);
+  });
+
+  test('uiuxmax aliases resolve to the ui-ux-pro-max plugin package', () => {
+    expect(findPkg('uiuxmax')?.id).toBe('ui-ux-pro-max');
+    expect(findPkg('UIUXMAX')?.id).toBe('ui-ux-pro-max');
+    expect(findPkg('ui-ux-max')?.id).toBe('ui-ux-pro-max');
   });
 });

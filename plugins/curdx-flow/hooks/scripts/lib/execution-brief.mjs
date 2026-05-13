@@ -274,7 +274,14 @@ import path, { basename as basename3, isAbsolute as isAbsolute2, relative, resol
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // src/hooks/_shared/path-resolver.ts
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import { basename as basename2, isAbsolute, join, posix } from "node:path";
 var DEFAULT_SPECS_DIR = "./specs";
 var SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
@@ -290,6 +297,43 @@ function isDir(p) {
     return statSync(p).isDirectory();
   } catch {
     return false;
+  }
+}
+function sanitizeSessionId(sessionId) {
+  const raw = sessionId?.trim();
+  if (!raw) return null;
+  const safe = raw.replace(/[^A-Za-z0-9_.-]/g, "-").slice(0, 120);
+  return safe.length > 0 ? safe : null;
+}
+function specPathExists(cwd, specPath) {
+  const fsPath = isAbsolute(specPath) ? specPath : join(cwd, specPath);
+  return isDir(fsPath);
+}
+function sessionBindingPath(opts) {
+  const cwd = resolveCwd(opts);
+  const sessionId = sanitizeSessionId(opts?.sessionId);
+  if (!sessionId) return null;
+  return join(cwd, ".curdx", "sessions", `${sessionId}.json`);
+}
+function readSessionSpecBinding(opts) {
+  const cwd = resolveCwd(opts);
+  const path2 = sessionBindingPath(opts);
+  if (!path2 || !existsSync(path2)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path2, "utf8"));
+    if (parsed.version !== 1) return null;
+    if (typeof parsed.sessionId !== "string" || typeof parsed.specPath !== "string") return null;
+    if (!specPathExists(cwd, parsed.specPath)) return null;
+    return {
+      version: 1,
+      sessionId: parsed.sessionId,
+      specPath: parsed.specPath,
+      specName: typeof parsed.specName === "string" ? parsed.specName : basename2(parsed.specPath),
+      lastSeenAt: typeof parsed.lastSeenAt === "string" ? parsed.lastSeenAt : "",
+      source: typeof parsed.source === "string" ? parsed.source : "unknown"
+    };
+  } catch {
+    return null;
   }
 }
 function normalizePath(input) {
@@ -394,6 +438,8 @@ function findSpec(name, opts) {
 function resolveCurrent(opts) {
   const cwd = resolveCwd(opts);
   if (!isDir(cwd)) return null;
+  const sessionBinding = readSessionSpecBinding(opts);
+  if (sessionBinding) return sessionBinding.specPath;
   const defaultDir = getDefaultDir(opts);
   const markerFs = [
     join(cwd, defaultDir, ".current-spec"),
@@ -1038,7 +1084,7 @@ import { basename as basename4 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 
 // src/hooks/lib/capability-normalization.ts
-var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui-ux-pro-max|pua)\b/gi;
+var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b/gi;
 function stripKnownCapabilityTokens(input) {
   return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
 }
@@ -1497,10 +1543,11 @@ if (isDirectRun3()) {
 }
 
 // src/hooks/lib/project-brain.ts
-import { appendFileSync, existsSync as existsSync3, mkdirSync, readFileSync as readFileSync3, statSync as statSync3, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync3, statSync as statSync3, writeFileSync as writeFileSync2 } from "node:fs";
 import { join as join2, resolve as resolve2 } from "node:path";
 var MAX_REASON = 240;
 var MAX_COMMAND = 180;
+var MAX_SUMMARY = 900;
 var MAX_BRAIN_BYTES = 64 * 1024;
 var MAX_BRAIN_LINES = 400;
 function normalizeCwd(cwd) {
@@ -1530,6 +1577,7 @@ function normalizeEvent(event) {
   }
   if (event.verifier) out.verifier = truncate(event.verifier, MAX_COMMAND);
   if (event.reason) out.reason = truncate(event.reason, MAX_REASON);
+  if (event.summary) out.summary = truncate(event.summary, MAX_SUMMARY);
   if (typeof event.files === "number" && Number.isFinite(event.files)) {
     out.files = Math.max(0, Math.floor(event.files));
   }
@@ -1539,7 +1587,7 @@ function appendBrainEvent(cwd, event) {
   const path2 = brainPath(cwd);
   if (process.env.CURDX_FLOW_BRAIN === "off") return { ok: true, path: path2 };
   try {
-    mkdirSync(join2(normalizeCwd(cwd), ".curdx"), { recursive: true });
+    mkdirSync2(join2(normalizeCwd(cwd), ".curdx"), { recursive: true });
     appendFileSync(path2, JSON.stringify(normalizeEvent(event)) + "\n", "utf8");
     compactBrainIfNeeded(path2);
     return { ok: true, path: path2 };
@@ -1552,7 +1600,7 @@ function compactBrainIfNeeded(path2) {
   try {
     if (statSync3(path2).size <= MAX_BRAIN_BYTES) return;
     const lines = readFileSync3(path2, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-MAX_BRAIN_LINES);
-    writeFileSync(path2, lines.join("\n") + (lines.length > 0 ? "\n" : ""), "utf8");
+    writeFileSync2(path2, lines.join("\n") + (lines.length > 0 ? "\n" : ""), "utf8");
   } catch {
   }
 }
@@ -1560,7 +1608,7 @@ function parseBrainLine(line) {
   try {
     const parsed = JSON.parse(line);
     if (parsed.version !== 1) return null;
-    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked" && parsed.type !== "last-mile-decision") {
+    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked" && parsed.type !== "last-mile-decision" && parsed.type !== "compact-summary") {
       return null;
     }
     if (typeof parsed.timestamp !== "string") return null;
@@ -1603,6 +1651,7 @@ function summarizeProjectBrain(cwd) {
     events.filter((event) => event.type === "verification-run" && event.exitCode === 0).map((event) => event.command ?? event.verifier),
     5
   );
+  const compactEvent = events.filter((event) => event.type === "compact-summary" && event.summary).at(-1);
   return {
     path: path2,
     exists: existsSync3(path2),
@@ -1610,7 +1659,13 @@ function summarizeProjectBrain(cwd) {
     lastUpdated: events.length > 0 ? events[events.length - 1]?.timestamp ?? null : null,
     stackHints: uniqueRecent(events.map((event) => event.stack), 5),
     verifierHints,
-    recentFailures: failures
+    recentFailures: failures,
+    ...compactEvent?.summary ? {
+      lastCompactSummary: {
+        timestamp: compactEvent.timestamp,
+        summary: compactEvent.summary
+      }
+    } : {}
   };
 }
 
@@ -2752,7 +2807,7 @@ function resolveSpecPath(input) {
     if (found.ok) return found.path;
     return explicit;
   }
-  return resolveCurrent({ cwd }) ?? void 0;
+  return resolveCurrent({ cwd, sessionId: input.sessionId }) ?? void 0;
 }
 function readJsonFile(path2) {
   try {
@@ -2896,6 +2951,7 @@ function buildWorkflowSnapshot(input = {}) {
   const specPath = resolveSpecPath({ ...input, cwd });
   const topology = compactTopology(discoverProjectTopology({ cwd, goal: input.goal ?? "" }));
   const git = gitSnapshot(cwd);
+  const brain = summarizeProjectBrain(cwd);
   if (!specPath) {
     return {
       version: 2,
@@ -2920,6 +2976,10 @@ function buildWorkflowSnapshot(input = {}) {
       tasks: { total: 0, completed: 0, pending: 0, currentIndex: 0 },
       topology,
       git,
+      recovery: {
+        recentFailures: brain.recentFailures,
+        ...brain.lastCompactSummary ? { lastCompactSummary: brain.lastCompactSummary } : {}
+      },
       nextAction: "No active spec. Run /curdx-flow:start <name> <goal>.",
       gates: ["no-active-spec"]
     };
@@ -2977,6 +3037,10 @@ function buildWorkflowSnapshot(input = {}) {
     tasks,
     topology,
     git,
+    recovery: {
+      recentFailures: brain.recentFailures,
+      ...brain.lastCompactSummary ? { lastCompactSummary: brain.lastCompactSummary } : {}
+    },
     nextAction: inferNextAction(state, artifacts, tasks),
     gates: buildGates(stateInfo, artifacts, tasks, topology)
   };
@@ -2986,7 +3050,8 @@ function main6() {
   const snapshot = buildWorkflowSnapshot({
     cwd: readArg6("--cwd", argv),
     spec: readArg6("--spec", argv),
-    goal: readArg6("--goal", argv)
+    goal: readArg6("--goal", argv),
+    sessionId: readArg6("--session-id", argv)
   });
   process.stdout.write(JSON.stringify(snapshot, null, 2) + "\n");
 }

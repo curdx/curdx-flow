@@ -280,7 +280,14 @@ import path, { basename as basename3, isAbsolute as isAbsolute2, relative, resol
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // src/hooks/_shared/path-resolver.ts
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import { basename as basename2, isAbsolute, join, posix } from "node:path";
 var DEFAULT_SPECS_DIR = "./specs";
 var SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
@@ -296,6 +303,69 @@ function isDir(p) {
     return statSync(p).isDirectory();
   } catch {
     return false;
+  }
+}
+function sanitizeSessionId(sessionId) {
+  const raw = sessionId?.trim();
+  if (!raw) return null;
+  const safe = raw.replace(/[^A-Za-z0-9_.-]/g, "-").slice(0, 120);
+  return safe.length > 0 ? safe : null;
+}
+function specPathExists(cwd, specPath) {
+  const fsPath = isAbsolute(specPath) ? specPath : join(cwd, specPath);
+  return isDir(fsPath);
+}
+function sessionBindingPath(opts) {
+  const cwd = resolveCwd(opts);
+  const sessionId = sanitizeSessionId(opts?.sessionId);
+  if (!sessionId) return null;
+  return join(cwd, ".curdx", "sessions", `${sessionId}.json`);
+}
+function readSessionSpecBinding(opts) {
+  const cwd = resolveCwd(opts);
+  const path3 = sessionBindingPath(opts);
+  if (!path3 || !existsSync(path3)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path3, "utf8"));
+    if (parsed.version !== 1) return null;
+    if (typeof parsed.sessionId !== "string" || typeof parsed.specPath !== "string") return null;
+    if (!specPathExists(cwd, parsed.specPath)) return null;
+    return {
+      version: 1,
+      sessionId: parsed.sessionId,
+      specPath: parsed.specPath,
+      specName: typeof parsed.specName === "string" ? parsed.specName : basename2(parsed.specPath),
+      lastSeenAt: typeof parsed.lastSeenAt === "string" ? parsed.lastSeenAt : "",
+      source: typeof parsed.source === "string" ? parsed.source : "unknown"
+    };
+  } catch {
+    return null;
+  }
+}
+function bindSessionSpec(specPath, opts) {
+  const cwd = resolveCwd(opts);
+  const sessionId = sanitizeSessionId(opts?.sessionId);
+  if (!sessionId) return { ok: false, reason: "missing-session-id" };
+  if (!specPath || !specPathExists(cwd, specPath)) {
+    return { ok: false, reason: "spec-not-found" };
+  }
+  const bindingPath = sessionBindingPath({ cwd, sessionId });
+  if (!bindingPath) return { ok: false, reason: "missing-session-id" };
+  const binding = {
+    version: 1,
+    sessionId,
+    specPath,
+    specName: basename2(specPath),
+    lastSeenAt: (/* @__PURE__ */ new Date()).toISOString(),
+    source: opts?.source ?? "runtime"
+  };
+  try {
+    mkdirSync(join(cwd, ".curdx", "sessions"), { recursive: true });
+    writeFileSync(bindingPath, JSON.stringify(binding, null, 2) + "\n", "utf8");
+    return { ok: true, path: bindingPath };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return { ok: false, reason, path: bindingPath };
   }
 }
 function normalizePath(input) {
@@ -400,6 +470,8 @@ function findSpec(name, opts) {
 function resolveCurrent(opts) {
   const cwd = resolveCwd(opts);
   if (!isDir(cwd)) return null;
+  const sessionBinding = readSessionSpecBinding(opts);
+  if (sessionBinding) return sessionBinding.specPath;
   const defaultDir = getDefaultDir(opts);
   const markerFs = [
     join(cwd, defaultDir, ".current-spec"),
@@ -1070,7 +1142,7 @@ import { basename as basename4 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 
 // src/hooks/lib/capability-normalization.ts
-var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui-ux-pro-max|pua)\b/gi;
+var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b/gi;
 function stripKnownCapabilityTokens(input) {
   return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
 }
@@ -1529,10 +1601,11 @@ if (isDirectRun3()) {
 }
 
 // src/hooks/lib/project-brain.ts
-import { appendFileSync, existsSync as existsSync3, mkdirSync, readFileSync as readFileSync3, statSync as statSync3, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync3, statSync as statSync3, writeFileSync as writeFileSync2 } from "node:fs";
 import { join as join2, resolve as resolve2 } from "node:path";
 var MAX_REASON = 240;
 var MAX_COMMAND = 180;
+var MAX_SUMMARY = 900;
 var MAX_BRAIN_BYTES = 64 * 1024;
 var MAX_BRAIN_LINES = 400;
 function normalizeCwd(cwd) {
@@ -1562,6 +1635,7 @@ function normalizeEvent(event) {
   }
   if (event.verifier) out.verifier = truncate(event.verifier, MAX_COMMAND);
   if (event.reason) out.reason = truncate(event.reason, MAX_REASON);
+  if (event.summary) out.summary = truncate(event.summary, MAX_SUMMARY);
   if (typeof event.files === "number" && Number.isFinite(event.files)) {
     out.files = Math.max(0, Math.floor(event.files));
   }
@@ -1571,7 +1645,7 @@ function appendBrainEvent(cwd, event) {
   const path3 = brainPath(cwd);
   if (process.env.CURDX_FLOW_BRAIN === "off") return { ok: true, path: path3 };
   try {
-    mkdirSync(join2(normalizeCwd(cwd), ".curdx"), { recursive: true });
+    mkdirSync2(join2(normalizeCwd(cwd), ".curdx"), { recursive: true });
     appendFileSync(path3, JSON.stringify(normalizeEvent(event)) + "\n", "utf8");
     compactBrainIfNeeded(path3);
     return { ok: true, path: path3 };
@@ -1584,7 +1658,7 @@ function compactBrainIfNeeded(path3) {
   try {
     if (statSync3(path3).size <= MAX_BRAIN_BYTES) return;
     const lines = readFileSync3(path3, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-MAX_BRAIN_LINES);
-    writeFileSync(path3, lines.join("\n") + (lines.length > 0 ? "\n" : ""), "utf8");
+    writeFileSync2(path3, lines.join("\n") + (lines.length > 0 ? "\n" : ""), "utf8");
   } catch {
   }
 }
@@ -1592,7 +1666,7 @@ function parseBrainLine(line) {
   try {
     const parsed = JSON.parse(line);
     if (parsed.version !== 1) return null;
-    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked" && parsed.type !== "last-mile-decision") {
+    if (parsed.type !== "route-compiled" && parsed.type !== "edit-batch" && parsed.type !== "verification-run" && parsed.type !== "verification-blocked" && parsed.type !== "last-mile-decision" && parsed.type !== "compact-summary") {
       return null;
     }
     if (typeof parsed.timestamp !== "string") return null;
@@ -1635,6 +1709,7 @@ function summarizeProjectBrain(cwd) {
     events.filter((event) => event.type === "verification-run" && event.exitCode === 0).map((event) => event.command ?? event.verifier),
     5
   );
+  const compactEvent = events.filter((event) => event.type === "compact-summary" && event.summary).at(-1);
   return {
     path: path3,
     exists: existsSync3(path3),
@@ -1642,7 +1717,13 @@ function summarizeProjectBrain(cwd) {
     lastUpdated: events.length > 0 ? events[events.length - 1]?.timestamp ?? null : null,
     stackHints: uniqueRecent(events.map((event) => event.stack), 5),
     verifierHints,
-    recentFailures: failures
+    recentFailures: failures,
+    ...compactEvent?.summary ? {
+      lastCompactSummary: {
+        timestamp: compactEvent.timestamp,
+        summary: compactEvent.summary
+      }
+    } : {}
   };
 }
 
@@ -2780,7 +2861,7 @@ function resolveSpecPath(input) {
     if (found.ok) return found.path;
     return explicit;
   }
-  return resolveCurrent({ cwd }) ?? void 0;
+  return resolveCurrent({ cwd, sessionId: input.sessionId }) ?? void 0;
 }
 function readJsonFile(path3) {
   try {
@@ -2924,6 +3005,7 @@ function buildWorkflowSnapshot(input = {}) {
   const specPath = resolveSpecPath({ ...input, cwd });
   const topology = compactTopology(discoverProjectTopology({ cwd, goal: input.goal ?? "" }));
   const git = gitSnapshot(cwd);
+  const brain = summarizeProjectBrain(cwd);
   if (!specPath) {
     return {
       version: 2,
@@ -2948,6 +3030,10 @@ function buildWorkflowSnapshot(input = {}) {
       tasks: { total: 0, completed: 0, pending: 0, currentIndex: 0 },
       topology,
       git,
+      recovery: {
+        recentFailures: brain.recentFailures,
+        ...brain.lastCompactSummary ? { lastCompactSummary: brain.lastCompactSummary } : {}
+      },
       nextAction: "No active spec. Run /curdx-flow:start <name> <goal>.",
       gates: ["no-active-spec"]
     };
@@ -3005,6 +3091,10 @@ function buildWorkflowSnapshot(input = {}) {
     tasks: tasks2,
     topology,
     git,
+    recovery: {
+      recentFailures: brain.recentFailures,
+      ...brain.lastCompactSummary ? { lastCompactSummary: brain.lastCompactSummary } : {}
+    },
     nextAction: inferNextAction(state2, artifacts, tasks2),
     gates: buildGates(stateInfo, artifacts, tasks2, topology)
   };
@@ -3014,7 +3104,8 @@ function main6() {
   const snapshot2 = buildWorkflowSnapshot({
     cwd: readArg6("--cwd", argv),
     spec: readArg6("--spec", argv),
-    goal: readArg6("--goal", argv)
+    goal: readArg6("--goal", argv),
+    sessionId: readArg6("--session-id", argv)
   });
   process.stdout.write(JSON.stringify(snapshot2, null, 2) + "\n");
 }
@@ -3272,11 +3363,11 @@ async function walkSrcTree(dir) {
 import { spawn, spawnSync } from "node:child_process";
 import {
   existsSync as existsSync8,
-  mkdirSync as mkdirSync2,
+  mkdirSync as mkdirSync3,
   openSync,
   readFileSync as readFileSync8,
   rmSync,
-  writeFileSync as writeFileSync2
+  writeFileSync as writeFileSync3
 } from "node:fs";
 import { isAbsolute as isAbsolute5, join as join7, resolve as resolve4 } from "node:path";
 function readJsonFile2(path3) {
@@ -3482,7 +3573,7 @@ function readRuntimeState(projectRoot) {
 }
 function startDevRuntime(input = {}) {
   const plan = detectDevRuntime(input);
-  mkdirSync2(runtimeDir(plan.projectRoot), { recursive: true });
+  mkdirSync3(runtimeDir(plan.projectRoot), { recursive: true });
   const services = [];
   for (const service of plan.services) {
     const root = plan.roots.find((candidate) => candidate.path === service.root);
@@ -3514,7 +3605,7 @@ function startDevRuntime(input = {}) {
     services,
     gaps: plan.gaps
   };
-  writeFileSync2(runtimeStatePath(plan.projectRoot), JSON.stringify(state2, null, 2) + "\n");
+  writeFileSync3(runtimeStatePath(plan.projectRoot), JSON.stringify(state2, null, 2) + "\n");
   return state2;
 }
 function healthDevRuntime(input = {}) {
@@ -4041,11 +4132,12 @@ function usage(exitCode = 1) {
     "commands:",
     "  route --goal <text> [--name <spec>] [--flags <args>] [--cwd <dir>] [--compile] [--record]",
     "  last-mile --goal <text> [--spec <name-or-path>] [--cwd <dir>] [--record]",
-    "  snapshot [--spec <name-or-path>] [--goal <text>] [--cwd <dir>]",
+    "  snapshot [--spec <name-or-path>] [--goal <text>] [--cwd <dir>] [--session-id <id>]",
     "  specs dirs [--cwd <dir>]",
     "  specs list [--cwd <dir>]",
     "  specs find <name> [--cwd <dir>]",
-    "  specs resolve [name-or-path] [--cwd <dir>]",
+    "  specs resolve [name-or-path] [--cwd <dir>] [--session-id <id>]",
+    "  specs bind-session <name-or-path> --session-id <id> [--cwd <dir>]",
     "  state merge <state-file> <json-patch>",
     "  tasks count <tasks.md>",
     "  dev detect [--cwd <dir>]",
@@ -4110,7 +4202,8 @@ function snapshot(argv) {
     buildWorkflowSnapshot({
       cwd: readArg8("--cwd", argv),
       spec: readArg8("--spec", argv),
-      goal: readArg8("--goal", argv)
+      goal: readArg8("--goal", argv),
+      sessionId: readArg8("--session-id", argv)
     })
   );
 }
@@ -4610,6 +4703,7 @@ function hookFreshnessDoctor() {
     ["user-prompt-expansion-guard.ts", "user-prompt-expansion-guard.mjs"],
     ["user-prompt-submit-autopilot.ts", "user-prompt-submit-autopilot.mjs"],
     ["post-tool-batch-snapshot.ts", "post-tool-batch-snapshot.mjs"],
+    ["post-compact-recorder.ts", "post-compact-recorder.mjs"],
     ["task-completed-verifier.ts", "task-completed-verifier.mjs"],
     [join8("lib", "smart-route.ts"), join8("lib", "smart-route.mjs")],
     [join8("lib", "tool-capabilities.ts"), join8("lib", "tool-capabilities.mjs")],
@@ -4660,7 +4754,7 @@ function specs(argv) {
   if (sub === "list") {
     printJson({
       defaultDir: getDefaultDir({ cwd }),
-      active: resolveCurrent({ cwd }),
+      active: resolveCurrent({ cwd, sessionId: readArg8("--session-id", rest) }),
       specs: listSpecs({ cwd })
     });
     return;
@@ -4675,7 +4769,7 @@ function specs(argv) {
   }
   if (sub === "resolve") {
     const input = firstPositional(rest);
-    const target = input ?? resolveCurrent({ cwd }) ?? void 0;
+    const target = input ?? resolveCurrent({ cwd, sessionId: readArg8("--session-id", rest) }) ?? void 0;
     if (!target) {
       printJson({ ok: false, reason: "no-current" });
       process.exit(1);
@@ -4696,6 +4790,28 @@ function specs(argv) {
     }
     const resolved = resolveSpecPathForOutput(cwd, found.path);
     printJson({ ok: true, name: basename10(found.path), ...resolved });
+    return;
+  }
+  if (sub === "bind-session") {
+    const sessionId = readArg8("--session-id", rest);
+    const input = firstPositional(rest);
+    if (!sessionId || !input) usage();
+    let specPath = input;
+    if (!(input.startsWith("./") || input.startsWith("../") || input.includes("/") || isAbsolute6(input))) {
+      const found = findSpec(input, { cwd });
+      if (!found.ok) {
+        printJson(found);
+        process.exit(found.reason === "ambiguous" ? 2 : 1);
+      }
+      specPath = found.path;
+    }
+    const result = bindSessionSpec(specPath, {
+      cwd,
+      sessionId,
+      source: "runtime-cli"
+    });
+    printJson(result);
+    if (!result.ok) process.exit(1);
     return;
   }
   usage();
@@ -4759,7 +4875,8 @@ async function verify(argv) {
   }
   const snap = buildWorkflowSnapshot({
     cwd,
-    spec: readArg8("--spec", rest)
+    spec: readArg8("--spec", rest),
+    sessionId: readArg8("--session-id", rest)
   });
   if (!snap.spec?.fsPath || !snap.spec.statePath) {
     process.stderr.write("verify run: no active spec\n");
@@ -4820,7 +4937,8 @@ async function verifyBlocks(argv) {
   const cwd = readArg8("--cwd", argv);
   const snap = buildWorkflowSnapshot({
     cwd,
-    spec: readArg8("--spec", argv)
+    spec: readArg8("--spec", argv),
+    sessionId: readArg8("--session-id", argv)
   });
   if (!snap.spec?.fsPath) {
     process.stderr.write("verify-blocks: no active spec\n");
@@ -4833,7 +4951,11 @@ async function verifyBlocks(argv) {
 }
 function doctor(argv) {
   const cwd = resolve5(readArg8("--cwd", argv) ?? process.cwd());
-  const snap = buildWorkflowSnapshot({ cwd, spec: readArg8("--spec", argv) });
+  const snap = buildWorkflowSnapshot({
+    cwd,
+    spec: readArg8("--spec", argv),
+    sessionId: readArg8("--session-id", argv)
+  });
   const goal = readArg8("--goal", argv) ?? "";
   const routeFacts = classifySmartRoute({ cwd, goal });
   const topology = discoverProjectTopology({ cwd, goal });

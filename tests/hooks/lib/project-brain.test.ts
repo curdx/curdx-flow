@@ -46,6 +46,15 @@ describe("project-brain", () => {
         type: "verification-blocked",
         phase: "execution",
       });
+
+      appendBrainEvent(cwd, {
+        type: "compact-summary",
+        phase: "recovering",
+        summary: "Compacted after finishing research and starting design.",
+      });
+      expect(summarizeProjectBrain(cwd).lastCompactSummary).toMatchObject({
+        summary: "Compacted after finishing research and starting design.",
+      });
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

@@ -23,10 +23,14 @@ Output contract:
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/update-spec-index.mjs" --quiet
    ```
-2. Run the workflow snapshot:
+2. Run the workflow snapshot. Prefer the session-aware form when Claude Code
+   exposes `CLAUDE_SESSION_ID`; this keeps status aligned with the current
+   session binding instead of only the global `.current-spec` marker:
    ```bash
-   curdx-flow snapshot
+   curdx-flow snapshot --session-id "$CLAUDE_SESSION_ID"
    ```
+   The snapshot includes `recovery.recentFailures` and
+   `recovery.lastCompactSummary` from `.curdx/brain.jsonl`.
 3. Run the lightweight health check:
    ```bash
    curdx-flow doctor
@@ -55,6 +59,12 @@ Recommended next action: <snapshot.nextAction>
 Playwright: <ready/not ready> <recommended command if available>
 Chrome DevTools MCP: <ready/not ready>
 
+## Recovery
+
+Compact summary: <present/none>
+Recent failures: <count>
+Context capsule: <active hook-injected/none>
+
 ## Specs
 
 ### <spec-name> [ACTIVE]
@@ -68,6 +78,8 @@ Commands:
 - /curdx-flow:start [name] [goal]
 - /curdx-flow:switch <name>
 - /curdx-flow:status --update-index
+- curdx-flow snapshot --session-id "$CLAUDE_SESSION_ID"
+- curdx-flow specs bind-session <name> --session-id "$CLAUDE_SESSION_ID"
 - curdx-flow doctor
 ```
 

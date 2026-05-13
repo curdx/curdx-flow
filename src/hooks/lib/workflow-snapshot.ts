@@ -15,11 +15,13 @@ import type { CurdxState, VerificationBlock } from "../_shared/types.js";
 import { findSpec, resolveCurrent } from "../_shared/path-resolver.js";
 import { parseTaskList, type TaskMeta } from "../_shared/markdown-task-parser.js";
 import { discoverProjectTopology, type ProjectTopology } from "./project-topology.js";
+import { summarizeProjectBrain } from "./project-brain.js";
 
 export interface WorkflowSnapshotInput {
   cwd?: string;
   spec?: string;
   goal?: string;
+  sessionId?: string;
 }
 
 export interface ArtifactSnapshot {
@@ -79,6 +81,10 @@ export interface WorkflowSnapshot {
   tasks: TaskSnapshot;
   topology?: Pick<ProjectTopology, "workspaceState" | "devContextFound" | "roots" | "requiredRoots" | "missingRoots" | "accessFix" | "warnings">;
   git: GitSnapshot;
+  recovery: {
+    recentFailures: ReturnType<typeof summarizeProjectBrain>["recentFailures"];
+    lastCompactSummary?: ReturnType<typeof summarizeProjectBrain>["lastCompactSummary"];
+  };
   nextAction: string;
   gates: string[];
 }
@@ -110,7 +116,7 @@ function resolveSpecPath(input: WorkflowSnapshotInput): string | undefined {
     if (found.ok) return found.path;
     return explicit;
   }
-  return resolveCurrent({ cwd }) ?? undefined;
+  return resolveCurrent({ cwd, sessionId: input.sessionId }) ?? undefined;
 }
 
 function readJsonFile<T>(path: string): { ok: true; value: T } | { ok: false; error: string } {
@@ -283,6 +289,7 @@ export function buildWorkflowSnapshot(input: WorkflowSnapshotInput = {}): Workfl
   const specPath = resolveSpecPath({ ...input, cwd });
   const topology = compactTopology(discoverProjectTopology({ cwd, goal: input.goal ?? "" }));
   const git = gitSnapshot(cwd);
+  const brain = summarizeProjectBrain(cwd);
 
   if (!specPath) {
     return {
@@ -308,6 +315,10 @@ export function buildWorkflowSnapshot(input: WorkflowSnapshotInput = {}): Workfl
       tasks: { total: 0, completed: 0, pending: 0, currentIndex: 0 },
       topology,
       git,
+      recovery: {
+        recentFailures: brain.recentFailures,
+        ...(brain.lastCompactSummary ? { lastCompactSummary: brain.lastCompactSummary } : {}),
+      },
       nextAction: "No active spec. Run /curdx-flow:start <name> <goal>.",
       gates: ["no-active-spec"],
     };
@@ -369,6 +380,10 @@ export function buildWorkflowSnapshot(input: WorkflowSnapshotInput = {}): Workfl
     tasks,
     topology,
     git,
+    recovery: {
+      recentFailures: brain.recentFailures,
+      ...(brain.lastCompactSummary ? { lastCompactSummary: brain.lastCompactSummary } : {}),
+    },
     nextAction: inferNextAction(state, artifacts, tasks),
     gates: buildGates(stateInfo, artifacts, tasks, topology),
   };
@@ -380,6 +395,7 @@ function main(): void {
     cwd: readArg("--cwd", argv),
     spec: readArg("--spec", argv),
     goal: readArg("--goal", argv),
+    sessionId: readArg("--session-id", argv),
   });
   process.stdout.write(JSON.stringify(snapshot, null, 2) + "\n");
 }

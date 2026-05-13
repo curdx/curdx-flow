@@ -731,7 +731,7 @@ runHook(async (input) => {
 
   // Resolve current spec. Re-attach `./` prefix that posix.join strips, so
   // the continuation prompt embeds a path byte-equal to the v6 bash baseline.
-  const rawSpecPath = resolveCurrent({ cwd });
+  const rawSpecPath = resolveCurrent({ cwd, sessionId: input.session_id });
   if (!rawSpecPath) return;
   const specPath = preserveDotPrefix(rawSpecPath, getSpecsDirs({ cwd }));
   const specName = basename(specPath);

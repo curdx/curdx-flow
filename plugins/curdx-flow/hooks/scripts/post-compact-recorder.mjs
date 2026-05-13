@@ -5,9 +5,6 @@ const require = __ccr(import.meta.url);
 const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
-// src/hooks/stop-failure-handler.ts
-import process2 from "node:process";
-
 // src/hooks/lib/project-brain.ts
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -71,65 +68,52 @@ function compactBrainIfNeeded(path) {
   }
 }
 
-// src/hooks/stop-failure-handler.ts
-var MATCHER_DESCRIPTIONS = {
-  rate_limit: "Anthropic API 429 \u2014 request throttled",
-  authentication_failed: "Anthropic API 401 \u2014 credentials rejected",
-  oauth_org_not_allowed: "Org-level OAuth deny \u2014 workspace not permitted",
-  billing_error: "Account billing fault \u2014 payment / quota issue",
-  invalid_request: "Malformed request from Claude \u2014 client-side bug",
-  server_error: "Anthropic 5xx \u2014 upstream server error",
-  max_output_tokens: "Hit response token limit \u2014 output truncated",
-  unknown: "Catch-all \u2014 Claude Code did not classify the failure"
-};
-function readStdin() {
-  return new Promise((resolve2, reject) => {
-    const chunks = [];
-    process2.stdin.on("data", (chunk) => chunks.push(chunk));
-    process2.stdin.on(
-      "end",
-      () => resolve2(Buffer.concat(chunks).toString("utf8"))
-    );
-    process2.stdin.on("error", reject);
-  });
+// src/hooks/_shared/stdin.ts
+import process2 from "node:process";
+async function readStdinJson() {
+  const chunks = [];
+  for await (const chunk of process2.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  const raw = Buffer.concat(chunks).toString("utf-8").trim();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    process2.stderr.write(`[hook] invalid stdin JSON: ${msg}
+`);
+    throw e;
+  }
+}
+
+// src/hooks/post-compact-recorder.ts
+function compactSummary(input) {
+  for (const key of ["compact_summary", "summary"]) {
+    const value = input[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return "";
 }
 async function main() {
-  let raw = "";
+  let input;
   try {
-    raw = await readStdin();
+    input = await readStdinJson();
   } catch {
-    process2.stderr.write("stop-failure-handler: stdin read failed\n");
-    process2.exit(0);
+    return;
   }
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) {
-    process2.exit(0);
-  }
-  let payload;
-  try {
-    payload = JSON.parse(trimmed);
-  } catch {
-    process2.stderr.write("stop-failure-handler: malformed stdin\n");
-    process2.exit(0);
-  }
-  const matcher = typeof payload === "object" && payload !== null && "matcher" in payload && typeof payload.matcher === "string" ? payload.matcher : "unknown";
-  const cwd = typeof payload === "object" && payload !== null && "cwd" in payload && typeof payload.cwd === "string" ? payload.cwd : void 0;
-  const description = MATCHER_DESCRIPTIONS[matcher] ?? `unrecognised matcher (echoed verbatim from stdin)`;
-  if (cwd !== void 0) {
-    appendBrainEvent(cwd, {
-      type: "last-mile-decision",
-      phase: "recovering",
-      reason: `StopFailure ${matcher}: ${description}`
-    });
-  }
-  process2.stderr.write(`[StopFailure:${matcher}] ${description}
-`);
-  process2.exit(0);
+  const cwd = input.cwd;
+  if (!cwd) return;
+  const summary = compactSummary(input);
+  if (!summary) return;
+  appendBrainEvent(cwd, {
+    type: "compact-summary",
+    phase: "recovering",
+    summary,
+    reason: input.trigger ? `PostCompact:${String(input.trigger)}` : "PostCompact"
+  });
 }
-main().catch((err) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  process2.stderr.write(`stop-failure-handler: ${msg}
-`);
-  process2.exit(0);
-});
-//# sourceMappingURL=stop-failure-handler.mjs.map
+void main();
+//# sourceMappingURL=post-compact-recorder.mjs.map

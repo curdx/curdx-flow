@@ -13,7 +13,7 @@
  *      — open question 5 settled in design: subagent dispatch under completed
  *      spec is a coordinator-side bug, this hook stays out of it).
  *   5. `buildContextPayload(state, specDir, {forSubagent: true})` → compact
- *      `<curdx-spec-context>` text block (~100-150B, NFR-1 ≤ 2KB).
+ *      CURDX SPEC DATA text block (~200B, NFR-1 ≤ 2KB).
  *   6. Emit `{hookSpecificOutput:{hookEventName:"SubagentStart",
  *      additionalContext:<text>}, continue:true}` (Claude Code wraps the
  *      string in a `<system-reminder>` block — issue #23885 wontfix upstream).
@@ -88,7 +88,7 @@ runHook(async (input) => {
     // Resolve `<defaultSpecsDir>/.current-spec`. Returns POSIX-form serialized
     // spec path; we re-anchor with `path.join` for fs reads (Node tolerates
     // mixed seps on Windows — see path-resolver.ts contract).
-    const specPath = resolveCurrent({ cwd });
+    const specPath = resolveCurrent({ cwd, sessionId: input.session_id });
     if (!specPath) {
       return FAIL_OPEN as unknown as HookOutput;
     }
@@ -116,7 +116,7 @@ runHook(async (input) => {
       return FAIL_OPEN as unknown as HookOutput;
     }
 
-    // Build compact `<curdx-spec-context>` text block. We pass the original
+    // Build compact CURDX SPEC DATA text block. We pass the original
     // POSIX-form `specPath` (not the local fs join) so the payload is byte-
     // stable across platforms — matches lib's "specDir is serialized form"
     // contract used by the SessionStart payload as well.

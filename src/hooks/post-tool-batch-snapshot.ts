@@ -16,6 +16,7 @@ interface ToolCall {
 
 interface PostToolBatchInput {
   cwd?: string;
+  session_id?: string;
   tool_calls?: ToolCall[];
 }
 
@@ -39,7 +40,7 @@ async function main(): Promise<void> {
   if (!touchedWriteTool) return;
 
   try {
-    const snapshot = buildWorkflowSnapshot({ cwd: input.cwd });
+    const snapshot = buildWorkflowSnapshot({ cwd: input.cwd, sessionId: input.session_id });
     const route = classifySmartRoute({ cwd: input.cwd });
     const brief = buildExecutionBrief({ cwd: input.cwd, routeFacts: route });
     const lastMile = decideLastMile({

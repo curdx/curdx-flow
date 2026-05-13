@@ -19,6 +19,8 @@ Use it instead of repeating fragile shell snippets:
 ```bash
 curdx-flow route --goal "$GOAL" --flags "$ARGUMENTS"
 curdx-flow snapshot --spec "$SPEC" --goal "$GOAL"
+curdx-flow snapshot --session-id "$CLAUDE_SESSION_ID"
+curdx-flow specs bind-session "$SPEC" --session-id "$CLAUDE_SESSION_ID"
 curdx-flow state merge "$SPEC_PATH/.curdx-state.json" '{"phase":"tasks"}'
 curdx-flow tasks count "$SPEC_PATH/tasks.md"
 curdx-flow dev detect
@@ -33,6 +35,9 @@ curdx-flow doctor
 The CLI is a thin wrapper around bundled TypeScript helpers under
 `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/`. It is the default source of truth
 for route facts, active spec facts, task counts, and state merge operations.
+When Claude Code provides a session id, active spec resolution is session-aware:
+session binding under `.curdx/sessions/` wins over the global `.current-spec`
+marker, while explicit `--spec` always wins over both.
 `curdx-flow verify run` is the preferred way to perform final task/spec
 verification because it runs the command and records the resulting
 `verificationBlocks.<phase>` evidence in one step.
@@ -109,6 +114,10 @@ Key fields: `phase`, `taskIndex`, `totalTasks`, `taskIteration`, `maxTaskIterati
 
 Phase skills must start by running `curdx-flow snapshot`. Treat the snapshot's
 `gates` list as blocking unless the current skill explicitly owns that gate.
+Snapshots also carry recovery facts from `.curdx/brain.jsonl`: recent verifier
+failures and the last official PostCompact summary. Hooks inject only compact
+CURDX SPEC DATA capsules with pointers and state; they do not inject full
+artifact bodies as instructions.
 
 ## Commit Behavior
 

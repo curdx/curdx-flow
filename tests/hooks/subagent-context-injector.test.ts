@@ -18,7 +18,7 @@ describe("subagent-context-injector (SubagentStart hook)", () => {
     activeSpec.cleanup();
   });
 
-  it("(a) happy: spec active + valid state → additionalContext contains phase:, spec:, iron-law:", () => {
+  it("(a) happy: spec active + valid state → additionalContext contains safe curdx data block", () => {
     const r = runHook("subagent-context-injector", FIXTURE, {
       cwd: activeSpec.cwd,
     });
@@ -34,6 +34,8 @@ describe("subagent-context-injector (SubagentStart hook)", () => {
     expect(out.continue).toBe(true);
     expect(out.hookSpecificOutput?.hookEventName).toBe("SubagentStart");
     const ctx = out.hookSpecificOutput?.additionalContext ?? "";
+    expect(ctx).toContain("---BEGIN CURDX SPEC DATA---");
+    expect(ctx).toContain("---END CURDX SPEC DATA---");
     expect(ctx).toContain("phase:");
     expect(ctx).toContain("spec:");
     expect(ctx).toContain("iron-law:");
@@ -74,7 +76,7 @@ describe("subagent-context-injector (SubagentStart hook)", () => {
     expect(r.stderr).toContain("[subagent-context-injector]");
   });
 
-  it("(d) payload size: JSON.stringify(output).length ≤ 2048 AND additionalContext.length ≤ 200", () => {
+  it("(d) payload size: JSON.stringify(output).length ≤ 2048 AND additionalContext.length ≤ 320", () => {
     const r = runHook("subagent-context-injector", FIXTURE, {
       cwd: activeSpec.cwd,
     });
@@ -86,7 +88,7 @@ describe("subagent-context-injector (SubagentStart hook)", () => {
       (r.json as {
         hookSpecificOutput?: { additionalContext?: string };
       }).hookSpecificOutput?.additionalContext ?? "";
-    expect(ctx.length).toBeLessThanOrEqual(200);
+    expect(ctx.length).toBeLessThanOrEqual(320);
   });
 
   it("(e) iron-law verbatim: additionalContext contains exact IRON_LAW_SUMMARY string", () => {
@@ -153,6 +155,7 @@ describe("subagent-context-injector (SubagentStart hook)", () => {
       expect(out.continue).toBe(true);
       expect(out.hookSpecificOutput?.hookEventName).toBe("SubagentStart");
       const ctx = out.hookSpecificOutput?.additionalContext ?? "";
+      expect(ctx).toContain("---BEGIN CURDX SPEC DATA---");
       expect(ctx).toContain("phase:");
       expect(ctx).toContain("spec:");
       expect(ctx).toContain("iron-law:");

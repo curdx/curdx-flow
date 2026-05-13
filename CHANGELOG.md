@@ -2,11 +2,29 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.33 — 2026-05-13
+
+### Added
+
+- **Session-scoped active spec binding.** Hooks and the runtime CLI now resolve `.curdx/sessions/<session-id>.json` before the global `.current-spec`, so concurrent Claude Code sessions can stay attached to different specs without clobbering each other.
+- **Compact recovery memory.** Added a `PostCompact` hook that records Claude Code's official `compact_summary` into `.curdx/brain.jsonl`, and surfaces recent failures plus the last compact summary through workflow snapshots.
+- **Safe context capsules.** UserPromptSubmit, SessionStart, and SubagentStart now inject bounded `CURDX SPEC DATA` blocks as data, not instructions, with UTF-8 byte-safe truncation for multilingual compact summaries.
+
+### Changed
+
+- **UI dependency contract remains ui-ux-pro-max.** The curdx-flow plugin dependency, installer registry, capability router, docs, and tests use `ui-ux-pro-max@ui-ux-pro-max-skill`; the legacy official UI wheel is not a tracked curdx-flow requirement.
+- **uiuxmax shorthand is accepted.** Installer package lookup and capability-token normalization now treat `uiuxmax` / `ui-ux-max` as aliases for the published `ui-ux-pro-max` plugin, while keeping the official Claude Code dependency name unchanged.
+- **Status and runtime surfaces are session-aware.** `curdx-flow snapshot`, `specs resolve`, `specs list`, `verify run`, `verify-blocks`, and `doctor` accept `--session-id`; `specs bind-session` explicitly binds a spec to a Claude session.
+
+### Tests
+
+- Added coverage for session-bound spec resolution, compact summary recovery, context capsule byte budgets, `PostCompact` recording, and runtime CLI session binding. Verified with `npm run verify` and `claude plugin validate ./plugins/curdx-flow`.
+
 ## 7.1.32 — 2026-05-13
 
 ### Changed
 
-- **UI/UX companion plugin switched to ui-ux-pro-max.** The installer, Claude Code plugin dependency manifest, root marketplace allowlist, doctor dependency checks, capability router, last-mile autopilot, CLAUDE.md sync guidance, smoke tests, and plugin references now use `ui-ux-pro-max@ui-ux-pro-max-skill` from `nextlevelbuilder/ui-ux-pro-max-skill` instead of the old `frontend-design@claude-plugins-official` dependency.
+- **UI companion plugin uses ui-ux-pro-max.** The installer, Claude Code plugin dependency manifest, root marketplace allowlist, doctor dependency checks, capability router, last-mile autopilot, CLAUDE.md sync guidance, smoke tests, and plugin references use `ui-ux-pro-max@ui-ux-pro-max-skill` instead of duplicating that wheel inside curdx-flow.
 
 ### Tests
 
@@ -57,18 +75,18 @@ All notable changes to `@curdx/flow` are documented here. Format follows [Keep a
 ### Fixed
 
 - **Avoid false updates against non-user installs.** Machines with old `curdx-flow`, `pua`, or `claude-mem` copies in another scope no longer try `claude plugin update ...` against the default user scope.
-- **frontend-design marketplace retry.** If `frontend-design` install fails because the official marketplace cache is stale, the installer forces `claude plugin marketplace update claude-plugins-official` and retries once.
+- **ui-ux-pro-max marketplace retry.** If `ui-ux-pro-max` install fails because the marketplace cache is stale, the installer forces `claude plugin marketplace update ui-ux-pro-max-skill` and retries once.
 
 ## 7.1.28 — 2026-05-13
 
 ### Fixed
 
 - **Claude Code plugin updates now target the installed scope.** The installer reads the plugin's actual `user`, `project`, `local`, or `managed` scope from `claude plugin list --json` and passes it to `claude plugin update`, avoiding false "not installed at scope user" failures.
-- **Official frontend-design installs now refresh the right marketplace.** `frontend-design` declares and ensures `claude-plugins-official`, so stale or missing official marketplace caches are refreshed before installation.
+- **ui-ux-pro-max installs now refresh the right marketplace.** `ui-ux-pro-max` declares and ensures `ui-ux-pro-max-skill`, so stale or missing marketplace caches are refreshed before installation.
 
 ### Tests
 
-- Added regression coverage for scope-aware plugin update/uninstall commands and frontend-design marketplace refresh wiring.
+- Added regression coverage for scope-aware plugin update/uninstall commands and ui-ux-pro-max marketplace refresh wiring.
 
 ## 7.1.27 — 2026-05-13
 
@@ -76,7 +94,7 @@ All notable changes to `@curdx/flow` are documented here. Format follows [Keep a
 
 - **Wheel-source-aware capability recommendations.** `recommendedCapabilities` now carries `availabilityState`, `ownedBy`, `provisioning`, `curdxRole`, `doNotReimplement`, `expectedByDefault`, and `missingAction` so route consumers can distinguish Claude Code plugin dependencies from externally configured MCP wheels and curdx-flow-owned workflow gates.
 - **External MCP diagnostics.** `curdx-flow doctor` reports `context7` and `sequential-thinking` as expected external MCP servers, including whether Claude Code can see them and confirming they are not bundled by curdx-flow.
-- **Capability-token normalization.** Smart-route and stack profiling strip known wheel names before inferring stack/runtime intent, so prompts that mention `frontend-design`, `chrome-devtools-mcp`, `context7`, or `sequential-thinking` do not accidentally route as UI/browser work.
+- **Capability-token normalization.** Smart-route and stack profiling strip known wheel names before inferring stack/runtime intent, so prompts that mention `ui-ux-pro-max`, `chrome-devtools-mcp`, `context7`, or `sequential-thinking` do not accidentally route as UI/browser work.
 
 ### Changed
 
@@ -212,8 +230,8 @@ All notable changes to `@curdx/flow` are documented here. Format follows [Keep a
 
 ### Changed
 
-- **Companion capabilities are now the default required bundle.** `pua`, `claude-mem`, `chrome-devtools-mcp`, `frontend-design`, `sequential-thinking`, and `context7` are marked `required` in the installer alongside `curdx-flow`, so interactive installs show them as always installed and `--ids` installs auto-include missing required companions.
-- **Official plugin dependency metadata added.** `curdx-flow` now declares plugin dependencies for `pua`, `claude-mem`, `chrome-devtools-mcp`, and `frontend-design`, and the root marketplace explicitly allows those cross-marketplace dependencies.
+- **Companion capabilities are now the default required bundle.** `pua`, `claude-mem`, `chrome-devtools-mcp`, `ui-ux-pro-max`, `sequential-thinking`, and `context7` are marked `required` in the installer alongside `curdx-flow`, so interactive installs show them as always installed and `--ids` installs auto-include missing required companions.
+- **Official plugin dependency metadata added.** `curdx-flow` now declares plugin dependencies for `pua`, `claude-mem`, `chrome-devtools-mcp`, and `ui-ux-pro-max`, and the root marketplace explicitly allows those cross-marketplace dependencies.
 - **Capability routing marks bundled companions as `core-required`.** Smart-route recommendations still trigger only when relevant, but recommended bundled capabilities are no longer suppressed by narrow availability filters.
 
 ### Tests
@@ -224,7 +242,7 @@ All notable changes to `@curdx/flow` are documented here. Format follows [Keep a
 
 ### Added
 
-- **Third-party capability graph for smart routing.** New `hooks/scripts/lib/tool-capabilities.mjs` maps installed companion capabilities (`claude-mem`, `context7`, `sequential-thinking`, `chrome-devtools-mcp`, `frontend-design`, and `pua`) to concrete AI-facing triggers, phases, skip rules, and invocations.
+- **Third-party capability graph for smart routing.** New `hooks/scripts/lib/tool-capabilities.mjs` maps installed companion capabilities (`claude-mem`, `context7`, `sequential-thinking`, `chrome-devtools-mcp`, `ui-ux-pro-max`, and `pua`) to concrete AI-facing triggers, phases, skip rules, and invocations.
 - **Capability recommendations in `smart-route`.** Route output now includes `recommendedCapabilities` so `/curdx-flow:start` can choose docs lookup, memory search, UI design, browser verification, structured reasoning, or retry tooling from goal/topology facts without forcing every task through every tool.
 
 ### Changed
@@ -484,7 +502,7 @@ All notable changes to `@curdx/flow` are documented here. Format follows [Keep a
 
 - **`~/.claude/CLAUDE.md` managed block is now language-aware.** `src/runner/claudeMd.ts` no longer emits a single Chinese-only block regardless of installer language. The managed `<!-- BEGIN @curdx/flow v1 -->` block now renders in English when the installer runs with `--lang en` (or `CURDX_FLOW_LANG=en`) and in Chinese when it runs with `zh`. This keeps the generated guidance aligned with the installer's selected language instead of mixing an English install flow with Chinese managed instructions.
 - **Chinese installs inject an explicit language policy into the managed block.** When the current installer language is `zh`, flow now prepends a `Language Policy` section that instructs Claude to keep tool/model interaction in English while replying to the user in Simplified Chinese. English installs do not inject this section. This behavior is covered by new tests in `tests/runner/claudeMd.test.ts`.
-- **Managed-block guidance now uses clearer Claude Code terminology.** The block now distinguishes slash commands from MCP capabilities and plugin skills instead of mixing them together. `claude-mem` calls are rendered as `/claude-mem:...`, Context7 / sequential-thinking / Chrome DevTools are described as MCP capabilities, and the overly-strong `frontend-design` "auto fire" wording was softened to "prioritize, then invoke explicitly if needed". The global decision tree also stopped leaking `TaskCreate` as a user-facing universal rule, matching current Claude Code best-practice guidance more closely.
+- **Managed-block guidance now uses clearer Claude Code terminology.** The block now distinguishes slash commands from MCP capabilities and plugin skills instead of mixing them together. `claude-mem` calls are rendered as `/claude-mem:...`, Context7 / sequential-thinking / Chrome DevTools are described as MCP capabilities, and the overly-strong `ui-ux-pro-max` "auto fire" wording was softened to "prioritize, then invoke explicitly if needed". The global decision tree also stopped leaking `TaskCreate` as a user-facing universal rule, matching current Claude Code best-practice guidance more closely.
 
 ### Added
 
@@ -747,7 +765,7 @@ All notable changes to `@curdx/flow` are documented here. Format follows [Keep a
 
 ### Notes
 
-Of the 6 bundled items, only `pua` and `claude-mem` expose comparable versions. `chrome-devtools-mcp` and `frontend-design` (Anthropic official marketplace) don't declare `version` in marketplace metadata and so always render as "installed" without version. Both MCP servers (`sequential-thinking`, `context7`) have no installed-version concept (`npx -y` auto-fetches latest each launch / remote HTTP) and behave the same way.
+Of the 6 bundled items, only `pua` and `claude-mem` expose comparable versions. `chrome-devtools-mcp` and `ui-ux-pro-max` don't declare `version` in marketplace metadata and so always render as "installed" without version. Both MCP servers (`sequential-thinking`, `context7`) have no installed-version concept (`npx -y` auto-fetches latest each launch / remote HTTP) and behave the same way.
 
 ## 3.1.0 — 2026-04-26
 

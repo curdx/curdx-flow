@@ -12,7 +12,8 @@ export type BrainEventType =
   | "edit-batch"
   | "verification-run"
   | "verification-blocked"
-  | "last-mile-decision";
+  | "last-mile-decision"
+  | "compact-summary";
 
 export interface BrainEvent {
   version: 1;
@@ -25,6 +26,7 @@ export interface BrainEvent {
   exitCode?: number;
   verifier?: string;
   reason?: string;
+  summary?: string;
   files?: number;
 }
 
@@ -48,10 +50,15 @@ export interface BrainSummary {
     command?: string;
     reason?: string;
   }>;
+  lastCompactSummary?: {
+    timestamp: string;
+    summary: string;
+  };
 }
 
 const MAX_REASON = 240;
 const MAX_COMMAND = 180;
+const MAX_SUMMARY = 900;
 const MAX_BRAIN_BYTES = 64 * 1024;
 const MAX_BRAIN_LINES = 400;
 
@@ -85,6 +92,7 @@ function normalizeEvent(event: Omit<BrainEvent, "version" | "timestamp">): Brain
   }
   if (event.verifier) out.verifier = truncate(event.verifier, MAX_COMMAND);
   if (event.reason) out.reason = truncate(event.reason, MAX_REASON);
+  if (event.summary) out.summary = truncate(event.summary, MAX_SUMMARY);
   if (typeof event.files === "number" && Number.isFinite(event.files)) {
     out.files = Math.max(0, Math.floor(event.files));
   }
@@ -131,7 +139,8 @@ function parseBrainLine(line: string): BrainEvent | null {
       parsed.type !== "edit-batch" &&
       parsed.type !== "verification-run" &&
       parsed.type !== "verification-blocked" &&
-      parsed.type !== "last-mile-decision"
+      parsed.type !== "last-mile-decision" &&
+      parsed.type !== "compact-summary"
     ) {
       return null;
     }
@@ -190,6 +199,9 @@ export function summarizeProjectBrain(cwd?: string): BrainSummary {
       .map((event) => event.command ?? event.verifier),
     5,
   );
+  const compactEvent = events
+    .filter((event) => event.type === "compact-summary" && event.summary)
+    .at(-1);
 
   return {
     path,
@@ -199,5 +211,13 @@ export function summarizeProjectBrain(cwd?: string): BrainSummary {
     stackHints: uniqueRecent(events.map((event) => event.stack), 5),
     verifierHints,
     recentFailures: failures,
+    ...(compactEvent?.summary
+      ? {
+          lastCompactSummary: {
+            timestamp: compactEvent.timestamp,
+            summary: compactEvent.summary,
+          },
+        }
+      : {}),
   };
 }

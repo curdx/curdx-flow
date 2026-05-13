@@ -17,7 +17,14 @@ import path, { basename as basename2, isAbsolute as isAbsolute2, relative, resol
 import { fileURLToPath } from "node:url";
 
 // src/hooks/_shared/path-resolver.ts
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
 var SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
 function isDir(p) {

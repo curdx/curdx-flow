@@ -9,11 +9,11 @@ const __dirname = __ccd(__filename);
 import { spawn, spawnSync } from "node:child_process";
 import {
   existsSync as existsSync4,
-  mkdirSync,
+  mkdirSync as mkdirSync2,
   openSync,
   readFileSync as readFileSync4,
   rmSync,
-  writeFileSync
+  writeFileSync as writeFileSync2
 } from "node:fs";
 import { isAbsolute as isAbsolute4, join as join3, resolve as resolve3 } from "node:path";
 
@@ -29,7 +29,14 @@ import path, { basename as basename2, isAbsolute as isAbsolute2, relative, resol
 import { fileURLToPath } from "node:url";
 
 // src/hooks/_shared/path-resolver.ts
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
 var SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
 function isDir(p) {
@@ -672,7 +679,7 @@ import { existsSync as existsSync3, readFileSync as readFileSync3, readdirSync a
 import { isAbsolute as isAbsolute3, join as join2, resolve as resolve2 } from "node:path";
 
 // src/hooks/lib/capability-normalization.ts
-var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui-ux-pro-max|pua)\b/gi;
+var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b/gi;
 function stripKnownCapabilityTokens(input) {
   return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
 }
@@ -1394,7 +1401,7 @@ function readRuntimeState(projectRoot) {
 }
 function startDevRuntime(input = {}) {
   const plan = detectDevRuntime(input);
-  mkdirSync(runtimeDir(plan.projectRoot), { recursive: true });
+  mkdirSync2(runtimeDir(plan.projectRoot), { recursive: true });
   const services = [];
   for (const service of plan.services) {
     const root = plan.roots.find((candidate) => candidate.path === service.root);
@@ -1426,7 +1433,7 @@ function startDevRuntime(input = {}) {
     services,
     gaps: plan.gaps
   };
-  writeFileSync(runtimeStatePath(plan.projectRoot), JSON.stringify(state, null, 2) + "\n");
+  writeFileSync2(runtimeStatePath(plan.projectRoot), JSON.stringify(state, null, 2) + "\n");
   return state;
 }
 function healthDevRuntime(input = {}) {

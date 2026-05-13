@@ -50,6 +50,7 @@ import type { CurdxState } from "./_shared/types.js";
 interface TaskCompletedStdin {
   cwd?: string;
   hook_event_name?: string;
+  session_id?: string;
   task_id?: string;
   [k: string]: unknown;
 }
@@ -90,7 +91,7 @@ async function main(): Promise<void> {
   const cwd = typeof input.cwd === "string" && input.cwd.length > 0
     ? input.cwd
     : process.cwd();
-  const specPath = resolveCurrent({ cwd });
+  const specPath = resolveCurrent({ cwd, sessionId: input.session_id });
   if (!specPath) {
     passThrough();
   }
