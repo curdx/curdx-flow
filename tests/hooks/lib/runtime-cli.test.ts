@@ -164,11 +164,17 @@ describe("runtime-cli lib", () => {
       );
       writeFileSync(path.join(cwd, "playwright.config.ts"), "export default {};\n");
       writeFileSync(fakeChrome, "");
+      const pluginManifest = JSON.parse(
+        readFileSync(path.join(process.cwd(), "plugins", "curdx-flow", ".claude-plugin", "plugin.json"), "utf8"),
+      ) as { version: string };
+      const version = pluginManifest.version;
 
       const result = runLib("runtime-cli", ["doctor", "--cwd", cwd], {
         env: {
           CHROME_PATH: fakeChrome,
           CURDX_FLOW_MCP_LIST_OUTPUT: "context7 https://mcp.context7.com/mcp\nsequential-thinking npx @modelcontextprotocol/server-sequential-thinking",
+          CURDX_FLOW_GIT_LS_REMOTE_OUTPUT:
+            `abc123\trefs/tags/v${version}\nabc123\trefs/tags/curdx-flow--v${version}\n`,
         },
       });
       expect(result.exitCode).toBe(0);
@@ -214,6 +220,12 @@ describe("runtime-cli lib", () => {
           ready?: boolean;
           expectedNpmTag?: string | null;
           expectedPluginTag?: string | null;
+          tagParity?: {
+            ready?: boolean;
+            state?: string;
+            npmTag?: { exists?: boolean | null };
+            pluginTag?: { exists?: boolean | null };
+          };
         };
         browserVerification?: {
           project?: {
@@ -279,6 +291,12 @@ describe("runtime-cli lib", () => {
         ready: true,
         expectedNpmTag: expect.stringMatching(/^v\d+\.\d+\.\d+/),
         expectedPluginTag: expect.stringMatching(/^curdx-flow--v\d+\.\d+\.\d+/),
+        tagParity: {
+          ready: true,
+          state: "complete",
+          npmTag: { exists: true },
+          pluginTag: { exists: true },
+        },
       });
       expect(json.recommendations).toEqual(
         expect.arrayContaining([
@@ -306,6 +324,42 @@ describe("runtime-cli lib", () => {
         ready: true,
         dependencyDeclared: true,
         chromeInstalled: true,
+      });
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("marks doctor unhealthy when npm and plugin release tags are out of sync", () => {
+    const cwd = makeTmpDir("runtime-doctor-release-tags");
+    try {
+      const pluginManifest = JSON.parse(
+        readFileSync(path.join(process.cwd(), "plugins", "curdx-flow", ".claude-plugin", "plugin.json"), "utf8"),
+      ) as { version: string };
+      const version = pluginManifest.version;
+
+      const result = runLib("runtime-cli", ["doctor", "--cwd", cwd], {
+        env: {
+          CURDX_FLOW_GIT_LS_REMOTE_OUTPUT: `abc123\trefs/tags/v${version}\n`,
+          CURDX_FLOW_MCP_LIST_OUTPUT: "",
+        },
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.json).toMatchObject({
+        ok: false,
+        release: {
+          ready: false,
+          tagParity: {
+            ready: false,
+            state: "incomplete",
+            npmTag: { exists: true },
+            pluginTag: { exists: false },
+          },
+          warnings: expect.arrayContaining([
+            "npm tag and Claude Code plugin tag are out of sync for the aligned release version.",
+          ]),
+        },
       });
     } finally {
       rmSync(cwd, { recursive: true, force: true });

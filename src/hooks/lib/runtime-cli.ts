@@ -198,6 +198,8 @@ interface MarketplaceManifest {
   plugins?: Array<{ name?: string; version?: string }>;
 }
 
+type ReleaseTagState = "complete" | "not-published" | "incomplete" | "unknown";
+
 const EXPECTED_PLUGIN_DEPENDENCIES = [
   { name: "pua", marketplace: "pua-skills" },
   { name: "claude-mem", marketplace: "thedotmack" },
@@ -355,11 +357,20 @@ function releaseDoctor(): unknown {
   const values = Object.values(versions);
   const aligned = values.every((value) => value !== null && value === values[0]);
   const version = aligned ? values[0] : null;
+  const tagParity = version ? releaseTagParityDoctor(version) as {
+    ready?: boolean | null;
+    state?: ReleaseTagState;
+  } : null;
   return {
-    ready: aligned,
+    ready: aligned && tagParity?.ready !== false,
+    aligned,
     versions,
     expectedNpmTag: version ? `v${version}` : null,
     expectedPluginTag: version ? `curdx-flow--v${version}` : null,
+    tagParity,
+    warnings: tagParity?.state === "incomplete"
+      ? ["npm tag and Claude Code plugin tag are out of sync for the aligned release version."]
+      : [],
     commands: [
       "npm run check-versions",
       "claude plugin validate ./plugins/curdx-flow",
@@ -550,6 +561,92 @@ function browserVerificationDoctor(cwd: string): unknown {
       "console/network/performance diagnosis",
       "Playwright flaky or insufficient evidence",
     ],
+  };
+}
+
+function remoteTagExists(output: string, tag: string): boolean {
+  const ref = `refs/tags/${tag}`;
+  return output.split(/\r?\n/).some((line) => line.includes(ref));
+}
+
+function releaseTagParityDoctor(version: string): unknown {
+  const repoRoot = repoRootFromPlugin();
+  const npmTag = `v${version}`;
+  const pluginTag = `curdx-flow--v${version}`;
+  const command = `git -C ${shellToken(repoRoot)} ls-remote --tags origin ${shellToken(npmTag)} ${shellToken(pluginTag)}`;
+  const envOutput = process.env.CURDX_FLOW_GIT_LS_REMOTE_OUTPUT;
+  const envExitCode = process.env.CURDX_FLOW_GIT_LS_REMOTE_EXIT_CODE;
+
+  let output = "";
+  let exitCode: number | null = null;
+  let error: string | null = null;
+  let checked = true;
+  let source = "git ls-remote";
+
+  if (envOutput !== undefined) {
+    output = envOutput;
+    exitCode = envExitCode === undefined ? 0 : Number(envExitCode);
+    source = "CURDX_FLOW_GIT_LS_REMOTE_OUTPUT";
+  } else if (!existsSync(join(repoRoot, ".git"))) {
+    checked = false;
+    source = "not-git-worktree";
+  } else {
+    const result = spawnSync("git", [
+      "-C",
+      repoRoot,
+      "ls-remote",
+      "--tags",
+      "origin",
+      npmTag,
+      pluginTag,
+    ], {
+      encoding: "utf8",
+      timeout: 5000,
+      maxBuffer: 1024 * 1024,
+    });
+    output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+    exitCode = result.status ?? null;
+    if (result.error) error = (result.error as Error).message;
+  }
+
+  if (!checked || exitCode !== 0) {
+    return {
+      ready: null,
+      checked,
+      source,
+      command,
+      exitCode,
+      error,
+      state: "unknown" as ReleaseTagState,
+      npmTag: { name: npmTag, exists: null },
+      pluginTag: { name: pluginTag, exists: null },
+      action: "Run this check from a git checkout with access to origin before publishing.",
+    };
+  }
+
+  const npmTagExists = remoteTagExists(output, npmTag);
+  const pluginTagExists = remoteTagExists(output, pluginTag);
+  const state: ReleaseTagState =
+    npmTagExists && pluginTagExists
+      ? "complete"
+      : !npmTagExists && !pluginTagExists
+        ? "not-published"
+        : "incomplete";
+
+  return {
+    ready: state !== "incomplete",
+    checked: true,
+    source,
+    command,
+    exitCode,
+    error,
+    state,
+    npmTag: { name: npmTag, exists: npmTagExists },
+    pluginTag: { name: pluginTag, exists: pluginTagExists },
+    action:
+      state === "incomplete"
+        ? "Restore tag parity: run `claude plugin tag --push` for the plugin tag before relying on the npm release tag."
+        : null,
   };
 }
 
@@ -933,9 +1030,14 @@ function doctor(argv: string[]): void {
   const runtimeReady = expected.every((p) => existsSync(p));
   const plugin = pluginHealthDoctor() as { ready?: boolean };
   const hookFreshness = hookFreshnessDoctor() as { fresh?: boolean; sourceAvailable?: boolean };
+  const release = releaseDoctor() as { ready?: boolean };
   const root = pluginRoot();
   printJson({
-    ok: runtimeReady && plugin.ready === true && (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
+    ok:
+      runtimeReady &&
+      plugin.ready === true &&
+      release.ready !== false &&
+      (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
     cwd,
     scripts: Object.fromEntries(expected.map((p) => [basename(p), existsSync(p)])),
     runtime: {
@@ -944,7 +1046,7 @@ function doctor(argv: string[]): void {
     },
     plugin,
     hookFreshness,
-    release: releaseDoctor(),
+    release,
     docsSensitiveWarnings: [
       "Claude Code plugin, skill, agent, hook, dependency, marketplace, and tag behavior must be verified against https://code.claude.com/docs/llms.txt before release-facing changes.",
       "context7 and sequential-thinking are expected external MCP servers in this environment; curdx-flow should diagnose them but not bundle duplicate MCP config.",

@@ -39,5 +39,7 @@ Every phase skill starts from facts, not memory:
 - No greenfield product phase may begin business feature implementation before product context, constitution, and a walking-skeleton task exist or are explicitly source-deferred.
 - No tasks phase is complete unless `tasks.md` has `## Source Coverage Audit` and executable top-level tasks are checkbox list items (`- [ ] 1.1 ...` or `- [x] 1.1 ...`), not heading-only sections.
 - No implementation task is complete without `TASK_COMPLETE`, the task Verify command, and a sane post-commit diff.
-- No release/tag/push claim is complete without `npm run verify` passing in the same worktree.
+- No release/tag/push claim is complete without `npm run verify` passing in the
+  same worktree and `curdx-flow doctor --cwd <repo>` showing release tag parity
+  is either `complete` or `not-published`, never `incomplete`.
 - No agent marker may be inferred from prose. Markers are byte-sensitive contracts.

@@ -1842,7 +1842,14 @@ var STACKS = {
     name: "Claude Code plugin",
     frameworks: ["claude-code-plugin"],
     goalPattern: /\b(claude code|plugin|skill|agent|hook|hooks|mcp|marketplace|tag|release)\b/i,
-    manifestHints: [".claude-plugin/plugin.json", "hooks/hooks.json", "skills/*/SKILL.md"],
+    manifestHints: [
+      ".claude-plugin/plugin.json",
+      "hooks/hooks.json",
+      "skills/*/SKILL.md",
+      "plugins/*/.claude-plugin/plugin.json",
+      "plugins/*/hooks/hooks.json",
+      "plugins/*/skills/*/SKILL.md"
+    ],
     docsQuery: "Claude Code official docs for plugins, skills, agents, hooks, dependencies, and release tags",
     tdd: "Use focused hook/runner tests and the real Claude Code smoke path before release.",
     security: "Review hook fail-open behavior, plugin metadata, dependency declarations, and release tags.",
@@ -1891,6 +1898,29 @@ function readText2(file) {
 function packageJsonContains(rootAbs, pattern) {
   return pattern.test(readText2(join3(rootAbs, "package.json")));
 }
+function globSegmentToRegExp(segment) {
+  return new RegExp(
+    `^${segment.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`
+  );
+}
+function globPathExists(rootAbs, hint) {
+  const parts = hint.split("/").filter(Boolean);
+  function walk(dir, idx) {
+    if (idx >= parts.length) return existsSync4(dir);
+    const part = parts[idx];
+    if (!part) return false;
+    if (!part.includes("*")) return walk(join3(dir, part), idx + 1);
+    let entries;
+    try {
+      entries = readdirSync3(dir, { withFileTypes: true });
+    } catch {
+      return false;
+    }
+    const pattern = globSegmentToRegExp(part);
+    return entries.some((entry) => pattern.test(entry.name) && walk(join3(dir, entry.name), idx + 1));
+  }
+  return walk(rootAbs || ".", 0);
+}
 function hasManifestHint(rootAbs, hint) {
   if (hint.includes(":")) {
     const [file, needle] = hint.split(":", 2);
@@ -1898,16 +1928,7 @@ function hasManifestHint(rootAbs, hint) {
     return readText2(join3(rootAbs, file)).toLowerCase().includes(needle.toLowerCase());
   }
   if (hint.includes("*")) {
-    const pattern = new RegExp(`^${hint.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`);
-    const dir = hint.includes("/") ? hint.split("/").slice(0, -1).join("/") : ".";
-    const base = rootAbs === "" ? "." : rootAbs;
-    try {
-      return existsSync4(join3(base, dir)) && readdirSync3(join3(base, dir)).some(
-        (name) => pattern.test(dir === "." ? name : `${dir}/${name}`)
-      );
-    } catch {
-      return false;
-    }
+    return globPathExists(rootAbs, hint);
   }
   return existsSync4(join3(rootAbs, hint));
 }
@@ -4011,11 +4032,15 @@ function releaseDoctor() {
   const values = Object.values(versions);
   const aligned = values.every((value) => value !== null && value === values[0]);
   const version = aligned ? values[0] : null;
+  const tagParity = version ? releaseTagParityDoctor(version) : null;
   return {
-    ready: aligned,
+    ready: aligned && tagParity?.ready !== false,
+    aligned,
     versions,
     expectedNpmTag: version ? `v${version}` : null,
     expectedPluginTag: version ? `curdx-flow--v${version}` : null,
+    tagParity,
+    warnings: tagParity?.state === "incomplete" ? ["npm tag and Claude Code plugin tag are out of sync for the aligned release version."] : [],
     commands: [
       "npm run check-versions",
       "claude plugin validate ./plugins/curdx-flow",
@@ -4160,6 +4185,78 @@ function browserVerificationDoctor(cwd) {
       "console/network/performance diagnosis",
       "Playwright flaky or insufficient evidence"
     ]
+  };
+}
+function remoteTagExists(output, tag) {
+  const ref = `refs/tags/${tag}`;
+  return output.split(/\r?\n/).some((line) => line.includes(ref));
+}
+function releaseTagParityDoctor(version) {
+  const repoRoot = repoRootFromPlugin();
+  const npmTag = `v${version}`;
+  const pluginTag = `curdx-flow--v${version}`;
+  const command = `git -C ${shellToken(repoRoot)} ls-remote --tags origin ${shellToken(npmTag)} ${shellToken(pluginTag)}`;
+  const envOutput = process.env.CURDX_FLOW_GIT_LS_REMOTE_OUTPUT;
+  const envExitCode = process.env.CURDX_FLOW_GIT_LS_REMOTE_EXIT_CODE;
+  let output = "";
+  let exitCode = null;
+  let error = null;
+  let checked = true;
+  let source = "git ls-remote";
+  if (envOutput !== void 0) {
+    output = envOutput;
+    exitCode = envExitCode === void 0 ? 0 : Number(envExitCode);
+    source = "CURDX_FLOW_GIT_LS_REMOTE_OUTPUT";
+  } else if (!existsSync9(join8(repoRoot, ".git"))) {
+    checked = false;
+    source = "not-git-worktree";
+  } else {
+    const result = spawnSync2("git", [
+      "-C",
+      repoRoot,
+      "ls-remote",
+      "--tags",
+      "origin",
+      npmTag,
+      pluginTag
+    ], {
+      encoding: "utf8",
+      timeout: 5e3,
+      maxBuffer: 1024 * 1024
+    });
+    output = `${result.stdout ?? ""}
+${result.stderr ?? ""}`;
+    exitCode = result.status ?? null;
+    if (result.error) error = result.error.message;
+  }
+  if (!checked || exitCode !== 0) {
+    return {
+      ready: null,
+      checked,
+      source,
+      command,
+      exitCode,
+      error,
+      state: "unknown",
+      npmTag: { name: npmTag, exists: null },
+      pluginTag: { name: pluginTag, exists: null },
+      action: "Run this check from a git checkout with access to origin before publishing."
+    };
+  }
+  const npmTagExists = remoteTagExists(output, npmTag);
+  const pluginTagExists = remoteTagExists(output, pluginTag);
+  const state2 = npmTagExists && pluginTagExists ? "complete" : !npmTagExists && !pluginTagExists ? "not-published" : "incomplete";
+  return {
+    ready: state2 !== "incomplete",
+    checked: true,
+    source,
+    command,
+    exitCode,
+    error,
+    state: state2,
+    npmTag: { name: npmTag, exists: npmTagExists },
+    pluginTag: { name: pluginTag, exists: pluginTagExists },
+    action: state2 === "incomplete" ? "Restore tag parity: run `claude plugin tag --push` for the plugin tag before relying on the npm release tag." : null
   };
 }
 function collectCommandHooks(config) {
@@ -4487,9 +4584,10 @@ function doctor(argv) {
   const runtimeReady = expected.every((p) => existsSync9(p));
   const plugin = pluginHealthDoctor();
   const hookFreshness = hookFreshnessDoctor();
+  const release = releaseDoctor();
   const root = pluginRoot();
   printJson({
-    ok: runtimeReady && plugin.ready === true && (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
+    ok: runtimeReady && plugin.ready === true && release.ready !== false && (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
     cwd,
     scripts: Object.fromEntries(expected.map((p) => [basename9(p), existsSync9(p)])),
     runtime: {
@@ -4498,7 +4596,7 @@ function doctor(argv) {
     },
     plugin,
     hookFreshness,
-    release: releaseDoctor(),
+    release,
     docsSensitiveWarnings: [
       "Claude Code plugin, skill, agent, hook, dependency, marketplace, and tag behavior must be verified against https://code.claude.com/docs/llms.txt before release-facing changes.",
       "context7 and sequential-thinking are expected external MCP servers in this environment; curdx-flow should diagnose them but not bundle duplicate MCP config."

@@ -1,5 +1,8 @@
 import * as p from '@clack/prompts';
 import { defineCommand, runMain } from 'citty';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { initLanguage } from './ui/language.ts';
 import { mainMenu } from './ui/menu.ts';
 import { installFlow } from './flows/install.ts';
@@ -9,6 +12,18 @@ import { statusFlow } from './flows/status.ts';
 import analyzeCmd from './flows/analyze.ts';
 import { t, type Lang } from './i18n/index.ts';
 import { assertFreshLocalBuild } from './runner/buildFreshness.ts';
+
+function readCliVersion(): string {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(readFileSync(resolve(here, '..', 'package.json'), 'utf8')) as {
+      version?: unknown;
+    };
+    return typeof pkg.version === 'string' && pkg.version.length > 0 ? pkg.version : '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
 
 function parseLang(v: unknown): Lang | undefined {
   return v === 'zh' || v === 'en' ? v : undefined;
@@ -76,6 +91,7 @@ const updateCmd = defineCommand({
   args: {
     ...sharedArgs,
     all: { type: 'boolean' as const, description: 'Update all installed' },
+    'no-refresh': { type: 'boolean' as const, description: 'Skip refreshing marketplace caches' },
     ids: { type: 'positional' as const, required: false, description: 'Item ids', default: '' },
   },
   async run({ args }) {
@@ -85,6 +101,7 @@ const updateCmd = defineCommand({
     await updateFlow({
       ids,
       all: Boolean(args.all),
+      noRefresh: Boolean((args as Record<string, unknown>)['no-refresh']),
       noClaudeMd: noClaudeMdFromArgs(args as Record<string, unknown>),
     });
     p.outro(t('app.outro'));
@@ -112,11 +129,15 @@ const statusCmd = defineCommand({
   args: {
     ...sharedArgs,
     json: { type: 'boolean' as const, description: 'Output JSON (machine-readable)' },
+    'no-refresh': { type: 'boolean' as const, description: 'Skip refreshing marketplace caches' },
   },
   async run({ args }) {
     await initLanguage(parseLang(args.lang));
     if (!args.json) p.intro(t('app.intro'));
-    await statusFlow({ json: Boolean(args.json) });
+    await statusFlow({
+      json: Boolean(args.json),
+      noRefresh: Boolean((args as Record<string, unknown>)['no-refresh']),
+    });
     if (!args.json) p.outro(t('app.outro'));
   },
 });
@@ -152,7 +173,7 @@ SEE ALSO
 const root = defineCommand({
   meta: {
     name: '@curdx/flow',
-    version: '3.3.2',
+    version: readCliVersion(),
     description: 'Interactive installer for Claude Code plugins and MCP servers',
   },
   args: sharedArgs,
@@ -179,11 +200,22 @@ function collectPositional(args: Record<string, unknown>): string[] {
   return ids;
 }
 
-function firstNonFlag(argv: string[]): string | undefined {
-  for (const a of argv) {
+function firstCommandArg(argv: string[]): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (!a) continue;
+    if (a === '--lang') {
+      i += 1;
+      continue;
+    }
+    if (a.startsWith('--lang=')) continue;
     if (!a.startsWith('-')) return a;
   }
   return undefined;
+}
+
+function hasRootInfoFlag(argv: string[]): boolean {
+  return argv.includes('--help') || argv.includes('-h') || argv.includes('--version') || argv.includes('-v');
 }
 
 async function runInteractive(argv: string[]): Promise<void> {
@@ -200,8 +232,13 @@ async function runInteractive(argv: string[]): Promise<void> {
 }
 
 const argv = process.argv.slice(2);
-const first = firstNonFlag(argv);
+const first = firstCommandArg(argv);
 assertFreshLocalBuild();
+
+if (first === undefined && (argv.includes('--version') || argv.includes('-v'))) {
+  process.stdout.write(`${readCliVersion()}\n`);
+  process.exit(0);
+}
 
 // Early dispatch for the `check` subcommand (Task 2.24).
 // Matches the task spec literal: "if process.argv[2] === 'check', call
@@ -222,22 +259,15 @@ if (process.argv[2] === 'check') {
   process.exit(0);
 }
 
-if (first === undefined || (first !== undefined && !SUBCOMMANDS.has(first) && first !== '--help' && first !== '-h')) {
+if (first === undefined && !hasRootInfoFlag(argv)) {
   // No subcommand → interactive menu.
-  // (--help / -h are flags, handled by citty if user typed them; we won't reach here.)
-  if (first === undefined) {
-    runInteractive(argv).catch((err) => {
-      console.error(err);
-      process.exit(1);
-    });
-  } else {
-    // Unknown positional — let citty handle it (will throw E_UNKNOWN_COMMAND).
-    runMain(root).catch((err) => {
-      console.error(err);
-      process.exit(1);
-    });
-  }
+  runInteractive(argv).catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
 } else {
+  // Root info flags, known subcommands, and unknown positionals all go through
+  // citty so --help/--version and E_UNKNOWN_COMMAND behave normally.
   runMain(root).catch((err) => {
     console.error(err);
     process.exit(1);

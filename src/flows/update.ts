@@ -3,12 +3,13 @@ import pc from 'picocolors';
 import { PKGS, findPkg } from '../registry/index.ts';
 import type { Pkg } from '../registry/types.ts';
 import { t } from '../i18n/index.ts';
-import { listMcp, listPlugins } from '../runner/state.ts';
+import { listMcp, listPlugins, refreshMarketplaces } from '../runner/state.ts';
 import { syncFromState } from '../runner/claudeMd.ts';
 
 export type UpdateOptions = {
   ids?: string[];
   all?: boolean;
+  noRefresh?: boolean;
   noClaudeMd?: boolean;
 };
 
@@ -33,9 +34,28 @@ async function probeInstalled(): Promise<Pkg[]> {
   }
 }
 
+async function maybeRefreshMarketplaces(opts: UpdateOptions): Promise<void> {
+  if (opts.noRefresh) return;
+  const names = new Set<string>();
+  for (const pkg of PKGS) {
+    if (pkg.marketplaces) for (const name of pkg.marketplaces()) names.add(name);
+  }
+  if (names.size === 0) return;
+  const sp = p.spinner();
+  sp.start(t('marketplace.refreshing'));
+  const refreshed = await refreshMarketplaces([...names]);
+  sp.stop(
+    refreshed.length > 0
+      ? t('marketplace.refreshed', { count: refreshed.length })
+      : t('marketplace.refreshSkipped'),
+  );
+}
+
 export async function updateFlow(opts: UpdateOptions = {}): Promise<void> {
   let userCancelled = false;
   try {
+    await maybeRefreshMarketplaces(opts);
+
     const installed = await probeInstalled();
     if (installed.length === 0) {
       p.log.info(t('update.noneInstalled'));

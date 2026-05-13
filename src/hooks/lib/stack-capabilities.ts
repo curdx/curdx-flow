@@ -305,7 +305,14 @@ const STACKS: Record<StackCapabilityId, StackCapability> = {
     name: "Claude Code plugin",
     frameworks: ["claude-code-plugin"],
     goalPattern: /\b(claude code|plugin|skill|agent|hook|hooks|mcp|marketplace|tag|release)\b/i,
-    manifestHints: [".claude-plugin/plugin.json", "hooks/hooks.json", "skills/*/SKILL.md"],
+    manifestHints: [
+      ".claude-plugin/plugin.json",
+      "hooks/hooks.json",
+      "skills/*/SKILL.md",
+      "plugins/*/.claude-plugin/plugin.json",
+      "plugins/*/hooks/hooks.json",
+      "plugins/*/skills/*/SKILL.md",
+    ],
     docsQuery: "Claude Code official docs for plugins, skills, agents, hooks, dependencies, and release tags",
     tdd: "Use focused hook/runner tests and the real Claude Code smoke path before release.",
     security: "Review hook fail-open behavior, plugin metadata, dependency declarations, and release tags.",
@@ -360,6 +367,35 @@ function packageJsonContains(rootAbs: string, pattern: RegExp): boolean {
   return pattern.test(readText(join(rootAbs, "package.json")));
 }
 
+function globSegmentToRegExp(segment: string): RegExp {
+  return new RegExp(
+    `^${segment.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`,
+  );
+}
+
+function globPathExists(rootAbs: string, hint: string): boolean {
+  const parts = hint.split("/").filter(Boolean);
+
+  function walk(dir: string, idx: number): boolean {
+    if (idx >= parts.length) return existsSync(dir);
+    const part = parts[idx];
+    if (!part) return false;
+
+    if (!part.includes("*")) return walk(join(dir, part), idx + 1);
+
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return false;
+    }
+    const pattern = globSegmentToRegExp(part);
+    return entries.some((entry) => pattern.test(entry.name) && walk(join(dir, entry.name), idx + 1));
+  }
+
+  return walk(rootAbs || ".", 0);
+}
+
 function hasManifestHint(rootAbs: string, hint: string): boolean {
   if (hint.includes(":")) {
     const [file, needle] = hint.split(":", 2);
@@ -367,17 +403,7 @@ function hasManifestHint(rootAbs: string, hint: string): boolean {
     return readText(join(rootAbs, file)).toLowerCase().includes(needle.toLowerCase());
   }
   if (hint.includes("*")) {
-    const pattern = new RegExp(`^${hint.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`);
-    const dir = hint.includes("/") ? hint.split("/").slice(0, -1).join("/") : ".";
-    const base = rootAbs === "" ? "." : rootAbs;
-    try {
-      return existsSync(join(base, dir)) &&
-        readdirSync(join(base, dir)).some((name) =>
-          pattern.test(dir === "." ? name : `${dir}/${name}`),
-        );
-    } catch {
-      return false;
-    }
+    return globPathExists(rootAbs, hint);
   }
   return existsSync(join(rootAbs, hint));
 }

@@ -2,6 +2,23 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.30 — 2026-05-13
+
+### Added
+
+- **Release tag parity diagnostics.** `curdx-flow doctor` now checks whether the npm tag `vX.Y.Z` and Claude Code plugin tag `curdx-flow--vX.Y.Z` are in sync, reporting `release.tagParity.state = "incomplete"` when only one exists.
+- **Nested Claude Code plugin stack detection.** Stack profiling now recognizes marketplace-style repositories with plugin manifests under `plugins/*/.claude-plugin/plugin.json`.
+
+### Changed
+
+- **Status/update refresh marketplace caches by default.** `status` and `update` now refresh known marketplaces before deriving installed/latest state, with `--no-refresh` available for offline or cached checks.
+- **Root CLI info flags are non-interactive.** `@curdx/flow --version` now prints the package version and `--lang zh --version` no longer falls through to unknown-command or interactive behavior.
+- **Claude Code smoke separates runtime health from release maintenance drift.** Smoke still surfaces release tag parity drift, but only fails when core runtime/plugin health is broken.
+
+### Fixed
+
+- **Historical plugin tag gap.** Restored the missing `curdx-flow--v7.1.29` plugin release tag so the previous npm release and Claude Code plugin tag are back in parity.
+
 ## 7.1.29 — 2026-05-13
 
 ### Changed

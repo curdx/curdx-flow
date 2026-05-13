@@ -2,12 +2,24 @@ import * as p from '@clack/prompts';
 import pc from 'picocolors';
 import { PKGS } from '../registry/index.ts';
 import { t } from '../i18n/index.ts';
+import { refreshMarketplaces } from '../runner/state.ts';
 
 export type StatusOptions = {
   json?: boolean;
+  noRefresh?: boolean;
 };
 
+async function refreshKnownMarketplaces(): Promise<void> {
+  const names = new Set<string>();
+  for (const pkg of PKGS) {
+    if (pkg.marketplaces) for (const name of pkg.marketplaces()) names.add(name);
+  }
+  if (names.size > 0) await refreshMarketplaces([...names]);
+}
+
 export async function statusFlow(opts: StatusOptions = {}): Promise<void> {
+  if (!opts.noRefresh) await refreshKnownMarketplaces();
+
   const states = await Promise.all(
     PKGS.map(async (pkg) => {
       const installed = await pkg.isInstalled();

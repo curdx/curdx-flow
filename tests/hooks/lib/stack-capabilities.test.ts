@@ -113,6 +113,37 @@ describe("stack-capabilities", () => {
     }
   });
 
+  it("detects nested Claude Code plugin packages in a marketplace repository", () => {
+    const cwd = makeTmpDir("stack-nested-plugin");
+    try {
+      const pluginRoot = path.join(cwd, "plugins", "curdx-flow");
+      mkdirSync(path.join(pluginRoot, ".claude-plugin"), { recursive: true });
+      mkdirSync(path.join(pluginRoot, "hooks"), { recursive: true });
+      mkdirSync(path.join(pluginRoot, "skills", "start"), { recursive: true });
+      writeJson(path.join(pluginRoot, ".claude-plugin", "plugin.json"), { name: "curdx-flow" });
+      writeFileSync(path.join(pluginRoot, "hooks", "hooks.json"), "{}\n");
+      writeFileSync(path.join(pluginRoot, "skills", "start", "SKILL.md"), "---\nname: start\n---\n");
+      writeJson(path.join(cwd, "package.json"), {
+        devDependencies: { typescript: "^5.6.0" },
+        scripts: { typecheck: "tsc --noEmit" },
+      });
+
+      const topology = discoverProjectTopology({ cwd, goal: "Improve release diagnostics" });
+      const stackProfile = detectStackProfile({ cwd, topology, goal: "Improve release diagnostics" });
+
+      expect(stackProfile.primary).toBe("claude-code-plugin");
+      expect(stackProfile.evidence).toEqual(
+        expect.arrayContaining([
+          ".: plugins/*/.claude-plugin/plugin.json",
+          ".: plugins/*/hooks/hooks.json",
+          ".: plugins/*/skills/*/SKILL.md",
+        ]),
+      );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("CLI emits stack profile, gates, verifier, and context budget", () => {
     const cwd = makeTmpDir("stack-cli");
     try {

@@ -121,7 +121,7 @@ entry. Each gate (commit / tag / release) requires the listed phase keys to be
 |---|---|---|
 | **per-task commit** | `verificationBlocks.execution` (current task's verify cmd) | `npm run typecheck` (POC tasks); `npm run test:hooks` (test tasks); `npm run verify` (gate tasks) |
 | **phase exit (Stop hook)** | `verificationBlocks.<currentPhase>` | per-phase verify cmd recorded by phase agent |
-| **release tag push** | `verificationBlocks.execution` | `npm run verify` |
+| **release tag push** | `verificationBlocks.execution` | `npm run verify`, then `curdx-flow doctor --cwd <repo>` release tag parity |
 
 **Authoritative `npm` scripts** (synced with `package.json`; tests in
 `tests/runner/iron-law-doc.test.ts` enforce this list matches `package.json`):
@@ -133,6 +133,7 @@ entry. Each gate (commit / tag / release) requires the listed phase keys to be
 | `npm run check:hooks-fresh` | Fail if bundled `.mjs` is older than its `.ts` source | CI gate; runs as part of `verify`. |
 | `npm run test:hooks` | `vitest run tests/hooks` (after `build:hooks`) | After hook source or test changes. |
 | `npm run verify` | Full chain: `typecheck && check-versions && check:hooks-fresh && build && check:bundle && test:hooks && test:analyze` | Release gate; pre-tag; CI. |
+| `curdx-flow doctor --cwd <repo>` | Runtime, plugin, hook freshness, dependency, and release tag parity diagnostics | Before relying on npm/plugin release tags. |
 
 The `verify` chain is the canonical release-time gate. Do not invent ad-hoc
 chains — use `npm run verify` so every leg gets a fresh block.

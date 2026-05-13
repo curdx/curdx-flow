@@ -94,7 +94,9 @@ For `claude-code-plugin` stack work:
   check:hooks-fresh`, `npm run typecheck`, focused hook/runner tests, and
   `CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc`.
 - Before release, align package, lockfile, plugin manifest, marketplace entry,
-  changelog, and tag behavior.
+  changelog, and tag behavior. Run `curdx-flow doctor --cwd <repo>` and treat
+  `release.tagParity.state = "incomplete"` as blocking until npm and plugin
+  tags are restored to parity.
 - For plugin dependency version resolution, Claude Code uses
   `{plugin-name}--v{version}` tags. The repository's existing `vX.Y.Z` tag is
   the npm publish trigger, not a substitute for the plugin dependency tag.
