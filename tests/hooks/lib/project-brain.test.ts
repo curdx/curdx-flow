@@ -8,6 +8,10 @@ import {
 } from "../../../src/hooks/lib/project-brain.js";
 import { makeTmpDir } from "./_lib-helpers.js";
 
+function slashPath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
 describe("project-brain", () => {
   it("stores lightweight project-local verification memory under .curdx", () => {
     const cwd = makeTmpDir("brain");
@@ -34,7 +38,7 @@ describe("project-brain", () => {
       expect(readBrainEvents(cwd)).toHaveLength(2);
 
       const summary = summarizeProjectBrain(cwd);
-      expect(summary.path).toContain(".curdx/brain.jsonl");
+      expect(slashPath(summary.path)).toContain(".curdx/brain.jsonl");
       expect(summary.totalEvents).toBe(2);
       expect(summary.stackHints).toContain("go");
       expect(summary.verifierHints).toContain("go test ./...");

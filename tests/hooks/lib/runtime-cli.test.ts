@@ -3,6 +3,10 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { makeTmpDir, runLib } from "./_lib-helpers.js";
 
+function slashPath(value: string | undefined): string {
+  return (value ?? "").replace(/\\/g, "/");
+}
+
 describe("runtime-cli lib", () => {
   it("routes through the shared smart-route helper", () => {
     const result = runLib("runtime-cli", ["route", "--goal", "Fix README typo"]);
@@ -27,17 +31,17 @@ describe("runtime-cli lib", () => {
         "Update Claude Code plugin hooks and publish",
       ]);
       expect(result.exitCode).toBe(0);
-      expect(result.json).toMatchObject({
+      const json = result.json as { brain?: { path?: string } };
+      expect(json).toMatchObject({
         version: 1,
         route: "full-spec",
         stack: "claude-code-plugin",
         execution: {
           primarySkill: expect.any(String),
         },
-        brain: {
-          path: expect.stringContaining(".curdx/brain.jsonl"),
-        },
+        brain: expect.any(Object),
       });
+      expect(slashPath(json.brain?.path)).toContain(".curdx/brain.jsonl");
       expect(existsSync(path.join(cwd, ".curdx", "brain.jsonl"))).toBe(false);
 
       const recorded = runLib("runtime-cli", [
@@ -286,7 +290,7 @@ describe("runtime-cli lib", () => {
       expect(json.stackProfile?.primary).toEqual(expect.any(String));
       expect(json.qualityGates).toEqual(expect.any(Array));
       expect(json.suggestedVerifier).toBeDefined();
-      expect(json.brain?.path).toContain(".curdx/brain.jsonl");
+      expect(slashPath(json.brain?.path)).toContain(".curdx/brain.jsonl");
       expect(json.executionBrief?.completionContract).toEqual(expect.any(Array));
       expect(json.browserVerification?.project?.devServerScripts).toContain("dev");
       expect(json.browserVerification?.project?.e2eScripts).toContain("test:e2e");
