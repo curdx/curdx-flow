@@ -15,4 +15,10 @@ describe('default companion bundle', () => {
     ]);
     expect(optional).toEqual(expect.arrayContaining(['sequential-thinking', 'context7']));
   });
+
+  test('frontend-design refreshes the official marketplace before install', () => {
+    const frontendDesign = PKGS.find((pkg) => pkg.id === 'frontend-design');
+
+    expect(frontendDesign?.marketplaces?.()).toEqual(['claude-plugins-official']);
+  });
 });

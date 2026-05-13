@@ -2,6 +2,17 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.28 — 2026-05-13
+
+### Fixed
+
+- **Claude Code plugin updates now target the installed scope.** The installer reads the plugin's actual `user`, `project`, `local`, or `managed` scope from `claude plugin list --json` and passes it to `claude plugin update`, avoiding false "not installed at scope user" failures.
+- **Official frontend-design installs now refresh the right marketplace.** `frontend-design` declares and ensures `claude-plugins-official`, so stale or missing official marketplace caches are refreshed before installation.
+
+### Tests
+
+- Added regression coverage for scope-aware plugin update/uninstall commands and frontend-design marketplace refresh wiring.
+
 ## 7.1.27 — 2026-05-13
 
 ### Added
