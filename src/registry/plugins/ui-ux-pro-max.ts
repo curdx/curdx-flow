@@ -9,19 +9,19 @@ import {
   updatePluginById,
 } from './_helpers.ts';
 
-const PLUGIN_ID = 'frontend-design@claude-plugins-official';
-const PLUGIN_NAME = 'frontend-design';
-const MARKETPLACE_NAME = 'claude-plugins-official';
-const MARKETPLACE_SOURCE = 'anthropics/claude-plugins-official';
+const PLUGIN_ID = 'ui-ux-pro-max@ui-ux-pro-max-skill';
+const PLUGIN_NAME = 'ui-ux-pro-max';
+const MARKETPLACE_NAME = 'ui-ux-pro-max-skill';
+const MARKETPLACE_SOURCE = 'nextlevelbuilder/ui-ux-pro-max-skill';
 
-const frontendDesign: Pkg = {
-  id: 'frontend-design',
-  name: 'frontend-design',
-  description: 'Anthropic official — UI/frontend design helpers',
+const uiUxProMax: Pkg = {
+  id: 'ui-ux-pro-max',
+  name: 'ui-ux-pro-max',
+  description: 'nextlevelbuilder/ui-ux-pro-max-skill - UI/UX design intelligence',
   type: 'plugin',
   required: true,
   whenToUse:
-    'auto-fires when building UI / web components / pages. Best where visual personality matters (landing, marketing, portfolio).',
+    'auto-fires when building UI / UX / web components / pages. Best where visual quality, accessibility, responsive behavior, or design systems matter.',
   marketplaces: () => [MARKETPLACE_NAME],
   isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   latestVersion: () => getMarketplacePluginVersion(MARKETPLACE_NAME, PLUGIN_NAME),
@@ -38,4 +38,4 @@ const frontendDesign: Pkg = {
   update: (ctx) => updatePluginById(PLUGIN_ID, ctx),
 };
 
-export default frontendDesign;
+export default uiUxProMax;

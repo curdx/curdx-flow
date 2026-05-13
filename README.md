@@ -131,7 +131,7 @@ The same npm package delivers both products. The installer reads its descriptor 
 npx @curdx/flow
 ```
 
-On first run, you pick a language (中文 / English). The full curdx-flow bundle is installed by default: `curdx-flow`, `pua`, `claude-mem`, `chrome-devtools-mcp`, `frontend-design`, `sequential-thinking`, and `context7`. If a companion has a local prerequisite that is missing, the installer reports the skip reason and continues so the core workflow remains usable.
+On first run, you pick a language (中文 / English). The full curdx-flow bundle is installed by default: `curdx-flow`, `pua`, `claude-mem`, `chrome-devtools-mcp`, `ui-ux-pro-max`, `sequential-thinking`, and `context7`. If a companion has a local prerequisite that is missing, the installer reports the skip reason and continues so the core workflow remains usable.
 
 That language choice also controls the managed `~/.claude/CLAUDE.md` block that flow writes. The block is rendered in the selected language, and when you choose `zh` it additionally injects a language policy telling Claude to keep tool/model interaction in English while replying to the user in Simplified Chinese.
 
@@ -323,7 +323,7 @@ The installer ships with a curated set of plugins and MCP servers. You opt in pe
 | `claude-mem` | plugin | `thedotmack/claude-mem` | Cross-session memory. Stores observations and recalls them at the start of subsequent sessions. |
 | `pua` | plugin | `tanweai/pua` | "Anti-failure" pressure mode. Auto-fires on 2+ consecutive failures or detected user frustration; pushes the agent to switch approaches. |
 | `chrome-devtools-mcp` | plugin | `ChromeDevTools/chrome-devtools-mcp` | Drive a real Chrome via MCP — performance traces, network inspection, console, screenshots, accessibility audits. |
-| `frontend-design` | plugin | `claude-plugins-official` | Distinctive, production-grade frontend output. Avoids generic AI aesthetics. |
+| `ui-ux-pro-max` | plugin | `ui-ux-pro-max-skill` | Distinctive, production-grade frontend output. Avoids generic AI aesthetics. |
 | `sequential-thinking` | mcp | `@modelcontextprotocol/server-sequential-thinking` | Step-by-step reasoning MCP server. |
 | `context7` | mcp | `https://mcp.context7.com/mcp` | Live library documentation over MCP. Beats stale training-data answers for recent SDK changes. |
 

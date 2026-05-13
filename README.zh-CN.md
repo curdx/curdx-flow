@@ -323,7 +323,7 @@ flow 内置九个专项子 agent，各自承担明确的单一职责。它们由
 | `claude-mem` | 插件 | `thedotmack/claude-mem` | 跨会话记忆。在每次新会话开始时召回此前积累的观察记录。 |
 | `pua` | 插件 | `tanweai/pua` | 抗失败压力模式。检测到连续 2 次以上失败或用户挫败感时自动触发，督促 agent 切换思路。 |
 | `chrome-devtools-mcp` | 插件 | `ChromeDevTools/chrome-devtools-mcp` | 通过 MCP 操控真实的 Chrome——性能采集、网络检查、控制台、截图、可访问性审计。 |
-| `frontend-design` | 插件 | `claude-plugins-official` | 高质量、有辨识度的前端产出，避免常见的"AI 生成"风格。 |
+| `ui-ux-pro-max` | 插件 | `ui-ux-pro-max-skill` | 高质量、有辨识度的前端产出，避免常见的"AI 生成"风格。 |
 | `sequential-thinking` | mcp | `@modelcontextprotocol/server-sequential-thinking` | 逐步推理 MCP 服务器。 |
 | `context7` | mcp | `https://mcp.context7.com/mcp` | 通过 MCP 实时获取库文档，针对近期 SDK 变更比训练数据中的过期内容更可靠。 |
 

@@ -660,7 +660,7 @@ if (isDirectRun()) {
 }
 
 // src/hooks/lib/capability-normalization.ts
-var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|frontend-design|pua)\b/gi;
+var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui-ux-pro-max|pua)\b/gi;
 function stripKnownCapabilityTokens(input) {
   return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
 }

@@ -48,7 +48,7 @@ Use `${CLAUDE_PLUGIN_ROOT}/references/last-mile-autopilot.md` as the policy.
 The coordinator must apply `coordinatorInstruction`, honor
 `evidenceRequired`, and route dependency capabilities automatically:
 `claude-mem` for historical/repeated-failure context, `pua` for recovery or
-parallel decomposition, `frontend-design` for visible UI work, and Chrome
+parallel decomposition, `ui-ux-pro-max` for visible UI work, and Chrome
 DevTools MCP for browser runtime evidence.
 
 **ERROR: Missing/Corrupt State File**

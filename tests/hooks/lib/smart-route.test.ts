@@ -63,7 +63,7 @@ describe("smart-route classifier", () => {
     expect(route.shouldUseSubagent).toBe(true);
     expect(route.taskCountLimit).toBe(12);
     expect(route.recommendedCapabilities.map((rec) => rec.id)).toEqual(
-      expect.arrayContaining(["claude-mem", "frontend-design", "chrome-devtools-mcp", "sequential-thinking"]),
+      expect.arrayContaining(["claude-mem", "ui-ux-pro-max", "chrome-devtools-mcp", "sequential-thinking"]),
     );
   });
 
@@ -329,7 +329,7 @@ describe("smart-route classifier", () => {
         "context7",
         "docs-query",
         "claude-mem",
-        "frontend-design",
+        "ui-ux-pro-max",
         "chrome-devtools-mcp",
         "browser-verification",
         "stack-specific-verification",
@@ -340,7 +340,7 @@ describe("smart-route classifier", () => {
     expect(route.recommendedCapabilities.map((rec) => rec.id)).not.toContain("pua");
     expect(route.recommendedCapabilities.find((rec) => rec.id === "context7")?.availabilityState).toBe("available");
     expect(route.recommendedCapabilities.find((rec) => rec.id === "claude-mem")?.availabilityState).toBe("missing");
-    expect(route.recommendedCapabilities.find((rec) => rec.id === "frontend-design")?.availabilityState).toBe("missing");
+    expect(route.recommendedCapabilities.find((rec) => rec.id === "ui-ux-pro-max")?.availabilityState).toBe("missing");
     expect(route.recommendedCapabilities.find((rec) => rec.id === "chrome-devtools-mcp")?.availabilityState).toBe("available");
     expect(route.recommendedCapabilities.find((rec) => rec.id === "sequential-thinking")?.availabilityState).toBe("missing");
   });
@@ -365,7 +365,7 @@ describe("smart-route classifier", () => {
 
   it("does not infer UI stacks from companion capability names alone", () => {
     const route = classifySmartRoute({
-      goal: "Use claude-mem pua context7 sequential-thinking chrome-devtools-mcp frontend-design to improve routing",
+      goal: "Use claude-mem pua context7 sequential-thinking chrome-devtools-mcp ui-ux-pro-max to improve routing",
       cwd: process.cwd(),
     });
 

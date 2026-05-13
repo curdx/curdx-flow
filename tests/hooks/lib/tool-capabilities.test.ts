@@ -86,22 +86,22 @@ describe("tool capability router", () => {
       risk: "medium",
       topologyKinds: ["frontend-app"],
       topologyFrameworks: ["vue"],
-      availableCapabilities: ["frontend-design", "chrome-devtools-mcp", "context7"],
+      availableCapabilities: ["ui-ux-pro-max", "chrome-devtools-mcp", "context7"],
     });
 
     expect(recs.map((rec) => rec.id)).toEqual(
       expect.arrayContaining([
         "context7",
         "docs-query",
-        "frontend-design",
+        "ui-ux-pro-max",
         "chrome-devtools-mcp",
         "browser-verification",
       ]),
     );
-    expect(recs.find((rec) => rec.id === "frontend-design")?.phase).toBe("implementation");
+    expect(recs.find((rec) => rec.id === "ui-ux-pro-max")?.phase).toBe("implementation");
     expect(recs.find((rec) => rec.id === "chrome-devtools-mcp")?.phase).toBe("verification");
     expect(recs.find((rec) => rec.id === "context7")?.availabilityState).toBe("available");
-    expect(recs.find((rec) => rec.id === "frontend-design")?.availabilityState).toBe("available");
+    expect(recs.find((rec) => rec.id === "ui-ux-pro-max")?.availabilityState).toBe("available");
     expect(recs.find((rec) => rec.id === "chrome-devtools-mcp")?.availabilityState).toBe("available");
   });
 
@@ -142,7 +142,7 @@ describe("tool capability router", () => {
       route: "lite-spec",
       risk: "medium",
       missingRoots: 1,
-      availableCapabilities: ["frontend-design", "chrome-devtools-mcp"],
+      availableCapabilities: ["ui-ux-pro-max", "chrome-devtools-mcp"],
     });
 
     expect(recs).toEqual([]);
@@ -160,12 +160,12 @@ describe("tool capability router", () => {
 
   it("does not treat companion capability names as frontend/browser stack intent", () => {
     const recs = recommendToolCapabilities({
-      goal: "Use claude-mem pua context7 sequential-thinking chrome-devtools-mcp frontend-design for better routing",
+      goal: "Use claude-mem pua context7 sequential-thinking chrome-devtools-mcp ui-ux-pro-max for better routing",
       route: "lite-spec",
       risk: "medium",
     });
 
-    expect(recs.map((rec) => rec.id)).not.toContain("frontend-design");
+    expect(recs.map((rec) => rec.id)).not.toContain("ui-ux-pro-max");
     expect(recs.map((rec) => rec.id)).not.toContain("chrome-devtools-mcp");
     expect(recs.map((rec) => rec.id)).not.toContain("browser-verification");
   });
@@ -179,14 +179,14 @@ describe("tool capability router", () => {
       "--risk",
       "high",
       "--available-capabilities",
-      "context7,frontend-design,chrome-devtools-mcp,sequential-thinking",
+      "context7,ui-ux-pro-max,chrome-devtools-mcp,sequential-thinking",
     ]);
 
     expect(result.exitCode).toBe(0);
     expect(result.json).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "context7" }),
-        expect.objectContaining({ id: "frontend-design" }),
+        expect.objectContaining({ id: "ui-ux-pro-max" }),
         expect.objectContaining({ id: "chrome-devtools-mcp" }),
         expect.objectContaining({ id: "sequential-thinking" }),
       ]),

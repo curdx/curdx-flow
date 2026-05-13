@@ -115,7 +115,7 @@ curdx-flow last-mile --cwd "$PWD" --spec "$SPEC_PATH" --record
 Treat the JSON as the execution autopilot contract:
 - `phase` tells whether the coordinator is planning, implementing, verifying, recovering, or releasing.
 - `problemTypes` tells what is currently risky: missing context, UI quality, browser evidence, repeated failure, release risk, verification gap, scope drift, or missing dependency.
-- `capabilityPlan` tells when to use dependency wheels. Use `claude-mem`, `pua`, `frontend-design`, or Chrome DevTools MCP only when their `availabilityState` is available/expected; if missing, follow `fallbackWhenMissing` and do not reimplement the wheel inside curdx-flow.
+- `capabilityPlan` tells when to use dependency wheels. Use `claude-mem`, `pua`, `ui-ux-pro-max`, or Chrome DevTools MCP only when their `availabilityState` is available/expected; if missing, follow `fallbackWhenMissing` and do not reimplement the wheel inside curdx-flow.
 - `evidenceRequired` and `blockingGates` are completion gates. Do not output `ALL_TASKS_COMPLETE` while they are unsatisfied.
 - `coordinatorInstruction` is the next action for this loop iteration.
 

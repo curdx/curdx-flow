@@ -221,7 +221,7 @@ const EXPECTED_PLUGIN_DEPENDENCIES = [
   { name: "pua", marketplace: "pua-skills" },
   { name: "claude-mem", marketplace: "thedotmack" },
   { name: "chrome-devtools-mcp", marketplace: "chrome-devtools-plugins" },
-  { name: "frontend-design", marketplace: "claude-plugins-official" },
+  { name: "ui-ux-pro-max", marketplace: "ui-ux-pro-max-skill" },
 ] as const;
 
 const EXPECTED_EXTERNAL_MCPS = [

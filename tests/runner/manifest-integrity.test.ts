@@ -170,14 +170,14 @@ describe("manifest discovery", () => {
       { name: "pua", marketplace: "pua-skills" },
       { name: "claude-mem", marketplace: "thedotmack" },
       { name: "chrome-devtools-mcp", marketplace: "chrome-devtools-plugins" },
-      { name: "frontend-design", marketplace: "claude-plugins-official" },
+      { name: "ui-ux-pro-max", marketplace: "ui-ux-pro-max-skill" },
     ]);
     expect(marketplace.allowCrossMarketplaceDependenciesOn).toEqual(
       expect.arrayContaining([
         "pua-skills",
         "thedotmack",
         "chrome-devtools-plugins",
-        "claude-plugins-official",
+        "ui-ux-pro-max-skill",
       ]),
     );
   });

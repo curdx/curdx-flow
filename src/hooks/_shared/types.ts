@@ -268,7 +268,7 @@ export interface CurdxState {
       | "context7"
       | "sequential-thinking"
       | "chrome-devtools-mcp"
-      | "frontend-design"
+      | "ui-ux-pro-max"
       | "pua"
       | "docs-query"
       | "browser-verification"
@@ -293,7 +293,7 @@ export interface CurdxState {
       | "context7"
       | "sequential-thinking"
       | "chrome-devtools-mcp"
-      | "frontend-design"
+      | "ui-ux-pro-max"
       | "pua"
       | "curdx-flow";
     provisioning?: "plugin-dependency" | "external-mcp" | "workflow";

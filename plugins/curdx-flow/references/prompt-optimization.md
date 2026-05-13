@@ -43,7 +43,7 @@ Do not ask curdx-flow to rebuild capabilities already owned by companion tools:
 - `pua`: recovery after repeated failures or bounded parallel decomposition.
 - `chrome-devtools-mcp`: real Chrome console, network, DOM, performance, and
   visual evidence.
-- `frontend-design`: visible UI, interaction, layout, and visual quality.
+- `ui-ux-pro-max`: visible UI, interaction, layout, and visual quality.
 - `context7`: current external library, SDK, API, and framework docs.
 - `sequential-thinking`: high-risk architecture, debugging, and assumption
   analysis.

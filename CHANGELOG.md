@@ -2,6 +2,16 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.32 — 2026-05-13
+
+### Changed
+
+- **UI/UX companion plugin switched to ui-ux-pro-max.** The installer, Claude Code plugin dependency manifest, root marketplace allowlist, doctor dependency checks, capability router, last-mile autopilot, CLAUDE.md sync guidance, smoke tests, and plugin references now use `ui-ux-pro-max@ui-ux-pro-max-skill` from `nextlevelbuilder/ui-ux-pro-max-skill` instead of the old `frontend-design@claude-plugins-official` dependency.
+
+### Tests
+
+- Updated regression coverage for required plugin dependencies, manifest integrity, capability recommendations, last-mile routing, runtime CLI output, and Claude Code smoke expectations. Verified targeted suites with `npm run typecheck`, `npm run test:hooks`, and `npm run test:runner`.
+
 ## 7.1.31 — 2026-05-13
 
 ### Added

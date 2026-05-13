@@ -10,15 +10,15 @@ describe('default companion bundle', () => {
       'pua',
       'claude-mem',
       'chrome-devtools-mcp',
-      'frontend-design',
+      'ui-ux-pro-max',
       'curdx-flow',
     ]);
     expect(optional).toEqual(expect.arrayContaining(['sequential-thinking', 'context7']));
   });
 
-  test('frontend-design refreshes the official marketplace before install', () => {
-    const frontendDesign = PKGS.find((pkg) => pkg.id === 'frontend-design');
+  test('ui-ux-pro-max refreshes its marketplace before install', () => {
+    const uiUxProMax = PKGS.find((pkg) => pkg.id === 'ui-ux-pro-max');
 
-    expect(frontendDesign?.marketplaces?.()).toEqual(['claude-plugins-official']);
+    expect(uiUxProMax?.marketplaces?.()).toEqual(['ui-ux-pro-max-skill']);
   });
 });

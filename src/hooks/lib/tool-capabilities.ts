@@ -21,7 +21,7 @@ export type ToolCapabilityId =
   | "context7"
   | "sequential-thinking"
   | "chrome-devtools-mcp"
-  | "frontend-design"
+  | "ui-ux-pro-max"
   | "pua"
   | "docs-query"
   | "browser-verification"
@@ -37,7 +37,7 @@ export type CapabilityOwner =
   | "context7"
   | "sequential-thinking"
   | "chrome-devtools-mcp"
-  | "frontend-design"
+  | "ui-ux-pro-max"
   | "pua"
   | "curdx-flow";
 
@@ -187,20 +187,20 @@ const CAPABILITIES: Record<ToolCapabilityId, ToolCapability> = {
     skipWhen: "Skip for backend-only code with no browser-facing behavior.",
     missingAction: "Install/enable chrome-devtools-mcp and make sure Chrome is installed.",
   },
-  "frontend-design": {
-    id: "frontend-design",
-    name: "frontend-design",
+  "ui-ux-pro-max": {
+    id: "ui-ux-pro-max",
+    name: "ui-ux-pro-max",
     type: "plugin",
-    ownedBy: "frontend-design",
+    ownedBy: "ui-ux-pro-max",
     provisioning: "plugin-dependency",
     curdxRole: ["recommend"],
     doNotReimplement: true,
     expectedByDefault: true,
-    invocation: "frontend-design plugin skills",
+    invocation: "ui-ux-pro-max plugin skills",
     summary: "frontend UX/design guidance for UI pages, components, and interaction polish",
     useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
     skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
-    missingAction: "Install/enable frontend-design from the official plugin marketplace.",
+    missingAction: "Install/enable ui-ux-pro-max from the ui-ux-pro-max-skill marketplace dependency.",
   },
   "pua": {
     id: "pua",
@@ -307,7 +307,7 @@ const ORDER: ToolCapabilityId[] = [
   "context7",
   "docs-query",
   "claude-mem",
-  "frontend-design",
+  "ui-ux-pro-max",
   "chrome-devtools-mcp",
   "browser-verification",
   "tdd-cycle",
@@ -524,10 +524,10 @@ export function recommendToolCapabilities(
     pushRecommendation(
       recs,
       available,
-      "frontend-design",
+      "ui-ux-pro-max",
       "implementation",
       "visible frontend behavior or UI quality is in scope",
-      "Use frontend-design guidance for UI structure, interaction, responsive behavior, and visual polish.",
+      "Use ui-ux-pro-max guidance for UI structure, interaction, responsive behavior, and visual polish.",
       { category: "verification", stackIds },
     );
   }
@@ -660,8 +660,8 @@ export function renderCapabilityDecisionTree(availableCapabilities: string[]): s
   if (available.has("claude-mem")) {
     rules.push("Might similar work, a prior decision, or a repeated failure exist? -> Start with `/claude-mem:mem-search`.");
   }
-  if (available.has("frontend-design") || available.has("chrome-devtools-mcp")) {
-    rules.push("Is visible frontend behavior in scope? -> Use frontend-design for UI decisions and Chrome DevTools MCP for runtime proof when installed.");
+  if (available.has("ui-ux-pro-max") || available.has("chrome-devtools-mcp")) {
+    rules.push("Is visible frontend behavior in scope? -> Use ui-ux-pro-max for UI decisions and Chrome DevTools MCP for runtime proof when installed.");
   }
   if (available.has("sequential-thinking")) {
     rules.push("Is the work high-risk, architectural, or assumption-heavy? -> Use sequential-thinking after reading the relevant code.");

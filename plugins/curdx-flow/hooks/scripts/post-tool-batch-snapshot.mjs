@@ -1377,7 +1377,7 @@ import { basename as basename5 } from "node:path";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
 // src/hooks/lib/capability-normalization.ts
-var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|frontend-design|pua)\b/gi;
+var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui-ux-pro-max|pua)\b/gi;
 function stripKnownCapabilityTokens(input) {
   return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
 }
@@ -1444,20 +1444,20 @@ var CAPABILITIES = {
     skipWhen: "Skip for backend-only code with no browser-facing behavior.",
     missingAction: "Install/enable chrome-devtools-mcp and make sure Chrome is installed."
   },
-  "frontend-design": {
-    id: "frontend-design",
-    name: "frontend-design",
+  "ui-ux-pro-max": {
+    id: "ui-ux-pro-max",
+    name: "ui-ux-pro-max",
     type: "plugin",
-    ownedBy: "frontend-design",
+    ownedBy: "ui-ux-pro-max",
     provisioning: "plugin-dependency",
     curdxRole: ["recommend"],
     doNotReimplement: true,
     expectedByDefault: true,
-    invocation: "frontend-design plugin skills",
+    invocation: "ui-ux-pro-max plugin skills",
     summary: "frontend UX/design guidance for UI pages, components, and interaction polish",
     useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
     skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
-    missingAction: "Install/enable frontend-design from the official plugin marketplace."
+    missingAction: "Install/enable ui-ux-pro-max from the ui-ux-pro-max-skill marketplace dependency."
   },
   "pua": {
     id: "pua",
@@ -1563,7 +1563,7 @@ var ORDER = [
   "context7",
   "docs-query",
   "claude-mem",
-  "frontend-design",
+  "ui-ux-pro-max",
   "chrome-devtools-mcp",
   "browser-verification",
   "tdd-cycle",
@@ -1706,10 +1706,10 @@ function recommendToolCapabilities(input) {
     pushRecommendation(
       recs,
       available,
-      "frontend-design",
+      "ui-ux-pro-max",
       "implementation",
       "visible frontend behavior or UI quality is in scope",
-      "Use frontend-design guidance for UI structure, interaction, responsive behavior, and visual polish.",
+      "Use ui-ux-pro-max guidance for UI structure, interaction, responsive behavior, and visual polish.",
       { category: "verification", stackIds }
     );
   }
@@ -3048,7 +3048,7 @@ function inferProblemTypes(input, route, snapshot, brain) {
   if (route.route === "blocked-ask-user" || route.intent.missingFacts.length > 0) {
     out.push("missing-context");
   }
-  if (hasRec(route, "frontend-design")) out.push("ui-quality-risk");
+  if (hasRec(route, "ui-ux-pro-max")) out.push("ui-quality-risk");
   if (hasRec(route, "chrome-devtools-mcp") || hasRec(route, "browser-verification")) {
     out.push("browser-evidence-needed");
   }
@@ -3124,7 +3124,7 @@ function instructionFor(phase, problems, plan, route, snapshot) {
     return `Stop the same edit loop; ${parts.join(", ")}.`;
   }
   if (problems.includes("ui-quality-risk")) {
-    return "Apply frontend-design guidance before changing visible UI, then keep browser evidence as the completion gate.";
+    return "Apply ui-ux-pro-max guidance before changing visible UI, then keep browser evidence as the completion gate.";
   }
   if (problems.includes("browser-evidence-needed")) {
     return "After implementation, collect browser runtime evidence with Playwright or Chrome DevTools MCP before claiming completion.";

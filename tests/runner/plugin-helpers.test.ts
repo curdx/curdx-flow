@@ -78,11 +78,11 @@ describe('plugin command helpers', () => {
   test('installs plugins explicitly to user scope', async () => {
     const { installPluginById } = await import('../../src/registry/plugins/_helpers.ts');
 
-    await installPluginById('frontend-design@claude-plugins-official', ctx);
+    await installPluginById('ui-ux-pro-max@ui-ux-pro-max-skill', ctx);
 
     expect(mocks.runStreaming).toHaveBeenCalledWith(
       'claude',
-      ['plugin', 'install', 'frontend-design@claude-plugins-official', '--scope', 'user'],
+      ['plugin', 'install', 'ui-ux-pro-max@ui-ux-pro-max-skill', '--scope', 'user'],
       ctx.log,
     );
   });
@@ -90,11 +90,11 @@ describe('plugin command helpers', () => {
   test('can force-refresh a marketplace before retrying install', async () => {
     const { refreshMarketplace } = await import('../../src/registry/plugins/_helpers.ts');
 
-    await refreshMarketplace('claude-plugins-official', ctx);
+    await refreshMarketplace('ui-ux-pro-max-skill', ctx);
 
     expect(mocks.runStreaming).toHaveBeenCalledWith(
       'claude',
-      ['plugin', 'marketplace', 'update', 'claude-plugins-official'],
+      ['plugin', 'marketplace', 'update', 'ui-ux-pro-max-skill'],
       ctx.log,
     );
     expect(mocks.clearStateCache).toHaveBeenCalledTimes(1);

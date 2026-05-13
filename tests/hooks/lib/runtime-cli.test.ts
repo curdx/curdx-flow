@@ -97,7 +97,7 @@ describe("runtime-cli lib", () => {
         "--goal",
         "Fix React browser regression after failed twice",
         "--available-capabilities",
-        "claude-mem,pua,frontend-design,chrome-devtools-mcp",
+        "claude-mem,pua,ui-ux-pro-max,chrome-devtools-mcp",
       ]);
 
       expect(result.exitCode).toBe(0);
@@ -105,7 +105,7 @@ describe("runtime-cli lib", () => {
         version: 1,
         problemTypes: expect.arrayContaining(["browser-evidence-needed"]),
         capabilityPlan: expect.arrayContaining([
-          expect.objectContaining({ id: "frontend-design" }),
+          expect.objectContaining({ id: "ui-ux-pro-max" }),
           expect.objectContaining({ id: "chrome-devtools-mcp" }),
         ]),
       });
