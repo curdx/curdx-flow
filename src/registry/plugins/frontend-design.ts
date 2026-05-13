@@ -1,8 +1,10 @@
 import type { Pkg } from '../types.ts';
-import { getMarketplacePluginVersion, isPluginInstalled } from '../../runner/state.ts';
+import { getMarketplacePluginVersion, isPluginInstalledAtScope } from '../../runner/state.ts';
 import {
   ensureMarketplace,
   installPluginById,
+  PLUGIN_SCOPE,
+  refreshMarketplace,
   uninstallPluginById,
   updatePluginById,
 } from './_helpers.ts';
@@ -21,11 +23,16 @@ const frontendDesign: Pkg = {
   whenToUse:
     'auto-fires when building UI / web components / pages. Best where visual personality matters (landing, marketing, portfolio).',
   marketplaces: () => [MARKETPLACE_NAME],
-  isInstalled: () => isPluginInstalled(PLUGIN_ID),
+  isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   latestVersion: () => getMarketplacePluginVersion(MARKETPLACE_NAME, PLUGIN_NAME),
   install: async (ctx) => {
     await ensureMarketplace(MARKETPLACE_NAME, MARKETPLACE_SOURCE, ctx);
-    await installPluginById(PLUGIN_ID, ctx);
+    try {
+      await installPluginById(PLUGIN_ID, ctx);
+    } catch {
+      await refreshMarketplace(MARKETPLACE_NAME, ctx);
+      await installPluginById(PLUGIN_ID, ctx);
+    }
   },
   uninstall: (ctx) => uninstallPluginById(PLUGIN_ID, ctx),
   update: (ctx) => updatePluginById(PLUGIN_ID, ctx),

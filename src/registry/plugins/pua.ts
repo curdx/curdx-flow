@@ -1,8 +1,9 @@
 import type { Pkg } from '../types.ts';
-import { findPlugin, getMarketplacePluginVersion, isPluginInstalled } from '../../runner/state.ts';
+import { findPluginAtScope, getMarketplacePluginVersion, isPluginInstalledAtScope } from '../../runner/state.ts';
 import {
   ensureMarketplace,
   installPluginById,
+  PLUGIN_SCOPE,
   uninstallPluginById,
   updatePluginById,
 } from './_helpers.ts';
@@ -22,9 +23,9 @@ const pua: Pkg = {
   whenToUse:
     'auto-fires on 2+ failures or user frustration; sub-modes p7 / p9 / pro / loop. Skip on first-attempt failures or when a known fix is executing.',
   marketplaces: () => [MARKETPLACE_NAME],
-  isInstalled: () => isPluginInstalled(PLUGIN_ID),
+  isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   installedVersion: async () => {
-    const p = await findPlugin(PLUGIN_ID);
+    const p = await findPluginAtScope(PLUGIN_ID, PLUGIN_SCOPE);
     const v = p?.version;
     return v && v !== 'unknown' ? v : null;
   },

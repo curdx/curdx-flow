@@ -1,8 +1,9 @@
 import type { Pkg } from '../types.ts';
-import { findPlugin, getMarketplacePluginVersion, isPluginInstalled } from '../../runner/state.ts';
+import { findPluginAtScope, getMarketplacePluginVersion, isPluginInstalledAtScope } from '../../runner/state.ts';
 import {
   ensureMarketplace,
   installPluginById,
+  PLUGIN_SCOPE,
   uninstallPluginById,
   updatePluginById,
 } from './_helpers.ts';
@@ -22,9 +23,9 @@ const curdxFlow: Pkg = {
   whenToUse:
     'for spec-driven multi-task work — research → requirements → design → tasks → autonomous execution per task. Use when starting a feature that benefits from upfront spec; skip for one-shot fixes or simple edits.',
   marketplaces: () => [MARKETPLACE_NAME],
-  isInstalled: () => isPluginInstalled(PLUGIN_ID),
+  isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   installedVersion: async () => {
-    const p = await findPlugin(PLUGIN_ID);
+    const p = await findPluginAtScope(PLUGIN_ID, PLUGIN_SCOPE);
     const v = p?.version;
     return v && v !== 'unknown' ? v : null;
   },

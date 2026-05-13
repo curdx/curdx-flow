@@ -114,6 +114,11 @@ export async function isPluginInstalled(id: string): Promise<boolean> {
   return list.some((p) => p.id === id);
 }
 
+export async function isPluginInstalledAtScope(id: string, scope: string): Promise<boolean> {
+  const list = await listPlugins();
+  return list.some((p) => p.id === id && (p.scope ?? 'user') === scope);
+}
+
 export async function isMarketplaceAdded(name: string): Promise<boolean> {
   const list = await listMarketplaces();
   return list.some((m) => m.name === name);
@@ -127,6 +132,11 @@ export async function isMcpInstalled(name: string): Promise<boolean> {
 export async function findPlugin(id: string): Promise<PluginEntry | undefined> {
   const list = await listPlugins();
   return list.find((p) => p.id === id);
+}
+
+export async function findPluginAtScope(id: string, scope: string): Promise<PluginEntry | undefined> {
+  const list = await listPlugins();
+  return list.find((p) => p.id === id && (p.scope ?? 'user') === scope);
 }
 
 // ---- marketplace.json reading + cache refresh ----

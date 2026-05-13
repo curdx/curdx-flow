@@ -1,9 +1,10 @@
 import type { Pkg } from '../types.ts';
-import { findPlugin, getMarketplacePluginVersion, isPluginInstalled } from '../../runner/state.ts';
+import { findPluginAtScope, getMarketplacePluginVersion, isPluginInstalledAtScope } from '../../runner/state.ts';
 import { ensureBun } from '../../runner/ensureBun.ts';
 import {
   ensureMarketplace,
   installPluginById,
+  PLUGIN_SCOPE,
   uninstallPluginById,
   updatePluginById,
 } from './_helpers.ts';
@@ -24,9 +25,9 @@ const claudeMem: Pkg = {
     'for cross-session memory search ("did we solve this before?"), phased planning (`make-plan`), or phased execution (`do`).',
   marketplaces: () => [MARKETPLACE_NAME],
   prereqCheck: (t) => ensureBun(t),
-  isInstalled: () => isPluginInstalled(PLUGIN_ID),
+  isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   installedVersion: async () => {
-    const p = await findPlugin(PLUGIN_ID);
+    const p = await findPluginAtScope(PLUGIN_ID, PLUGIN_SCOPE);
     const v = p?.version;
     return v && v !== 'unknown' ? v : null;
   },

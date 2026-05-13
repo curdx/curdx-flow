@@ -2,6 +2,17 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.29 — 2026-05-13
+
+### Changed
+
+- **Installer-managed Claude Code plugins are user-scope only.** `@curdx/flow` now ignores plugin copies installed at `project`, `local`, or `managed` scope when deciding whether an installer item is installed or updatable. Missing user-scope items are installed with `--scope user`; user-scope items are updated or uninstalled with `--scope user`.
+
+### Fixed
+
+- **Avoid false updates against non-user installs.** Machines with old `curdx-flow`, `pua`, or `claude-mem` copies in another scope no longer try `claude plugin update ...` against the default user scope.
+- **frontend-design marketplace retry.** If `frontend-design` install fails because the official marketplace cache is stale, the installer forces `claude plugin marketplace update claude-plugins-official` and retries once.
+
 ## 7.1.28 — 2026-05-13
 
 ### Fixed

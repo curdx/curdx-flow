@@ -1,10 +1,11 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import type { Pkg, PrereqResult } from '../types.ts';
-import { isPluginInstalled } from '../../runner/state.ts';
+import { isPluginInstalledAtScope } from '../../runner/state.ts';
 import {
   ensureMarketplace,
   installPluginById,
+  PLUGIN_SCOPE,
   uninstallPluginById,
   updatePluginById,
 } from './_helpers.ts';
@@ -71,7 +72,7 @@ const chromeDevtoolsMcp: Pkg = {
     }
     return { ok: true };
   },
-  isInstalled: () => isPluginInstalled(PLUGIN_ID),
+  isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   install: async (ctx) => {
     await ensureMarketplace(MARKETPLACE_NAME, MARKETPLACE_SOURCE, ctx);
     await installPluginById(PLUGIN_ID, ctx);
