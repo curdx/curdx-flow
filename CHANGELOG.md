@@ -2,6 +2,18 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.35 — 2026-05-14
+
+### Fixed
+
+- **Spec-conformance cleanup in `plugins/curdx-flow/hooks/hooks.json`.** Removed `"matcher": "*"` from `UserPromptSubmit`, `Stop`, and `PostCompact` entries. Per the current Claude Code hooks reference, these events do not accept a `matcher` field; the value was previously a harmless no-op equivalent to "match all" but is no longer included so the manifest validates cleanly under stricter loaders.
+- **`plugins/curdx-flow/skills/feedback/SKILL.md` `arguments` field.** Migrated from the legacy `arguments: [{ name, description, required }]` object-array form to the current spec, which accepts a space-separated string or a YAML list of names. Added `argument-hint` for autocomplete.
+
+### Verified
+
+- Plugin manifests audited against the latest Claude Code references (`plugins-reference.md`, `hooks.md`, `skills.md`, `sub-agents.md`, `plugin-marketplaces.md`, `plugin-dependencies.md`). All 10 agent and 22 skill frontmatter blocks confirmed compliant with current schemas. Cross-marketplace `dependencies` (with `marketplace` field) and the `allowCrossMarketplaceDependenciesOn` allowlist in `.claude-plugin/marketplace.json` confirmed correct.
+- `npm run verify` green: 442 tests across hooks (215), analyze (110), and runner (117) suites.
+
 ## 7.1.34 — 2026-05-14
 
 ### Added
