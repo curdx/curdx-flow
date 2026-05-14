@@ -1,7 +1,0 @@
-{
-  "hookSpecificOutput": {
-    "permissionDecision": "deny"
-  },
-  "systemMessage": "Quick mode active: do NOT ask the user any questions. Make opinionated decisions autonomously. Choose the simplest, most conventional approach."
-}
-EXIT_CODE=0

@@ -1,5 +1,0 @@
-[curdx-flow] Active spec detected: demo-spec
-[curdx-flow] Phase: execution | Task: 2/3 | Awaiting approval: false
-[curdx-flow] Execution in progress. Run /curdx-flow:implement to continue.
-[curdx-flow] Goal: A frozen demo goal for byte-equal regression testing.
-EXIT_CODE=0

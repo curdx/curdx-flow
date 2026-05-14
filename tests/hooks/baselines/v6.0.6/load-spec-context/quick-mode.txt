@@ -1,3 +1,0 @@
-[curdx-flow] Active spec detected: quick-spec
-[curdx-flow] Phase: design | Task: 1/0 | Awaiting approval: false
-EXIT_CODE=0

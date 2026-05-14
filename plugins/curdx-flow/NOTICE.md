@@ -1,1 +1,0 @@
-This plugin was originally authored as `smart-ralph` by tzachbon (https://github.com/tzachbon/smart-ralph), forked as `ralph-specum`, and is now maintained as `curdx-flow` under the original MIT License (see ./LICENSE).
