@@ -45,6 +45,11 @@
           "minimum": 0,
           "description": "Max mtime (epoch ms) of relevant source tree at verify time; used for stale-detection"
         },
+        "taskIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Task index (0-based) this verification was recorded against. Required-in-practice for execution-phase blocks so that evidence written for task N cannot gate task N+1. Optional in the schema for backwards compatibility with pre-v7.2.0 states; the iron-law gate only enforces the match when the field is present."
+        },
         "description": {
           "type": "string",
           "description": "Optional human-readable summary of what was verified"

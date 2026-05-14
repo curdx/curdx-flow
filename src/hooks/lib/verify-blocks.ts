@@ -178,6 +178,23 @@ export async function verifyPhaseBlock(
       command: block.command,
     };
   }
+  // Task-level granularity (v7.2.0): when an execution-phase block was
+  // recorded against a specific `taskIndex`, refuse to let it gate a later
+  // task. This closes the phase-level loophole where evidence from task N
+  // could pass task N+1 if N+1 happened not to touch any source files
+  // (e.g. a docs-only or wrap-up task). Backwards-compat: legacy blocks
+  // without `taskIndex` are accepted unchanged.
+  if (phase === "execution" && typeof block.taskIndex === "number") {
+    const currentTaskIndex = typeof state.taskIndex === "number" ? state.taskIndex : 0;
+    if (block.taskIndex !== currentTaskIndex) {
+      const specName = basename(specDir);
+      return {
+        ok: false,
+        reason: `Stale evidence for phase 'execution': block recorded against task index ${block.taskIndex}, current task index is ${currentTaskIndex}. Re-run: ${block.command}. Spec: ${specName}.`,
+        command: block.command,
+      };
+    }
+  }
   return { ok: true };
 }
 

@@ -2,6 +2,28 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.2.0 — 2026-05-14
+
+This release is the follow-up to the v7.1.35 spec-conformance pass: a file-level audit of the full user flow (entry → 5-phase pipeline → autonomous execution loop) against the latest Claude Code plugin references, fixing the real user-facing issues that surfaced.
+
+### Added
+
+- **Task-level granularity for execution-phase verification blocks (Iron-Law strengthening).** `VerificationBlock` gains an optional `taskIndex` field (`plugins/curdx-flow/schemas/spec.schema.json` + `src/hooks/_shared/types.ts`). `curdx-flow verify run --phase execution` (in `src/hooks/lib/runtime-cli.ts`) now stamps the current `state.taskIndex` onto the block. `verifyPhaseBlock` (in `src/hooks/lib/verify-blocks.ts`) rejects an execution-phase block whose `taskIndex` does not match the current `state.taskIndex`, closing the phase-level loophole where evidence written for task N could gate task N+1 if N+1 happened not to touch any source files. Backwards-compat: blocks written before this version (no `taskIndex` field) are accepted unchanged. Four new unit tests cover the gate plus the legacy bypass.
+- **Help skill (`plugins/curdx-flow/skills/help/SKILL.md`): start-vs-new guidance and full `/curdx-flow:implement` flag table.** Reduces a long-standing UX confusion where users picked `/curdx-flow:new` for existing specs and were dropped into a resume-or-overwrite prompt; `/curdx-flow:start` is now explicitly the recommended default. The implement flag table now includes `--quick` and `--recovery-mode`.
+
+### Changed
+
+- **`/curdx-flow:cancel` now requires explicit confirmation via `AskUserQuestion`** before running `rm -rf` against the spec directory (`plugins/curdx-flow/skills/cancel/SKILL.md`). The previous flow deleted state and the entire spec tree silently, so a single typo could destroy a partially-implemented spec. The new flow shows the spec path, phase, task progress, and file count, and aborts on anything other than an explicit `Delete` choice. `allowed-tools` extended to include `AskUserQuestion`.
+- **`implement` skill `argument-hint` and body now document `--quick`** (`plugins/curdx-flow/skills/implement/SKILL.md`). `--quick` was referenced by `references/branch-management.md` but missing from the skill itself; users had no way to discover the flag. The body also clarifies the scope of `--recovery-mode` (execution failures only; verification failures still follow `references/verification-layers.md`).
+
+### Fixed
+
+- **i18n: `UserPromptSubmit` autopilot regex now covers more high-frequency Chinese coding verbs** (`src/hooks/lib/last-mile-orchestrator.ts`). Added `添加`, `修改`, `优化`, `编写`, `调试`, `查看`, `分析`, `重写`, `集成`, `接入`, `调用`, `审查`, `审核`, `完成`, `生成` to `CODING_PROMPT_RE`, plus `提测`, `灰度` to `RELEASE_RE`, plus `崩溃`, `阻塞`, `无法`, `不通过` to `FAILURE_RE`. Phrases like "我想添加 OAuth 登录" now route through autopilot rather than silently skipping.
+
+### Verified
+
+- `npm run verify` green: 446 tests across hooks (219), analyze (110), and runner (117) suites. `check:hooks-fresh` green after the regenerated `plugins/curdx-flow/hooks/scripts/**/*.mjs` bundles were committed alongside their TypeScript sources. byte-equal regression fixtures unchanged — the new `taskIndex` field is optional and pre-v7.2.0 fixtures hit the legacy backwards-compat path.
+
 ## 7.1.35 — 2026-05-14
 
 ### Fixed

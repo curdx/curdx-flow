@@ -495,6 +495,17 @@ async function verifyPhaseBlock(state, phase, specDir) {
       command: block.command
     };
   }
+  if (phase === "execution" && typeof block.taskIndex === "number") {
+    const currentTaskIndex = typeof state.taskIndex === "number" ? state.taskIndex : 0;
+    if (block.taskIndex !== currentTaskIndex) {
+      const specName = basename2(specDir);
+      return {
+        ok: false,
+        reason: `Stale evidence for phase 'execution': block recorded against task index ${block.taskIndex}, current task index is ${currentTaskIndex}. Re-run: ${block.command}. Spec: ${specName}.`,
+        command: block.command
+      };
+    }
+  }
   return { ok: true };
 }
 async function walkSrcTree(dir) {

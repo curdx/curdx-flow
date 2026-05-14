@@ -3062,9 +3062,9 @@ if (isDirectRun6()) {
 }
 
 // src/hooks/lib/last-mile-orchestrator.ts
-var CODING_PROMPT_RE = /\b(implement|fix|debug|build|add|update|refactor|release|publish|test|verify|ui|ux|frontend|backend|plugin|hook|skill|mcp|agent|doctor|npm|tag)\b|实现|修复|开发|构建|新增|更新|重构|发布|测试|验证|前端|后端|页面|插件|钩子|技能|报错|失败|定位|排查/i;
-var RELEASE_RE2 = /\b(release|publish|deploy|ship|tag|npm|version|changelog)\b|发布|部署|上线|打包|版本|标签/i;
-var FAILURE_RE = /\b(fail|failed|failure|error|stuck|retry|debug|broken|regression)\b|失败|报错|卡住|重试|排查|定位|回归/i;
+var CODING_PROMPT_RE = /\b(implement|fix|debug|build|add|update|refactor|release|publish|test|verify|ui|ux|frontend|backend|plugin|hook|skill|mcp|agent|doctor|npm|tag)\b|实现|修复|开发|构建|新增|添加|更新|修改|优化|重构|发布|测试|验证|前端|后端|页面|插件|钩子|技能|报错|失败|定位|排查|编写|调试|查看|分析|重写|集成|接入|调用|审查|审核|完成|生成/i;
+var RELEASE_RE2 = /\b(release|publish|deploy|ship|tag|npm|version|changelog)\b|发布|部署|上线|打包|版本|标签|提测|灰度/i;
+var FAILURE_RE = /\b(fail|failed|failure|error|stuck|retry|debug|broken|regression)\b|失败|报错|卡住|重试|排查|定位|回归|崩溃|阻塞|无法|不通过/i;
 function normalize3(value) {
   return (value ?? "").trim().replace(/\s+/g, " ");
 }

@@ -199,6 +199,122 @@ describe("verifyPhaseBlock", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // Task-level granularity gate (v7.2.0): close the phase-level loophole
+  // where evidence written for task N could gate task N+1 if N+1 didn't
+  // touch any source files.
+
+  it("execution block recorded against a prior task → ok=false, reason embeds task indices", async () => {
+    const dir = makeTmpDir("task-mismatch");
+    try {
+      const ts = new Date().toISOString();
+      // Block was written when state.taskIndex was 5, but state has since advanced to 6.
+      const block = {
+        command: "npm run typecheck",
+        exitCode: 0,
+        timestamp: ts,
+        srcMtime: Date.parse(ts) - 1000,
+        taskIndex: 5,
+      };
+      const state = {
+        name: "demo",
+        basePath: "./specs/demo",
+        phase: "execution",
+        taskIndex: 6,
+        totalTasks: 10,
+        verificationBlocks: { execution: block },
+      } as unknown as CurdxState;
+      const r = await verifyPhaseBlock(state, "execution", dir);
+      expect(r.ok).toBe(false);
+      expect(r.reason).toMatch(/^Stale evidence for phase 'execution'/);
+      expect(r.reason).toContain("task index 5");
+      expect(r.reason).toContain("current task index is 6");
+      expect(r.reason).toContain("Re-run: npm run typecheck");
+      expect(r.command).toBe("npm run typecheck");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("execution block with matching taskIndex → ok=true", async () => {
+    const dir = makeTmpDir("task-match");
+    try {
+      const ts = new Date().toISOString();
+      const block = {
+        command: "npm run typecheck",
+        exitCode: 0,
+        timestamp: ts,
+        srcMtime: Date.parse(ts) - 1000,
+        taskIndex: 3,
+      };
+      const state = {
+        name: "demo",
+        basePath: "./specs/demo",
+        phase: "execution",
+        taskIndex: 3,
+        totalTasks: 10,
+        verificationBlocks: { execution: block },
+      } as unknown as CurdxState;
+      const r = await verifyPhaseBlock(state, "execution", dir);
+      expect(r.ok).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("legacy execution block without taskIndex → ok=true (backwards-compat)", async () => {
+    const dir = makeTmpDir("task-legacy");
+    try {
+      const ts = new Date().toISOString();
+      // No taskIndex field — represents states written before v7.2.0.
+      const block = {
+        command: "npm run typecheck",
+        exitCode: 0,
+        timestamp: ts,
+        srcMtime: Date.parse(ts) - 1000,
+      };
+      const state = {
+        name: "demo",
+        basePath: "./specs/demo",
+        phase: "execution",
+        taskIndex: 7,
+        totalTasks: 10,
+        verificationBlocks: { execution: block },
+      } as unknown as CurdxState;
+      const r = await verifyPhaseBlock(state, "execution", dir);
+      expect(r.ok).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("non-execution phase ignores taskIndex even when present", async () => {
+    // taskIndex is an execution-only concept; verifyPhaseBlock should not
+    // gate research/requirements/design/tasks on it.
+    const dir = makeTmpDir("task-non-exec");
+    try {
+      const ts = new Date().toISOString();
+      const block = {
+        command: "npm run typecheck",
+        exitCode: 0,
+        timestamp: ts,
+        srcMtime: Date.parse(ts) - 1000,
+        taskIndex: 99, // deliberately wrong, must be ignored
+      };
+      const state = {
+        name: "demo",
+        basePath: "./specs/demo",
+        phase: "design",
+        taskIndex: 0,
+        totalTasks: 0,
+        verificationBlocks: { design: block },
+      } as unknown as CurdxState;
+      const r = await verifyPhaseBlock(state, "design", dir);
+      expect(r.ok).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

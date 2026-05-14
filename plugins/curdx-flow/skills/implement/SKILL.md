@@ -1,7 +1,7 @@
 ---
 name: implement
 description: Use when a spec has tasks.md and should enter autonomous task execution.
-argument-hint: "[--max-task-iterations 5] [--max-global-iterations 30] [--goal-turns 30] [--manual] [--recovery-mode]"
+argument-hint: "[--max-task-iterations 5] [--max-global-iterations 30] [--goal-turns 30] [--manual] [--quick] [--recovery-mode]"
 allowed-tools: "Read Write Edit Agent Bash Skill"
 disable-model-invocation: true
 ---
@@ -40,7 +40,8 @@ From `$ARGUMENTS`:
 - **--max-global-iterations**: Max total loop iterations (default: 30 per FR-D1; tightened from legacy 100 to bound cost runaway blast radius). Safety limit to prevent infinite execution loops; when hit, the coordinator halts entirely (US-1 / AC-1.1). Override example: `--max-global-iterations 100` to opt back into legacy cap. Mirrors `--max-task-iterations` parse pattern: flag value propagates into `state.maxGlobalIterations` at init.
 - **--goal-turns**: Max native `/goal` turns before reporting an incomplete blocker (default: same as `--max-global-iterations`).
 - **--manual**: Do not ask the user to set native `/goal`; run one coordinator turn and leave a resumable status. Use only when `/goal` is unavailable because hooks are disabled or managed policy disallows it.
-- **--recovery-mode**: Enable iterative failure recovery (default: false). When enabled, failed tasks trigger automatic fix task generation instead of stopping.
+- **--quick**: Non-interactive mode. Skip all confirmation prompts (branch selection, worktree creation, review approval). Branch handling per `references/branch-management.md` § Quick Mode: on the default branch auto-create a feature branch in place without prompting; on a non-default branch stay put. Quick mode also short-circuits review approval prompts in earlier phases (research, requirements, design, tasks) and trusts `autoPolicy.reviewCadence` to gate verification. Use for CI, scripted runs, or experienced users who want minimum interruption.
+- **--recovery-mode**: Enable iterative failure recovery (default: false). When enabled, failed tasks trigger automatic fix task generation instead of stopping. Only affects execution failures; verification failures (Layer-3 review) follow `references/verification-layers.md` rules regardless of this flag.
 
 Read existing `.curdx-state.json::autoPolicy` before applying defaults:
 - If no explicit `--max-task-iterations`, use `autoPolicy.maxTaskIterations` when present, else 5.

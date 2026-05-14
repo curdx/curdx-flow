@@ -178,6 +178,14 @@ export interface VerificationBlock {
   exitCode: number;
   timestamp: string;
   srcMtime: number;
+  /**
+   * Task index (0-based) this verification was recorded against.
+   * Required-in-practice for execution-phase blocks so that evidence written
+   * for task N cannot gate the completion of task N+1. Optional in the type
+   * for backwards compatibility with pre-v7.2.0 states; the iron-law gate
+   * (`verifyPhaseBlock`) only enforces the match when this field is present.
+   */
+  taskIndex?: number;
   description?: string;
   failedReason?: string;
   reviews?: {
