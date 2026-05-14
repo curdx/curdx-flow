@@ -1,9 +1,9 @@
 /**
- * Stop hook — loop controller for spec task execution continuation.
+ * Stop hook — deterministic completion and safety gate for spec execution.
  *
- * Behaviour mirrors v6 `stop-watcher.sh` (362 LOC). This is the largest hook
- * port (Risk R8 in design.md). Every shell command in the source has a 1:1
- * TypeScript counterpart documented inline below.
+ * Behaviour started as a v6 `stop-watcher.sh` port. The v8 execution driver is
+ * native `/goal`; this hook no longer injects coordinator continuation prompts.
+ * It only enforces deterministic gates that must hold at turn boundaries.
  *
  * Shell-op translation table (see .progress.md for the full audit):
  *
@@ -22,8 +22,6 @@
  *   shell JSON-mutate '.specs |= map(if ...)'               | parse → mutate → writeFileAtomic
  *   mktemp ... + mv                                         | _shared/atomic-write.writeFileAtomic
  *   update-spec-index.sh --quiet                            | spawn bundled update-spec-index.mjs
- *   awk single-task block (L258-267)                        | extractTaskBlock from _shared/markdown-task-parser
- *   awk parallel-group block (L278-289)                     | hand-written scanner mirroring awk arms
  *   grep -c '^\\s*- \\[ \\]'                                | string.match regex count
  *   find -mmin +60 -delete                                  | readdirSync + statSync.mtimeMs age + unlinkSync
  *   shell JSON-emit '{decision:"block", reason:$r, systemMessage:$m}' | direct JSON.stringify of object literal
@@ -64,9 +62,7 @@ import process from "node:process";
 import { runHook } from "./_shared/run-hook.js";
 import { getSpecsDirs, resolveCurrent } from "./_shared/path-resolver.js";
 import { writeFileAtomic } from "./_shared/atomic-write.js";
-import { extractTaskBlock } from "./_shared/markdown-task-parser.js";
 import { getVerificationPhase, verifyPhaseBlock } from "./lib/verify-blocks.js";
-import { compactLastMileDecision, decideLastMile } from "./lib/last-mile-orchestrator.js";
 import type { BlockDecisionOutput } from "./_shared/types.js";
 import type { CurdxState } from "./_shared/types.js";
 
@@ -90,10 +86,9 @@ const ALL_TASKS_COMPLETE_RE = /(^|\W)ALL_TASKS_COMPLETE(\W|$)/;
  *
  * `path-resolver.resolveCurrent()` returns `posix.join("./specs", "name")`
  * which yields `"specs/name"` (the v6 shell pipeline kept `"./specs/name"`
- * because it built paths via plain string concat). v6 embeds `$SPEC_PATH`
- * directly into the continuation prompt, so to preserve byte-equal-ish parity
- * with the v6 baseline we re-attach the `./` whenever a configured specs-dir
- * starts with `./` and the resolved path matches its body.
+ * because it built paths via plain string concat). Re-attach `./` whenever a
+ * configured specs-dir starts with `./` and the resolved path matches its body
+ * so hard-gate messages keep the same user-facing path shape.
  *
  * Same helper pattern as `preserveDotPrefix` in update-spec-index.ts (1.14).
  * Kept local rather than DRY-extracted because the shared module would have
@@ -107,29 +102,6 @@ function preserveDotPrefix(specPath: string, specsDirs: string[]): string {
     if (body && specPath === body) return `./${specPath}`;
   }
   return specPath;
-}
-
-/**
- * Mirror of the v6 shell `// true` default-coalesce on a boolean field.
- *
- * The v6 default-coalesce operator treats BOTH `null` and `false` as
- * default-triggers, so `.x // true` on a value of `false` evaluates to `true`.
- * v6 stop-watcher uses this on `nativeSyncEnabled` for the continuation
- * prompt; preserve the byte-equal output here by returning `true` unless the
- * input is some non-boolean, non-null value JSON would render distinctly. In
- * practice the state schema constrains this field to bool/missing, so this
- * always returns `true`. We keep the helper small and explicit for
- * documentation.
- */
-function defaultTrueIfFalsyOrNull(value: unknown): boolean {
-  if (value === null || value === undefined) return true;
-  if (value === false) return true;
-  if (value === true) return true;
-  // Non-boolean, non-null/undefined value: the v6 shell would print it
-  // verbatim. The continuation prompt then renders it as-is. We return true
-  // for the boolean-typed slot in the prompt (the rendered output is governed
-  // by the source-of-truth boolean here, not this helper).
-  return true;
 }
 
 /** Strip CRLF/CR → LF and a leading UTF-8 BOM. Mirrors normalize() in markdown-task-parser. */
@@ -346,79 +318,6 @@ function countUncheckedTasks(tasksFile: string): number {
 }
 
 /**
- * Parallel-group task scanner — mirrors v6 awk at L278-289 line-for-line.
- *
- * Awk recipe:
- *   /^- \[[ x]\]/ {
- *     if (count >= idx) {
- *       if (/\[P\]/ && pcount < max_group) { found=1; pcount++; block=block $0 "\n"; next }
- *       else if (found) { exit }
- *     }
- *     count++
- *   }
- *   found && /^  / { block=block $0 "\n"; next }
- *   found && /^$/ { block=block $0 "\n"; next }
- *   found && !/^  / && !/^$/ { exit }
- *   END { printf "%s", block }
- *
- * NOTE the count semantics differ from extractTaskBlock's frozen-counter:
- * here `count++` runs on every task line UNCONDITIONALLY (it's outside the
- * inner if-else), so count advances normally. Each task line at or past idx
- * is checked for `[P]`; the first non-[P] task after a [P] hit closes the
- * block.
- *
- * Returns the accumulated block (possibly multi-task). Trailing newline is
- * NOT stripped here because the awk uses `printf "%s", block` and each
- * appended line carries its own `\n`; the final block ends with `\n` which
- * v6 then assigns to TASK_BLOCK without further trimming.
- */
-function extractParallelGroupBlock(
-  markdown: string,
-  taskIndex: number,
-  maxGroup = 5,
-): string {
-  if (!markdown) return "";
-  if (!Number.isFinite(taskIndex) || taskIndex < 0) return "";
-  const lines = normalizeText(markdown).split("\n");
-  let count = 0;
-  let pcount = 0;
-  let found = false;
-  let block = "";
-  for (const line of lines) {
-    if (/^- \[[ x]\]/.test(line)) {
-      if (count >= taskIndex) {
-        if (/\[P\]/.test(line) && pcount < maxGroup) {
-          found = true;
-          pcount++;
-          block += line + "\n";
-          count++;
-          continue;
-        } else if (found) {
-          break;
-        }
-      }
-      count++;
-      continue;
-    }
-    if (!found) continue;
-    if (/^  /.test(line)) {
-      block += line + "\n";
-      continue;
-    }
-    if (/^\s*$/.test(line)) {
-      block += line + "\n";
-      continue;
-    }
-    // non-indented, non-blank, non-task → exit
-    break;
-  }
-  // Bash command-substitution strips trailing newlines from `$(...)`. v6 uses
-  // `PARALLEL_TASKS=$(awk ...)` so the value loses its trailing `\n`. Mirror
-  // that here for byte-equal continuation prompts.
-  return block.replace(/\n+$/, "");
-}
-
-/**
  * Build a Layer-1 iron-law gate block decision from a `verifyPhaseBlock`
  * result. Emitted when a phase is about to exit but the recorded
  * `verificationBlocks[phase]` is missing, failed, or stale.
@@ -523,20 +422,6 @@ function buildCorruptStateBlock(specPath: string): BlockDecision {
   };
 }
 
-/** Build the quick-mode "do not stop" block decision (L167-183). */
-function buildQuickModeBlock(phase: string, specName: string): BlockDecision {
-  const reason =
-    `Quick mode active — do NOT stop. Continue spec phase: ${phase} for ${specName}.\n\n` +
-    `You are running in quick mode. Do NOT stop, do NOT ask the user questions.\n` +
-    `Continue generating artifacts for the current phase (${phase}) and proceed to the next phase.\n` +
-    `Make strong, opinionated decisions autonomously.`;
-  return {
-    decision: "block",
-    reason,
-    systemMessage: `curdx-flow quick mode: continue ${phase} phase`,
-  };
-}
-
 /**
  * Build the cost-runaway hard-block decision (spec-cost-runaway-guards D4).
  *
@@ -621,94 +506,6 @@ function buildUncheckedTasksBlock(
   };
 }
 
-/** Build the continuation block decision (L314-352). */
-function buildContinuationBlock(args: {
-  specName: string;
-  specPath: string;
-  taskIndex: number;
-  totalTasks: number;
-  taskIteration: number;
-  maxTaskIter: number;
-  globalIteration: number;
-  recoveryMode: boolean;
-  nativeSync: boolean;
-  taskBlock: string;
-  isParallel: boolean;
-  lastMileSummary?: string;
-  stopHookPolicy?: "disabled" | "short-continuation" | "full-loop";
-}): BlockDecision {
-  const taskHeader = args.isParallel
-    ? "## Current Task Group (PARALLEL)"
-    : "## Current Task";
-  // v6 PARALLEL_INSTRUCTIONS literal (L307-308): starts with `\n` so that when
-  // it's substituted into the heredoc (L322 `$PARALLEL_INSTRUCTIONS`), a blank
-  // line precedes the `PARALLEL: ...` text. For non-parallel mode the variable
-  // is empty, leaving the heredoc's two adjacent newlines visible (one from
-  // the empty-var line, one from the explicit blank above `## Resume`).
-  const parallelInstructions = args.isParallel
-    ? `\nPARALLEL: These are [P] tasks -- dispatch ALL in ONE message via Agent tool. Each gets progressFile: .progress-task-$INDEX.md. After all complete: merge progress, advance taskIndex past group.`
-    : "";
-
-  if (args.stopHookPolicy === "short-continuation") {
-    const reason =
-      `Continue spec: ${args.specName} (Task ${args.taskIndex + 1}/${args.totalTasks}, Iter ${args.globalIteration})\n` +
-      `State: path=${args.specPath} index=${args.taskIndex} taskIteration=${args.taskIteration}/${args.maxTaskIter} recovery=${args.recoveryMode}\n\n` +
-      `${taskHeader}\n` +
-      `${args.taskBlock}\n` +
-      `${parallelInstructions}\n\n` +
-      `${args.lastMileSummary ? `Autopilot: ${args.lastMileSummary}\n` : ""}` +
-      `Next: delegate this vertical-slice task, run its Verify command, update tasks.md and .curdx-state.json, then continue. Output ALL_TASKS_COMPLETE only after every task is [x].`;
-
-    let systemMessage =
-      `curdx-flow iteration ${args.globalIteration} | Task ${args.taskIndex + 1}/${args.totalTasks}`;
-    if (args.isParallel) systemMessage += " (PARALLEL GROUP)";
-    return { decision: "block", reason, systemMessage };
-  }
-
-  // The heredoc layout (v6 L314-337) interpolates variables literally on their
-  // own lines. Reproduce by joining each substituted segment with `\n`.
-  const reason =
-    `Continue spec: ${args.specName} (Task ${args.taskIndex + 1}/${args.totalTasks}, Iter ${args.globalIteration})\n` +
-    `\n` +
-    `## State\n` +
-    `Path: ${args.specPath} | Index: ${args.taskIndex} | Iteration: ${args.taskIteration}/${args.maxTaskIter} | Recovery: ${args.recoveryMode} | NativeSync: ${args.nativeSync}\n` +
-    `\n` +
-    `${taskHeader}\n` +
-    `${args.taskBlock}\n` +
-    `${parallelInstructions}\n` +
-    `\n` +
-    `## Resume\n` +
-    `1. Read ${args.specPath}/.curdx-state.json for current state\n` +
-    `2. Native sync (if NativeSync != false): (a) if nativeTaskMap is empty, rebuild from tasks.md (TaskCreate all, store IDs in state), (b) TaskUpdate current task to in_progress with activeForm\n` +
-    `3. Delegate the task above to spec-executor (or qa-engineer for [VERIFY])\n` +
-    `4. On TASK_COMPLETE: verify, update state, advance. Then TaskUpdate task to completed (if NativeSync != false)\n` +
-    `5. If taskIndex >= totalTasks: finalize all native tasks to completed (if NativeSync != false), read ${args.specPath}/tasks.md to verify all [x], delete state file, output ALL_TASKS_COMPLETE\n\n` +
-    `## Critical\n` +
-    `- Delegate via Agent tool - do NOT implement yourself\n` +
-    `- Verify all 3 layers before advancing (see verification-layers.md)\n` +
-    `- Do NOT push after every commit - batch pushes per phase or every 5 commits (see coordinator-pattern.md § 'Git Push Strategy')\n` +
-    `- On failure: increment taskIteration, retry or generate fix task if recoveryMode\n` +
-    `- On TASK_MODIFICATION_REQUEST: validate, insert tasks, update state (see coordinator-pattern.md § 'Modification Request Handler')`;
-
-  let systemMessage =
-    `curdx-flow iteration ${args.globalIteration} | Task ${args.taskIndex + 1}/${args.totalTasks}`;
-  if (args.isParallel) systemMessage += " (PARALLEL GROUP)";
-
-  return { decision: "block", reason, systemMessage };
-}
-
-function buildStopLastMileSummary(cwd: string): string | undefined {
-  try {
-    const decision = decideLastMile({
-      cwd,
-      hookEvent: "Stop",
-    });
-    return `${compactLastMileDecision(decision)} ${decision.coordinatorInstruction}`;
-  } catch {
-    return undefined;
-  }
-}
-
 runHook(async (input) => {
   // D5: canonical early-exit guard — owned by spec A
   // (spec-verification-iron-law). Any stop-hook re-invocation must short-circuit
@@ -729,8 +526,8 @@ runHook(async (input) => {
     if (enabled === "false") return;
   }
 
-  // Resolve current spec. Re-attach `./` prefix that posix.join strips, so
-  // the continuation prompt embeds a path byte-equal to the v6 bash baseline.
+  // Resolve current spec. Re-attach `./` prefix that posix.join strips so
+  // user-facing gate messages preserve the configured specs-dir shape.
   const rawSpecPath = resolveCurrent({ cwd, sessionId: input.session_id });
   if (!rawSpecPath) return;
   const specPath = preserveDotPrefix(rawSpecPath, getSpecsDirs({ cwd }));
@@ -875,35 +672,14 @@ runHook(async (input) => {
     typeof state.taskIndex === "number" ? state.taskIndex : 0;
   const totalTasks =
     typeof state.totalTasks === "number" ? state.totalTasks : 0;
-  const taskIteration =
-    typeof state.taskIteration === "number" ? state.taskIteration : 1;
-  const quickMode = state.quickMode === true;
-  // nativeSyncEnabled: v6 used a shell coalesce `// true` on this field
-  // which — because that operator treats both `null` AND `false` as
-  // default-triggers — returns the string "true" whenever the field is
-  // null/missing OR explicitly `false`. The only way to get "false" out of
-  // that pipeline would be a non-boolean truthy-ish value in the field,
-  // which the state schema disallows. Preserve byte-equal continuation
-  // prompts by returning the v6 stringified result faithfully.
-  const nativeSync = defaultTrueIfFalsyOrNull(state.nativeSyncEnabled);
-  const globalIteration =
-    typeof state.globalIteration === "number" ? state.globalIteration : 1;
-
   // Global iteration cap is now enforced upstream as a hard block via
   // `buildCostRunawayBlock` (spec-cost-runaway-guards C2). The soft stderr
   // warn that previously lived here was removed in v7.2 — see CHANGELOG.
 
-  // Quick-mode guard: block stop during ANY phase except execution.
-  // (D5: stop_hook_active re-invocation already short-circuited at the top of
-  // runHook; no inner guard needed here.)
-  if (quickMode && phase !== "execution") {
-    return buildQuickModeBlock(phase, specName);
-  }
-
   // Log current state during execution phase.
   if (phase === "execution") {
     process.stderr.write(
-      `[curdx-flow] Session stopped during spec: ${specName} | Task: ${taskIndex + 1}/${totalTasks} | Attempt: ${taskIteration}\n`,
+      `[curdx-flow] Session stopped during spec: ${specName} | Task: ${taskIndex + 1}/${totalTasks}\n`,
     );
   }
 
@@ -934,15 +710,11 @@ runHook(async (input) => {
     return;
   }
 
-  // Loop control: continuation prompt when more tasks remain.
+  // Native `/goal` is the execution driver. The Stop hook must not inject a
+  // continuation prompt here; doing so creates a second autonomous loop that
+  // conflicts with the session-scoped goal evaluator. Allow the stop after
+  // cleanup unless one of the hard gates above blocked it.
   if (phase === "execution" && taskIndex < totalTasks) {
-    if (state.autoPolicy?.stopHookPolicy === "disabled") {
-      process.stderr.write(
-        `[curdx-flow] autoPolicy stopHookPolicy=disabled, allowing stop\n`,
-      );
-      return;
-    }
-
     if (state.awaitingApproval === true) {
       process.stderr.write(
         `[curdx-flow] awaitingApproval=true, allowing stop for user gate\n`,
@@ -950,70 +722,11 @@ runHook(async (input) => {
       return;
     }
 
-    const recoveryMode = state.recoveryMode === true;
-    const maxTaskIter =
-      typeof state.maxTaskIterations === "number"
-        ? state.maxTaskIterations
-        : 5;
-
-    // Re-invocation safety guard already enforced at the top of runHook
-    // (D5: canonical early-exit). No inner guard needed here.
-
-    // Extract current task block via shared parser (replaces v6 awk + sed).
-    const tasksFile = join(cwd, specPath, "tasks.md");
-    let taskBlock = "";
-    if (existsSync(tasksFile)) {
-      let tasksMd = "";
-      try {
-        tasksMd = readFileSync(tasksFile, "utf8");
-      } catch {
-        tasksMd = "";
-      }
-      taskBlock = extractTaskBlock(tasksMd, taskIndex);
-    }
-
-    // Parallel-group detection: scan first line of taskBlock for `[P]` marker.
-    const firstLine = taskBlock.split("\n", 1)[0] ?? "";
-    let isParallel = /\[P\]/.test(firstLine);
-
-    if (isParallel && existsSync(tasksFile)) {
-      let tasksMd = "";
-      try {
-        tasksMd = readFileSync(tasksFile, "utf8");
-      } catch {
-        tasksMd = "";
-      }
-      const parallelTasks = extractParallelGroupBlock(tasksMd, taskIndex);
-      if (parallelTasks.length > 0) {
-        taskBlock = parallelTasks;
-      } else {
-        // No [P] tasks accumulated — fall back to single-task path.
-        isParallel = false;
-      }
-    }
-
-    // Pre-2.2 v6 path: emitBlock() (no exit) → fall through to cleanup → exit.
-    // Preserve same effect by running cleanup BEFORE returning the block, so
-    // runHook serializes the JSON last. Cleanup is best-effort (>60 min files)
-    // and produces no stdout/stderr in steady state, so reordering is safe.
     cleanupStaleProgressFiles(join(cwd, specPath));
-    return buildContinuationBlock({
-      specName,
-      specPath,
-      taskIndex,
-      totalTasks,
-      taskIteration,
-      maxTaskIter,
-      globalIteration,
-      recoveryMode,
-      nativeSync,
-      taskBlock,
-      isParallel,
-      lastMileSummary: state.autoPolicy?.stopHookPolicy === "short-continuation"
-        ? buildStopLastMileSummary(cwd)
-        : undefined,
-      stopHookPolicy: state.autoPolicy?.stopHookPolicy,
-    });
+    process.stderr.write(
+      `[curdx-flow] execution remains in progress; native /goal or a later /curdx-flow:implement invocation should drive the next turn\n`,
+    );
+    return;
   }
 
   // Cleanup orphaned temp progress files (>60 min old).

@@ -34,7 +34,7 @@ If the user has not named a specific command, recommend `/curdx-flow:start`. It 
 | `/curdx-flow:status` | Show specs and the recommended next action |
 | `/curdx-flow:triage [epic-name] [goal]` | Split oversized work into dependency-aware specs |
 | `/curdx-flow:tasks` | Generate value-slice implementation tasks after design |
-| `/curdx-flow:implement [--max-task-iterations 5] [--max-global-iterations 30]` | Execute approved tasks |
+| `/curdx-flow:implement [--max-task-iterations 5] [--max-global-iterations 30] [--goal-turns 30] [--manual]` | Execute approved tasks with native `/goal` driving follow-up turns |
 
 All public entrypoints remain available:
 
@@ -43,22 +43,23 @@ All public entrypoints remain available:
 ## Smart Start Options
 
 ```text
-/curdx-flow:start [name] [goal] [--fresh] [--quick] [--mode auto|fast|deep] [--tasks-size auto|coarse|standard|fine] [--review minimal|standard|strict] [--commit-spec] [--no-commit-spec] [--specs-dir <path>]
+/curdx-flow:start [name] [goal] [--fresh] [--quick] [--mode auto|fast|deep] [--task-granularity auto|coarse|standard|fine] [--review minimal|standard|strict] [--commit-spec] [--no-commit-spec] [--specs-dir <path>]
 ```
 
 - `--fresh`: create a new spec instead of resuming a matching unfinished one.
 - `--quick`: skip human approval checkpoints when the route still needs a spec.
 - `--mode`: choose automatic, faster, or deeper policy.
-- `--tasks-size`: override value-slice task granularity.
+- `--task-granularity`: override value-slice task granularity.
 - `--review`: override review cadence.
 - `--commit-spec` / `--no-commit-spec`: control spec artifact commits.
 
-The compatibility `autoPolicy` is stored in `.curdx-state.json`; behavior routing is driven by `smart-route`.
+The compatibility `autoPolicy` is stored in `.curdx-state.json`; behavior routing is driven by `smart-route`, and implementation follow-up turns are driven by native `/goal` unless `--manual` is used.
 
 ## Recovery
 
 - Spec not found: run `/curdx-flow:status`, then `/curdx-flow:switch <name>` or `/curdx-flow:start <name> <goal>`.
 - Wrong active spec: run `/curdx-flow:switch <name>`.
+- Goal unavailable: run `/curdx-flow:implement --manual`, finish the current turn, then resume explicitly.
 - Loop stopped by caps: re-run `/curdx-flow:implement --max-task-iterations <n>` or `/curdx-flow:implement --max-global-iterations <n>` after checking `.progress.md`.
 - Need to change approved docs: run `/curdx-flow:refactor [spec-name]`.
 

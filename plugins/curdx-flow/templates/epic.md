@@ -38,7 +38,7 @@ created: {{TIMESTAMP}}
 **Architecture** (advisory):
 {{Key components, data flow, suggested patterns. This guides decomposition but does not constrain the spec's own design phase.}}
 
-**Size**: {{S/M/L/XL}}
+**Complexity**: {{low|medium|high|epic-level, with basis}}
 
 ## Dependency Graph
 

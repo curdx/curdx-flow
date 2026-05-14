@@ -93,23 +93,22 @@ describe("stop-watcher (Stop hook)", () => {
     corruptSpec.cleanup();
   });
 
-  it("happy: spec mid-execution → exit 0, JSON decision=block with resume prompt", () => {
+  it("happy: spec mid-execution → exit 0, allows stop without continuation prompt", () => {
     const r = runHook(
       "stop-watcher",
       "tests/hooks/fixtures/stop-watcher/execution-block.json",
       { cwd: demoSpec.cwd },
     );
     expect(r.exitCode).toBe(0);
-    expect(r.json).toBeDefined();
-    expect((r.json as any).decision).toBe("block");
-    expect((r.json as any).reason).toMatch(/Continue spec.*demo-spec/);
-    expect((r.json as any).systemMessage).toMatch(/curdx-flow/);
+    expect(r.stdout).toBe("");
+    expect(r.json).toBeUndefined();
     // Stderr banner echoes spec status for human visibility
     expect(norm(r.stderr)).toContain("demo-spec");
+    expect(norm(r.stderr)).toContain("native /goal");
   });
 
-  it("autoPolicy short-continuation → emits compact resume prompt", () => {
-    const shortSpec = createFixtureSpec({
+  it("legacy continuation policy fields are ignored by the Stop hook", () => {
+    const legacyPolicySpec = createFixtureSpec({
       state: {
         phase: "execution",
         taskIndex: 1,
@@ -117,7 +116,7 @@ describe("stop-watcher (Stop hook)", () => {
         autoPolicy: {
           version: 1,
           mode: "auto",
-          size: "M",
+          legacyClassifier: "old-medium",
           risk: "medium",
           executionMode: "standard",
           taskGranularity: "standard",
@@ -125,7 +124,7 @@ describe("stop-watcher (Stop hook)", () => {
           reviewCadence: "final",
           verificationLevel: "standard",
           subagentPolicy: "on-demand",
-          stopHookPolicy: "short-continuation",
+          legacyContinuationPolicy: "old-continuation",
         },
       },
     });
@@ -133,51 +132,39 @@ describe("stop-watcher (Stop hook)", () => {
       const r = runHook(
         "stop-watcher",
         "tests/hooks/fixtures/stop-watcher/execution-block.json",
-        { cwd: shortSpec.cwd },
-      );
-      expect(r.exitCode).toBe(0);
-      expect((r.json as any).decision).toBe("block");
-      expect((r.json as any).reason).toContain("vertical-slice task");
-      expect((r.json as any).reason).not.toContain("Read ./specs");
-      expect((r.json as any).reason).not.toContain("verification-layers.md");
-    } finally {
-      shortSpec.cleanup();
-    }
-  });
-
-  it("autoPolicy disabled stop hook → allows stop without continuation", () => {
-    const directSpec = createFixtureSpec({
-      state: {
-        phase: "execution",
-        taskIndex: 1,
-        totalTasks: 3,
-        autoPolicy: {
-          version: 1,
-          mode: "auto",
-          size: "S",
-          risk: "low",
-          executionMode: "spec-lite",
-          taskGranularity: "coarse",
-          taskTargetRange: { min: 1, max: 3 },
-          reviewCadence: "minimal",
-          verificationLevel: "targeted",
-          subagentPolicy: "none",
-          stopHookPolicy: "disabled",
-        },
-      },
-    });
-    try {
-      const r = runHook(
-        "stop-watcher",
-        "tests/hooks/fixtures/stop-watcher/execution-block.json",
-        { cwd: directSpec.cwd },
+        { cwd: legacyPolicySpec.cwd },
       );
       expect(r.exitCode).toBe(0);
       expect(r.stdout).toBe("");
       expect(r.json).toBeUndefined();
-      expect(norm(r.stderr)).toContain("stopHookPolicy=disabled");
+      expect(norm(r.stderr)).toContain("native /goal");
     } finally {
-      directSpec.cleanup();
+      legacyPolicySpec.cleanup();
+    }
+  });
+
+  it("quick mode outside execution no longer uses Stop-hook continuation", () => {
+    const quickSpec = createFixtureSpec({
+      specName: "quick-spec",
+      state: {
+        phase: "design",
+        taskIndex: 0,
+        totalTasks: 0,
+        quickMode: true,
+      },
+    });
+    try {
+      const r = runHook(
+        "stop-watcher",
+        "tests/hooks/fixtures/stop-watcher/quick-mode.json",
+        { cwd: quickSpec.cwd },
+      );
+      expect(r.exitCode).toBe(0);
+      expect(r.stdout).toBe("");
+      expect(r.json).toBeUndefined();
+      expect(norm(r.stderr)).not.toContain("Continue spec phase");
+    } finally {
+      quickSpec.cleanup();
     }
   });
 
@@ -294,13 +281,13 @@ describe("stop-watcher (Stop hook)", () => {
     }
   });
 
-  // NFR-5b / NFR-2: v7.0.x legacy state without `completed` field must fall
-  // through to the existing in-progress continuation logic (backwards-compat).
+  // NFR-5b / NFR-2: v7.0.x legacy state without `completed` field must be
+  // treated as in-progress without reintroducing Stop-hook continuation.
   // Uses `createLegacyState()` to build the pre-v7.1.0 shape from scratch
   // (no `completed` key at all on disk — absence is explicit, not "set to
   // undefined"). The state file is written manually so DEFAULT_STATE's
   // `completed: false` doesn't leak in via createFixtureSpec's merge.
-  it("legacy v7.0.x state (no `completed` key) → fall through to in-progress logic", () => {
+  it("legacy v7.0.x state (no `completed` key) → allows stop as in-progress", () => {
     const legacySpec = createFixtureSpec({ noStateFile: true });
     try {
       const legacyState = createLegacyState({
@@ -328,10 +315,9 @@ describe("stop-watcher (Stop hook)", () => {
         { cwd: legacySpec.cwd },
       );
       expect(r.exitCode).toBe(0);
-      // Continuation block IS emitted (NFR-2: legacy state → in-progress).
-      expect(r.json).toBeDefined();
-      expect((r.json as any).decision).toBe("block");
-      expect((r.json as any).reason).toMatch(/Continue spec.*demo-spec/);
+      expect(r.stdout).toBe("");
+      expect(r.json).toBeUndefined();
+      expect(norm(r.stderr)).toContain("native /goal");
     } finally {
       legacySpec.cleanup();
     }

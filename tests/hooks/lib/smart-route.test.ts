@@ -36,7 +36,7 @@ describe("smart-route classifier", () => {
   it("keeps a tiny npm-test implementation on the lite-spec path", () => {
     const route = classifySmartRoute({
       goal: "Implement src/greet.js so npm test passes",
-      flags: "--mode fast --review minimal --tasks-size coarse",
+      flags: "--mode fast --review minimal --task-granularity coarse",
       changedFiles: ["src/greet.js", "test/greet.test.js"],
     });
 
@@ -290,6 +290,7 @@ describe("smart-route classifier", () => {
     expect(result.exitCode).toBe(0);
     expect(result.json).toMatchObject({ route: "direct-change" });
     expect(result.stdout).not.toMatch(/"size"\s*:/);
+    expect(result.stdout).not.toMatch(/stopHookPolicy/);
     expect(result.stdout).not.toMatch(/\b(XS|XL)\b/);
   });
 

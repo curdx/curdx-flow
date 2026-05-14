@@ -28,6 +28,7 @@ import {
 } from "./stack-capabilities.js";
 import { buildExecutionBrief } from "./execution-brief.js";
 import { decideLastMile } from "./last-mile-orchestrator.js";
+import { buildGoalBridge } from "./goal-bridge.js";
 import { appendBrainEvent, summarizeProjectBrain } from "./project-brain.js";
 import {
   findSpec,
@@ -62,6 +63,7 @@ function usage(exitCode = 1): never {
     "",
     "commands:",
     "  route --goal <text> [--name <spec>] [--flags <args>] [--cwd <dir>] [--compile] [--record]",
+    "  goal [--spec <name-or-path>] [--goal <text>] [--cwd <dir>] [--max-turns <n>]",
     "  last-mile --goal <text> [--spec <name-or-path>] [--cwd <dir>] [--record]",
     "  snapshot [--spec <name-or-path>] [--goal <text>] [--cwd <dir>] [--session-id <id>]",
     "  specs dirs [--cwd <dir>]",
@@ -155,6 +157,18 @@ function lastMile(argv: string[]): void {
       availableCapabilities: available.length > 0 ? available : undefined,
       hookEvent: "runtime",
       record: hasFlag(argv, "--record"),
+    }),
+  );
+}
+
+function goal(argv: string[]): void {
+  const maxTurnsRaw = readArg("--max-turns", argv) ?? readArg("--max-global-iterations", argv);
+  printJson(
+    buildGoalBridge({
+      cwd: readArg("--cwd", argv),
+      spec: readArg("--spec", argv) ?? readArg("--name", argv),
+      goal: readArg("--goal", argv),
+      maxTurns: maxTurnsRaw === undefined ? undefined : Number(maxTurnsRaw),
     }),
   );
 }
@@ -1135,6 +1149,9 @@ async function main(): Promise<void> {
   switch (command) {
     case "route":
       route(argv);
+      return;
+    case "goal":
+      goal(argv);
       return;
     case "last-mile":
       lastMile(argv);

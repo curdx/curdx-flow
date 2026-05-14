@@ -1,14 +1,14 @@
 {
   "name": "curdx-flow",
-  "version": "7.1.33",
-  "description": "Spec-driven development with task-by-task execution. Research, requirements, design, tasks, autonomous implementation, and epic triage for multi-spec feature decomposition.",
+  "version": "7.1.34",
+  "description": "Spec-driven development with task-by-task execution. Research, requirements, design, tasks, native goal-driven implementation, and epic triage for multi-spec feature decomposition.",
   "author": {
     "name": "curdx"
   },
   "homepage": "https://github.com/curdx/curdx-flow#readme",
   "repository": "https://github.com/curdx/curdx-flow",
   "license": "MIT",
-  "keywords": ["spec-driven", "skills-first", "research", "requirements", "design", "tasks", "autonomous", "loop", "epic", "triage"],
+  "keywords": ["spec-driven", "skills-first", "research", "requirements", "design", "tasks", "autonomous", "goal-driven", "epic", "triage"],
   "dependencies": [
     { "name": "pua", "marketplace": "pua-skills" },
     { "name": "claude-mem", "marketplace": "thedotmack" },

@@ -11,13 +11,12 @@ import { fileURLToPath } from "node:url";
 import { basename } from "node:path";
 
 export type AutoPolicyMode = "auto" | "fast" | "deep";
-export type AutoPolicySize = "XS" | "S" | "M" | "L" | "XL";
 export type AutoPolicyRisk = "low" | "medium" | "high" | "critical";
 export type TaskGranularity = "none" | "coarse" | "standard" | "fine";
 export type ReviewCadence = "minimal" | "final" | "periodic" | "strict";
 export type VerificationLevel = "targeted" | "standard" | "strict";
 export type SubagentPolicy = "none" | "on-demand" | "per-slice";
-export type StopHookPolicy = "disabled" | "short-continuation" | "full-loop";
+export type ExecutionDriver = "goal" | "manual";
 export type ExecutionMode =
   | "direct"
   | "spec-lite"
@@ -39,17 +38,16 @@ export interface TaskTargetRange {
 }
 
 export interface AutoPolicy {
-  version: 1;
+  version: 2;
   mode: AutoPolicyMode;
-  size: AutoPolicySize;
   risk: AutoPolicyRisk;
   executionMode: ExecutionMode;
+  executionDriver: ExecutionDriver;
   taskGranularity: TaskGranularity;
   taskTargetRange: TaskTargetRange;
   reviewCadence: ReviewCadence;
   verificationLevel: VerificationLevel;
   subagentPolicy: SubagentPolicy;
-  stopHookPolicy: StopHookPolicy;
   maxGlobalIterations: number;
   maxTaskIterations: number;
   shouldSplitSpec: boolean;
@@ -58,7 +56,7 @@ export interface AutoPolicy {
 
 interface FlagOverrides {
   mode: AutoPolicyMode;
-  tasksSize?: TaskGranularity | "auto";
+  taskGranularity?: TaskGranularity | "auto";
   review?: ReviewCadence | "standard";
 }
 
@@ -71,7 +69,7 @@ const HIGH_RISK_RE =
 const CRITICAL_RISK_RE =
   /\b(payment|billing|security|secret|secrets|password|token|oauth|authorization|permission|migration|data loss|release|publish|tag|hooks?\.json|plugin\.json|claude-plugin)\b/i;
 
-const XL_RE =
+const EPIC_TRIAGE_RE =
   /\b(epic|multi-spec|multiple specs|multiple subsystems|cross-system|whole app|entire app|rewrite|rebuild|platform|framework migration|全量|重写|多个子系统|史诗)\b/i;
 
 const ADD_OR_FIX_RE =
@@ -84,15 +82,15 @@ function normalizeWords(input: string | undefined): string {
 function parseFlags(flags: string | undefined): FlagOverrides {
   const text = ` ${flags ?? ""} `;
   const modeMatch = text.match(/\s--mode\s+(auto|fast|deep)(?=\s|$)/);
-  const tasksMatch = text.match(
-    /\s--tasks-size\s+(auto|coarse|standard|fine)(?=\s|$)/,
-  );
+  const granularityMatch =
+    text.match(/\s--task-granularity\s+(auto|coarse|standard|fine)(?=\s|$)/) ??
+    text.match(/\s--tasks-size\s+(auto|coarse|standard|fine)(?=\s|$)/);
   const reviewMatch = text.match(
     /\s--review\s+(minimal|standard|strict)(?=\s|$)/,
   );
   return {
     mode: (modeMatch?.[1] as AutoPolicyMode | undefined) ?? "auto",
-    tasksSize: tasksMatch?.[1] as FlagOverrides["tasksSize"],
+    taskGranularity: granularityMatch?.[1] as FlagOverrides["taskGranularity"],
     review: reviewMatch?.[1] as FlagOverrides["review"],
   };
 }
@@ -150,116 +148,118 @@ function classifyRisk(goal: string, files: string[], fileCount: number): {
   return { risk, reasons };
 }
 
-function classifySize(args: {
+function classifyExecutionMode(args: {
   goal: string;
   risk: AutoPolicyRisk;
   fileCount: number;
   dirCount: number;
   taskCount?: number;
   mode: AutoPolicyMode;
-}): { size: AutoPolicySize; reasons: string[] } {
+}): { executionMode: ExecutionMode; reasons: string[] } {
   const reasons: string[] = [];
-  let size: AutoPolicySize;
+  let executionMode: ExecutionMode;
 
   if (
-    XL_RE.test(args.goal) ||
+    EPIC_TRIAGE_RE.test(args.goal) ||
     args.fileCount >= 16 ||
     args.dirCount >= 6 ||
     (typeof args.taskCount === "number" && args.taskCount > 12)
   ) {
-    size = "XL";
-    reasons.push("epic or oversized task/file surface");
+    executionMode = "epic-triage";
+    reasons.push("epic-level or multi-subsystem task/file surface");
   } else if (args.risk === "critical" || args.fileCount >= 9) {
-    size = "L";
+    executionMode = "deep-spec";
     reasons.push("critical/high blast radius requires deep spec");
   } else if (args.risk === "high" || args.fileCount >= 4) {
-    size = "M";
+    executionMode = "standard";
     reasons.push("moderate implementation surface");
   } else if (args.risk === "low" && args.fileCount <= 1) {
-    size = "XS";
+    executionMode = "direct";
     reasons.push("single low-risk change");
   } else if (args.fileCount <= 3) {
-    size = "S";
+    executionMode = "spec-lite";
     reasons.push("small bounded change");
   } else {
-    size = "M";
+    executionMode = "standard";
     reasons.push("default standard slice");
   }
 
-  if (args.mode === "deep" && size !== "XL") {
-    size = size === "XS" || size === "S" ? "M" : "L";
+  if (args.mode === "deep" && executionMode !== "epic-triage") {
+    executionMode =
+      executionMode === "direct" || executionMode === "spec-lite"
+        ? "standard"
+        : "deep-spec";
     reasons.push("explicit deep mode");
   }
-  if (args.mode === "fast" && size === "L" && args.risk !== "critical") {
-    size = "M";
+  if (
+    args.mode === "fast" &&
+    executionMode === "deep-spec" &&
+    args.risk !== "critical"
+  ) {
+    executionMode = "standard";
     reasons.push("explicit fast mode without critical risk");
   }
 
-  return { size, reasons };
+  return { executionMode, reasons };
 }
 
-function policyForSize(size: AutoPolicySize): Omit<
+function policyForExecutionMode(executionMode: ExecutionMode): Omit<
   AutoPolicy,
-  "version" | "mode" | "size" | "risk" | "shouldSplitSpec" | "reasons"
+  "version" | "mode" | "risk" | "executionMode" | "shouldSplitSpec" | "reasons"
 > {
-  switch (size) {
-    case "XS":
+  switch (executionMode) {
+    case "direct":
       return {
-        executionMode: "direct",
+        executionDriver: "goal",
         taskGranularity: "none",
         taskTargetRange: { min: 0, max: 1 },
         reviewCadence: "minimal",
         verificationLevel: "targeted",
         subagentPolicy: "none",
-        stopHookPolicy: "disabled",
         maxGlobalIterations: 5,
         maxTaskIterations: 2,
       };
-    case "S":
+    case "spec-lite":
       return {
-        executionMode: "spec-lite",
+        executionDriver: "goal",
         taskGranularity: "coarse",
         taskTargetRange: { min: 1, max: 3 },
         reviewCadence: "minimal",
         verificationLevel: "targeted",
         subagentPolicy: "none",
-        stopHookPolicy: "disabled",
         maxGlobalIterations: 8,
         maxTaskIterations: 3,
       };
-    case "M":
+    case "standard":
       return {
-        executionMode: "standard",
+        executionDriver: "goal",
         taskGranularity: "standard",
         taskTargetRange: { min: 3, max: 7 },
         reviewCadence: "final",
         verificationLevel: "standard",
         subagentPolicy: "on-demand",
-        stopHookPolicy: "short-continuation",
         maxGlobalIterations: 18,
         maxTaskIterations: 4,
       };
-    case "L":
+    case "deep-spec":
       return {
-        executionMode: "deep-spec",
+        executionDriver: "goal",
         taskGranularity: "standard",
         taskTargetRange: { min: 5, max: 12 },
         reviewCadence: "periodic",
         verificationLevel: "strict",
         subagentPolicy: "per-slice",
-        stopHookPolicy: "short-continuation",
         maxGlobalIterations: 30,
         maxTaskIterations: 5,
       };
-    case "XL":
+    case "epic-triage":
       return {
-        executionMode: "epic-triage",
+        executionDriver: "goal",
         taskGranularity: "standard",
         taskTargetRange: { min: 5, max: 10 },
         reviewCadence: "strict",
         verificationLevel: "strict",
         subagentPolicy: "per-slice",
-        stopHookPolicy: "short-continuation",
         maxGlobalIterations: 30,
         maxTaskIterations: 5,
       };
@@ -271,9 +271,12 @@ function applyOverrides(
   overrides: FlagOverrides,
 ): AutoPolicy {
   const next: AutoPolicy = { ...policy };
-  if (overrides.tasksSize !== undefined && overrides.tasksSize !== "auto") {
-    next.taskGranularity = overrides.tasksSize;
-    next.reasons = [...next.reasons, `explicit tasks-size=${overrides.tasksSize}`];
+  if (overrides.taskGranularity !== undefined && overrides.taskGranularity !== "auto") {
+    next.taskGranularity = overrides.taskGranularity;
+    next.reasons = [
+      ...next.reasons,
+      `explicit task-granularity=${overrides.taskGranularity}`,
+    ];
   }
   if (overrides.review === "minimal") {
     next.reviewCadence = "minimal";
@@ -298,7 +301,7 @@ export function classifyAutoPolicy(input: AutoPolicyInput): AutoPolicy {
   const dirCount = countDistinctDirs(changedFiles);
 
   const riskResult = classifyRisk(goal, changedFiles, fileCount);
-  const sizeResult = classifySize({
+  const modeResult = classifyExecutionMode({
     goal,
     risk: riskResult.risk,
     fileCount,
@@ -306,20 +309,20 @@ export function classifyAutoPolicy(input: AutoPolicyInput): AutoPolicy {
     taskCount: input.taskCount,
     mode: flags.mode,
   });
-  const base = policyForSize(sizeResult.size);
+  const base = policyForExecutionMode(modeResult.executionMode);
   const taskCount = input.taskCount;
   const shouldSplitSpec =
-    sizeResult.size === "XL" ||
+    modeResult.executionMode === "epic-triage" ||
     (typeof taskCount === "number" && taskCount > base.taskTargetRange.max);
 
   return applyOverrides(
     {
-      version: 1,
+      version: 2,
       mode: flags.mode,
-      size: sizeResult.size,
       risk: riskResult.risk,
+      executionMode: modeResult.executionMode,
       shouldSplitSpec,
-      reasons: [...riskResult.reasons, ...sizeResult.reasons],
+      reasons: [...riskResult.reasons, ...modeResult.reasons],
       ...base,
     },
     flags,

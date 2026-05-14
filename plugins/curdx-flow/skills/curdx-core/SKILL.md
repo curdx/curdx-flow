@@ -62,7 +62,7 @@ All curdx-flow public entrypoint skills support these standard arguments:
 | `--max-task-iterations` | `-m` | Max retries per failed task before stopping | 5 |
 | `--max-global-iterations` | | Max whole-spec loop iterations before stopping | 30 |
 | `--fresh` | `-f` | Force new spec/feature, overwrite if exists | false |
-| `--tasks-size` | | Task sizing override: `auto`, `coarse`, `standard`, or `fine` | auto |
+| `--task-granularity` | | Task granularity override: `auto`, `coarse`, `standard`, or `fine` | auto |
 | `--review` | | Review override: `minimal`, `standard`, or `strict` | policy-derived |
 
 Argument precedence: `--no-commit-spec` > `--commit-spec` > mode default.
@@ -85,7 +85,7 @@ instead of asking the user to choose fast/deep. Policy controls:
 - review cadence
 - verification level
 - subagent policy
-- Stop-hook continuation length
+- native `/goal` turn driver and deterministic Stop-hook gates
 
 ### Normal Mode (Interactive)
 

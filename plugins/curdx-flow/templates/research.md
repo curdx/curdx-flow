@@ -52,7 +52,7 @@ created: {{TIMESTAMP}}
 | Aspect | Assessment | Notes |
 |--------|------------|-------|
 | Technical Viability | High/Medium/Low | {{reasoning}} |
-| Effort Estimate | S/M/L/XL | {{basis for estimate}} |
+| Effort Estimate | low/medium/high/epic-level | {{basis for estimate}} |
 | Risk Level | High/Medium/Low | {{key risks identified}} |
 
 ## Recommendations for Requirements

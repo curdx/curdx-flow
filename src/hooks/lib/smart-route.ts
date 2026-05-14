@@ -118,12 +118,12 @@ export interface SmartRoute {
     mode: AutoPolicy["mode"];
     risk: AutoPolicy["risk"];
     executionMode: AutoPolicy["executionMode"];
+    executionDriver: AutoPolicy["executionDriver"];
     taskGranularity: AutoPolicy["taskGranularity"];
     taskTargetRange: AutoPolicy["taskTargetRange"];
     reviewCadence: AutoPolicy["reviewCadence"];
     verificationLevel: AutoPolicy["verificationLevel"];
     subagentPolicy: AutoPolicy["subagentPolicy"];
-    stopHookPolicy: AutoPolicy["stopHookPolicy"];
     maxGlobalIterations: AutoPolicy["maxGlobalIterations"];
     maxTaskIterations: AutoPolicy["maxTaskIterations"];
     shouldSplitSpec: AutoPolicy["shouldSplitSpec"];
@@ -244,12 +244,12 @@ function publicPolicy(policy: AutoPolicy): SmartRoute["policy"] {
     mode: policy.mode,
     risk: policy.risk,
     executionMode: policy.executionMode,
+    executionDriver: policy.executionDriver,
     taskGranularity: policy.taskGranularity,
     taskTargetRange: policy.taskTargetRange,
     reviewCadence: policy.reviewCadence,
     verificationLevel: policy.verificationLevel,
     subagentPolicy: policy.subagentPolicy,
-    stopHookPolicy: policy.stopHookPolicy,
     maxGlobalIterations: policy.maxGlobalIterations,
     maxTaskIterations: policy.maxTaskIterations,
     shouldSplitSpec: policy.shouldSplitSpec,

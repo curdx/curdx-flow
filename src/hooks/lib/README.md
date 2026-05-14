@@ -42,7 +42,7 @@ to recreate later.
 
 | Lib | LOC | Callers | Purpose |
 | --- | --- | --- | --- |
-| `auto-policy` | 360 | 0 (designed for `skills/start`, `skills/new`, `skills/tasks`) | deterministic XS/S/M/L/XL execution policy classifier for task sizing, review cadence, verification level, subagent use, and Stop-hook behavior |
+| `auto-policy` | 360 | 0 (designed for `skills/start`, `skills/new`, `skills/tasks`) | deterministic execution policy classifier for behavior routing, task granularity, review cadence, verification level, subagent use, and goal/manual execution driver |
 | `cleanup-files` | 185 | 0 (designed for `skills/implement/SKILL.md` cleanup phase) | glob + delete with safety guards (refuses to delete outside repo, refuses dotfiles unless explicit) |
 | `count-mocks` | 107 | 0 (designed for `templates/tasks.md` verification-before-completion VE2) | walks tests/, counts `vi.mock` / `jest.mock` / `mock.fn` occurrences, prints mock-vs-real ratio JSON |
 | `count-tasks` | 54 | 0 (designed for `templates/tasks.md`, `skills/status/SKILL.md`) | parse `tasks.md` → `{total, completed, pending}` JSON via `_shared/markdown-task-parser` |

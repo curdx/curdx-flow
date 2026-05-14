@@ -22,12 +22,12 @@ describe("AutoPolicy workflow docs", () => {
     ].join("\n");
 
     expect(docs).toContain("--mode auto|fast|deep");
-    expect(docs).toContain("--tasks-size auto|coarse|standard|fine");
+    expect(docs).toContain("--task-granularity auto|coarse|standard|fine");
     expect(docs).toContain("--review minimal|standard|strict");
     expect(docs).toContain("autoPolicy");
   });
 
-  it("task sizing docs enforce vertical slices and bounded task counts", () => {
+  it("task granularity docs enforce vertical slices and bounded task counts", () => {
     const sizing = read("plugins/curdx-flow/references/sizing-rules.md");
     const planner = read("plugins/curdx-flow/agents/task-planner.md");
     const combined = `${sizing}\n${planner}`;

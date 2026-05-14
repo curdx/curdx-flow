@@ -35,9 +35,9 @@ What this means for autonomous loops:
 - **Sleep > 5 min between iterations = guaranteed cache miss.** Every
   re-entry pays full input-token price for the system prompt + tool defs +
   prior turns up to the cache breakpoint.
-- **Stop hook that prompts a verifier subagent** can easily blow past 5 min
-  on a slow `npm run verify` / typecheck / test run; on the next iteration
-  the loop pays write-price again.
+- **Goal-driven verifier turns** can easily blow past 5 min on a slow
+  `npm run verify` / typecheck / test run; on the next `/goal` turn the loop
+  may pay write-price again.
 - **Schema-default `maxGlobalIterations`** (this spec changed it from 100 →
   30, see `package.json` schema and `spec.schema.json::definitions.state`)
   exists precisely to bound how many times the loop can re-pay this
@@ -102,9 +102,9 @@ if (input.stop_hook_active) return { continue: false };
 ```
 
 This is **NOT** owned by this spec — it is the canonical anti-recursion
-guard from `spec-iron-law-verification` (spec A). It prevents a Stop hook
-that itself triggers a continuation prompt from re-invoking itself in an
-unbounded recursion, which would re-pay the cache-write multiplier every
+guard from `spec-iron-law-verification` (spec A). It keeps command hooks from
+running their Stop logic recursively when Claude Code is already inside a
+Stop-hook evaluation path, which would re-pay the cache-write multiplier every
 single re-entry.
 
 For the full rationale, field semantics, and hook-source pointers, see:

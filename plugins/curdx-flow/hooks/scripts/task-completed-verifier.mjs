@@ -308,7 +308,7 @@ import { basename as basename3 } from "node:path";
 var LOW_RISK_RE = /\b(readme|docs?|documentation|typo|copy|wording|comment|comments|changelog|license|format text|rename label|css copy|style text)\b/i;
 var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|delete|remove|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
 var CRITICAL_RISK_RE = /\b(payment|billing|security|secret|secrets|password|token|oauth|authorization|permission|migration|data loss|release|publish|tag|hooks?\.json|plugin\.json|claude-plugin)\b/i;
-var XL_RE = /\b(epic|multi-spec|multiple specs|multiple subsystems|cross-system|whole app|entire app|rewrite|rebuild|platform|framework migration|全量|重写|多个子系统|史诗)\b/i;
+var EPIC_TRIAGE_RE = /\b(epic|multi-spec|multiple specs|multiple subsystems|cross-system|whole app|entire app|rewrite|rebuild|platform|framework migration|全量|重写|多个子系统|史诗)\b/i;
 var ADD_OR_FIX_RE = /\b(add|build|create|implement|support|fix|debug|repair|resolve|refactor|change|modify|update)\b/i;
 function normalizeWords(input) {
   return (input ?? "").trim().replace(/\s+/g, " ");
@@ -316,15 +316,13 @@ function normalizeWords(input) {
 function parseFlags(flags) {
   const text = ` ${flags ?? ""} `;
   const modeMatch = text.match(/\s--mode\s+(auto|fast|deep)(?=\s|$)/);
-  const tasksMatch = text.match(
-    /\s--tasks-size\s+(auto|coarse|standard|fine)(?=\s|$)/
-  );
+  const granularityMatch = text.match(/\s--task-granularity\s+(auto|coarse|standard|fine)(?=\s|$)/) ?? text.match(/\s--tasks-size\s+(auto|coarse|standard|fine)(?=\s|$)/);
   const reviewMatch = text.match(
     /\s--review\s+(minimal|standard|strict)(?=\s|$)/
   );
   return {
     mode: modeMatch?.[1] ?? "auto",
-    tasksSize: tasksMatch?.[1],
+    taskGranularity: granularityMatch?.[1],
     review: reviewMatch?.[1]
   };
 }
@@ -373,97 +371,92 @@ function classifyRisk(goal, files, fileCount) {
   }
   return { risk, reasons };
 }
-function classifySize(args) {
+function classifyExecutionMode(args) {
   const reasons = [];
-  let size;
-  if (XL_RE.test(args.goal) || args.fileCount >= 16 || args.dirCount >= 6 || typeof args.taskCount === "number" && args.taskCount > 12) {
-    size = "XL";
-    reasons.push("epic or oversized task/file surface");
+  let executionMode;
+  if (EPIC_TRIAGE_RE.test(args.goal) || args.fileCount >= 16 || args.dirCount >= 6 || typeof args.taskCount === "number" && args.taskCount > 12) {
+    executionMode = "epic-triage";
+    reasons.push("epic-level or multi-subsystem task/file surface");
   } else if (args.risk === "critical" || args.fileCount >= 9) {
-    size = "L";
+    executionMode = "deep-spec";
     reasons.push("critical/high blast radius requires deep spec");
   } else if (args.risk === "high" || args.fileCount >= 4) {
-    size = "M";
+    executionMode = "standard";
     reasons.push("moderate implementation surface");
   } else if (args.risk === "low" && args.fileCount <= 1) {
-    size = "XS";
+    executionMode = "direct";
     reasons.push("single low-risk change");
   } else if (args.fileCount <= 3) {
-    size = "S";
+    executionMode = "spec-lite";
     reasons.push("small bounded change");
   } else {
-    size = "M";
+    executionMode = "standard";
     reasons.push("default standard slice");
   }
-  if (args.mode === "deep" && size !== "XL") {
-    size = size === "XS" || size === "S" ? "M" : "L";
+  if (args.mode === "deep" && executionMode !== "epic-triage") {
+    executionMode = executionMode === "direct" || executionMode === "spec-lite" ? "standard" : "deep-spec";
     reasons.push("explicit deep mode");
   }
-  if (args.mode === "fast" && size === "L" && args.risk !== "critical") {
-    size = "M";
+  if (args.mode === "fast" && executionMode === "deep-spec" && args.risk !== "critical") {
+    executionMode = "standard";
     reasons.push("explicit fast mode without critical risk");
   }
-  return { size, reasons };
+  return { executionMode, reasons };
 }
-function policyForSize(size) {
-  switch (size) {
-    case "XS":
+function policyForExecutionMode(executionMode) {
+  switch (executionMode) {
+    case "direct":
       return {
-        executionMode: "direct",
+        executionDriver: "goal",
         taskGranularity: "none",
         taskTargetRange: { min: 0, max: 1 },
         reviewCadence: "minimal",
         verificationLevel: "targeted",
         subagentPolicy: "none",
-        stopHookPolicy: "disabled",
         maxGlobalIterations: 5,
         maxTaskIterations: 2
       };
-    case "S":
+    case "spec-lite":
       return {
-        executionMode: "spec-lite",
+        executionDriver: "goal",
         taskGranularity: "coarse",
         taskTargetRange: { min: 1, max: 3 },
         reviewCadence: "minimal",
         verificationLevel: "targeted",
         subagentPolicy: "none",
-        stopHookPolicy: "disabled",
         maxGlobalIterations: 8,
         maxTaskIterations: 3
       };
-    case "M":
+    case "standard":
       return {
-        executionMode: "standard",
+        executionDriver: "goal",
         taskGranularity: "standard",
         taskTargetRange: { min: 3, max: 7 },
         reviewCadence: "final",
         verificationLevel: "standard",
         subagentPolicy: "on-demand",
-        stopHookPolicy: "short-continuation",
         maxGlobalIterations: 18,
         maxTaskIterations: 4
       };
-    case "L":
+    case "deep-spec":
       return {
-        executionMode: "deep-spec",
+        executionDriver: "goal",
         taskGranularity: "standard",
         taskTargetRange: { min: 5, max: 12 },
         reviewCadence: "periodic",
         verificationLevel: "strict",
         subagentPolicy: "per-slice",
-        stopHookPolicy: "short-continuation",
         maxGlobalIterations: 30,
         maxTaskIterations: 5
       };
-    case "XL":
+    case "epic-triage":
       return {
-        executionMode: "epic-triage",
+        executionDriver: "goal",
         taskGranularity: "standard",
         taskTargetRange: { min: 5, max: 10 },
         reviewCadence: "strict",
         verificationLevel: "strict",
         subagentPolicy: "per-slice",
-        stopHookPolicy: "short-continuation",
         maxGlobalIterations: 30,
         maxTaskIterations: 5
       };
@@ -471,9 +464,12 @@ function policyForSize(size) {
 }
 function applyOverrides(policy, overrides) {
   const next = { ...policy };
-  if (overrides.tasksSize !== void 0 && overrides.tasksSize !== "auto") {
-    next.taskGranularity = overrides.tasksSize;
-    next.reasons = [...next.reasons, `explicit tasks-size=${overrides.tasksSize}`];
+  if (overrides.taskGranularity !== void 0 && overrides.taskGranularity !== "auto") {
+    next.taskGranularity = overrides.taskGranularity;
+    next.reasons = [
+      ...next.reasons,
+      `explicit task-granularity=${overrides.taskGranularity}`
+    ];
   }
   if (overrides.review === "minimal") {
     next.reviewCadence = "minimal";
@@ -493,7 +489,7 @@ function classifyAutoPolicy(input) {
   const fileCount = Math.max(estimatedFiles, changedFiles.length);
   const dirCount = countDistinctDirs(changedFiles);
   const riskResult = classifyRisk(goal, changedFiles, fileCount);
-  const sizeResult = classifySize({
+  const modeResult = classifyExecutionMode({
     goal,
     risk: riskResult.risk,
     fileCount,
@@ -501,17 +497,17 @@ function classifyAutoPolicy(input) {
     taskCount: input.taskCount,
     mode: flags.mode
   });
-  const base = policyForSize(sizeResult.size);
+  const base = policyForExecutionMode(modeResult.executionMode);
   const taskCount = input.taskCount;
-  const shouldSplitSpec = sizeResult.size === "XL" || typeof taskCount === "number" && taskCount > base.taskTargetRange.max;
+  const shouldSplitSpec = modeResult.executionMode === "epic-triage" || typeof taskCount === "number" && taskCount > base.taskTargetRange.max;
   return applyOverrides(
     {
-      version: 1,
+      version: 2,
       mode: flags.mode,
-      size: sizeResult.size,
       risk: riskResult.risk,
+      executionMode: modeResult.executionMode,
       shouldSplitSpec,
-      reasons: [...riskResult.reasons, ...sizeResult.reasons],
+      reasons: [...riskResult.reasons, ...modeResult.reasons],
       ...base
     },
     flags
@@ -2373,12 +2369,12 @@ function publicPolicy(policy) {
     mode: policy.mode,
     risk: policy.risk,
     executionMode: policy.executionMode,
+    executionDriver: policy.executionDriver,
     taskGranularity: policy.taskGranularity,
     taskTargetRange: policy.taskTargetRange,
     reviewCadence: policy.reviewCadence,
     verificationLevel: policy.verificationLevel,
     subagentPolicy: policy.subagentPolicy,
-    stopHookPolicy: policy.stopHookPolicy,
     maxGlobalIterations: policy.maxGlobalIterations,
     maxTaskIterations: policy.maxTaskIterations,
     shouldSplitSpec: policy.shouldSplitSpec

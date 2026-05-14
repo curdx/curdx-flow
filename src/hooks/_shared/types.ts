@@ -6,7 +6,7 @@
  *
  * Design choice: a single permissive `HookStdin` interface with all observed
  * fields optional, plus a discriminated `HookOutput` union covering the three
- * actual emitted shapes (context block | permission decision | stop block).
+ * actual emitted shapes (context block | permission decision | stop safety block).
  *
  * Rationale: we keep `HookStdin` permissive because Claude Code's hook
  * envelope evolves and we tolerate unknown fields (FR-8: never block the
@@ -23,7 +23,7 @@
 
 /**
  * Decision tags emitted by hooks at the top-level `decision` field.
- *  - `block` : Stop hook continuation (stop-watcher).
+ *  - `block` : Stop hook safety/completion gate (stop-watcher).
  *
  * Note: PreToolUse permission decisions (quick-mode-guard) do NOT use the
  * top-level `decision` field — Claude Code's schema rejects values other
@@ -90,9 +90,10 @@ export interface DenyDecisionOutput {
 }
 
 /**
- * Stop hook block decision — emitted by stop-watcher to keep the loop alive
- * (continuation, quick-mode hold, corrupt-state recovery, unchecked-tasks
- * gate).
+ * Stop hook block decision — emitted by stop-watcher for deterministic safety
+ * gates only (corrupt-state recovery, cost caps, failed verification, or
+ * unchecked tasks). Follow-up turns are driven by native `/goal`, not by this
+ * output shape.
  */
 export interface BlockDecisionOutput {
   decision: "block";
@@ -222,21 +223,21 @@ export interface CurdxState {
   awaitingApproval?: boolean;
   recoveryMode?: boolean;
   nativeSyncEnabled?: boolean;
+  executionDriver?: "goal" | "manual";
   // mode
   quickMode?: boolean;
   granularity?: "auto" | "fine" | "standard" | "coarse";
   autoPolicy?: {
     version?: 1 | 2;
     mode?: "auto" | "fast" | "deep";
-    size?: "XS" | "S" | "M" | "L" | "XL";
     risk?: "low" | "medium" | "high" | "critical";
     executionMode?: "direct" | "spec-lite" | "standard" | "deep-spec" | "epic-triage";
+    executionDriver?: "goal" | "manual";
     taskGranularity?: "none" | "coarse" | "standard" | "fine";
     taskTargetRange?: { min?: number; max?: number };
     reviewCadence?: "minimal" | "final" | "periodic" | "strict";
     verificationLevel?: "targeted" | "standard" | "strict";
     subagentPolicy?: "none" | "on-demand" | "per-slice";
-    stopHookPolicy?: "disabled" | "short-continuation" | "full-loop";
     maxGlobalIterations?: number;
     maxTaskIterations?: number;
     shouldSplitSpec?: boolean;

@@ -500,6 +500,17 @@ describe("byte-equal regression vs v6.0.6 baseline", () => {
 
           const normalizedBaseline = normalize(baseline);
           let normalizedV7 = normalize(captured.combined);
+          if (hook === "stop-watcher" && baselineFile === "execution-block.txt") {
+            expect(normalizedV7).toContain("native /goal");
+            expect(normalizedV7).not.toContain("\"decision\":\"block\"");
+            expect(normalizedV7).not.toContain("Continue spec:");
+            return;
+          }
+          if (hook === "stop-watcher" && baselineFile === "quick-mode.txt") {
+            expect(normalizedV7).not.toContain("\"decision\":\"block\"");
+            expect(normalizedV7).not.toContain("Continue spec phase");
+            return;
+          }
           normalizedV7 = reconcileAdditiveJson(normalizedBaseline, normalizedV7);
 
           expect(normalizedV7).toEqual(normalizedBaseline);

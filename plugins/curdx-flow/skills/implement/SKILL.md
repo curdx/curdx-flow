@@ -1,7 +1,7 @@
 ---
 name: implement
 description: Use when a spec has tasks.md and should enter autonomous task execution.
-argument-hint: "[--max-task-iterations 5] [--max-global-iterations 30] [--recovery-mode]"
+argument-hint: "[--max-task-iterations 5] [--max-global-iterations 30] [--goal-turns 30] [--manual] [--recovery-mode]"
 allowed-tools: "Read Write Edit Agent Bash Skill"
 disable-model-invocation: true
 ---
@@ -18,7 +18,7 @@ Complete these coordination steps in order; do not create user-facing implementa
 1. **Validate prerequisites** -- check spec and tasks.md exist
 2. **Parse arguments** -- extract flags and options
 3. **Initialize state** -- write .curdx-state.json
-4. **Execute task loop** -- delegate tasks via coordinator pattern
+4. **Start goal-driven execution** -- compile native /goal condition and delegate tasks via coordinator pattern
 5. **Handle completion** -- cleanup and output ALL_TASKS_COMPLETE
 
 ## Step 1: Determine Active Spec and Validate
@@ -38,12 +38,15 @@ Complete these coordination steps in order; do not create user-facing implementa
 From `$ARGUMENTS`:
 - **--max-task-iterations**: Max retries per task (default: 5). Cap on per-task retry loop; when hit, the current task is marked failed and the retry loop breaks (US-2 / AC-2.2). Override example: `--max-task-iterations 10`.
 - **--max-global-iterations**: Max total loop iterations (default: 30 per FR-D1; tightened from legacy 100 to bound cost runaway blast radius). Safety limit to prevent infinite execution loops; when hit, the coordinator halts entirely (US-1 / AC-1.1). Override example: `--max-global-iterations 100` to opt back into legacy cap. Mirrors `--max-task-iterations` parse pattern: flag value propagates into `state.maxGlobalIterations` at init.
+- **--goal-turns**: Max native `/goal` turns before reporting an incomplete blocker (default: same as `--max-global-iterations`).
+- **--manual**: Do not ask the user to set native `/goal`; run one coordinator turn and leave a resumable status. Use only when `/goal` is unavailable because hooks are disabled or managed policy disallows it.
 - **--recovery-mode**: Enable iterative failure recovery (default: false). When enabled, failed tasks trigger automatic fix task generation instead of stopping.
 
 Read existing `.curdx-state.json::autoPolicy` before applying defaults:
 - If no explicit `--max-task-iterations`, use `autoPolicy.maxTaskIterations` when present, else 5.
 - If no explicit `--max-global-iterations`, use `autoPolicy.maxGlobalIterations` when present, else 30.
-- If `autoPolicy.stopHookPolicy == "disabled"`, execute the first task normally but do not rely on Stop-hook continuation for unattended looping.
+- If no explicit `--goal-turns`, use the parsed max-global value.
+- Ignore legacy continuation policy keys from older state files; native `/goal` is the default execution driver.
 
 ## Step 3: Initialize Execution State
 
@@ -79,6 +82,7 @@ Update `.curdx-state.json` by merging these fields into the existing object:
   "maxModificationsPerTask": 3,
   "maxModificationDepth": 2,
   "awaitingApproval": false,
+  "executionDriver": "<'manual' when --manual is present, otherwise 'goal'>",
   "nativeTaskMap": {},
   "nativeSyncEnabled": true,
   "nativeSyncFailureCount": 0
@@ -87,24 +91,69 @@ Update `.curdx-state.json` by merging these fields into the existing object:
 
 Use the merge-state lib to preserve existing fields (atomic deep-merge, cross-platform):
 ```bash
-PATCH=$(node -e "console.log(JSON.stringify({phase:'execution',taskIndex:$FIRST_INCOMPLETE,totalTasks:$TOTAL,taskIteration:1,maxTaskIterations:$MAX_TASK_ITER,recoveryMode:$RECOVERY_MODE,maxFixTasksPerOriginal:3,maxFixTaskDepth:3,globalIteration:1,maxGlobalIterations:$MAX_GLOBAL_ITER,fixTaskMap:{},modificationMap:{},maxModificationsPerTask:3,maxModificationDepth:2,awaitingApproval:false,nativeTaskMap:{},nativeSyncEnabled:true,nativeSyncFailureCount:0}))")
+PATCH=$(FIRST_INCOMPLETE="$FIRST_INCOMPLETE" TOTAL="$TOTAL" MAX_TASK_ITER="$MAX_TASK_ITER" RECOVERY_MODE="$RECOVERY_MODE" MAX_GLOBAL_ITER="$MAX_GLOBAL_ITER" MANUAL_MODE="$MANUAL_MODE" node -e '
+const bool = (name) => /^(1|true|yes)$/i.test(process.env[name] || "");
+const num = (name, fallback) => {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : fallback;
+};
+console.log(JSON.stringify({
+  phase: "execution",
+  taskIndex: num("FIRST_INCOMPLETE", 0),
+  totalTasks: num("TOTAL", 0),
+  taskIteration: 1,
+  maxTaskIterations: num("MAX_TASK_ITER", 5),
+  recoveryMode: bool("RECOVERY_MODE"),
+  maxFixTasksPerOriginal: 3,
+  maxFixTaskDepth: 3,
+  globalIteration: 1,
+  maxGlobalIterations: num("MAX_GLOBAL_ITER", 30),
+  fixTaskMap: {},
+  modificationMap: {},
+  maxModificationsPerTask: 3,
+  maxModificationDepth: 2,
+  awaitingApproval: false,
+  executionDriver: bool("MANUAL_MODE") ? "manual" : "goal",
+  nativeTaskMap: {},
+  nativeSyncEnabled: true,
+  nativeSyncFailureCount: 0
+}));
+')
 curdx-flow state merge "$SPEC_PATH/.curdx-state.json" "$PATCH"
 ```
 
-Where `$MAX_TASK_ITER`, `$RECOVERY_MODE`, `$MAX_GLOBAL_ITER` come from parsed arguments (Step 2). The merge-state lib handles atomic write internally — no tmp+mv needed.
+Where `$FIRST_INCOMPLETE` and `$TOTAL` come from the task count command, and `$MAX_TASK_ITER`, `$RECOVERY_MODE`, `$MAX_GLOBAL_ITER`, and `$MANUAL_MODE` come from parsed arguments (Step 2). The merge-state lib handles atomic write internally — no tmp+mv needed.
 
 **Preserved fields** (set by earlier phases, must NOT be removed):
 - `source`, `name`, `basePath`, `commitSpec`, `relatedSpecs`
 
 **State v2 policy**: New execution state uses `version: 2`. If a legacy state blocks execution, reinitialize with `/curdx-flow:start --fresh` or rerun this skill after replacing the state file; do not silently migrate malformed state.
 
-## Step 4: Execute Task Loop
+## Step 4: Start Goal-Driven Execution
 
-After writing the state file, output the coordinator prompt below. This starts the execution loop.
-The stop-hook continues the loop only when policy allows it. `autoPolicy.stopHookPolicy` controls this:
-- `disabled`: no automatic continuation; complete the current task and stop with status.
-- `short-continuation`: hook injects only current task + next action.
-- `full-loop`: legacy long coordinator prompt.
+After writing the state file, compile the native Claude Code `/goal` bridge:
+
+```bash
+curdx-flow goal --cwd "$PWD" --spec "$SPEC_PATH" --max-turns "$GOAL_TURNS"
+```
+
+Treat the JSON as the execution driver contract:
+- `slashCommand` is the exact native `/goal` condition to run for unattended multi-turn execution.
+- `condition` is transcript-verifiable. Claude must surface every proof needed by the goal evaluator; the evaluator will not run commands or read files by itself.
+- `evidenceProtocol` lists the proof that must appear before `ALL_TASKS_COMPLETE`.
+- `warnings` explains fallback cases such as `disableAllHooks` or managed `allowManagedHooksOnly`.
+
+Default path:
+1. Show the `slashCommand` prominently before the coordinator prompt.
+2. Tell the user that native `/goal` drives follow-up turns. Do not claim unattended continuation unless that slash command is active.
+3. Continue with the first coordinator turn using the prompt below.
+
+Manual fallback:
+- If `--manual` is present or `/goal` is unavailable, run only the current coordinator turn.
+- Leave `.curdx-state.json` resumable and print the next action instead of relying on any Stop-hook continuation.
+- The Stop hook is now a deterministic safety/completion gate only; it must not be treated as the execution loop driver.
 
 Before dispatching the first task, run:
 
@@ -148,6 +197,7 @@ Then Read and follow these references in order. They contain the complete coordi
    This covers: one commit per task, commit message format, spec file staging, and when to commit.
 
 Before dispatching any task, read `.curdx-state.json::autoPolicy` and obey:
+- `executionDriver`: `goal` means native `/goal` owns follow-up turns; `manual` means return a resumable status after the current turn.
 - `subagentPolicy`: no implementation subagent for `none`; on-demand delegation for `on-demand`; one focused subagent per vertical slice for `per-slice`.
 - `reviewCadence`: artifact review only at the cadence selected by policy.
 - `verificationLevel`: targeted/standard/strict verification depth.

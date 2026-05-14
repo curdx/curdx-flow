@@ -26,17 +26,16 @@ curdx-flow uses `.curdx-state.json` to track execution state. Current state is
   "maxTaskIterations": 5,
   "maxGlobalIterations": 30,
   "autoPolicy": {
-    "version": 1,
+    "version": 2,
     "mode": "auto",
-    "size": "<legacy internal classifier label>",
     "risk": "medium",
     "executionMode": "standard",
+    "executionDriver": "goal",
     "taskGranularity": "standard",
     "taskTargetRange": { "min": 3, "max": 7 },
     "reviewCadence": "final",
     "verificationLevel": "standard",
-    "subagentPolicy": "on-demand",
-    "stopHookPolicy": "short-continuation"
+    "subagentPolicy": "on-demand"
   },
   "projectTopology": {
     "workspaceState": "existing",
@@ -125,7 +124,7 @@ curdx-flow uses `.curdx-state.json` to track execution state. Current state is
 | `taskIteration` | number | Current retry attempt (1-based) |
 | `maxTaskIterations` | number | Max retries before blocking |
 | `maxGlobalIterations` | number | Max execution loop iterations before blocking |
-| `autoPolicy` | object | Deterministic policy controlling sizing, review, verification, subagents, and stop-hook behavior |
+| `autoPolicy` | object | Deterministic policy controlling behavior routing, review, verification, subagents, goal/manual execution driver, and iteration caps |
 | `projectTopology` | object | Compact multi-root project facts returned by `smart-route` |
 | `intent` | object | Adaptive start facts: workspace state, intent kind, clarity, stack/artifact signals, delivery expectation, missing facts, and recommended action |
 | `route` | object | Initial route decision returned by `curdx-flow route`, including optional stack profile, quality gates, suggested verifier, and context budget |
@@ -142,18 +141,17 @@ curdx-flow uses `.curdx-state.json` to track execution state. Current state is
 
 ### AutoPolicy Fields
 
-`autoPolicy` is computed through `curdx-flow route` when a spec is created. Later phases must obey it instead of re-asking the user to choose fast/deep:
+`autoPolicy` is computed through `curdx-flow route` when a spec is created. Later phases must obey it instead of re-asking the user to choose fast/deep. Existing state files from older releases may contain ignored legacy classifier keys; current skills should use behavior routes and policy fields below:
 
 | Field | Values |
 |-------|--------|
-| `size` | legacy internal classifier label; skills should use `smart-route` behavior names instead |
 | `risk` | `low`, `medium`, `high`, `critical` |
 | `executionMode` | `direct`, `spec-lite`, `standard`, `deep-spec`, `epic-triage` |
+| `executionDriver` | `goal`, `manual` |
 | `taskGranularity` | `none`, `coarse`, `standard`, `fine` |
 | `reviewCadence` | `minimal`, `final`, `periodic`, `strict` |
 | `verificationLevel` | `targeted`, `standard`, `strict` |
 | `subagentPolicy` | `none`, `on-demand`, `per-slice` |
-| `stopHookPolicy` | `disabled`, `short-continuation`, `full-loop` |
 
 ## Phase Values
 

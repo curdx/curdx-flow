@@ -152,6 +152,7 @@ The goal MUST be captured before proceeding:
      "maxTaskIterations": "<POLICY_JSON.maxTaskIterations>",
      "globalIteration": 1,
      "maxGlobalIterations": "<POLICY_JSON.maxGlobalIterations>",
+     "executionDriver": "goal",
      "autoPolicy": "<POLICY_JSON object>",
      "route": "<ROUTE_JSON compact object>",
      "granularity": "<POLICY_JSON.taskGranularity>"

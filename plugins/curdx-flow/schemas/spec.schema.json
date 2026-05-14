@@ -98,24 +98,19 @@
   "definitions": {
     "autoPolicy": {
       "type": "object",
-      "description": "Deterministic execution policy selected before expensive model work. Drives task sizing, review cadence, subagent usage, verification strictness, and Stop-hook continuation length.",
-      "required": ["version", "mode", "size", "risk", "executionMode", "taskGranularity", "taskTargetRange", "reviewCadence", "verificationLevel", "subagentPolicy", "stopHookPolicy"],
-      "additionalProperties": false,
+      "description": "Deterministic execution policy selected before expensive model work. Drives behavior routing, review cadence, subagent usage, verification strictness, and iteration caps. Legacy policy keys from older state files are tolerated but ignored by the current runtime.",
+      "required": ["version", "mode", "risk", "executionMode", "taskGranularity", "taskTargetRange", "reviewCadence", "verificationLevel", "subagentPolicy"],
+      "additionalProperties": true,
       "properties": {
         "version": {
           "type": "integer",
-          "const": 1,
+          "enum": [1, 2],
           "description": "AutoPolicy schema version"
         },
         "mode": {
           "type": "string",
           "enum": ["auto", "fast", "deep"],
           "description": "User override mode parsed from --mode; auto is default"
-        },
-        "size": {
-          "type": "string",
-          "enum": ["XS", "S", "M", "L", "XL"],
-          "description": "Execution size selected by deterministic classifier"
         },
         "risk": {
           "type": "string",
@@ -127,10 +122,15 @@
           "enum": ["direct", "spec-lite", "standard", "deep-spec", "epic-triage"],
           "description": "Workflow strength selected for this spec"
         },
+        "executionDriver": {
+          "type": "string",
+          "enum": ["goal", "manual"],
+          "description": "Turn driver for implementation. Current default is native Claude Code /goal; manual is the fallback when /goal is unavailable."
+        },
         "taskGranularity": {
           "type": "string",
           "enum": ["none", "coarse", "standard", "fine"],
-          "description": "Task sizing policy; none means direct work without tasks.md"
+          "description": "Task granularity policy; none means direct work without tasks.md"
         },
         "taskTargetRange": {
           "type": "object",
@@ -156,11 +156,6 @@
           "type": "string",
           "enum": ["none", "on-demand", "per-slice"],
           "description": "When implementation/review subagents should be used"
-        },
-        "stopHookPolicy": {
-          "type": "string",
-          "enum": ["disabled", "short-continuation", "full-loop"],
-          "description": "How much continuation context the Stop hook may inject"
         },
         "maxGlobalIterations": {
           "type": "integer",
@@ -383,7 +378,7 @@
         "granularity": {
           "type": "string",
           "enum": ["auto", "fine", "standard", "coarse"],
-          "description": "Task sizing override. AutoPolicy is authoritative when present; legacy fine/coarse states remain valid."
+          "description": "Task granularity override. AutoPolicy is authoritative when present; legacy fine/coarse states remain valid."
         },
         "autoPolicy": {
           "$ref": "#/definitions/autoPolicy",
@@ -501,6 +496,11 @@
           "type": "object",
           "description": "Compact last-mile autopilot state: current phase/problem, capability plan, and evidence gates inferred from route, snapshot, and project brain.",
           "additionalProperties": true
+        },
+        "executionDriver": {
+          "type": "string",
+          "enum": ["goal", "manual"],
+          "description": "Turn driver for implementation state. `goal` means native Claude Code /goal owns follow-up turns; `manual` means the current turn should leave resumable status."
         },
         "completed": {
           "type": "boolean",

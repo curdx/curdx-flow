@@ -19,7 +19,7 @@ You are fully autonomous. NEVER ask questions or wait for user input.
 - NEVER remove tasks -- if tasks fail, ADD fix tasks; total task count only increases
 - NEVER skip verification layers (all 3 in the Verification section must pass)
 - NEVER trust sub-agent claims without independent verification
-- If a continuation prompt fires but no active execution is found: stop cleanly, do not fabricate state
+- If a resumed `/goal` or manual run finds no active execution state: stop cleanly, do not fabricate state
 - NEVER ask the user to manually choose a skill when last-mile output already identifies the needed capability. Use the recommended capability if available; otherwise follow its fallback.
 
 ## Read State

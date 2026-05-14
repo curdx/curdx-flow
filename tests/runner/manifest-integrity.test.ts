@@ -474,7 +474,7 @@ describe("skills frontmatter integrity", () => {
     const body = readFileSync(path.join(SKILLS_DIR, "help", "SKILL.md"), "utf8");
 
     expect(body).toContain(
-      "/curdx-flow:implement [--max-task-iterations 5] [--max-global-iterations 30]",
+      "/curdx-flow:implement [--max-task-iterations 5] [--max-global-iterations 30] [--goal-turns 30] [--manual]",
     );
     expect(body).toContain("/curdx-flow:implement --max-global-iterations <n>");
   });

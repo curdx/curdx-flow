@@ -8,8 +8,8 @@ const __dirname = __ccd(__filename);
 // src/hooks/lib/runtime-cli.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync9, readFileSync as readFileSync9, statSync as statSync6 } from "node:fs";
-import { basename as basename10, dirname, isAbsolute as isAbsolute6, join as join8, resolve as resolve5 } from "node:path";
-import { fileURLToPath as fileURLToPath7 } from "node:url";
+import { basename as basename11, dirname, isAbsolute as isAbsolute6, join as join8, resolve as resolve5 } from "node:path";
+import { fileURLToPath as fileURLToPath8 } from "node:url";
 
 // src/hooks/lib/smart-route.ts
 import { existsSync as existsSync5, readFileSync as readFileSync5 } from "node:fs";
@@ -22,7 +22,7 @@ import { basename } from "node:path";
 var LOW_RISK_RE = /\b(readme|docs?|documentation|typo|copy|wording|comment|comments|changelog|license|format text|rename label|css copy|style text)\b/i;
 var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|delete|remove|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
 var CRITICAL_RISK_RE = /\b(payment|billing|security|secret|secrets|password|token|oauth|authorization|permission|migration|data loss|release|publish|tag|hooks?\.json|plugin\.json|claude-plugin)\b/i;
-var XL_RE = /\b(epic|multi-spec|multiple specs|multiple subsystems|cross-system|whole app|entire app|rewrite|rebuild|platform|framework migration|全量|重写|多个子系统|史诗)\b/i;
+var EPIC_TRIAGE_RE = /\b(epic|multi-spec|multiple specs|multiple subsystems|cross-system|whole app|entire app|rewrite|rebuild|platform|framework migration|全量|重写|多个子系统|史诗)\b/i;
 var ADD_OR_FIX_RE = /\b(add|build|create|implement|support|fix|debug|repair|resolve|refactor|change|modify|update)\b/i;
 function normalizeWords(input) {
   return (input ?? "").trim().replace(/\s+/g, " ");
@@ -30,15 +30,13 @@ function normalizeWords(input) {
 function parseFlags(flags) {
   const text = ` ${flags ?? ""} `;
   const modeMatch = text.match(/\s--mode\s+(auto|fast|deep)(?=\s|$)/);
-  const tasksMatch = text.match(
-    /\s--tasks-size\s+(auto|coarse|standard|fine)(?=\s|$)/
-  );
+  const granularityMatch = text.match(/\s--task-granularity\s+(auto|coarse|standard|fine)(?=\s|$)/) ?? text.match(/\s--tasks-size\s+(auto|coarse|standard|fine)(?=\s|$)/);
   const reviewMatch = text.match(
     /\s--review\s+(minimal|standard|strict)(?=\s|$)/
   );
   return {
     mode: modeMatch?.[1] ?? "auto",
-    tasksSize: tasksMatch?.[1],
+    taskGranularity: granularityMatch?.[1],
     review: reviewMatch?.[1]
   };
 }
@@ -58,22 +56,22 @@ function bumpRisk(a, b) {
   const order = ["low", "medium", "high", "critical"];
   return order[Math.max(order.indexOf(a), order.indexOf(b))];
 }
-function classifyRisk(goal, files, fileCount) {
+function classifyRisk(goal2, files, fileCount) {
   let risk = "medium";
   const reasons = [];
-  if (LOW_RISK_RE.test(goal)) {
+  if (LOW_RISK_RE.test(goal2)) {
     risk = "low";
     reasons.push("low-risk wording/docs signal");
   }
-  if (!ADD_OR_FIX_RE.test(goal) && fileCount <= 2) {
+  if (!ADD_OR_FIX_RE.test(goal2) && fileCount <= 2) {
     risk = bumpRisk(risk, "low");
     reasons.push("small unclear change; keep validation targeted");
   }
-  if (HIGH_RISK_RE.test(goal) || files.some((f) => HIGH_RISK_RE.test(f))) {
+  if (HIGH_RISK_RE.test(goal2) || files.some((f) => HIGH_RISK_RE.test(f))) {
     risk = bumpRisk(risk, "high");
     reasons.push("high-risk domain or publish-critical file");
   }
-  if (CRITICAL_RISK_RE.test(goal) || files.some((f) => CRITICAL_RISK_RE.test(f))) {
+  if (CRITICAL_RISK_RE.test(goal2) || files.some((f) => CRITICAL_RISK_RE.test(f))) {
     risk = bumpRisk(risk, "critical");
     reasons.push("critical security/data/release/plugin surface");
   }
@@ -87,97 +85,92 @@ function classifyRisk(goal, files, fileCount) {
   }
   return { risk, reasons };
 }
-function classifySize(args) {
+function classifyExecutionMode(args) {
   const reasons = [];
-  let size;
-  if (XL_RE.test(args.goal) || args.fileCount >= 16 || args.dirCount >= 6 || typeof args.taskCount === "number" && args.taskCount > 12) {
-    size = "XL";
-    reasons.push("epic or oversized task/file surface");
+  let executionMode;
+  if (EPIC_TRIAGE_RE.test(args.goal) || args.fileCount >= 16 || args.dirCount >= 6 || typeof args.taskCount === "number" && args.taskCount > 12) {
+    executionMode = "epic-triage";
+    reasons.push("epic-level or multi-subsystem task/file surface");
   } else if (args.risk === "critical" || args.fileCount >= 9) {
-    size = "L";
+    executionMode = "deep-spec";
     reasons.push("critical/high blast radius requires deep spec");
   } else if (args.risk === "high" || args.fileCount >= 4) {
-    size = "M";
+    executionMode = "standard";
     reasons.push("moderate implementation surface");
   } else if (args.risk === "low" && args.fileCount <= 1) {
-    size = "XS";
+    executionMode = "direct";
     reasons.push("single low-risk change");
   } else if (args.fileCount <= 3) {
-    size = "S";
+    executionMode = "spec-lite";
     reasons.push("small bounded change");
   } else {
-    size = "M";
+    executionMode = "standard";
     reasons.push("default standard slice");
   }
-  if (args.mode === "deep" && size !== "XL") {
-    size = size === "XS" || size === "S" ? "M" : "L";
+  if (args.mode === "deep" && executionMode !== "epic-triage") {
+    executionMode = executionMode === "direct" || executionMode === "spec-lite" ? "standard" : "deep-spec";
     reasons.push("explicit deep mode");
   }
-  if (args.mode === "fast" && size === "L" && args.risk !== "critical") {
-    size = "M";
+  if (args.mode === "fast" && executionMode === "deep-spec" && args.risk !== "critical") {
+    executionMode = "standard";
     reasons.push("explicit fast mode without critical risk");
   }
-  return { size, reasons };
+  return { executionMode, reasons };
 }
-function policyForSize(size) {
-  switch (size) {
-    case "XS":
+function policyForExecutionMode(executionMode) {
+  switch (executionMode) {
+    case "direct":
       return {
-        executionMode: "direct",
+        executionDriver: "goal",
         taskGranularity: "none",
         taskTargetRange: { min: 0, max: 1 },
         reviewCadence: "minimal",
         verificationLevel: "targeted",
         subagentPolicy: "none",
-        stopHookPolicy: "disabled",
         maxGlobalIterations: 5,
         maxTaskIterations: 2
       };
-    case "S":
+    case "spec-lite":
       return {
-        executionMode: "spec-lite",
+        executionDriver: "goal",
         taskGranularity: "coarse",
         taskTargetRange: { min: 1, max: 3 },
         reviewCadence: "minimal",
         verificationLevel: "targeted",
         subagentPolicy: "none",
-        stopHookPolicy: "disabled",
         maxGlobalIterations: 8,
         maxTaskIterations: 3
       };
-    case "M":
+    case "standard":
       return {
-        executionMode: "standard",
+        executionDriver: "goal",
         taskGranularity: "standard",
         taskTargetRange: { min: 3, max: 7 },
         reviewCadence: "final",
         verificationLevel: "standard",
         subagentPolicy: "on-demand",
-        stopHookPolicy: "short-continuation",
         maxGlobalIterations: 18,
         maxTaskIterations: 4
       };
-    case "L":
+    case "deep-spec":
       return {
-        executionMode: "deep-spec",
+        executionDriver: "goal",
         taskGranularity: "standard",
         taskTargetRange: { min: 5, max: 12 },
         reviewCadence: "periodic",
         verificationLevel: "strict",
         subagentPolicy: "per-slice",
-        stopHookPolicy: "short-continuation",
         maxGlobalIterations: 30,
         maxTaskIterations: 5
       };
-    case "XL":
+    case "epic-triage":
       return {
-        executionMode: "epic-triage",
+        executionDriver: "goal",
         taskGranularity: "standard",
         taskTargetRange: { min: 5, max: 10 },
         reviewCadence: "strict",
         verificationLevel: "strict",
         subagentPolicy: "per-slice",
-        stopHookPolicy: "short-continuation",
         maxGlobalIterations: 30,
         maxTaskIterations: 5
       };
@@ -185,9 +178,12 @@ function policyForSize(size) {
 }
 function applyOverrides(policy, overrides) {
   const next = { ...policy };
-  if (overrides.tasksSize !== void 0 && overrides.tasksSize !== "auto") {
-    next.taskGranularity = overrides.tasksSize;
-    next.reasons = [...next.reasons, `explicit tasks-size=${overrides.tasksSize}`];
+  if (overrides.taskGranularity !== void 0 && overrides.taskGranularity !== "auto") {
+    next.taskGranularity = overrides.taskGranularity;
+    next.reasons = [
+      ...next.reasons,
+      `explicit task-granularity=${overrides.taskGranularity}`
+    ];
   }
   if (overrides.review === "minimal") {
     next.reviewCadence = "minimal";
@@ -200,32 +196,32 @@ function applyOverrides(policy, overrides) {
   return next;
 }
 function classifyAutoPolicy(input) {
-  const goal = normalizeWords(input.goal);
+  const goal2 = normalizeWords(input.goal);
   const flags = parseFlags(input.flags);
   const changedFiles = input.changedFiles ?? [];
   const estimatedFiles = typeof input.estimatedFiles === "number" && Number.isFinite(input.estimatedFiles) ? Math.max(0, Math.floor(input.estimatedFiles)) : changedFiles.length;
   const fileCount = Math.max(estimatedFiles, changedFiles.length);
   const dirCount = countDistinctDirs(changedFiles);
-  const riskResult = classifyRisk(goal, changedFiles, fileCount);
-  const sizeResult = classifySize({
-    goal,
+  const riskResult = classifyRisk(goal2, changedFiles, fileCount);
+  const modeResult = classifyExecutionMode({
+    goal: goal2,
     risk: riskResult.risk,
     fileCount,
     dirCount,
     taskCount: input.taskCount,
     mode: flags.mode
   });
-  const base = policyForSize(sizeResult.size);
+  const base = policyForExecutionMode(modeResult.executionMode);
   const taskCount = input.taskCount;
-  const shouldSplitSpec = sizeResult.size === "XL" || typeof taskCount === "number" && taskCount > base.taskTargetRange.max;
+  const shouldSplitSpec = modeResult.executionMode === "epic-triage" || typeof taskCount === "number" && taskCount > base.taskTargetRange.max;
   return applyOverrides(
     {
-      version: 1,
+      version: 2,
       mode: flags.mode,
-      size: sizeResult.size,
       risk: riskResult.risk,
+      executionMode: modeResult.executionMode,
       shouldSplitSpec,
-      reasons: [...riskResult.reasons, ...sizeResult.reasons],
+      reasons: [...riskResult.reasons, ...modeResult.reasons],
       ...base
     },
     flags
@@ -242,13 +238,13 @@ function readArg(name, argv) {
 }
 function main() {
   const argv = process.argv.slice(2);
-  const goal = readArg("--goal", argv) ?? "";
+  const goal2 = readArg("--goal", argv) ?? "";
   const flags = readArg("--flags", argv) ?? "";
   const files = parseList(readArg("--files", argv));
   const estimatedRaw = readArg("--estimated-files", argv);
   const taskRaw = readArg("--task-count", argv);
   const policy = classifyAutoPolicy({
-    goal,
+    goal: goal2,
     flags,
     changedFiles: files,
     estimatedFiles: estimatedRaw === void 0 ? void 0 : Number(estimatedRaw),
@@ -1003,8 +999,8 @@ function rootMatches(root, role) {
   if (role === "shared") return root.kinds.includes("shared-library");
   return root.kinds.includes("claude-code-plugin");
 }
-function inferRequiredRoots(goal, roots) {
-  const text = (goal ?? "").trim();
+function inferRequiredRoots(goal2, roots) {
+  const text = (goal2 ?? "").trim();
   if (text.length === 0) return [];
   const required = /* @__PURE__ */ new Map();
   const frontendRoots = roots.filter((root) => rootMatches(root, "frontend"));
@@ -1116,9 +1112,9 @@ function readArg2(name, argv) {
 function main2() {
   const argv = process.argv.slice(2);
   const cwd = readArg2("--cwd", argv);
-  const goal = readArg2("--goal", argv);
+  const goal2 = readArg2("--goal", argv);
   const format = readArg2("--format", argv) ?? "json";
-  const topology = discoverProjectTopology({ cwd, goal });
+  const topology = discoverProjectTopology({ cwd, goal: goal2 });
   if (format === "context-map") {
     process.stdout.write(renderContextMap(topology));
     return;
@@ -1404,8 +1400,8 @@ function sortRecommendations(recs) {
   return [...recs].sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
 }
 function recommendToolCapabilities(input) {
-  const goal = normalize(input.goal);
-  const semanticGoal = normalize(stripKnownCapabilityTokens(goal));
+  const goal2 = normalize(input.goal);
+  const semanticGoal = normalize(stripKnownCapabilityTokens(goal2));
   const route2 = normalize(input.route);
   const risk = normalize(input.risk);
   const topologyKinds2 = input.topologyKinds ?? [];
@@ -2016,10 +2012,10 @@ function hasManifestHint(rootAbs, hint) {
   }
   return existsSync4(join3(rootAbs, hint));
 }
-function scoreStack(stack, roots, projectRoot, goal) {
+function scoreStack(stack, roots, projectRoot, goal2) {
   const evidence = [];
   let score = 0;
-  if (stack.goalPattern.test(goal)) {
+  if (stack.goalPattern.test(goal2)) {
     score += stack.id === "claude-code-plugin" ? 0.46 : ["react", "vue", "next", "spring-cloud", "spring-boot"].includes(stack.id) ? 0.32 : 0.24;
     evidence.push("goal keyword");
   }
@@ -2053,9 +2049,9 @@ function scoreStack(stack, roots, projectRoot, goal) {
   };
 }
 function detectStackProfile(input) {
-  const goal = normalizeText(stripKnownCapabilityTokens(input.goal));
+  const goal2 = normalizeText(stripKnownCapabilityTokens(input.goal));
   const roots = input.topology.roots;
-  const detected = Object.values(STACKS).map((stack) => scoreStack(stack, roots, input.topology.projectRoot, goal)).filter((item) => item !== null).sort(
+  const detected = Object.values(STACKS).map((stack) => scoreStack(stack, roots, input.topology.projectRoot, goal2)).filter((item) => item !== null).sort(
     (a, b) => b.confidence - a.confidence || STACK_PRIORITY[b.id] - STACK_PRIORITY[a.id]
   );
   const primary = detected[0]?.id ?? "unknown";
@@ -2216,14 +2212,14 @@ function readArg4(name, argv) {
 function main4() {
   const argv = process.argv.slice(2);
   const cwd = readArg4("--cwd", argv);
-  const goal = readArg4("--goal", argv) ?? "";
+  const goal2 = readArg4("--goal", argv) ?? "";
   const route2 = readArg4("--route", argv);
   const risk = readArg4("--risk", argv);
-  const topology = discoverProjectTopology({ cwd, goal });
-  const stackProfile = detectStackProfile({ cwd, goal, topology, route: route2, risk });
-  const qualityGates = selectQualityGates({ cwd, goal, topology, route: route2, risk, stackProfile });
-  const suggestedVerifier = selectSuggestedVerifier({ cwd, goal, topology, route: route2, risk, stackProfile, qualityGates });
-  const contextBudget = selectContextBudget({ cwd, goal, topology, route: route2, risk, stackProfile });
+  const topology = discoverProjectTopology({ cwd, goal: goal2 });
+  const stackProfile = detectStackProfile({ cwd, goal: goal2, topology, route: route2, risk });
+  const qualityGates = selectQualityGates({ cwd, goal: goal2, topology, route: route2, risk, stackProfile });
+  const suggestedVerifier = selectSuggestedVerifier({ cwd, goal: goal2, topology, route: route2, risk, stackProfile, qualityGates });
+  const contextBudget = selectContextBudget({ cwd, goal: goal2, topology, route: route2, risk, stackProfile });
   process.stdout.write(JSON.stringify({
     stackProfile,
     qualityGates,
@@ -2332,12 +2328,12 @@ function publicPolicy(policy) {
     mode: policy.mode,
     risk: policy.risk,
     executionMode: policy.executionMode,
+    executionDriver: policy.executionDriver,
     taskGranularity: policy.taskGranularity,
     taskTargetRange: policy.taskTargetRange,
     reviewCadence: policy.reviewCadence,
     verificationLevel: policy.verificationLevel,
     subagentPolicy: policy.subagentPolicy,
-    stopHookPolicy: policy.stopHookPolicy,
     maxGlobalIterations: policy.maxGlobalIterations,
     maxTaskIterations: policy.maxTaskIterations,
     shouldSplitSpec: policy.shouldSplitSpec
@@ -2362,8 +2358,8 @@ var REFACTOR_RE = /\b(refactor|rewrite|cleanup|restructure|重构|重写|整理)
 var RELEASE_RE = /\b(release|publish|deploy|ship|tag|npm|上线|发布|部署|打包)\b/i;
 var DEMO_RE = /\b(demo|prototype|poc|演示|原型)\b/i;
 var PRODUCTION_RE = /\b(production|prod|ship|launch|deploy|release|上线|生产|发布|可用|能用)\b/i;
-function classifyIntent(goal, topology) {
-  const semanticGoal = stripKnownCapabilityTokens(goal);
+function classifyIntent(goal2, topology) {
+  const semanticGoal = stripKnownCapabilityTokens(goal2);
   const artifactProvided = ARTIFACT_RE.test(semanticGoal);
   const stackSpecified = STACK_RE.test(semanticGoal);
   let intentKind = "unknown";
@@ -2374,7 +2370,7 @@ function classifyIntent(goal, topology) {
   else if (FIX_RE.test(semanticGoal)) intentKind = "fix";
   else if (REFACTOR_RE.test(semanticGoal)) intentKind = "refactor";
   else if (PRODUCT_RE.test(semanticGoal)) intentKind = "product";
-  else if (goal.length > 0) intentKind = "feature";
+  else if (goal2.length > 0) intentKind = "feature";
   let deliveryExpectation = "maintenance";
   if (DEMO_RE.test(semanticGoal)) deliveryExpectation = "demo";
   else if (PRODUCTION_RE.test(semanticGoal)) deliveryExpectation = "production";
@@ -2561,13 +2557,13 @@ function topologyFrameworks(topology) {
   return [...new Set(topology.roots.flatMap((root) => root.frameworks))];
 }
 function classifySmartRoute(input) {
-  const goal = normalizeText2(input.goal);
+  const goal2 = normalizeText2(input.goal);
   const cwd = input.cwd ?? process.cwd();
   const activeSpec = findActiveSpec({ ...input, cwd });
-  const topology = discoverProjectTopology({ cwd, goal });
-  const intent = classifyIntent(goal, topology);
+  const topology = discoverProjectTopology({ cwd, goal: goal2 });
+  const intent = classifyIntent(goal2, topology);
   const policy = classifyAutoPolicy({
-    goal,
+    goal: goal2,
     flags: input.flags,
     changedFiles: input.changedFiles,
     estimatedFiles: input.estimatedFiles,
@@ -2576,14 +2572,14 @@ function classifySmartRoute(input) {
   const routeCandidate = routeFromIntent(intent, policy);
   const stackProfile = detectStackProfile({
     cwd,
-    goal,
+    goal: goal2,
     topology,
     route: routeCandidate,
     risk: policy.risk
   });
   const qualityGates = selectQualityGates({
     cwd,
-    goal,
+    goal: goal2,
     topology,
     route: routeCandidate,
     risk: policy.risk,
@@ -2591,7 +2587,7 @@ function classifySmartRoute(input) {
   });
   const suggestedVerifier = selectSuggestedVerifier({
     cwd,
-    goal,
+    goal: goal2,
     topology,
     route: routeCandidate,
     risk: policy.risk,
@@ -2600,7 +2596,7 @@ function classifySmartRoute(input) {
   });
   const contextBudget = selectContextBudget({
     cwd,
-    goal,
+    goal: goal2,
     topology,
     route: routeCandidate,
     risk: policy.risk,
@@ -2608,7 +2604,7 @@ function classifySmartRoute(input) {
   });
   const brain = summarizeProjectBrain(cwd);
   const recommendations = recommendToolCapabilities({
-    goal,
+    goal: goal2,
     route: routeCandidate,
     risk: policy.risk,
     topologyKinds: topologyKinds(topology),
@@ -2620,7 +2616,7 @@ function classifySmartRoute(input) {
     availableCapabilities: input.availableCapabilities,
     recentFailures: brain.recentFailures.length
   });
-  if (activeSpec !== void 0 && !activeSpec.completed && goal.length === 0) {
+  if (activeSpec !== void 0 && !activeSpec.completed && goal2.length === 0) {
     return {
       version: 1,
       route: "resume-current",
@@ -2639,7 +2635,7 @@ function classifySmartRoute(input) {
       reasons: ["active unfinished spec"]
     };
   }
-  if (activeSpec !== void 0 && !activeSpec.completed && normalizeText2(input.name).length > 0 && goal.length > 0) {
+  if (activeSpec !== void 0 && !activeSpec.completed && normalizeText2(input.name).length > 0 && goal2.length > 0) {
     return {
       version: 1,
       route: "blocked-ask-user",
@@ -2680,7 +2676,7 @@ function classifySmartRoute(input) {
       };
     }
   }
-  if (goal.length === 0) {
+  if (goal2.length === 0) {
     return {
       version: 1,
       route: "blocked-ask-user",
@@ -2738,7 +2734,7 @@ function classifySmartRoute(input) {
 }
 function main5() {
   const argv = process.argv.slice(2);
-  const goal = readArg5("--goal", argv) ?? "";
+  const goal2 = readArg5("--goal", argv) ?? "";
   const name = readArg5("--name", argv);
   const flags = readArg5("--flags", argv) ?? "";
   const cwd = readArg5("--cwd", argv);
@@ -2747,7 +2743,7 @@ function main5() {
   const estimatedRaw = readArg5("--estimated-files", argv);
   const taskRaw = readArg5("--task-count", argv);
   const route2 = classifySmartRoute({
-    goal,
+    goal: goal2,
     name,
     flags,
     cwd,
@@ -3725,8 +3721,8 @@ function hasRec(route2, id) {
 function missingCapabilityIds(route2) {
   return route2.recommendedCapabilities.filter((item) => item.availabilityState === "missing" && item.expectedByDefault).map((item) => item.id);
 }
-function isReleaseSensitive(goal, route2) {
-  return route2.intent.intentKind === "release" || RELEASE_RE2.test(goal) || route2.qualityGates.some((gate) => gate.id.endsWith("-release")) || route2.stackProfile.primary === "claude-code-plugin" && RELEASE_RE2.test(goal);
+function isReleaseSensitive(goal2, route2) {
+  return route2.intent.intentKind === "release" || RELEASE_RE2.test(goal2) || route2.qualityGates.some((gate) => gate.id.endsWith("-release")) || route2.stackProfile.primary === "claude-code-plugin" && RELEASE_RE2.test(goal2);
 }
 function hasVerificationGap(input, snapshot2) {
   if (input.verification?.ok === false) return true;
@@ -3736,11 +3732,11 @@ function hasVerificationGap(input, snapshot2) {
   );
 }
 function inferPhase(input, route2, snapshot2, brain) {
-  const goal = normalize3(input.goal);
-  if (isReleaseSensitive(goal, route2)) return "releasing";
+  const goal2 = normalize3(input.goal);
+  if (isReleaseSensitive(goal2, route2)) return "releasing";
   if (input.verification?.ok === false || brain.recentFailures.length >= 2) return "recovering";
   if (input.hookEvent === "TaskCompleted") return "verifying";
-  if (FAILURE_RE.test(goal)) return "debugging";
+  if (FAILURE_RE.test(goal2)) return "debugging";
   const statePhase = snapshot2.state.phase;
   if (statePhase === "execution") return "implementing";
   if (statePhase === "research") return "discovering";
@@ -3752,7 +3748,7 @@ function inferPhase(input, route2, snapshot2, brain) {
   return "implementing";
 }
 function inferProblemTypes(input, route2, snapshot2, brain) {
-  const goal = normalize3(input.goal);
+  const goal2 = normalize3(input.goal);
   const out = [];
   if (route2.route === "blocked-ask-user" || route2.intent.missingFacts.length > 0) {
     out.push("missing-context");
@@ -3761,10 +3757,10 @@ function inferProblemTypes(input, route2, snapshot2, brain) {
   if (hasRec(route2, "chrome-devtools-mcp") || hasRec(route2, "browser-verification")) {
     out.push("browser-evidence-needed");
   }
-  if (brain.recentFailures.length >= 2 || hasRec(route2, "pua") || /\b(repeated|twice|again)\b|反复|连续|又失败|多次/i.test(goal)) {
+  if (brain.recentFailures.length >= 2 || hasRec(route2, "pua") || /\b(repeated|twice|again)\b|反复|连续|又失败|多次/i.test(goal2)) {
     out.push("repeated-failure");
   }
-  if (isReleaseSensitive(goal, route2)) out.push("release-risk");
+  if (isReleaseSensitive(goal2, route2)) out.push("release-risk");
   if (hasVerificationGap(input, snapshot2)) out.push("verification-gap");
   if (snapshot2.git.dirty && snapshot2.git.changedFiles > 8 || snapshot2.gates.includes("missing-code-root")) {
     out.push("scope-drift");
@@ -3862,8 +3858,8 @@ function recoveryFor(problems, plan, input) {
 }
 function decideLastMile(input = {}) {
   const cwd = input.cwd;
-  const goal = normalize3(input.goal);
-  const snapshot2 = input.snapshot ?? buildWorkflowSnapshot({ cwd, goal, spec: input.name });
+  const goal2 = normalize3(input.goal);
+  const snapshot2 = input.snapshot ?? buildWorkflowSnapshot({ cwd, goal: goal2, spec: input.name });
   const route2 = input.routeFacts ?? classifySmartRoute(input);
   const brain = summarizeProjectBrain(cwd);
   const phase = inferPhase(input, route2, snapshot2, brain);
@@ -3879,7 +3875,7 @@ function decideLastMile(input = {}) {
     problemType: problemTypes[0] ?? null,
     problemTypes,
     task: {
-      goal,
+      goal: goal2,
       route: route2.route,
       stack: route2.stackProfile.primary,
       risk: route2.policy.risk,
@@ -4112,8 +4108,159 @@ function buildExecutionBrief(input) {
   return brief;
 }
 
-// src/hooks/lib/runtime-cli.ts
+// src/hooks/lib/goal-bridge.ts
+import { basename as basename10 } from "node:path";
+import { fileURLToPath as fileURLToPath7 } from "node:url";
+var GOAL_CONDITION_LIMIT = 4e3;
 function readArg8(name, argv) {
+  const idx = argv.indexOf(name);
+  if (idx === -1) return void 0;
+  return argv[idx + 1];
+}
+function normalize4(input) {
+  return (input ?? "").trim().replace(/\s+/g, " ");
+}
+function parsePositiveInt(value, fallback) {
+  if (value === void 0) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, Math.floor(parsed));
+}
+function specLabel(snapshot2, explicitSpec) {
+  if (snapshot2.spec?.path) return snapshot2.spec.path;
+  if (explicitSpec && explicitSpec.trim()) return explicitSpec.trim();
+  return "the active curdx-flow spec";
+}
+function taskLine(snapshot2) {
+  const total = snapshot2.tasks.total;
+  const completed = snapshot2.tasks.completed;
+  if (total > 0) return `tasks.md shows ${completed}/${total} tasks complete and every remaining task is handled`;
+  return "tasks.md is present when the workflow requires tasks, or the route explicitly does not require tasks";
+}
+function verificationLine(snapshot2) {
+  const phase = snapshot2.state.phase ?? "execution";
+  const block = snapshot2.state.verificationBlocks[phase];
+  if (block?.command) {
+    return `the final ${phase} verifier is shown as ${block.command} with exitCode 0`;
+  }
+  return "the final execution verifier command and exit code 0 are shown in the conversation";
+}
+function capabilityEvidence(decision) {
+  const ids = decision.capabilityPlan.map((item) => item.id);
+  const out = [];
+  if (ids.includes("context7") || ids.includes("docs-query")) {
+    out.push("current docs evidence is shown before relying on external API, SDK, framework, or Claude Code behavior");
+  }
+  if (ids.includes("ui-ux-pro-max")) {
+    out.push("visible UI changes show ui-ux-pro-max guidance was applied or explicitly deemed irrelevant");
+  }
+  if (ids.includes("chrome-devtools-mcp") || ids.includes("browser-verification")) {
+    out.push("browser-sensitive work includes real browser evidence such as URL, actions, console/network result, screenshot, snapshot, or trace");
+  }
+  if (ids.includes("claude-mem")) {
+    out.push("similar prior work or repeated-failure memory was checked when relevant");
+  }
+  if (ids.includes("pua")) {
+    out.push("repeated failure or parallel slice recovery used pua when available, or recorded why it was skipped");
+  }
+  if (ids.includes("sequential-thinking")) {
+    out.push("high-risk architecture choices include a sequential-thinking conclusion or an explicit local reasoning substitute");
+  }
+  return out;
+}
+function evidenceProtocol(snapshot2, decision) {
+  return [
+    taskLine(snapshot2),
+    verificationLine(snapshot2),
+    "curdx-flow snapshot or last-mile output shows no blocking gates remain",
+    "the assistant outputs ALL_TASKS_COMPLETE only after the task and verifier evidence above is visible",
+    ...capabilityEvidence(decision)
+  ];
+}
+function compactCondition(parts, warnings) {
+  let condition = parts.join(" ");
+  if (condition.length <= GOAL_CONDITION_LIMIT) return condition;
+  warnings.push("Condition was shortened to fit Claude Code /goal's 4000 character limit.");
+  const suffix = " If incomplete or blocked, stop after the stated turn limit and report the blocker with next action.";
+  const maxBody = GOAL_CONDITION_LIMIT - suffix.length;
+  condition = condition.slice(0, Math.max(0, maxBody)).replace(/\s+\S*$/, "");
+  return `${condition}${suffix}`;
+}
+function buildGoalBridge(input = {}) {
+  const cwd = input.cwd ?? process.cwd();
+  const snapshot2 = buildWorkflowSnapshot({
+    cwd,
+    spec: input.spec,
+    goal: input.goal
+  });
+  const decision = decideLastMile({
+    cwd,
+    name: input.spec,
+    goal: input.goal ?? "",
+    snapshot: snapshot2,
+    hookEvent: "runtime"
+  });
+  const maxTurns = Math.max(
+    1,
+    Math.floor(input.maxTurns ?? snapshot2.state.autoPolicy?.maxGlobalIterations ?? 30)
+  );
+  const warnings = [];
+  if (!snapshot2.active) {
+    warnings.push("No active spec was resolved; the goal condition uses a generic active-spec target.");
+  }
+  warnings.push(
+    "Native /goal is unavailable if Claude Code hooks are disabled by disableAllHooks or allowManagedHooksOnly."
+  );
+  const evidence = evidenceProtocol(snapshot2, decision);
+  const target = specLabel(snapshot2, input.spec);
+  const userGoal = normalize4(input.goal);
+  const condition = compactCondition(
+    [
+      `Complete curdx-flow implementation for ${target}.`,
+      userGoal ? `User goal: ${userGoal}.` : "",
+      "This goal is satisfied only when the conversation visibly shows:",
+      evidence.map((item, idx) => `${idx + 1}. ${item}.`).join(" "),
+      `If the evidence is not visible, continue by running curdx-flow snapshot/last-mile as needed, executing the next incomplete value-slice task, recording verifier evidence, and updating state.`,
+      `Stop after ${maxTurns} goal turns if still incomplete and report the blocker, current task, verifier status, and next action instead of claiming completion.`
+    ].filter(Boolean),
+    warnings
+  );
+  return {
+    version: 1,
+    condition,
+    slashCommand: `/goal ${condition}`,
+    startPrompt: "Run the slashCommand in Claude Code to let native /goal drive follow-up turns. If /goal is unavailable, use manual resume and keep the same evidence protocol; do not rely on Stop-hook continuation.",
+    evidenceProtocol: evidence,
+    warnings
+  };
+}
+function main8() {
+  const argv = process.argv.slice(2);
+  const bridge = buildGoalBridge({
+    cwd: readArg8("--cwd", argv),
+    spec: readArg8("--spec", argv) ?? readArg8("--name", argv),
+    goal: readArg8("--goal", argv),
+    maxTurns: parsePositiveInt(
+      readArg8("--max-turns", argv) ?? readArg8("--max-global-iterations", argv),
+      30
+    )
+  });
+  process.stdout.write(JSON.stringify(bridge, null, 2) + "\n");
+}
+function isDirectRun8() {
+  try {
+    const entry = fileURLToPath7(import.meta.url);
+    return process.argv[1] === entry && basename10(entry).startsWith("goal-bridge.");
+  } catch {
+    return false;
+  }
+}
+if (isDirectRun8()) {
+  main8();
+}
+
+// src/hooks/lib/runtime-cli.ts
+function readArg9(name, argv) {
   const idx = argv.indexOf(name);
   if (idx === -1) return void 0;
   return argv[idx + 1];
@@ -4131,6 +4278,7 @@ function usage(exitCode = 1) {
     "",
     "commands:",
     "  route --goal <text> [--name <spec>] [--flags <args>] [--cwd <dir>] [--compile] [--record]",
+    "  goal [--spec <name-or-path>] [--goal <text>] [--cwd <dir>] [--max-turns <n>]",
     "  last-mile --goal <text> [--spec <name-or-path>] [--cwd <dir>] [--record]",
     "  snapshot [--spec <name-or-path>] [--goal <text>] [--cwd <dir>] [--session-id <id>]",
     "  specs dirs [--cwd <dir>]",
@@ -4153,7 +4301,7 @@ function usage(exitCode = 1) {
   process.exit(exitCode);
 }
 function scriptRoot() {
-  return dirname(fileURLToPath7(import.meta.url));
+  return dirname(fileURLToPath8(import.meta.url));
 }
 function pluginRoot() {
   return process.env.CLAUDE_PLUGIN_ROOT || resolve5(scriptRoot(), "..", "..", "..");
@@ -4178,15 +4326,15 @@ function runBundled(scriptName, args, cwd) {
   process.exit(result.status ?? 1);
 }
 function route(argv) {
-  const estimatedRaw = readArg8("--estimated-files", argv);
-  const taskRaw = readArg8("--task-count", argv);
-  const availableRaw = readArg8("--available-capabilities", argv);
+  const estimatedRaw = readArg9("--estimated-files", argv);
+  const taskRaw = readArg9("--task-count", argv);
+  const availableRaw = readArg9("--available-capabilities", argv);
   const input = {
-    goal: readArg8("--goal", argv) ?? "",
-    name: readArg8("--name", argv),
-    flags: readArg8("--flags", argv) ?? "",
-    cwd: readArg8("--cwd", argv),
-    changedFiles: parseList5(readArg8("--files", argv)),
+    goal: readArg9("--goal", argv) ?? "",
+    name: readArg9("--name", argv),
+    flags: readArg9("--flags", argv) ?? "",
+    cwd: readArg9("--cwd", argv),
+    changedFiles: parseList5(readArg9("--files", argv)),
     availableCapabilities: availableRaw === void 0 ? void 0 : parseList5(availableRaw),
     estimatedFiles: estimatedRaw === void 0 ? void 0 : Number(estimatedRaw),
     taskCount: taskRaw === void 0 ? void 0 : Number(taskRaw)
@@ -4200,24 +4348,35 @@ function route(argv) {
 function snapshot(argv) {
   printJson(
     buildWorkflowSnapshot({
-      cwd: readArg8("--cwd", argv),
-      spec: readArg8("--spec", argv),
-      goal: readArg8("--goal", argv),
-      sessionId: readArg8("--session-id", argv)
+      cwd: readArg9("--cwd", argv),
+      spec: readArg9("--spec", argv),
+      goal: readArg9("--goal", argv),
+      sessionId: readArg9("--session-id", argv)
     })
   );
 }
 function lastMile(argv) {
-  const available = parseList5(readArg8("--available-capabilities", argv));
+  const available = parseList5(readArg9("--available-capabilities", argv));
   printJson(
     decideLastMile({
-      cwd: readArg8("--cwd", argv),
-      goal: readArg8("--goal", argv) ?? "",
-      name: readArg8("--spec", argv) ?? readArg8("--name", argv),
-      changedFiles: parseList5(readArg8("--files", argv)),
+      cwd: readArg9("--cwd", argv),
+      goal: readArg9("--goal", argv) ?? "",
+      name: readArg9("--spec", argv) ?? readArg9("--name", argv),
+      changedFiles: parseList5(readArg9("--files", argv)),
       availableCapabilities: available.length > 0 ? available : void 0,
       hookEvent: "runtime",
       record: hasFlag2(argv, "--record")
+    })
+  );
+}
+function goal(argv) {
+  const maxTurnsRaw = readArg9("--max-turns", argv) ?? readArg9("--max-global-iterations", argv);
+  printJson(
+    buildGoalBridge({
+      cwd: readArg9("--cwd", argv),
+      spec: readArg9("--spec", argv) ?? readArg9("--name", argv),
+      goal: readArg9("--goal", argv),
+      maxTurns: maxTurnsRaw === void 0 ? void 0 : Number(maxTurnsRaw)
     })
   );
 }
@@ -4743,7 +4902,7 @@ function resolveSpecPathForOutput(cwd, path3) {
 }
 function specs(argv) {
   const [sub, ...rest] = argv;
-  const cwd = resolve5(readArg8("--cwd", rest) ?? process.cwd());
+  const cwd = resolve5(readArg9("--cwd", rest) ?? process.cwd());
   if (sub === "dirs") {
     printJson({
       defaultDir: getDefaultDir({ cwd }),
@@ -4754,7 +4913,7 @@ function specs(argv) {
   if (sub === "list") {
     printJson({
       defaultDir: getDefaultDir({ cwd }),
-      active: resolveCurrent({ cwd, sessionId: readArg8("--session-id", rest) }),
+      active: resolveCurrent({ cwd, sessionId: readArg9("--session-id", rest) }),
       specs: listSpecs({ cwd })
     });
     return;
@@ -4769,7 +4928,7 @@ function specs(argv) {
   }
   if (sub === "resolve") {
     const input = firstPositional(rest);
-    const target = input ?? resolveCurrent({ cwd, sessionId: readArg8("--session-id", rest) }) ?? void 0;
+    const target = input ?? resolveCurrent({ cwd, sessionId: readArg9("--session-id", rest) }) ?? void 0;
     if (!target) {
       printJson({ ok: false, reason: "no-current" });
       process.exit(1);
@@ -4780,7 +4939,7 @@ function specs(argv) {
         printJson({ ok: false, reason: "not-found", path: target });
         process.exit(1);
       }
-      printJson({ ok: true, name: basename10(target), ...resolved2 });
+      printJson({ ok: true, name: basename11(target), ...resolved2 });
       return;
     }
     const found = findSpec(target, { cwd });
@@ -4789,11 +4948,11 @@ function specs(argv) {
       process.exit(found.reason === "ambiguous" ? 2 : 1);
     }
     const resolved = resolveSpecPathForOutput(cwd, found.path);
-    printJson({ ok: true, name: basename10(found.path), ...resolved });
+    printJson({ ok: true, name: basename11(found.path), ...resolved });
     return;
   }
   if (sub === "bind-session") {
-    const sessionId = readArg8("--session-id", rest);
+    const sessionId = readArg9("--session-id", rest);
     const input = firstPositional(rest);
     if (!sessionId || !input) usage();
     let specPath = input;
@@ -4833,7 +4992,7 @@ function tasks(argv) {
 }
 function dev(argv) {
   const [sub, ...rest] = argv;
-  const cwd = readArg8("--cwd", rest);
+  const cwd = readArg9("--cwd", rest);
   switch (sub) {
     case "detect":
       printJson(detectDevRuntime({ cwd }));
@@ -4864,10 +5023,10 @@ function dev(argv) {
 async function verify(argv) {
   const [sub, ...rest] = argv;
   if (sub !== "run") usage();
-  const command = readArg8("--command", rest);
+  const command = readArg9("--command", rest);
   if (!command) usage();
-  const cwd = resolve5(readArg8("--cwd", rest) ?? process.cwd());
-  const phase = readArg8("--phase", rest) ?? "execution";
+  const cwd = resolve5(readArg9("--cwd", rest) ?? process.cwd());
+  const phase = readArg9("--phase", rest) ?? "execution";
   if (!["research", "requirements", "design", "tasks", "execution"].includes(phase)) {
     process.stderr.write(`verify run: unsupported phase: ${phase}
 `);
@@ -4875,8 +5034,8 @@ async function verify(argv) {
   }
   const snap = buildWorkflowSnapshot({
     cwd,
-    spec: readArg8("--spec", rest),
-    sessionId: readArg8("--session-id", rest)
+    spec: readArg9("--spec", rest),
+    sessionId: readArg9("--session-id", rest)
   });
   if (!snap.spec?.fsPath || !snap.spec.statePath) {
     process.stderr.write("verify run: no active spec\n");
@@ -4900,7 +5059,7 @@ async function verify(argv) {
     exitCode,
     timestamp,
     srcMtime,
-    description: readArg8("--description", rest) ?? `Verification for ${phase}`
+    description: readArg9("--description", rest) ?? `Verification for ${phase}`
   };
   if (exitCode !== 0) {
     block.failedReason = result.error ? result.error.message : `command exited ${exitCode}`;
@@ -4934,11 +5093,11 @@ async function verify(argv) {
   process.exit(exitCode);
 }
 async function verifyBlocks(argv) {
-  const cwd = readArg8("--cwd", argv);
+  const cwd = readArg9("--cwd", argv);
   const snap = buildWorkflowSnapshot({
     cwd,
-    spec: readArg8("--spec", argv),
-    sessionId: readArg8("--session-id", argv)
+    spec: readArg9("--spec", argv),
+    sessionId: readArg9("--session-id", argv)
   });
   if (!snap.spec?.fsPath) {
     process.stderr.write("verify-blocks: no active spec\n");
@@ -4950,22 +5109,22 @@ async function verifyBlocks(argv) {
   process.exit(result.code);
 }
 function doctor(argv) {
-  const cwd = resolve5(readArg8("--cwd", argv) ?? process.cwd());
+  const cwd = resolve5(readArg9("--cwd", argv) ?? process.cwd());
   const snap = buildWorkflowSnapshot({
     cwd,
-    spec: readArg8("--spec", argv),
-    sessionId: readArg8("--session-id", argv)
+    spec: readArg9("--spec", argv),
+    sessionId: readArg9("--session-id", argv)
   });
-  const goal = readArg8("--goal", argv) ?? "";
-  const routeFacts = classifySmartRoute({ cwd, goal });
-  const topology = discoverProjectTopology({ cwd, goal });
-  const stackProfile = detectStackProfile({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk });
-  const qualityGates = selectQualityGates({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
-  const suggestedVerifier = selectSuggestedVerifier({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile, qualityGates });
-  const contextBudget = selectContextBudget({ cwd, goal, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
+  const goal2 = readArg9("--goal", argv) ?? "";
+  const routeFacts = classifySmartRoute({ cwd, goal: goal2 });
+  const topology = discoverProjectTopology({ cwd, goal: goal2 });
+  const stackProfile = detectStackProfile({ cwd, goal: goal2, topology, route: routeFacts.route, risk: routeFacts.policy.risk });
+  const qualityGates = selectQualityGates({ cwd, goal: goal2, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
+  const suggestedVerifier = selectSuggestedVerifier({ cwd, goal: goal2, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile, qualityGates });
+  const contextBudget = selectContextBudget({ cwd, goal: goal2, topology, route: routeFacts.route, risk: routeFacts.policy.risk, stackProfile });
   const brain = summarizeProjectBrain(cwd);
-  const executionBrief = buildExecutionBrief({ cwd, goal, routeFacts });
-  const lastMileDecision = decideLastMile({ cwd, goal, routeFacts });
+  const executionBrief = buildExecutionBrief({ cwd, goal: goal2, routeFacts });
+  const lastMileDecision = decideLastMile({ cwd, goal: goal2, routeFacts });
   const expected = [
     join8(scriptRoot(), "workflow-snapshot.mjs"),
     join8(scriptRoot(), "smart-route.mjs"),
@@ -4982,10 +5141,10 @@ function doctor(argv) {
   printJson({
     ok: runtimeReady && plugin.ready === true && release.ready !== false && (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
     cwd,
-    scripts: Object.fromEntries(expected.map((p) => [basename10(p), existsSync9(p)])),
+    scripts: Object.fromEntries(expected.map((p) => [basename11(p), existsSync9(p)])),
     runtime: {
       ready: runtimeReady,
-      scripts: Object.fromEntries(expected.map((p) => [basename10(p), existsSync9(p)]))
+      scripts: Object.fromEntries(expected.map((p) => [basename11(p), existsSync9(p)]))
     },
     plugin,
     hookFreshness,
@@ -5018,11 +5177,14 @@ function doctor(argv) {
     ]
   });
 }
-async function main8() {
+async function main9() {
   const [command, ...argv] = process.argv.slice(2);
   switch (command) {
     case "route":
       route(argv);
+      return;
+    case "goal":
+      goal(argv);
       return;
     case "last-mile":
       lastMile(argv);
@@ -5060,15 +5222,15 @@ async function main8() {
 `);
   usage();
 }
-function isDirectRun8() {
+function isDirectRun9() {
   try {
-    const entry = fileURLToPath7(import.meta.url);
-    return process.argv[1] === entry && basename10(entry).startsWith("runtime-cli.");
+    const entry = fileURLToPath8(import.meta.url);
+    return process.argv[1] === entry && basename11(entry).startsWith("runtime-cli.");
   } catch {
     return false;
   }
 }
-if (isDirectRun8()) {
-  void main8();
+if (isDirectRun9()) {
+  void main9();
 }
 //# sourceMappingURL=runtime-cli.mjs.map

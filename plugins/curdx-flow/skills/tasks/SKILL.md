@@ -1,7 +1,7 @@
 ---
 name: tasks
 description: Use when a spec has design.md and needs implementation tasks.
-argument-hint: "[spec-name] [--tasks-size auto|coarse|standard|fine]"
+argument-hint: "[spec-name] [--task-granularity auto|coarse|standard|fine]"
 allowed-tools: "Read Write Edit Bash Agent AskUserQuestion"
 disable-model-invocation: true
 ---
@@ -33,11 +33,11 @@ Complete these coordination steps in order; do not create user-facing implementa
    ```bash
    curdx-flow state merge "$SPEC_PATH/.curdx-state.json" '{"awaitingApproval":false}'
    ```
-7. **`--tasks-size` flag handling**: Check `$ARGUMENTS` for `--tasks-size` flag:
+7. **`--task-granularity` flag handling**: Check `$ARGUMENTS` for `--task-granularity` flag:
    - Valid values: `auto`, `coarse`, `standard`, `fine`
    - If valid: update `granularity` in `.curdx-state.json` and treat it as an explicit override of `autoPolicy.taskGranularity`
-   - If invalid: warn the user (`Invalid --tasks-size value "<value>", using autoPolicy/default standard`) and set `"granularity": "auto"`
-   - If `--tasks-size` flag is absent: leave `granularity` unchanged in `.curdx-state.json` (preserve any value set by `/curdx-flow:start`)
+   - If invalid: warn the user (`Invalid --task-granularity value "<value>", using autoPolicy/default standard`) and set `"granularity": "auto"`
+   - If `--task-granularity` flag is absent: leave `granularity` unchanged in `.curdx-state.json` (preserve any value set by `/curdx-flow:start`)
 8. **AutoPolicy default**: If no `autoPolicy` exists in the snapshot, run:
    ```bash
    curdx-flow route --goal "$GOAL" --flags "$ARGUMENTS"

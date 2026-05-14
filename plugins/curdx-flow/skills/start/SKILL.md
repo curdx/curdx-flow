@@ -1,7 +1,7 @@
 ---
 name: start
 description: Use when starting curdx-flow, creating a spec, resuming work, or routing intent.
-argument-hint: "[name] [goal] [--fresh] [--quick] [--mode auto|fast|deep] [--tasks-size auto|coarse|standard|fine] [--review minimal|standard|strict] [--commit-spec] [--no-commit-spec] [--specs-dir <path>]"
+argument-hint: "[name] [goal] [--fresh] [--quick] [--mode auto|fast|deep] [--task-granularity auto|coarse|standard|fine] [--review minimal|standard|strict] [--commit-spec] [--no-commit-spec] [--specs-dir <path>]"
 allowed-tools: "Read Write Edit Bash Agent Skill AskUserQuestion"
 disable-model-invocation: true
 ---
@@ -189,6 +189,7 @@ For `lite-spec`, `full-spec`, `greenfield-spec`, `prototype`, and `import-spec`:
      "maxGlobalIterations": "<POLICY_JSON.maxGlobalIterations or 30>",
      "commitSpec": true,
      "quickMode": false,
+     "executionDriver": "goal",
      "autoPolicy": "<POLICY_JSON object>",
      "route": "<ROUTE_JSON compact object>",
      "intent": "<ROUTE_JSON.intent object>",

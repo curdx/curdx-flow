@@ -2,6 +2,26 @@
 
 All notable changes to `@curdx/flow` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## 7.1.34 — 2026-05-14
+
+### Added
+
+- **Native `/goal` execution bridge.** Added `curdx-flow goal` to generate transcript-verifiable Claude Code `/goal` conditions, evidence protocol, warnings, and start prompts for curdx-flow implementation runs.
+
+### Changed
+
+- **Execution now defaults to native `/goal`.** AutoPolicy v2 uses behavior route names plus `executionDriver: goal|manual`; the Stop hook no longer injects coordinator continuation prompts for in-progress execution.
+- **Stop hook is deterministic only.** Cost runaway, corrupt state, failed/stale verification, unchecked tasks, and `ALL_TASKS_COMPLETE` gates remain, while quick-mode and mid-execution continuation blocks are removed.
+- **Removed XS/S/M/L/XL policy semantics.** Routing now uses `direct`, `spec-lite`, `standard`, `deep-spec`, and `epic-triage`; public docs use `--task-granularity` instead of the old task-size wording.
+
+### Fixed
+
+- **Implementation state initialization snippet.** The `/curdx-flow:implement` merge-state example now uses environment-driven JSON construction instead of shell interpolation that could produce invalid JavaScript.
+
+### Tests
+
+- Updated Stop hook, AutoPolicy, smart-route, goal bridge, byte-equal divergence, docs, and manifest coverage. Verified with `npm run typecheck`, `npm run test:hooks`, `npm run test:runner`, and `claude plugin validate ./plugins/curdx-flow`.
+
 ## 7.1.33 — 2026-05-13
 
 ### Added
