@@ -278,6 +278,7 @@ export interface CurdxState {
       | "context7"
       | "sequential-thinking"
       | "chrome-devtools-mcp"
+      | "frontend-design"
       | "ui-ux-pro-max"
       | "pua"
       | "docs-query"
@@ -303,6 +304,7 @@ export interface CurdxState {
       | "context7"
       | "sequential-thinking"
       | "chrome-devtools-mcp"
+      | "frontend-design"
       | "ui-ux-pro-max"
       | "pua"
       | "curdx-flow";

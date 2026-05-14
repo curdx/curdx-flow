@@ -1080,7 +1080,7 @@ import { basename as basename4 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 
 // src/hooks/lib/capability-normalization.ts
-var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b/gi;
+var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|frontend[\s_-]*design|front[\s_-]*end[\s_-]*design|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b/gi;
 function stripKnownCapabilityTokens(input) {
   return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
 }
@@ -1161,6 +1161,21 @@ var CAPABILITIES = {
     useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
     skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
     missingAction: "Install/enable ui-ux-pro-max from the ui-ux-pro-max-skill marketplace dependency."
+  },
+  "frontend-design": {
+    id: "frontend-design",
+    name: "frontend-design",
+    type: "plugin",
+    ownedBy: "frontend-design",
+    provisioning: "plugin-dependency",
+    curdxRole: ["recommend"],
+    doNotReimplement: true,
+    expectedByDefault: true,
+    invocation: "frontend-design plugin skill",
+    summary: "official Anthropic frontend design guidance for distinctive production-grade UI",
+    useWhen: "Use before implementing visible frontend experiences, components, pages, interaction design, responsive layout, or visual polish.",
+    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
+    missingAction: "Install/enable frontend-design from the claude-plugins-official marketplace dependency."
   },
   "pua": {
     id: "pua",
@@ -1266,6 +1281,7 @@ var ORDER = [
   "context7",
   "docs-query",
   "claude-mem",
+  "frontend-design",
   "ui-ux-pro-max",
   "chrome-devtools-mcp",
   "browser-verification",
@@ -1409,10 +1425,19 @@ function recommendToolCapabilities(input) {
     pushRecommendation(
       recs,
       available,
+      "frontend-design",
+      "implementation",
+      "visible frontend behavior or UI quality is in scope",
+      "Apply frontend-design guidance before changing visible UI; record when the task is too small or non-visual for design guidance to matter.",
+      { category: "verification", stackIds }
+    );
+    pushRecommendation(
+      recs,
+      available,
       "ui-ux-pro-max",
       "implementation",
       "visible frontend behavior or UI quality is in scope",
-      "Use ui-ux-pro-max guidance for UI structure, interaction, responsive behavior, and visual polish.",
+      "Use ui-ux-pro-max guidance for UI structure, interaction, responsive behavior, and visual polish when the work needs deeper UI/UX critique.",
       { category: "verification", stackIds }
     );
   }

@@ -125,14 +125,29 @@ try {
     CURDX_FLOW_MCP_LIST_OUTPUT: '',
   });
   const doctorParsed = JSON.parse(doctor);
-  const releaseTagDriftOnly =
+  const coreDoctorReady =
     doctorParsed.runtime?.ready === true &&
     doctorParsed.plugin?.ready === true &&
-    doctorParsed.hookFreshness?.fresh === true &&
+    doctorParsed.hookFreshness?.fresh === true;
+  const releaseTagDriftOnly =
+    coreDoctorReady &&
     doctorParsed.release?.ready === false &&
     doctorParsed.release?.tagParity?.state === 'incomplete';
-  if (doctorParsed.ok !== true && !releaseTagDriftOnly) {
+  const externalMcpMissing =
+    doctorParsed.externalMcp?.ready === false &&
+    doctorParsed.diagnostics?.externalMcpReady === false &&
+    Array.isArray(doctorParsed.warnings) &&
+    doctorParsed.warnings.some((warning) => /Expected external MCP readiness is not confirmed/.test(warning));
+  const releaseOkOrExpected = doctorParsed.release?.ready === true || releaseTagDriftOnly;
+  const externalMcpOkOrExpected = doctorParsed.externalMcp?.ready === true || externalMcpMissing;
+  if (doctorParsed.ok !== true && !(coreDoctorReady && releaseOkOrExpected && externalMcpOkOrExpected)) {
     throw new Error(`runtime doctor failed: ${doctor}`);
+  }
+  if (!coreDoctorReady) {
+    throw new Error(`runtime doctor core readiness failed: ${doctor}`);
+  }
+  if (doctorParsed.externalMcp?.ready === false && !externalMcpMissing) {
+    throw new Error(`runtime doctor did not expose expected external MCP warning: ${doctor}`);
   }
   if (!doctorParsed.brain?.path || !doctorParsed.executionBrief?.completionContract) {
     throw new Error(`runtime doctor missing brain/executionBrief: ${doctor}`);
@@ -173,7 +188,7 @@ try {
     '--files',
     'src/Login.tsx,tests/login.test.ts',
     '--available-capabilities',
-    'context7,ui-ux-pro-max,chrome-devtools-mcp,sequential-thinking',
+    'context7,frontend-design,ui-ux-pro-max,chrome-devtools-mcp,sequential-thinking',
   ]);
   const capabilityParsed = JSON.parse(capabilityRoute);
   const capabilityRecs = capabilityParsed.recommendedCapabilities ?? [];
@@ -181,6 +196,7 @@ try {
   for (const [expected, availability, availabilityState, provisioning] of [
     ['context7', 'known-available', 'available', 'external-mcp'],
     ['claude-mem', 'plugin-dependency', 'missing', 'plugin-dependency'],
+    ['frontend-design', 'known-available', 'available', 'plugin-dependency'],
     ['ui-ux-pro-max', 'known-available', 'available', 'plugin-dependency'],
     ['chrome-devtools-mcp', 'known-available', 'available', 'plugin-dependency'],
     ['sequential-thinking', 'known-available', 'available', 'external-mcp'],

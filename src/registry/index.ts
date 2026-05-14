@@ -2,6 +2,7 @@ import type { Pkg } from './types.ts';
 import pua from './plugins/pua.ts';
 import claudeMem from './plugins/claude-mem.ts';
 import chromeDevtoolsMcp from './plugins/chrome-devtools-mcp.ts';
+import frontendDesign from './plugins/frontend-design.ts';
 import uiUxProMax from './plugins/ui-ux-pro-max.ts';
 import curdxFlow from './plugins/curdx-flow.ts';
 import sequentialThinking from './mcps/sequential-thinking.ts';
@@ -11,6 +12,7 @@ export const PKGS: Pkg[] = [
   pua,
   claudeMem,
   chromeDevtoolsMcp,
+  frontendDesign,
   uiUxProMax,
   curdxFlow,
   sequentialThinking,
@@ -21,6 +23,9 @@ const PKG_ALIASES: Record<string, string> = {
   uiuxmax: 'ui-ux-pro-max',
   'ui-ux-max': 'ui-ux-pro-max',
   'ui ux pro max': 'ui-ux-pro-max',
+  frontend: 'frontend-design',
+  'front-end-design': 'frontend-design',
+  'frontend design': 'frontend-design',
 };
 
 function canonicalPkgId(id: string): string {

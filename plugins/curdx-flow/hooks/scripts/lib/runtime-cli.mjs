@@ -1138,7 +1138,7 @@ import { basename as basename4 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 
 // src/hooks/lib/capability-normalization.ts
-var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b/gi;
+var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|frontend[\s_-]*design|front[\s_-]*end[\s_-]*design|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b/gi;
 function stripKnownCapabilityTokens(input) {
   return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
 }
@@ -1219,6 +1219,21 @@ var CAPABILITIES = {
     useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
     skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
     missingAction: "Install/enable ui-ux-pro-max from the ui-ux-pro-max-skill marketplace dependency."
+  },
+  "frontend-design": {
+    id: "frontend-design",
+    name: "frontend-design",
+    type: "plugin",
+    ownedBy: "frontend-design",
+    provisioning: "plugin-dependency",
+    curdxRole: ["recommend"],
+    doNotReimplement: true,
+    expectedByDefault: true,
+    invocation: "frontend-design plugin skill",
+    summary: "official Anthropic frontend design guidance for distinctive production-grade UI",
+    useWhen: "Use before implementing visible frontend experiences, components, pages, interaction design, responsive layout, or visual polish.",
+    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
+    missingAction: "Install/enable frontend-design from the claude-plugins-official marketplace dependency."
   },
   "pua": {
     id: "pua",
@@ -1324,6 +1339,7 @@ var ORDER = [
   "context7",
   "docs-query",
   "claude-mem",
+  "frontend-design",
   "ui-ux-pro-max",
   "chrome-devtools-mcp",
   "browser-verification",
@@ -1467,10 +1483,19 @@ function recommendToolCapabilities(input) {
     pushRecommendation(
       recs,
       available,
+      "frontend-design",
+      "implementation",
+      "visible frontend behavior or UI quality is in scope",
+      "Apply frontend-design guidance before changing visible UI; record when the task is too small or non-visual for design guidance to matter.",
+      { category: "verification", stackIds }
+    );
+    pushRecommendation(
+      recs,
+      available,
       "ui-ux-pro-max",
       "implementation",
       "visible frontend behavior or UI quality is in scope",
-      "Use ui-ux-pro-max guidance for UI structure, interaction, responsive behavior, and visual polish.",
+      "Use ui-ux-pro-max guidance for UI structure, interaction, responsive behavior, and visual polish when the work needs deeper UI/UX critique.",
       { category: "verification", stackIds }
     );
   }
@@ -3753,7 +3778,7 @@ function inferProblemTypes(input, route2, snapshot2, brain) {
   if (route2.route === "blocked-ask-user" || route2.intent.missingFacts.length > 0) {
     out.push("missing-context");
   }
-  if (hasRec(route2, "ui-ux-pro-max")) out.push("ui-quality-risk");
+  if (hasRec(route2, "frontend-design") || hasRec(route2, "ui-ux-pro-max")) out.push("ui-quality-risk");
   if (hasRec(route2, "chrome-devtools-mcp") || hasRec(route2, "browser-verification")) {
     out.push("browser-evidence-needed");
   }
@@ -3829,7 +3854,10 @@ function instructionFor(phase, problems, plan, route2, snapshot2) {
     return `Stop the same edit loop; ${parts.join(", ")}.`;
   }
   if (problems.includes("ui-quality-risk")) {
-    return "Apply ui-ux-pro-max guidance before changing visible UI, then keep browser evidence as the completion gate.";
+    const frontendDesign = firstCapability(plan, "frontend-design");
+    const uiUx = firstCapability(plan, "ui-ux-pro-max");
+    const design = frontendDesign !== void 0 && frontendDesign.availabilityState !== "missing" ? frontendDesign.invocation : uiUx !== void 0 && uiUx.availabilityState !== "missing" ? uiUx.invocation : "the available frontend design guidance";
+    return `Apply ${design} before changing visible UI, then keep browser evidence as the completion gate.`;
   }
   if (problems.includes("browser-evidence-needed")) {
     return "After implementation, collect browser runtime evidence with Playwright or Chrome DevTools MCP before claiming completion.";
@@ -4151,8 +4179,8 @@ function capabilityEvidence(decision) {
   if (ids.includes("context7") || ids.includes("docs-query")) {
     out.push("current docs evidence is shown before relying on external API, SDK, framework, or Claude Code behavior");
   }
-  if (ids.includes("ui-ux-pro-max")) {
-    out.push("visible UI changes show ui-ux-pro-max guidance was applied or explicitly deemed irrelevant");
+  if (ids.includes("frontend-design") || ids.includes("ui-ux-pro-max")) {
+    out.push("visible UI changes show frontend-design/ui-ux guidance was applied or explicitly deemed irrelevant");
   }
   if (ids.includes("chrome-devtools-mcp") || ids.includes("browser-verification")) {
     out.push("browser-sensitive work includes real browser evidence such as URL, actions, console/network result, screenshot, snapshot, or trace");
@@ -4413,6 +4441,7 @@ var EXPECTED_PLUGIN_DEPENDENCIES = [
   { name: "pua", marketplace: "pua-skills" },
   { name: "claude-mem", marketplace: "thedotmack" },
   { name: "chrome-devtools-mcp", marketplace: "chrome-devtools-plugins" },
+  { name: "frontend-design", marketplace: "claude-plugins-official" },
   { name: "ui-ux-pro-max", marketplace: "ui-ux-pro-max-skill" }
 ];
 var EXPECTED_EXTERNAL_MCPS = [
@@ -4495,12 +4524,22 @@ function externalMcpDoctor() {
     output = envOutput;
     exitCode = 0;
   } else {
-    const result = spawnSync2("zsh", ["-lic", `${shellToken(bin)} mcp list`], {
+    let result = spawnSync2(bin, ["mcp", "list"], {
       cwd: process.cwd(),
       encoding: "utf8",
-      timeout: 5e3,
+      timeout: 3e3,
       maxBuffer: 1024 * 1024
     });
+    source = "direct exec";
+    if (result.error?.code === "ENOENT") {
+      result = spawnSync2("zsh", ["-lic", `${shellToken(bin)} mcp list`], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        timeout: 3e3,
+        maxBuffer: 1024 * 1024
+      });
+      source = "zsh fallback";
+    }
     output = `${result.stdout ?? ""}
 ${result.stderr ?? ""}`;
     exitCode = result.status ?? null;
@@ -4530,6 +4569,15 @@ ${result.stderr ?? ""}`;
     servers,
     note: "curdx-flow does not bundle these MCP servers; setup scripts or user MCP config own installation."
   };
+}
+function externalMcpWarnings(externalMcp) {
+  if (externalMcp.ready === true) return [];
+  const unknown = externalMcp.servers?.filter((server) => server.status !== "available").map((server) => `${server.id ?? "unknown"}:${server.status ?? "unknown"}`) ?? [];
+  const suffix = unknown.length > 0 ? ` (${unknown.join(", ")})` : "";
+  const command = externalMcp.error ? `; command error: ${externalMcp.error}` : typeof externalMcp.exitCode === "number" ? `; exitCode=${externalMcp.exitCode}` : "";
+  return [
+    `Expected external MCP readiness is not confirmed${suffix}${command}. curdx-flow will not bundle duplicate MCP config; fix Claude MCP setup before relying on context7 or sequential-thinking.`
+  ];
 }
 function releaseDoctor() {
   const pkg = readJsonFile3(join8(repoRootFromPlugin(), "package.json"));
@@ -5143,9 +5191,19 @@ function doctor(argv) {
   const plugin = pluginHealthDoctor();
   const hookFreshness = hookFreshnessDoctor();
   const release = releaseDoctor();
+  const externalMcp = externalMcpDoctor();
+  const warnings = [
+    ...externalMcpWarnings(externalMcp)
+  ];
   const root = pluginRoot();
   printJson({
-    ok: runtimeReady && plugin.ready === true && release.ready !== false && (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
+    ok: runtimeReady && plugin.ready === true && externalMcp.ready === true && release.ready !== false && (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
+    warnings,
+    diagnostics: {
+      externalMcpReady: externalMcp.ready === true,
+      hookFreshnessFresh: hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true,
+      releaseReady: release.ready !== false
+    },
     cwd,
     scripts: Object.fromEntries(expected.map((p) => [basename11(p), existsSync9(p)])),
     runtime: {
@@ -5167,7 +5225,7 @@ function doctor(argv) {
     brain,
     executionBrief,
     lastMile: lastMileDecision,
-    externalMcp: externalMcpDoctor(),
+    externalMcp,
     browserVerification: browserVerificationDoctor(cwd),
     active: snap.active,
     spec: snap.spec,

@@ -23,8 +23,10 @@ follow.
   regressions, or repeated failures.
 - `pua`: use after repeated failures or when independent slices can be safely
   decomposed for parallel diagnosis/execution.
+- `frontend-design`: use before implementing visible frontend experiences,
+  components, pages, interaction design, responsive layout, or visual polish.
 - `ui-ux-pro-max`: use for visible UI, interaction, responsive behavior,
-  layout, visual polish, and design consistency.
+  layout, visual polish, deeper UX critique, and design consistency.
 - `chrome-devtools-mcp`: use for real browser evidence: console, network, DOM,
   screenshots, performance, canvas/WebGL/map/GPU, or flaky Playwright cases.
 
@@ -52,7 +54,7 @@ At the start of each execution loop and after any failed verifier:
    that wheel.
 3. If `repeated-failure` appears, search `claude-mem` first; use `pua` only
    after confirming the work can be decomposed or the same path already failed.
-4. If `ui-quality-risk` appears, apply `ui-ux-pro-max` before changing UI.
+4. If `ui-quality-risk` appears, apply `frontend-design` or `ui-ux-pro-max` before changing UI.
 5. If `browser-evidence-needed` appears, plan Playwright or Chrome DevTools MCP
    proof before claiming completion.
 6. If `verification-gap` appears, run and record the verifier before advancing.

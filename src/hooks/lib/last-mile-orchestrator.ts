@@ -5,8 +5,8 @@
 // This module does not invoke external plugins or MCP servers. It converts
 // route/snapshot/brain facts into a compact coordinator instruction so Claude
 // Code can decide when to use dependency wheels such as claude-mem, pua,
-// ui-ux-pro-max, and chrome-devtools-mcp without asking the user to pick a
-// skill manually.
+// frontend-design, ui-ux-pro-max, and chrome-devtools-mcp without asking the
+// user to pick a skill manually.
 
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -183,7 +183,7 @@ function inferProblemTypes(
   if (route.route === "blocked-ask-user" || route.intent.missingFacts.length > 0) {
     out.push("missing-context");
   }
-  if (hasRec(route, "ui-ux-pro-max")) out.push("ui-quality-risk");
+  if (hasRec(route, "frontend-design") || hasRec(route, "ui-ux-pro-max")) out.push("ui-quality-risk");
   if (hasRec(route, "chrome-devtools-mcp") || hasRec(route, "browser-verification")) {
     out.push("browser-evidence-needed");
   }
@@ -290,7 +290,14 @@ function instructionFor(
     return `Stop the same edit loop; ${parts.join(", ")}.`;
   }
   if (problems.includes("ui-quality-risk")) {
-    return "Apply ui-ux-pro-max guidance before changing visible UI, then keep browser evidence as the completion gate.";
+    const frontendDesign = firstCapability(plan, "frontend-design");
+    const uiUx = firstCapability(plan, "ui-ux-pro-max");
+    const design = frontendDesign !== undefined && frontendDesign.availabilityState !== "missing"
+      ? frontendDesign.invocation
+      : uiUx !== undefined && uiUx.availabilityState !== "missing"
+        ? uiUx.invocation
+        : "the available frontend design guidance";
+    return `Apply ${design} before changing visible UI, then keep browser evidence as the completion gate.`;
   }
   if (problems.includes("browser-evidence-needed")) {
     return "After implementation, collect browser runtime evidence with Playwright or Chrome DevTools MCP before claiming completion.";

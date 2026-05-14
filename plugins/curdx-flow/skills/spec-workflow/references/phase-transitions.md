@@ -83,7 +83,7 @@ Activities:
 - Commit after verified completion
 - Progress tracking in `.progress.md`
 
-Ends with: State file deleted on completion
+Ends with: `completed: true`, `completedAt`, and verification audit fields preserved in `.curdx-state.json`
 
 ## Quick Mode
 

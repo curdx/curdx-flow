@@ -84,7 +84,7 @@ Use dependency wheels as capabilities, not as copied assets:
 
 - `claude-mem` for history, previous decisions, and repeated failures.
 - `pua` for repeated-failure recovery or genuinely independent decomposition.
-- `ui-ux-pro-max` for UI/visual/interaction work.
+- `frontend-design` for official UI design guidance and `ui-ux-pro-max` for deeper UI/visual/interaction critique.
 - `chrome-devtools-mcp` for browser console/network/DOM/performance/evidence.
 
 If a required capability is missing, follow its `fallbackWhenMissing` and run

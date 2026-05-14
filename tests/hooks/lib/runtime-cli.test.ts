@@ -97,7 +97,7 @@ describe("runtime-cli lib", () => {
         "--goal",
         "Fix React browser regression after failed twice",
         "--available-capabilities",
-        "claude-mem,pua,ui-ux-pro-max,chrome-devtools-mcp",
+        "claude-mem,pua,frontend-design,ui-ux-pro-max,chrome-devtools-mcp",
       ]);
 
       expect(result.exitCode).toBe(0);
@@ -105,6 +105,7 @@ describe("runtime-cli lib", () => {
         version: 1,
         problemTypes: expect.arrayContaining(["browser-evidence-needed"]),
         capabilityPlan: expect.arrayContaining([
+          expect.objectContaining({ id: "frontend-design" }),
           expect.objectContaining({ id: "ui-ux-pro-max" }),
           expect.objectContaining({ id: "chrome-devtools-mcp" }),
         ]),
@@ -419,6 +420,46 @@ describe("runtime-cli lib", () => {
           },
           warnings: expect.arrayContaining([
             "npm tag and Claude Code plugin tag are out of sync for the aligned release version.",
+          ]),
+        },
+      });
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("marks doctor unhealthy when expected external MCP servers are not confirmed", () => {
+    const cwd = makeTmpDir("runtime-doctor-external-mcp");
+    try {
+      const pluginManifest = JSON.parse(
+        readFileSync(path.join(process.cwd(), "plugins", "curdx-flow", ".claude-plugin", "plugin.json"), "utf8"),
+      ) as { version: string };
+      const version = pluginManifest.version;
+
+      const result = runLib("runtime-cli", ["doctor", "--cwd", cwd], {
+        env: {
+          CURDX_FLOW_GIT_LS_REMOTE_OUTPUT:
+            `abc123\trefs/tags/v${version}\nabc123\trefs/tags/curdx-flow--v${version}\n`,
+          CURDX_FLOW_MCP_LIST_OUTPUT: "",
+        },
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.json).toMatchObject({
+        ok: false,
+        release: { ready: true },
+        diagnostics: {
+          externalMcpReady: false,
+          releaseReady: true,
+        },
+        warnings: expect.arrayContaining([
+          expect.stringContaining("Expected external MCP readiness is not confirmed"),
+        ]),
+        externalMcp: {
+          ready: false,
+          servers: expect.arrayContaining([
+            expect.objectContaining({ id: "context7", configured: false, status: "missing" }),
+            expect.objectContaining({ id: "sequential-thinking", configured: false, status: "missing" }),
           ]),
         },
       });

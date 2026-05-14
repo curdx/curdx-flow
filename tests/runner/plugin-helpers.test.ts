@@ -4,6 +4,7 @@ import type { InstallCtx } from '../../src/registry/types.ts';
 const mocks = vi.hoisted(() => ({
   runStreaming: vi.fn(),
   clearStateCache: vi.fn(),
+  getMarketplacePluginVersion: vi.fn(),
   isPluginInstalledAtScope: vi.fn(),
   isMarketplaceAdded: vi.fn(),
 }));
@@ -18,6 +19,7 @@ vi.mock('../../src/runner/exec.ts', async () => {
 
 vi.mock('../../src/runner/state.ts', () => ({
   clearStateCache: mocks.clearStateCache,
+  getMarketplacePluginVersion: mocks.getMarketplacePluginVersion,
   isPluginInstalledAtScope: mocks.isPluginInstalledAtScope,
   isMarketplaceAdded: mocks.isMarketplaceAdded,
 }));
@@ -98,5 +100,41 @@ describe('plugin command helpers', () => {
       ctx.log,
     );
     expect(mocks.clearStateCache).toHaveBeenCalledTimes(1);
+  });
+
+  test('frontend-design refreshes official marketplace before retrying a failed install', async () => {
+    const frontendDesign = (await import('../../src/registry/plugins/frontend-design.ts')).default;
+    mocks.runStreaming
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'not found' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+
+    await frontendDesign.install(ctx);
+
+    expect(mocks.runStreaming).toHaveBeenNthCalledWith(
+      1,
+      'claude',
+      ['plugin', 'marketplace', 'add', 'anthropics/claude-plugins-official'],
+      ctx.log,
+    );
+    expect(mocks.runStreaming).toHaveBeenNthCalledWith(
+      2,
+      'claude',
+      ['plugin', 'install', 'frontend-design@claude-plugins-official', '--scope', 'user'],
+      ctx.log,
+    );
+    expect(mocks.runStreaming).toHaveBeenNthCalledWith(
+      3,
+      'claude',
+      ['plugin', 'marketplace', 'update', 'claude-plugins-official'],
+      ctx.log,
+    );
+    expect(mocks.runStreaming).toHaveBeenNthCalledWith(
+      4,
+      'claude',
+      ['plugin', 'install', 'frontend-design@claude-plugins-official', '--scope', 'user'],
+      ctx.log,
+    );
   });
 });

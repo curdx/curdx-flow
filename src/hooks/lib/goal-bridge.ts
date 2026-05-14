@@ -73,8 +73,8 @@ function capabilityEvidence(decision: LastMileDecision): string[] {
   if (ids.includes("context7") || ids.includes("docs-query")) {
     out.push("current docs evidence is shown before relying on external API, SDK, framework, or Claude Code behavior");
   }
-  if (ids.includes("ui-ux-pro-max")) {
-    out.push("visible UI changes show ui-ux-pro-max guidance was applied or explicitly deemed irrelevant");
+  if (ids.includes("frontend-design") || ids.includes("ui-ux-pro-max")) {
+    out.push("visible UI changes show frontend-design/ui-ux guidance was applied or explicitly deemed irrelevant");
   }
   if (ids.includes("chrome-devtools-mcp") || ids.includes("browser-verification")) {
     out.push("browser-sensitive work includes real browser evidence such as URL, actions, console/network result, screenshot, snapshot, or trace");

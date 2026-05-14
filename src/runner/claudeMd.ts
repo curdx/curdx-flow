@@ -83,6 +83,9 @@ function renderInstalledCapabilityRules(ids: Set<string>): string[] {
   if (ids.has('ui-ux-pro-max')) {
     lines.push('- ui-ux-pro-max plugin skills: use when building or changing visible UI, interaction design, frontend layout, or visual quality.');
   }
+  if (ids.has('frontend-design')) {
+    lines.push('- frontend-design plugin skill: use before implementing visible frontend experiences, components, pages, interaction design, responsive layout, or visual polish.');
+  }
   if (ids.has('chrome-devtools-mcp')) {
     lines.push('- Chrome DevTools MCP: use for browser runtime behavior, UI regressions, DOM/CSS issues, network failures, and frontend verification.');
   }
@@ -105,8 +108,9 @@ function renderCapabilityDecisionTree(ids: Set<string>): string[] {
   if (ids.has('claude-mem')) {
     rules.push('Might similar work, a prior decision, or a repeated failure exist? -> Start with `/claude-mem:mem-search`.');
   }
-  if (ids.has('ui-ux-pro-max') || ids.has('chrome-devtools-mcp')) {
-    rules.push('Is visible frontend behavior in scope? -> Use ui-ux-pro-max for UI decisions and Chrome DevTools MCP for runtime proof when installed.');
+  if (ids.has('frontend-design') || ids.has('ui-ux-pro-max') || ids.has('chrome-devtools-mcp')) {
+    const design = ids.has('frontend-design') ? 'frontend-design' : 'ui-ux-pro-max';
+    rules.push(`Is visible frontend behavior in scope? -> Use ${design} for UI decisions and Chrome DevTools MCP for runtime proof when installed.`);
   }
   if (ids.has('sequential-thinking')) {
     rules.push('Is the work high-risk, architectural, or assumption-heavy? -> Use sequential-thinking after reading the relevant code.');

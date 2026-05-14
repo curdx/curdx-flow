@@ -170,6 +170,7 @@ describe("manifest discovery", () => {
       { name: "pua", marketplace: "pua-skills" },
       { name: "claude-mem", marketplace: "thedotmack" },
       { name: "chrome-devtools-mcp", marketplace: "chrome-devtools-plugins" },
+      { name: "frontend-design", marketplace: "claude-plugins-official" },
       { name: "ui-ux-pro-max", marketplace: "ui-ux-pro-max-skill" },
     ]);
     expect(marketplace.allowCrossMarketplaceDependenciesOn).toEqual(
@@ -177,6 +178,7 @@ describe("manifest discovery", () => {
         "pua-skills",
         "thedotmack",
         "chrome-devtools-plugins",
+        "claude-plugins-official",
         "ui-ux-pro-max-skill",
       ]),
     );
@@ -458,6 +460,25 @@ describe("skills frontmatter integrity", () => {
       );
       expect(body, `${label}: must not initialize new state with legacy cap 100`).not.toMatch(
         /maxGlobalIterations["\s:]+100/,
+      );
+    }
+  });
+
+  it("completion docs preserve state audit records instead of deleting state", () => {
+    const files = [
+      path.join(SKILLS_DIR, "implement", "SKILL.md"),
+      path.join(SKILLS_DIR, "spec-workflow", "references", "phase-transitions.md"),
+      path.join(SKILLS_DIR, "curdx-core", "references", "state-file-schema.md"),
+      path.join(REFERENCES_DIR, "coordinator-pattern.md"),
+      path.join(REFERENCES_DIR, "commit-discipline.md"),
+    ];
+    const staleCompletionDeleteRe =
+      /(?:delete|deleted|remove|removed)\s+(?:the\s+)?(?:spec\s+)?state\s+file\s+(?:on|after|when)\s+completion|delete state file,\s*output ALL_TASKS_COMPLETE/i;
+
+    for (const file of files) {
+      const body = readFileSync(file, "utf8");
+      expect(body, `${file}: completion must preserve .curdx-state.json audit fields`).not.toMatch(
+        staleCompletionDeleteRe,
       );
     }
   });

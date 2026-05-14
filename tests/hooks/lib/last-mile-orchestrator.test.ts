@@ -9,7 +9,7 @@ import { appendBrainEvent } from "../../../src/hooks/lib/project-brain.js";
 import { makeTmpDir, runLib } from "./_lib-helpers.js";
 
 describe("last-mile orchestrator", () => {
-  it("routes UI work to ui-ux-pro-max and browser evidence automatically", () => {
+  it("routes UI work to frontend design, ui-ux-pro-max, and browser evidence automatically", () => {
     const cwd = makeTmpDir("last-mile-ui");
     try {
       mkdirSync(path.join(cwd, "src"), { recursive: true });
@@ -25,7 +25,7 @@ describe("last-mile orchestrator", () => {
         cwd,
         goal: "Update the React login page and verify browser interaction",
         changedFiles: ["src/Login.tsx"],
-        availableCapabilities: ["ui-ux-pro-max", "chrome-devtools-mcp"],
+        availableCapabilities: ["frontend-design", "ui-ux-pro-max", "chrome-devtools-mcp"],
       });
 
       expect(decision.phase).toBe("planning");
@@ -34,6 +34,7 @@ describe("last-mile orchestrator", () => {
       );
       expect(decision.capabilityPlan).toEqual(
         expect.arrayContaining([
+          expect.objectContaining({ id: "frontend-design", availabilityState: "available" }),
           expect.objectContaining({ id: "ui-ux-pro-max", availabilityState: "available" }),
           expect.objectContaining({ id: "chrome-devtools-mcp", availabilityState: "available" }),
         ]),
@@ -122,6 +123,11 @@ describe("last-mile orchestrator", () => {
       expect(decision.capabilityPlan).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
+            id: "frontend-design",
+            availabilityState: "missing",
+            fallbackWhenMissing: expect.any(String),
+          }),
+          expect.objectContaining({
             id: "ui-ux-pro-max",
             availabilityState: "missing",
             fallbackWhenMissing: expect.any(String),
@@ -144,7 +150,7 @@ describe("last-mile orchestrator", () => {
       "--goal",
       "Again debug React browser failure after failed twice",
       "--available-capabilities",
-      "claude-mem,pua,ui-ux-pro-max,chrome-devtools-mcp",
+      "claude-mem,pua,frontend-design,ui-ux-pro-max,chrome-devtools-mcp",
     ]);
 
     expect(result.exitCode).toBe(0);

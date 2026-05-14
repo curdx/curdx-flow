@@ -238,6 +238,7 @@ const EXPECTED_PLUGIN_DEPENDENCIES = [
   { name: "pua", marketplace: "pua-skills" },
   { name: "claude-mem", marketplace: "thedotmack" },
   { name: "chrome-devtools-mcp", marketplace: "chrome-devtools-plugins" },
+  { name: "frontend-design", marketplace: "claude-plugins-official" },
   { name: "ui-ux-pro-max", marketplace: "ui-ux-pro-max-skill" },
 ] as const;
 
@@ -333,12 +334,22 @@ function externalMcpDoctor(): unknown {
     output = envOutput;
     exitCode = 0;
   } else {
-    const result = spawnSync("zsh", ["-lic", `${shellToken(bin)} mcp list`], {
+    let result = spawnSync(bin, ["mcp", "list"], {
       cwd: process.cwd(),
       encoding: "utf8",
-      timeout: 5000,
+      timeout: 3000,
       maxBuffer: 1024 * 1024,
     });
+    source = "direct exec";
+    if ((result.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
+      result = spawnSync("zsh", ["-lic", `${shellToken(bin)} mcp list`], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        timeout: 3000,
+        maxBuffer: 1024 * 1024,
+      });
+      source = "zsh fallback";
+    }
     output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
     exitCode = result.status ?? null;
     if (result.error) {
@@ -369,6 +380,27 @@ function externalMcpDoctor(): unknown {
     servers,
     note: "curdx-flow does not bundle these MCP servers; setup scripts or user MCP config own installation.",
   };
+}
+
+function externalMcpWarnings(externalMcp: {
+  ready?: boolean;
+  exitCode?: number | null;
+  error?: string | null;
+  servers?: Array<{ id?: string; status?: string }>;
+}): string[] {
+  if (externalMcp.ready === true) return [];
+  const unknown = externalMcp.servers
+    ?.filter((server) => server.status !== "available")
+    .map((server) => `${server.id ?? "unknown"}:${server.status ?? "unknown"}`) ?? [];
+  const suffix = unknown.length > 0 ? ` (${unknown.join(", ")})` : "";
+  const command = externalMcp.error
+    ? `; command error: ${externalMcp.error}`
+    : typeof externalMcp.exitCode === "number"
+      ? `; exitCode=${externalMcp.exitCode}`
+      : "";
+  return [
+    `Expected external MCP readiness is not confirmed${suffix}${command}. curdx-flow will not bundle duplicate MCP config; fix Claude MCP setup before relying on context7 or sequential-thinking.`,
+  ];
 }
 
 function releaseDoctor(): unknown {
@@ -1108,13 +1140,29 @@ function doctor(argv: string[]): void {
   const plugin = pluginHealthDoctor() as { ready?: boolean };
   const hookFreshness = hookFreshnessDoctor() as { fresh?: boolean; sourceAvailable?: boolean };
   const release = releaseDoctor() as { ready?: boolean };
+  const externalMcp = externalMcpDoctor() as {
+    ready?: boolean;
+    exitCode?: number | null;
+    error?: string | null;
+    servers?: Array<{ id?: string; status?: string }>;
+  };
+  const warnings = [
+    ...externalMcpWarnings(externalMcp),
+  ];
   const root = pluginRoot();
   printJson({
     ok:
       runtimeReady &&
       plugin.ready === true &&
+      externalMcp.ready === true &&
       release.ready !== false &&
       (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
+    warnings,
+    diagnostics: {
+      externalMcpReady: externalMcp.ready === true,
+      hookFreshnessFresh: hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true,
+      releaseReady: release.ready !== false,
+    },
     cwd,
     scripts: Object.fromEntries(expected.map((p) => [basename(p), existsSync(p)])),
     runtime: {
@@ -1136,7 +1184,7 @@ function doctor(argv: string[]): void {
     brain,
     executionBrief,
     lastMile: lastMileDecision,
-    externalMcp: externalMcpDoctor(),
+    externalMcp,
     browserVerification: browserVerificationDoctor(cwd),
     active: snap.active,
     spec: snap.spec,

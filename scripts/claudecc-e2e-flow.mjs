@@ -257,7 +257,7 @@ try {
   const prompt = [
     '/curdx-flow:start greet-helper',
     '"Implement src/greet.js so npm test passes. Export greet(name). Trim whitespace and return Hello, friend! for empty input."',
-    '--quick --no-commit-spec --mode fast --tasks-size coarse --review minimal',
+    '--quick --no-commit-spec --mode fast --task-granularity coarse --review minimal',
   ].join(' ');
 
   runClaudeCode(
