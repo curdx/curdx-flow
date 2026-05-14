@@ -3704,8 +3704,8 @@ function stopDevRuntime(input = {}) {
 // src/hooks/lib/last-mile-orchestrator.ts
 import { basename as basename9 } from "node:path";
 import { fileURLToPath as fileURLToPath6 } from "node:url";
-var RELEASE_RE2 = /\b(release|publish|deploy|ship|tag|npm|version|changelog)\b|发布|部署|上线|打包|版本|标签/i;
-var FAILURE_RE = /\b(fail|failed|failure|error|stuck|retry|debug|broken|regression)\b|失败|报错|卡住|重试|排查|定位|回归/i;
+var RELEASE_RE2 = /\b(release|publish|deploy|ship|tag|npm|version|changelog)\b|发布|部署|上线|打包|版本|标签|提测|灰度/i;
+var FAILURE_RE = /\b(fail|failed|failure|error|stuck|retry|debug|broken|regression)\b|失败|报错|卡住|重试|排查|定位|回归|崩溃|阻塞|无法|不通过/i;
 function normalize3(value) {
   return (value ?? "").trim().replace(/\s+/g, " ");
 }
@@ -5061,6 +5061,12 @@ async function verify(argv) {
     srcMtime,
     description: readArg9("--description", rest) ?? `Verification for ${phase}`
   };
+  if (phase === "execution") {
+    const stateTaskIndex = snap.state?.taskIndex;
+    if (typeof stateTaskIndex === "number" && Number.isInteger(stateTaskIndex) && stateTaskIndex >= 0) {
+      block.taskIndex = stateTaskIndex;
+    }
+  }
   if (exitCode !== 0) {
     block.failedReason = result.error ? result.error.message : `command exited ${exitCode}`;
   }

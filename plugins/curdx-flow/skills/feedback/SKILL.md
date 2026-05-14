@@ -1,10 +1,8 @@
 ---
 name: feedback
 description: Use when submitting curdx-flow feedback, bug reports, or feature requests.
-arguments:
-  - name: message
-    description: Your feedback or issue description
-    required: false
+argument-hint: "[feedback message]"
+arguments: message
 allowed-tools: "Bash AskUserQuestion"
 disable-model-invocation: true
 ---

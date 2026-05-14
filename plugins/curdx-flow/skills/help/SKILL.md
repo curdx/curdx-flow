@@ -29,16 +29,37 @@ If the user has not named a specific command, recommend `/curdx-flow:start`. It 
 
 | Command | Use |
 |---|---|
-| `/curdx-flow:start [name] [goal]` | Smart route, create, or resume |
+| `/curdx-flow:start [name] [goal]` | Smart route, create, or resume. **Prefer this when in doubt.** |
+| `/curdx-flow:new <name> [goal]` | Explicit create. Use only when you know the spec is new; will prompt to resume/overwrite if it already exists. |
 | `/curdx-flow:prompt-optimize [draft prompt]` | Improve a task prompt and route suggestion without executing it |
 | `/curdx-flow:status` | Show specs and the recommended next action |
 | `/curdx-flow:triage [epic-name] [goal]` | Split oversized work into dependency-aware specs |
 | `/curdx-flow:tasks` | Generate value-slice implementation tasks after design |
-| `/curdx-flow:implement [--max-task-iterations 5] [--max-global-iterations 30] [--goal-turns 30] [--manual]` | Execute approved tasks with native `/goal` driving follow-up turns |
+| `/curdx-flow:implement [flags]` | Execute approved tasks with native `/goal` driving follow-up turns (see Implement Flags below) |
+| `/curdx-flow:cancel [name]` | Confirm-then-delete a spec directory and its state file |
+
+### `start` vs `new`
+
+`start` is the smart wrapper: it routes intent, resumes unfinished specs, and creates new ones as needed. `new` is the explicit creator and does not resume or route. If you are unsure which to type, type `start`.
 
 All public entrypoints remain available:
 
 `/curdx-flow:cancel`, `/curdx-flow:design`, `/curdx-flow:feedback`, `/curdx-flow:help`, `/curdx-flow:implement`, `/curdx-flow:index`, `/curdx-flow:new`, `/curdx-flow:prompt-optimize`, `/curdx-flow:refactor`, `/curdx-flow:requirements`, `/curdx-flow:research`, `/curdx-flow:start`, `/curdx-flow:status`, `/curdx-flow:switch`, `/curdx-flow:tasks`, `/curdx-flow:triage`.
+
+## Implement Flags
+
+```text
+/curdx-flow:implement [--max-task-iterations 5] [--max-global-iterations 30] [--goal-turns 30] [--manual] [--quick] [--recovery-mode]
+```
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--max-task-iterations` | 5 | Per-task retry cap. When hit, the current task is marked failed and the retry loop breaks. |
+| `--max-global-iterations` | 30 | Global loop cap. When hit, the coordinator halts. Override with `100` to opt back into legacy behavior. |
+| `--goal-turns` | same as `--max-global-iterations` | Max native `/goal` turns before reporting an incomplete blocker. |
+| `--manual` | off | Do not ask the user to set native `/goal`; run one coordinator turn and leave a resumable status. |
+| `--quick` | off | Non-interactive. Skip branch/worktree/review prompts. Trusts `autoPolicy.reviewCadence`. |
+| `--recovery-mode` | off | On task failure, generate a fix task and retry instead of stopping. Affects execution failures only. |
 
 ## Smart Start Options
 

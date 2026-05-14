@@ -1,118 +1,138 @@
-# CLAUDE.md — curdx-flow
+# CLAUDE.md
 
-Project-level instructions for Claude Code working in this repo. Read once at session start.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this repo is
 
-`@curdx/flow` is a dual-purpose deliverable:
+`@curdx/flow` is a single npm package that ships two coupled deliverables under one version number:
 
-1. **npm CLI** (`npx @curdx/flow`) — interactive installer for Claude Code plugins and MCP servers. Source in `src/`, built with `tsup` into `dist/index.mjs`.
-2. **Bundled Claude plugin** `curdx-flow@curdx` — spec-driven dev workflow (`/curdx-flow:*` slash commands). Lives in `plugins/curdx-flow/`; `.claude-plugin/marketplace.json` advertises it.
+1. **CLI** (`npx @curdx/flow`) — interactive installer for Claude Code plugins and MCP servers. Source in `src/`, built by `tsup` to `dist/index.mjs`.
+2. **Bundled Claude plugin** `curdx-flow@curdx` — a spec-driven dev workflow exposed as `/curdx-flow:*` slash commands. Lives in `plugins/curdx-flow/`; advertised by `.claude-plugin/marketplace.json`.
 
-Both ship in the same npm package. A single version number governs the whole repo.
+Because both ship together, the version string lives in **five** places that must stay in lockstep (see Release SOP).
 
-## Layout cheatsheet
+## Common commands
 
-```
-src/                                 CLI source (TypeScript)
-dist/                                tsup build output (gitignored, npm-published)
-scripts/check-versions.mjs           version-drift gate (5 fields, see below)
-plugins/curdx-flow/                  bundled plugin tree
-  .claude-plugin/plugin.json         plugin manifest (version field)
-  hooks/hooks.json                   plugin hooks
-  schemas/spec.schema.json           spec schema
-.claude-plugin/marketplace.json      marketplace index (plugins[curdx-flow].version)
-.github/workflows/ci.yml             typecheck + build on push/PR
-.github/workflows/release.yml        npm publish + GH release on tag push
-CHANGELOG.md                         Keep-a-Changelog format
-```
+### Build / dev
+- `npm run dev` — `tsup --watch` for the CLI.
+- `npm run build` — bundle CLI to `dist/index.mjs`.
+- `npm run build:hooks` — esbuild bundles `src/hooks/**/*.ts` → `plugins/curdx-flow/hooks/scripts/**/*.mjs`. Run after editing any hook source.
+- `npm run typecheck` — `tsc --noEmit`.
+- `node dist/index.mjs` — smoke-run the built CLI.
+
+### Tests (vitest, `pool: 'forks'`, 5s timeout, includes `tests/**/*.test.ts`)
+- `npm run test:hooks` — builds hooks first, then runs `tests/hooks/`.
+- `npm run test:analyze` — `tests/analyze/` (cost analyzer).
+- `npm run test:runner` — `tests/runner/` (subprocess + state utilities).
+- `npm run test:claudecc` — CLI smoke (`scripts/claudecc-smoke.mjs`).
+- `npm run test:claudecc:e2e` — full end-to-end (`scripts/claudecc-e2e-flow.mjs`).
+- Single test file: `npx vitest run tests/hooks/<name>.test.ts`.
+- Single test by name: `npx vitest run -t "<test name>"`.
+
+`tests/cli/` exists but has no dedicated script — run via `npx vitest run tests/cli`.
+
+### Gates (also wired into CI / `prepublishOnly`)
+- `npm run check-versions` — the 5-field version-drift gate.
+- `npm run check:hooks-fresh` — rebuilds hooks and `git diff --exit-code`s the output to catch stale bundles.
+- `npm run check:bundle` — CLI bundle size check.
+- `npm run verify` — the "did I break anything" command: `typecheck && check-versions && check:hooks-fresh && build && check:bundle && test:hooks && test:analyze && test:runner && check-verification-blocks`.
+
+### Release helper
+- `npm run bump-version <X.Y.Z|patch|minor|major>` — atomically writes all 5 version fields and re-runs `check-versions`. Pass `--dry-run` to preview.
+
+### Linting / formatting
+**None.** No ESLint, Prettier, or Biome config exists. The quality gate is TypeScript strict mode (`tsconfig.json`: ES2022, ESNext modules, `strict`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, `noImplicitOverride`).
+
+## Architecture
+
+### CLI (`src/`)
+Entry point `src/index.ts` uses the **citty** framework to define five top-level subcommands — `install`, `update`, `uninstall`, `status`, `analyze` — with shared args `--lang` and `--no-claude-md`. Version is read from `package.json` at runtime.
+
+| Module | Role |
+| --- | --- |
+| `src/flows/` | One flow per CLI command. Orchestrates `claude plugin install` / `claude mcp add` subprocesses and syncs a managed block into `~/.claude/CLAUDE.md`. |
+| `src/registry/` | Catalog of installable plugins (`plugins/`) and MCP servers (`mcps/`) as descriptor files. |
+| `src/runner/` | Subprocess exec, persistent state, build-freshness checks, CLAUDE.md sync, bun detection. |
+| `src/ui/` | `@clack/prompts`-based interactive menus, language picker. |
+| `src/analyze/` | Transcript cost analysis (parser, pricing, filter, report). |
+| `src/i18n/` | `en.ts`, `zh.ts` translations. |
+| `src/hooks/` | TypeScript sources for the bundled plugin's runtime hooks. |
+
+### Bundled plugin (`plugins/curdx-flow/`)
+Implements a five-phase, spec-driven dev workflow. Each phase is a `/curdx-flow:*` slash command that delegates to a specialist agent and produces a markdown artifact that feeds the next phase:
+
+1. `/curdx-flow:research` → research-analyst → `research.md`
+2. `/curdx-flow:requirements` → product-manager → `requirements.md`
+3. `/curdx-flow:design` → architect-reviewer → `design.md`
+4. `/curdx-flow:tasks` → task-planner → `tasks.md`
+5. `/curdx-flow:implement` → spec-executor (autonomous loop) → code, tests, commits
+
+Plugin tree:
+- `.claude-plugin/plugin.json` — manifest (version field; one of the 5 synced fields).
+- `agents/` — specialist agents (architect-reviewer, product-manager, task-planner, spec-executor, QA, etc.).
+- `skills/` — skill bundles backing the slash commands.
+- `references/` — design docs (phase rules, verification layers, coordinator pattern, two-stage review, …).
+- `schemas/spec.schema.json` — spec validation schema.
+- `templates/` — scaffolds (e.g. `tasks.md` template).
+- `bin/curdx-flow` — plugin-side launcher.
+- `hooks/hooks.json` — registers built hook scripts to Claude Code lifecycle events.
+- `hooks/scripts/*.mjs` — **built** ESM bundles. Generated; do not hand-edit.
+
+### Hook build pipeline
+`src/hooks/**/*.ts` (~8 hook entries plus `lib/` and `_shared/` utilities) is bundled by esbuild via `scripts/build-hooks.mjs` into single-file ESM output at `plugins/curdx-flow/hooks/scripts/**/*.mjs`. Settings: `bundle: true`, `platform: 'node'`, `target: 'node20'`, `format: 'esm'`, `outbase: 'src/hooks'`, banner injects `require` / `__filename` / `__dirname` for ESM compatibility, `minify: false` for plugin auditability. `hooks.json` invokes each as `node "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/<name>.mjs"`.
+
+**Workflow rule:** edit `src/hooks/`, then `npm run build:hooks`. CI gates desync via `check:hooks-fresh`. Full rationale in `specs/cross-platform-support/design.md` → "Build Pipeline → esbuild 配置".
+
+### CI
+`.github/workflows/ci.yml` runs typecheck (Ubuntu), `check:hooks-fresh` (Ubuntu), and a test matrix across Ubuntu 20/22, macOS, and Windows. `.github/workflows/release.yml` triggers on tag push (see Release SOP).
 
 ## Release SOP
 
-The release pipeline is automated end-to-end **once a tag is pushed**. Local work is just: bump versions, update changelog, commit, tag, push.
+**Always confirm the bump level (PATCH/MINOR/MAJOR) with the user before editing any file.** Default to PATCH.
 
-### 1. Pick the version
+1. **`npm run bump-version <X.Y.Z|patch|minor|major>`** — atomically writes all 5 fields below and re-runs `check-versions`.
 
-Default to **PATCH bump** (`6.0.1 → 6.0.2`). Always confirm the bump level with the user before editing any file — never autonomously decide MAJOR/MINOR.
+   | File | Field |
+   | --- | --- |
+   | `package.json` | `version` |
+   | `package-lock.json` | `version` (top-level) |
+   | `package-lock.json` | `packages[""].version` |
+   | `plugins/curdx-flow/.claude-plugin/plugin.json` | `version` |
+   | `.claude-plugin/marketplace.json` | `plugins[name="curdx-flow"].version` |
 
-### 2. Sync all 5 version fields
+2. Prepend a new section to `CHANGELOG.md`:
+   ```
+   ## X.Y.Z — YYYY-MM-DD
 
-Run **`npm run bump-version <X.Y.Z|patch|minor|major>`** — it atomically writes all 5 fields below and then runs `check-versions` to confirm. Use `--dry-run` first if you want to see the plan.
+   ### Added | Changed | Fixed | Breaking
+   - ...
+   ```
+   Match existing tone (concrete; reference commit SHAs / file paths when relevant).
 
-| File | Field |
-| --- | --- |
-| `package.json` | `version` |
-| `package-lock.json` | `version` (top-level) |
-| `package-lock.json` | `packages[""].version` |
-| `plugins/curdx-flow/.claude-plugin/plugin.json` | `version` |
-| `.claude-plugin/marketplace.json` | `plugins[name="curdx-flow"].version` |
+3. Commit, tag, push:
+   ```bash
+   git add -A
+   git commit -m "chore: release vX.Y.Z"
+   git tag vX.Y.Z
+   git push origin main --tags
+   ```
 
-If you really need to edit by hand (rare), bump every field above and then run `npm run check-versions` — `prepublishOnly` and the release workflow both gate on it, so any drift fails the build.
+4. Tag push triggers `.github/workflows/release.yml`: `npm ci` → `check-versions` → `build` → `npm publish --provenance --access public` (uses `NPM_TOKEN`) → `softprops/action-gh-release@v2` for auto-generated notes.
 
-### 3. Update CHANGELOG.md
+5. Verify: GitHub Releases tab shows `vX.Y.Z`; `npm view @curdx/flow version`; `npx @curdx/flow@X.Y.Z --help`.
 
-Prepend a new section at the top:
-
-```
-## X.Y.Z — YYYY-MM-DD
-
-### Added | Changed | Fixed | Breaking
-- ...
-```
-
-Match the tone of existing entries — concrete, references commit SHAs / file paths when relevant.
-
-### 4. Commit + tag + push
-
-```bash
-git add -A
-git commit -m "chore: release vX.Y.Z"
-git tag vX.Y.Z
-git push origin main --tags
-```
-
-The tag push triggers `.github/workflows/release.yml`, which runs:
-
-1. `npm ci`
-2. `npm run check-versions` (the 5-field gate)
-3. `npm run build`
-4. `npm publish --provenance --access public` (uses `NPM_TOKEN` secret)
-5. `softprops/action-gh-release@v2` — auto-generates release notes from commits
-
-`prepublishOnly` in package.json (`check-versions && typecheck && build`) is a defense-in-depth guard for anyone running `npm publish` locally — CI does not rely on it.
-
-### 5. Verify
-
-- GitHub → Releases tab shows `vX.Y.Z` with auto notes
-- `npm view @curdx/flow version` returns the new version
-- `npx @curdx/flow@X.Y.Z --help` resolves
+`prepublishOnly` (`check-versions && typecheck && check:hooks-fresh && build`) is local defense-in-depth; CI does not depend on it.
 
 ## Things that have broken before — don't repeat
 
-- **v5.0.0** bumped `plugin.json` but missed `marketplace.json`. The Claude CLI kept advertising the old version and the installer's update path silently no-op'd. Fix shipped as commit `e234fb8`; `check-versions.mjs` was added to make this a hard build failure. → Always sync **all 5 fields** in step 2.
-- **v6.0.0** bumped `package.json` but missed `package-lock.json`. CI's `npm ci` failed because lockfile and manifest disagreed. Fix shipped as commit `d90f081`. → `npm version --no-git-tag-version` does this for you; don't hand-edit only `package.json`.
+- **v5.0.0** bumped `plugin.json` but missed `marketplace.json`. The Claude CLI kept advertising the old version and the installer's update path silently no-op'd. Fix: commit `e234fb8`, plus `check-versions.mjs` as a hard build gate. → Always sync **all 5 fields**.
+- **v6.0.0** bumped `package.json` but missed `package-lock.json`. CI's `npm ci` failed because lockfile and manifest disagreed. Fix: commit `d90f081`. → Use `bump-version` (or `npm version --no-git-tag-version`); never hand-edit only `package.json`.
 
 ## Don'ts
 
 - Don't bump the version without explicit user confirmation of the bump level.
 - Don't skip `npm run check-versions` locally — let it catch drift before CI does.
-- Don't push tags to main without first pushing the release commit (the workflow checks out the tag's commit, which must contain the bumped versions).
-- Don't run `npm publish` manually unless CI is broken and the user explicitly asks. The workflow has provenance + `NPM_TOKEN` already wired up.
-- Don't amend or force-push a release tag once it's on origin — npm publishes are immutable, so a re-push would create a tag/registry mismatch. Make a new patch version instead.
-
-## Local dev
-
-```bash
-npm install
-npm run dev          # tsup watch
-npm run typecheck
-npm run build
-node dist/index.mjs  # smoke test the CLI
-```
-
-The bundled plugin (`plugins/curdx-flow/`) ships TWO categories of files:
-
-- **Static artifacts** — manifests (`.claude-plugin/plugin.json`, `hooks/hooks.json`), `agents/*.md`, `commands/*.md`, `skills/*.md`, `references/*.md`, `schemas/*.json`. Edits take effect on the next `claude plugin install` / `update`.
-- **Built artifacts** — `hooks/scripts/**/*.mjs` (4 hooks + 11 lib utilities) bundled from `src/hooks/**/*.ts` via esbuild. Run `npm run build:hooks` after editing any TypeScript hook source. CI gates this with `npm run check:hooks-fresh` to catch desynced bundles (build output that drifted from source).
-
-See `specs/cross-platform-support/design.md` → "Build Pipeline → esbuild 配置" for the full rationale (bundled `.mjs` vs gitignored, ESM target, single-file zero-runtime-deps output, `outbase` flattening).
+- Don't push tags without first pushing the release commit (the workflow checks out the tag's commit, which must contain the bumped versions).
+- Don't run `npm publish` manually unless CI is broken and the user asks.
+- Don't amend or force-push a release tag once it's on origin — npm publishes are immutable, so a re-push creates a tag/registry mismatch. Cut a new patch instead.
+- Don't edit `plugins/curdx-flow/hooks/scripts/*.mjs` directly — they're generated. Edit `src/hooks/**/*.ts` and run `npm run build:hooks`.

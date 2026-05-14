@@ -1019,6 +1019,15 @@ async function verify(argv: string[]): Promise<void> {
     srcMtime,
     description: readArg("--description", rest) ?? `Verification for ${phase}`,
   };
+  // Task-level evidence for execution phase: pin the block to the task index
+  // it was recorded against so subsequent tasks cannot ride this block's
+  // freshness (`verifyPhaseBlock` rejects on mismatch when present).
+  if (phase === "execution") {
+    const stateTaskIndex = (snap.state as { taskIndex?: unknown } | undefined)?.taskIndex;
+    if (typeof stateTaskIndex === "number" && Number.isInteger(stateTaskIndex) && stateTaskIndex >= 0) {
+      block.taskIndex = stateTaskIndex;
+    }
+  }
   if (exitCode !== 0) {
     block.failedReason = result.error
       ? (result.error as Error).message
