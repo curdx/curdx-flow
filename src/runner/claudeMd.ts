@@ -5,6 +5,10 @@ import * as p from '@clack/prompts';
 import { listPlugins, listMcp } from './state.ts';
 import { PKGS } from '../registry/index.ts';
 import type { Pkg } from '../registry/types.ts';
+import {
+  renderCurdxCapabilityDecisionTree,
+  renderCurdxInstalledCapabilityRules,
+} from '../registry/capability-rules.ts';
 import { t } from '../i18n/index.ts';
 import { getLang } from '../i18n/index.ts';
 
@@ -37,7 +41,7 @@ export function claudeMdPath(): string {
 // ---------- pure rendering ----------
 
 function buildCombinationPatterns(ids: Set<string>): string[] {
-  const out = renderInstalledCapabilityRules(ids);
+  const out = renderCurdxInstalledCapabilityRules(ids);
   if (ids.has('curdx-flow')) {
     out.push('- /curdx-flow:start: Use for ambiguous, cross-cutting, phase-based, or multi-root work; skip for small direct edits.');
     out.push('- /curdx-flow:triage: Use when one request is too large for a single coherent spec.');
@@ -63,62 +67,11 @@ function buildSkipRules(ids: Set<string>): string[] {
 }
 
 function buildDecisionTree(ids: Set<string>): string[] {
-  const out = renderCapabilityDecisionTree(ids);
+  const out = renderCurdxCapabilityDecisionTree(ids);
   if (ids.has('curdx-flow')) {
     out.push(`${out.length + 1}. Is the request ambiguous, cross-cutting, phase-based, or multi-root? -> Run /curdx-flow:start.`);
   }
   return out;
-}
-
-function renderInstalledCapabilityRules(ids: Set<string>): string[] {
-  const lines = [
-    'Use installed capabilities by trigger, not by habit. Prefer the first matching rule; skip absent capabilities.',
-  ];
-  if (ids.has('context7')) {
-    lines.push('- Context7 MCP: use the Context7 MCP before implementation when external library, SDK, API, framework, or Claude Code behavior matters. Skip for pure local logic, typos, and code paths fully understood from this repository.');
-  }
-  if (ids.has('claude-mem')) {
-    lines.push('- /claude-mem:mem-search: Use /claude-mem:mem-search when similar work, prior decisions, or repeated failures may exist; use /claude-mem:make-plan only for genuinely phased work. Skip when the task is new, obvious, and smaller than a short local edit.');
-  }
-  if (ids.has('ui-ux-pro-max')) {
-    lines.push('- ui-ux-pro-max plugin skills: use when building or changing visible UI, interaction design, frontend layout, or visual quality.');
-  }
-  if (ids.has('frontend-design')) {
-    lines.push('- frontend-design plugin skill: use before implementing visible frontend experiences, components, pages, interaction design, responsive layout, or visual polish.');
-  }
-  if (ids.has('chrome-devtools-mcp')) {
-    lines.push('- Chrome DevTools MCP: use for browser runtime behavior, UI regressions, DOM/CSS issues, network failures, and frontend verification.');
-  }
-  if (ids.has('sequential-thinking')) {
-    lines.push('- sequential-thinking MCP: use for architecture tradeoffs, migrations, security/data/release risk, or debugging where assumptions may change.');
-  }
-  if (ids.has('pua')) {
-    lines.push('- /pua:pua-loop or /pua:p9: use after multiple failed attempts or for truly independent parallel work slices.');
-  }
-  return lines;
-}
-
-function renderCapabilityDecisionTree(ids: Set<string>): string[] {
-  const rules = [
-    'Can the edit be finished safely from local code in 1-2 steps? -> Do it directly.',
-  ];
-  if (ids.has('context7')) {
-    rules.push('Does correctness depend on external docs, SDKs, APIs, or Claude Code behavior? -> use the Context7 MCP before editing.');
-  }
-  if (ids.has('claude-mem')) {
-    rules.push('Might similar work, a prior decision, or a repeated failure exist? -> Start with `/claude-mem:mem-search`.');
-  }
-  if (ids.has('frontend-design') || ids.has('ui-ux-pro-max') || ids.has('chrome-devtools-mcp')) {
-    const design = ids.has('frontend-design') ? 'frontend-design' : 'ui-ux-pro-max';
-    rules.push(`Is visible frontend behavior in scope? -> Use ${design} for UI decisions and Chrome DevTools MCP for runtime proof when installed.`);
-  }
-  if (ids.has('sequential-thinking')) {
-    rules.push('Is the work high-risk, architectural, or assumption-heavy? -> Use sequential-thinking after reading the relevant code.');
-  }
-  if (ids.has('pua')) {
-    rules.push('Is the work stuck after real triage, or safely parallelizable? -> Use pua-loop for recovery or p9 for independent slices.');
-  }
-  return rules.map((rule, idx) => `${idx + 1}. ${rule}`);
 }
 
 function buildLanguagePolicy(): string[] {

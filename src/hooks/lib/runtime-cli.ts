@@ -8,6 +8,10 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  CURDX_EXTERNAL_MCPS,
+  CURDX_PLUGIN_DEPENDENCIES,
+} from "../../registry/capabilities.ts";
 import { classifySmartRoute } from "./smart-route.js";
 import { buildWorkflowSnapshot } from "./workflow-snapshot.js";
 import { runVerificationCheck } from "./check-verification-blocks.js";
@@ -234,27 +238,6 @@ interface MarketplaceManifest {
 
 type ReleaseTagState = "complete" | "not-published" | "incomplete" | "unknown";
 
-const EXPECTED_PLUGIN_DEPENDENCIES = [
-  { name: "pua", marketplace: "pua-skills" },
-  { name: "claude-mem", marketplace: "thedotmack" },
-  { name: "chrome-devtools-mcp", marketplace: "chrome-devtools-plugins" },
-  { name: "frontend-design", marketplace: "claude-plugins-official" },
-  { name: "ui-ux-pro-max", marketplace: "ui-ux-pro-max-skill" },
-] as const;
-
-const EXPECTED_EXTERNAL_MCPS = [
-  {
-    id: "context7",
-    match: /context7|mcp\.context7\.com/i,
-    installHint: "Installed externally by setup script; expected to appear in `claude mcp list`.",
-  },
-  {
-    id: "sequential-thinking",
-    match: /sequential[- ]thinking|server-sequential-thinking/i,
-    installHint: "Installed externally by setup script; expected to appear in `claude mcp list`.",
-  },
-] as const;
-
 function detectPackageManager(cwd: string): string | null {
   if (existsSync(join(cwd, "pnpm-lock.yaml"))) return "pnpm";
   if (existsSync(join(cwd, "bun.lockb")) || existsSync(join(cwd, "bun.lock"))) return "bun";
@@ -290,7 +273,7 @@ function pluginDependencyDoctor(): unknown {
   );
   const declared = manifest?.dependencies ?? [];
   const allowlist = new Set(marketplace?.allowCrossMarketplaceDependenciesOn ?? []);
-  const dependencies = EXPECTED_PLUGIN_DEPENDENCIES.map((expected) => {
+  const dependencies = CURDX_PLUGIN_DEPENDENCIES.map((expected) => {
     const actual = declared.find((item) => item.name === expected.name);
     const marketplaceName = actual?.marketplace ?? null;
     return {
@@ -358,7 +341,7 @@ function externalMcpDoctor(): unknown {
   }
 
   const commandWorked = exitCode === 0;
-  const servers = EXPECTED_EXTERNAL_MCPS.map((expected) => {
+  const servers = CURDX_EXTERNAL_MCPS.map((expected) => {
     const configured = commandWorked ? expected.match.test(output) : null;
     return {
       id: expected.id,

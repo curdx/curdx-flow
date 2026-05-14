@@ -188,7 +188,7 @@ try {
     '--files',
     'src/Login.tsx,tests/login.test.ts',
     '--available-capabilities',
-    'context7,frontend-design,ui-ux-pro-max,chrome-devtools-mcp,sequential-thinking',
+    'context7,ui-ux-pro-max,chrome-devtools-mcp,sequential-thinking',
   ]);
   const capabilityParsed = JSON.parse(capabilityRoute);
   const capabilityRecs = capabilityParsed.recommendedCapabilities ?? [];
@@ -196,7 +196,6 @@ try {
   for (const [expected, availability, availabilityState, provisioning] of [
     ['context7', 'known-available', 'available', 'external-mcp'],
     ['claude-mem', 'plugin-dependency', 'missing', 'plugin-dependency'],
-    ['frontend-design', 'known-available', 'available', 'plugin-dependency'],
     ['ui-ux-pro-max', 'known-available', 'available', 'plugin-dependency'],
     ['chrome-devtools-mcp', 'known-available', 'available', 'plugin-dependency'],
     ['sequential-thinking', 'known-available', 'available', 'external-mcp'],

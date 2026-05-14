@@ -1,4 +1,5 @@
 import type { Pkg } from '../types.ts';
+import { pluginDependencySpec } from '../capabilities.ts';
 import { findPluginAtScope, getMarketplacePluginVersion, isPluginInstalledAtScope } from '../../runner/state.ts';
 import {
   ensureMarketplace,
@@ -8,20 +9,20 @@ import {
   updatePluginById,
 } from './_helpers.ts';
 
-const PLUGIN_ID = 'pua@pua-skills';
-const PLUGIN_NAME = 'pua';
-const MARKETPLACE_NAME = 'pua-skills';
-const MARKETPLACE_SOURCE = 'tanweai/pua';
+const SPEC = pluginDependencySpec('pua');
+const PLUGIN_ID = SPEC.pluginId;
+const PLUGIN_NAME = SPEC.name;
+const MARKETPLACE_NAME = SPEC.marketplace;
+const MARKETPLACE_SOURCE = SPEC.marketplaceSource;
 
 const pua: Pkg = {
   id: 'pua',
   name: 'pua',
-  description: 'tanweai/pua — Chinese Claude Code skills bundle',
+  description: SPEC.description,
   type: 'plugin',
   required: true,
-  slashNamespace: '/pua:*',
-  whenToUse:
-    'auto-fires on 2+ failures or user frustration; sub-modes p7 / p9 / pro / loop. Skip on first-attempt failures or when a known fix is executing.',
+  slashNamespace: SPEC.slashNamespace,
+  whenToUse: SPEC.whenToUse,
   marketplaces: () => [MARKETPLACE_NAME],
   isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   installedVersion: async () => {

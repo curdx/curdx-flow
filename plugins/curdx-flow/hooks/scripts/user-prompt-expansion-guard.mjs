@@ -1555,14 +1555,19 @@ if (isDirectRun3()) {
 import { basename as basename5 } from "node:path";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
-// src/hooks/lib/capability-normalization.ts
-var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|frontend[\s_-]*design|front[\s_-]*end[\s_-]*design|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b/gi;
-function stripKnownCapabilityTokens(input) {
-  return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
+// src/registry/capability-tokens.ts
+var KNOWN_CAPABILITY_TOKEN_PATTERN = String.raw`\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b`;
+function knownCapabilityTokenRegex() {
+  return new RegExp(KNOWN_CAPABILITY_TOKEN_PATTERN, "gi");
 }
 
-// src/hooks/lib/tool-capabilities.ts
-var CAPABILITIES = {
+// src/hooks/lib/capability-normalization.ts
+function stripKnownCapabilityTokens(input) {
+  return (input ?? "").replace(knownCapabilityTokenRegex(), " ");
+}
+
+// src/registry/capabilities.ts
+var CURDX_TOOL_CAPABILITIES = {
   "context7": {
     id: "context7",
     name: "Context7",
@@ -1637,21 +1642,6 @@ var CAPABILITIES = {
     useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
     skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
     missingAction: "Install/enable ui-ux-pro-max from the ui-ux-pro-max-skill marketplace dependency."
-  },
-  "frontend-design": {
-    id: "frontend-design",
-    name: "frontend-design",
-    type: "plugin",
-    ownedBy: "frontend-design",
-    provisioning: "plugin-dependency",
-    curdxRole: ["recommend"],
-    doNotReimplement: true,
-    expectedByDefault: true,
-    invocation: "frontend-design plugin skill",
-    summary: "official Anthropic frontend design guidance for distinctive production-grade UI",
-    useWhen: "Use before implementing visible frontend experiences, components, pages, interaction design, responsive layout, or visual polish.",
-    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
-    missingAction: "Install/enable frontend-design from the claude-plugins-official marketplace dependency."
   },
   "pua": {
     id: "pua",
@@ -1753,11 +1743,10 @@ var CAPABILITIES = {
     skipWhen: "Skip only for no-op direct changes."
   }
 };
-var ORDER = [
+var CURDX_TOOL_CAPABILITY_ORDER = [
   "context7",
   "docs-query",
   "claude-mem",
-  "frontend-design",
   "ui-ux-pro-max",
   "chrome-devtools-mcp",
   "browser-verification",
@@ -1768,6 +1757,10 @@ var ORDER = [
   "sequential-thinking",
   "pua"
 ];
+
+// src/hooks/lib/tool-capabilities.ts
+var CAPABILITIES = CURDX_TOOL_CAPABILITIES;
+var ORDER = [...CURDX_TOOL_CAPABILITY_ORDER];
 var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|scaffold|starter|template|generator|initializer|initializr|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node|go|python|rust|cargo|maven|gradle|cookiecutter)\b|最新|依赖|框架|插件|官方|联网|搜索|文档|脚手架|初始化|生成器|模板/i;
 var MEMORY_RE = /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
 var UI_RE = /\b(ui|ux|frontend|front-end|browser|chrome|dom|css|html|layout|component|page|form|modal|responsive|visual|render|react|vue|vite|next\.?js|screenshot|interaction)\b|前端|页面|浏览器|样式|交互|组件|布局|视觉|截图/i;
@@ -1898,15 +1891,6 @@ function recommendToolCapabilities(input) {
     );
   }
   if (hasFrontend) {
-    pushRecommendation(
-      recs,
-      available,
-      "frontend-design",
-      "implementation",
-      "visible frontend behavior or UI quality is in scope",
-      "Apply frontend-design guidance before changing visible UI; record when the task is too small or non-visual for design guidance to matter.",
-      { category: "verification", stackIds }
-    );
     pushRecommendation(
       recs,
       available,
@@ -3134,7 +3118,7 @@ function inferProblemTypes(input, route, snapshot, brain) {
   if (route.route === "blocked-ask-user" || route.intent.missingFacts.length > 0) {
     out.push("missing-context");
   }
-  if (hasRec(route, "frontend-design") || hasRec(route, "ui-ux-pro-max")) out.push("ui-quality-risk");
+  if (hasRec(route, "ui-ux-pro-max")) out.push("ui-quality-risk");
   if (hasRec(route, "chrome-devtools-mcp") || hasRec(route, "browser-verification")) {
     out.push("browser-evidence-needed");
   }
@@ -3210,9 +3194,8 @@ function instructionFor(phase, problems, plan, route, snapshot) {
     return `Stop the same edit loop; ${parts.join(", ")}.`;
   }
   if (problems.includes("ui-quality-risk")) {
-    const frontendDesign = firstCapability(plan, "frontend-design");
     const uiUx = firstCapability(plan, "ui-ux-pro-max");
-    const design = frontendDesign !== void 0 && frontendDesign.availabilityState !== "missing" ? frontendDesign.invocation : uiUx !== void 0 && uiUx.availabilityState !== "missing" ? uiUx.invocation : "the available frontend design guidance";
+    const design = uiUx !== void 0 && uiUx.availabilityState !== "missing" ? uiUx.invocation : "the available frontend design guidance";
     return `Apply ${design} before changing visible UI, then keep browser evidence as the completion gate.`;
   }
   if (problems.includes("browser-evidence-needed")) {

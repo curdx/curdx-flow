@@ -10,14 +10,13 @@
     "pua-skills",
     "thedotmack",
     "chrome-devtools-plugins",
-    "claude-plugins-official",
     "ui-ux-pro-max-skill"
   ],
   "plugins": [
     {
       "name": "curdx-flow",
       "description": "Spec-driven development with research, requirements, design, tasks, native goal-driven execution, and epic triage. Fresh context per task.",
-      "version": "7.2.0",
+      "version": "7.2.1",
       "author": {
         "name": "curdx"
       },

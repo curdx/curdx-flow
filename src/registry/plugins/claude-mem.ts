@@ -1,4 +1,5 @@
 import type { Pkg } from '../types.ts';
+import { pluginDependencySpec } from '../capabilities.ts';
 import { findPluginAtScope, getMarketplacePluginVersion, isPluginInstalledAtScope } from '../../runner/state.ts';
 import { ensureBun } from '../../runner/ensureBun.ts';
 import {
@@ -9,20 +10,20 @@ import {
   updatePluginById,
 } from './_helpers.ts';
 
-const PLUGIN_ID = 'claude-mem@thedotmack';
-const PLUGIN_NAME = 'claude-mem';
-const MARKETPLACE_NAME = 'thedotmack';
-const MARKETPLACE_SOURCE = 'thedotmack/claude-mem';
+const SPEC = pluginDependencySpec('claude-mem');
+const PLUGIN_ID = SPEC.pluginId;
+const PLUGIN_NAME = SPEC.name;
+const MARKETPLACE_NAME = SPEC.marketplace;
+const MARKETPLACE_SOURCE = SPEC.marketplaceSource;
 
 const claudeMem: Pkg = {
   id: 'claude-mem',
   name: 'claude-mem',
-  description: 'thedotmack/claude-mem — persistent cross-session memory for Claude Code',
+  description: SPEC.description,
   type: 'plugin',
   required: true,
-  slashNamespace: '/claude-mem:*',
-  whenToUse:
-    'for cross-session memory search ("did we solve this before?"), phased planning (`make-plan`), or phased execution (`do`).',
+  slashNamespace: SPEC.slashNamespace,
+  whenToUse: SPEC.whenToUse,
   marketplaces: () => [MARKETPLACE_NAME],
   prereqCheck: (t) => ensureBun(t),
   isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),

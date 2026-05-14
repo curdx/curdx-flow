@@ -11,6 +11,254 @@ import { existsSync as existsSync9, readFileSync as readFileSync9, statSync as s
 import { basename as basename11, dirname, isAbsolute as isAbsolute6, join as join8, resolve as resolve5 } from "node:path";
 import { fileURLToPath as fileURLToPath8 } from "node:url";
 
+// src/registry/capabilities.ts
+var CURDX_PLUGIN_DEPENDENCIES = [
+  {
+    id: "pua",
+    name: "pua",
+    marketplace: "pua-skills",
+    marketplaceSource: "tanweai/pua",
+    pluginId: "pua@pua-skills",
+    description: "tanweai/pua - Chinese Claude Code skills bundle",
+    whenToUse: "auto-fires on 2+ failures or user frustration; sub-modes p7 / p9 / pro / loop. Skip on first-attempt failures or when a known fix is executing.",
+    slashNamespace: "/pua:*",
+    required: true
+  },
+  {
+    id: "claude-mem",
+    name: "claude-mem",
+    marketplace: "thedotmack",
+    marketplaceSource: "thedotmack/claude-mem",
+    pluginId: "claude-mem@thedotmack",
+    description: "thedotmack/claude-mem - persistent cross-session memory for Claude Code",
+    whenToUse: 'for cross-session memory search ("did we solve this before?"), phased planning (`make-plan`), or phased execution (`do`).',
+    slashNamespace: "/claude-mem:*",
+    required: true
+  },
+  {
+    id: "chrome-devtools-mcp",
+    name: "chrome-devtools-mcp",
+    marketplace: "chrome-devtools-plugins",
+    marketplaceSource: "ChromeDevTools/chrome-devtools-mcp",
+    pluginId: "chrome-devtools-mcp@chrome-devtools-plugins",
+    description: "ChromeDevTools/chrome-devtools-mcp - drive a real Chrome from Claude Code",
+    whenToUse: "when debugging code that runs in a browser: perf traces, network / console inspection, DOM / CSS issues. Prefer snapshot over screenshot.",
+    required: true
+  },
+  {
+    id: "ui-ux-pro-max",
+    name: "ui-ux-pro-max",
+    marketplace: "ui-ux-pro-max-skill",
+    marketplaceSource: "nextlevelbuilder/ui-ux-pro-max-skill",
+    pluginId: "ui-ux-pro-max@ui-ux-pro-max-skill",
+    description: "nextlevelbuilder/ui-ux-pro-max-skill - UI/UX design intelligence",
+    whenToUse: "auto-fires when building UI / UX / web components / pages. Best where visual quality, accessibility, responsive behavior, or design systems matter.",
+    required: true
+  }
+];
+var CURDX_EXTERNAL_MCPS = [
+  {
+    id: "context7",
+    match: /context7|mcp\.context7\.com/i,
+    installHint: "Installed externally by setup script; expected to appear in `claude mcp list`."
+  },
+  {
+    id: "sequential-thinking",
+    match: /sequential[- ]thinking|server-sequential-thinking/i,
+    installHint: "Installed externally by setup script; expected to appear in `claude mcp list`."
+  }
+];
+var CURDX_TOOL_CAPABILITIES = {
+  "context7": {
+    id: "context7",
+    name: "Context7",
+    type: "mcp",
+    ownedBy: "context7",
+    provisioning: "external-mcp",
+    curdxRole: ["recommend", "gate"],
+    doNotReimplement: true,
+    expectedByDefault: true,
+    invocation: "Context7 MCP",
+    summary: "current docs for libraries, SDKs, APIs, and frameworks",
+    useWhen: "use the Context7 MCP before implementation when external library, SDK, API, or framework behavior matters.",
+    skipWhen: "Skip for pure local logic, typos, and code paths fully understood from this repository.",
+    missingAction: "Enable the external context7 MCP server from your setup script or configure https://mcp.context7.com/mcp."
+  },
+  "claude-mem": {
+    id: "claude-mem",
+    name: "claude-mem",
+    type: "plugin",
+    ownedBy: "claude-mem",
+    provisioning: "plugin-dependency",
+    curdxRole: ["recommend"],
+    doNotReimplement: true,
+    expectedByDefault: true,
+    invocation: "/claude-mem:mem-search",
+    summary: "cross-session memory search and phased plan/execution commands",
+    useWhen: "Use /claude-mem:mem-search when similar work, prior decisions, or repeated failures may exist; use /claude-mem:make-plan only for genuinely phased work.",
+    skipWhen: "Skip when the task is new, obvious, and smaller than a short local edit.",
+    missingAction: "Install/enable claude-mem from the thedotmack marketplace dependency."
+  },
+  "sequential-thinking": {
+    id: "sequential-thinking",
+    name: "sequential-thinking",
+    type: "mcp",
+    ownedBy: "sequential-thinking",
+    provisioning: "external-mcp",
+    curdxRole: ["recommend"],
+    doNotReimplement: true,
+    expectedByDefault: true,
+    invocation: "sequential-thinking MCP",
+    summary: "structured hypothesis breakdown for hard architecture and debugging problems",
+    useWhen: "Use for architecture tradeoffs, migrations, security/data/release risk, or debugging where assumptions may change.",
+    skipWhen: "Skip for direct edits, simple lookups, and deterministic fixes.",
+    missingAction: "Enable the external sequential-thinking MCP server from your setup script."
+  },
+  "chrome-devtools-mcp": {
+    id: "chrome-devtools-mcp",
+    name: "Chrome DevTools MCP",
+    type: "plugin",
+    ownedBy: "chrome-devtools-mcp",
+    provisioning: "plugin-dependency",
+    curdxRole: ["recommend", "gate"],
+    doNotReimplement: true,
+    expectedByDefault: true,
+    invocation: "Chrome DevTools MCP",
+    summary: "real browser console, network, DOM, performance, and screenshot/snapshot verification",
+    useWhen: "Use for browser runtime behavior, UI regressions, DOM/CSS issues, network failures, and frontend verification.",
+    skipWhen: "Skip for backend-only code with no browser-facing behavior.",
+    missingAction: "Install/enable chrome-devtools-mcp and make sure Chrome is installed."
+  },
+  "ui-ux-pro-max": {
+    id: "ui-ux-pro-max",
+    name: "ui-ux-pro-max",
+    type: "plugin",
+    ownedBy: "ui-ux-pro-max",
+    provisioning: "plugin-dependency",
+    curdxRole: ["recommend"],
+    doNotReimplement: true,
+    expectedByDefault: true,
+    invocation: "ui-ux-pro-max plugin skills",
+    summary: "frontend UX/design guidance for UI pages, components, and interaction polish",
+    useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
+    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
+    missingAction: "Install/enable ui-ux-pro-max from the ui-ux-pro-max-skill marketplace dependency."
+  },
+  "pua": {
+    id: "pua",
+    name: "pua",
+    type: "plugin",
+    ownedBy: "pua",
+    provisioning: "plugin-dependency",
+    curdxRole: ["recommend"],
+    doNotReimplement: true,
+    expectedByDefault: true,
+    invocation: "/pua:pua-loop or /pua:p9",
+    summary: "structured retries and parallel task decomposition",
+    useWhen: "Use after multiple failed attempts or for truly independent parallel work slices.",
+    skipWhen: "Skip on first-attempt failures, known fixes, and work that is sequential by dependency.",
+    missingAction: "Install/enable pua from the pua-skills marketplace dependency."
+  },
+  "docs-query": {
+    id: "docs-query",
+    name: "Docs query",
+    type: "workflow",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["gate"],
+    doNotReimplement: false,
+    expectedByDefault: true,
+    invocation: "Context7 or official docs",
+    summary: "phase-specific grounding against current documentation",
+    useWhen: "Use before implementation when quality gates mark docs as required.",
+    skipWhen: "Skip when local code fully defines the behavior and no external API/version matters."
+  },
+  "browser-verification": {
+    id: "browser-verification",
+    name: "Browser verification",
+    type: "workflow",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["gate", "record-evidence"],
+    doNotReimplement: false,
+    expectedByDefault: true,
+    invocation: "Playwright or Chrome DevTools MCP",
+    summary: "repeatable browser/runtime proof for UI and full-stack behavior",
+    useWhen: "Use when browser-facing quality gates are required or suggested.",
+    skipWhen: "Skip for backend-only and CLI-only work."
+  },
+  "tdd-cycle": {
+    id: "tdd-cycle",
+    name: "TDD cycle",
+    type: "workflow",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["gate"],
+    doNotReimplement: false,
+    expectedByDefault: true,
+    invocation: "RED/GREEN/VERIFY loop",
+    summary: "test-first implementation for behavior changes",
+    useWhen: "Use when route/risk indicates implementation should be protected by a regression test.",
+    skipWhen: "Skip for docs-only edits and pure mechanical metadata updates."
+  },
+  "security-review": {
+    id: "security-review",
+    name: "Security review",
+    type: "workflow",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["gate"],
+    doNotReimplement: false,
+    expectedByDefault: true,
+    invocation: "read-only security review",
+    summary: "focused review of auth, secrets, injection, release, and dependency risk",
+    useWhen: "Use when quality gates indicate auth/security/release risk.",
+    skipWhen: "Skip for isolated copy edits with no executable behavior."
+  },
+  "stack-specific-verification": {
+    id: "stack-specific-verification",
+    name: "Stack-specific verification",
+    type: "workflow",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["gate", "record-evidence"],
+    doNotReimplement: false,
+    expectedByDefault: true,
+    invocation: "curdx-flow route qualityGates",
+    summary: "run the verifier that matches the detected stack profile",
+    useWhen: "Use before completion whenever smart-route returns a suggestedVerifier.",
+    skipWhen: "Skip only when no stack profile is detected and no repo verifier exists."
+  },
+  "context-budget": {
+    id: "context-budget",
+    name: "Context budget",
+    type: "policy",
+    ownedBy: "curdx-flow",
+    provisioning: "workflow",
+    curdxRole: ["route", "compile-brief"],
+    doNotReimplement: false,
+    expectedByDefault: true,
+    invocation: "curdx-flow route contextBudget",
+    summary: "limit reference loading by route and stack confidence",
+    useWhen: "Use for every non-trivial route to keep the session focused.",
+    skipWhen: "Skip only for no-op direct changes."
+  }
+};
+var CURDX_TOOL_CAPABILITY_ORDER = [
+  "context7",
+  "docs-query",
+  "claude-mem",
+  "ui-ux-pro-max",
+  "chrome-devtools-mcp",
+  "browser-verification",
+  "tdd-cycle",
+  "security-review",
+  "stack-specific-verification",
+  "context-budget",
+  "sequential-thinking",
+  "pua"
+];
+
 // src/hooks/lib/smart-route.ts
 import { existsSync as existsSync5, readFileSync as readFileSync5 } from "node:fs";
 import { basename as basename5, join as join4 } from "node:path";
@@ -1137,219 +1385,20 @@ if (isDirectRun2()) {
 import { basename as basename4 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 
+// src/registry/capability-tokens.ts
+var KNOWN_CAPABILITY_TOKEN_PATTERN = String.raw`\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b`;
+function knownCapabilityTokenRegex() {
+  return new RegExp(KNOWN_CAPABILITY_TOKEN_PATTERN, "gi");
+}
+
 // src/hooks/lib/capability-normalization.ts
-var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|frontend[\s_-]*design|front[\s_-]*end[\s_-]*design|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b/gi;
 function stripKnownCapabilityTokens(input) {
-  return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
+  return (input ?? "").replace(knownCapabilityTokenRegex(), " ");
 }
 
 // src/hooks/lib/tool-capabilities.ts
-var CAPABILITIES = {
-  "context7": {
-    id: "context7",
-    name: "Context7",
-    type: "mcp",
-    ownedBy: "context7",
-    provisioning: "external-mcp",
-    curdxRole: ["recommend", "gate"],
-    doNotReimplement: true,
-    expectedByDefault: true,
-    invocation: "Context7 MCP",
-    summary: "current docs for libraries, SDKs, APIs, and frameworks",
-    useWhen: "use the Context7 MCP before implementation when external library, SDK, API, or framework behavior matters.",
-    skipWhen: "Skip for pure local logic, typos, and code paths fully understood from this repository.",
-    missingAction: "Enable the external context7 MCP server from your setup script or configure https://mcp.context7.com/mcp."
-  },
-  "claude-mem": {
-    id: "claude-mem",
-    name: "claude-mem",
-    type: "plugin",
-    ownedBy: "claude-mem",
-    provisioning: "plugin-dependency",
-    curdxRole: ["recommend"],
-    doNotReimplement: true,
-    expectedByDefault: true,
-    invocation: "/claude-mem:mem-search",
-    summary: "cross-session memory search and phased plan/execution commands",
-    useWhen: "Use /claude-mem:mem-search when similar work, prior decisions, or repeated failures may exist; use /claude-mem:make-plan only for genuinely phased work.",
-    skipWhen: "Skip when the task is new, obvious, and smaller than a short local edit.",
-    missingAction: "Install/enable claude-mem from the thedotmack marketplace dependency."
-  },
-  "sequential-thinking": {
-    id: "sequential-thinking",
-    name: "sequential-thinking",
-    type: "mcp",
-    ownedBy: "sequential-thinking",
-    provisioning: "external-mcp",
-    curdxRole: ["recommend"],
-    doNotReimplement: true,
-    expectedByDefault: true,
-    invocation: "sequential-thinking MCP",
-    summary: "structured hypothesis breakdown for hard architecture and debugging problems",
-    useWhen: "Use for architecture tradeoffs, migrations, security/data/release risk, or debugging where assumptions may change.",
-    skipWhen: "Skip for direct edits, simple lookups, and deterministic fixes.",
-    missingAction: "Enable the external sequential-thinking MCP server from your setup script."
-  },
-  "chrome-devtools-mcp": {
-    id: "chrome-devtools-mcp",
-    name: "Chrome DevTools MCP",
-    type: "plugin",
-    ownedBy: "chrome-devtools-mcp",
-    provisioning: "plugin-dependency",
-    curdxRole: ["recommend", "gate"],
-    doNotReimplement: true,
-    expectedByDefault: true,
-    invocation: "Chrome DevTools MCP",
-    summary: "real browser console, network, DOM, performance, and screenshot/snapshot verification",
-    useWhen: "Use for browser runtime behavior, UI regressions, DOM/CSS issues, network failures, and frontend verification.",
-    skipWhen: "Skip for backend-only code with no browser-facing behavior.",
-    missingAction: "Install/enable chrome-devtools-mcp and make sure Chrome is installed."
-  },
-  "ui-ux-pro-max": {
-    id: "ui-ux-pro-max",
-    name: "ui-ux-pro-max",
-    type: "plugin",
-    ownedBy: "ui-ux-pro-max",
-    provisioning: "plugin-dependency",
-    curdxRole: ["recommend"],
-    doNotReimplement: true,
-    expectedByDefault: true,
-    invocation: "ui-ux-pro-max plugin skills",
-    summary: "frontend UX/design guidance for UI pages, components, and interaction polish",
-    useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
-    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
-    missingAction: "Install/enable ui-ux-pro-max from the ui-ux-pro-max-skill marketplace dependency."
-  },
-  "frontend-design": {
-    id: "frontend-design",
-    name: "frontend-design",
-    type: "plugin",
-    ownedBy: "frontend-design",
-    provisioning: "plugin-dependency",
-    curdxRole: ["recommend"],
-    doNotReimplement: true,
-    expectedByDefault: true,
-    invocation: "frontend-design plugin skill",
-    summary: "official Anthropic frontend design guidance for distinctive production-grade UI",
-    useWhen: "Use before implementing visible frontend experiences, components, pages, interaction design, responsive layout, or visual polish.",
-    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
-    missingAction: "Install/enable frontend-design from the claude-plugins-official marketplace dependency."
-  },
-  "pua": {
-    id: "pua",
-    name: "pua",
-    type: "plugin",
-    ownedBy: "pua",
-    provisioning: "plugin-dependency",
-    curdxRole: ["recommend"],
-    doNotReimplement: true,
-    expectedByDefault: true,
-    invocation: "/pua:pua-loop or /pua:p9",
-    summary: "structured retries and parallel task decomposition",
-    useWhen: "Use after multiple failed attempts or for truly independent parallel work slices.",
-    skipWhen: "Skip on first-attempt failures, known fixes, and work that is sequential by dependency.",
-    missingAction: "Install/enable pua from the pua-skills marketplace dependency."
-  },
-  "docs-query": {
-    id: "docs-query",
-    name: "Docs query",
-    type: "workflow",
-    ownedBy: "curdx-flow",
-    provisioning: "workflow",
-    curdxRole: ["gate"],
-    doNotReimplement: false,
-    expectedByDefault: true,
-    invocation: "Context7 or official docs",
-    summary: "phase-specific grounding against current documentation",
-    useWhen: "Use before implementation when quality gates mark docs as required.",
-    skipWhen: "Skip when local code fully defines the behavior and no external API/version matters."
-  },
-  "browser-verification": {
-    id: "browser-verification",
-    name: "Browser verification",
-    type: "workflow",
-    ownedBy: "curdx-flow",
-    provisioning: "workflow",
-    curdxRole: ["gate", "record-evidence"],
-    doNotReimplement: false,
-    expectedByDefault: true,
-    invocation: "Playwright or Chrome DevTools MCP",
-    summary: "repeatable browser/runtime proof for UI and full-stack behavior",
-    useWhen: "Use when browser-facing quality gates are required or suggested.",
-    skipWhen: "Skip for backend-only and CLI-only work."
-  },
-  "tdd-cycle": {
-    id: "tdd-cycle",
-    name: "TDD cycle",
-    type: "workflow",
-    ownedBy: "curdx-flow",
-    provisioning: "workflow",
-    curdxRole: ["gate"],
-    doNotReimplement: false,
-    expectedByDefault: true,
-    invocation: "RED/GREEN/VERIFY loop",
-    summary: "test-first implementation for behavior changes",
-    useWhen: "Use when route/risk indicates implementation should be protected by a regression test.",
-    skipWhen: "Skip for docs-only edits and pure mechanical metadata updates."
-  },
-  "security-review": {
-    id: "security-review",
-    name: "Security review",
-    type: "workflow",
-    ownedBy: "curdx-flow",
-    provisioning: "workflow",
-    curdxRole: ["gate"],
-    doNotReimplement: false,
-    expectedByDefault: true,
-    invocation: "read-only security review",
-    summary: "focused review of auth, secrets, injection, release, and dependency risk",
-    useWhen: "Use when quality gates indicate auth/security/release risk.",
-    skipWhen: "Skip for isolated copy edits with no executable behavior."
-  },
-  "stack-specific-verification": {
-    id: "stack-specific-verification",
-    name: "Stack-specific verification",
-    type: "workflow",
-    ownedBy: "curdx-flow",
-    provisioning: "workflow",
-    curdxRole: ["gate", "record-evidence"],
-    doNotReimplement: false,
-    expectedByDefault: true,
-    invocation: "curdx-flow route qualityGates",
-    summary: "run the verifier that matches the detected stack profile",
-    useWhen: "Use before completion whenever smart-route returns a suggestedVerifier.",
-    skipWhen: "Skip only when no stack profile is detected and no repo verifier exists."
-  },
-  "context-budget": {
-    id: "context-budget",
-    name: "Context budget",
-    type: "policy",
-    ownedBy: "curdx-flow",
-    provisioning: "workflow",
-    curdxRole: ["route", "compile-brief"],
-    doNotReimplement: false,
-    expectedByDefault: true,
-    invocation: "curdx-flow route contextBudget",
-    summary: "limit reference loading by route and stack confidence",
-    useWhen: "Use for every non-trivial route to keep the session focused.",
-    skipWhen: "Skip only for no-op direct changes."
-  }
-};
-var ORDER = [
-  "context7",
-  "docs-query",
-  "claude-mem",
-  "frontend-design",
-  "ui-ux-pro-max",
-  "chrome-devtools-mcp",
-  "browser-verification",
-  "tdd-cycle",
-  "security-review",
-  "stack-specific-verification",
-  "context-budget",
-  "sequential-thinking",
-  "pua"
-];
+var CAPABILITIES = CURDX_TOOL_CAPABILITIES;
+var ORDER = [...CURDX_TOOL_CAPABILITY_ORDER];
 var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|scaffold|starter|template|generator|initializer|initializr|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node|go|python|rust|cargo|maven|gradle|cookiecutter)\b|最新|依赖|框架|插件|官方|联网|搜索|文档|脚手架|初始化|生成器|模板/i;
 var MEMORY_RE = /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
 var UI_RE = /\b(ui|ux|frontend|front-end|browser|chrome|dom|css|html|layout|component|page|form|modal|responsive|visual|render|react|vue|vite|next\.?js|screenshot|interaction)\b|前端|页面|浏览器|样式|交互|组件|布局|视觉|截图/i;
@@ -1480,15 +1529,6 @@ function recommendToolCapabilities(input) {
     );
   }
   if (hasFrontend) {
-    pushRecommendation(
-      recs,
-      available,
-      "frontend-design",
-      "implementation",
-      "visible frontend behavior or UI quality is in scope",
-      "Apply frontend-design guidance before changing visible UI; record when the task is too small or non-visual for design guidance to matter.",
-      { category: "verification", stackIds }
-    );
     pushRecommendation(
       recs,
       available,
@@ -3778,7 +3818,7 @@ function inferProblemTypes(input, route2, snapshot2, brain) {
   if (route2.route === "blocked-ask-user" || route2.intent.missingFacts.length > 0) {
     out.push("missing-context");
   }
-  if (hasRec(route2, "frontend-design") || hasRec(route2, "ui-ux-pro-max")) out.push("ui-quality-risk");
+  if (hasRec(route2, "ui-ux-pro-max")) out.push("ui-quality-risk");
   if (hasRec(route2, "chrome-devtools-mcp") || hasRec(route2, "browser-verification")) {
     out.push("browser-evidence-needed");
   }
@@ -3854,9 +3894,8 @@ function instructionFor(phase, problems, plan, route2, snapshot2) {
     return `Stop the same edit loop; ${parts.join(", ")}.`;
   }
   if (problems.includes("ui-quality-risk")) {
-    const frontendDesign = firstCapability(plan, "frontend-design");
     const uiUx = firstCapability(plan, "ui-ux-pro-max");
-    const design = frontendDesign !== void 0 && frontendDesign.availabilityState !== "missing" ? frontendDesign.invocation : uiUx !== void 0 && uiUx.availabilityState !== "missing" ? uiUx.invocation : "the available frontend design guidance";
+    const design = uiUx !== void 0 && uiUx.availabilityState !== "missing" ? uiUx.invocation : "the available frontend design guidance";
     return `Apply ${design} before changing visible UI, then keep browser evidence as the completion gate.`;
   }
   if (problems.includes("browser-evidence-needed")) {
@@ -4179,8 +4218,8 @@ function capabilityEvidence(decision) {
   if (ids.includes("context7") || ids.includes("docs-query")) {
     out.push("current docs evidence is shown before relying on external API, SDK, framework, or Claude Code behavior");
   }
-  if (ids.includes("frontend-design") || ids.includes("ui-ux-pro-max")) {
-    out.push("visible UI changes show frontend-design/ui-ux guidance was applied or explicitly deemed irrelevant");
+  if (ids.includes("ui-ux-pro-max")) {
+    out.push("visible UI changes show ui-ux-pro-max guidance was applied or explicitly deemed irrelevant");
   }
   if (ids.includes("chrome-devtools-mcp") || ids.includes("browser-verification")) {
     out.push("browser-sensitive work includes real browser evidence such as URL, actions, console/network result, screenshot, snapshot, or trace");
@@ -4437,25 +4476,6 @@ function readJsonFile3(path3) {
     return null;
   }
 }
-var EXPECTED_PLUGIN_DEPENDENCIES = [
-  { name: "pua", marketplace: "pua-skills" },
-  { name: "claude-mem", marketplace: "thedotmack" },
-  { name: "chrome-devtools-mcp", marketplace: "chrome-devtools-plugins" },
-  { name: "frontend-design", marketplace: "claude-plugins-official" },
-  { name: "ui-ux-pro-max", marketplace: "ui-ux-pro-max-skill" }
-];
-var EXPECTED_EXTERNAL_MCPS = [
-  {
-    id: "context7",
-    match: /context7|mcp\.context7\.com/i,
-    installHint: "Installed externally by setup script; expected to appear in `claude mcp list`."
-  },
-  {
-    id: "sequential-thinking",
-    match: /sequential[- ]thinking|server-sequential-thinking/i,
-    installHint: "Installed externally by setup script; expected to appear in `claude mcp list`."
-  }
-];
 function detectPackageManager3(cwd) {
   if (existsSync9(join8(cwd, "pnpm-lock.yaml"))) return "pnpm";
   if (existsSync9(join8(cwd, "bun.lockb")) || existsSync9(join8(cwd, "bun.lock"))) return "bun";
@@ -4486,7 +4506,7 @@ function pluginDependencyDoctor() {
   );
   const declared = manifest?.dependencies ?? [];
   const allowlist = new Set(marketplace?.allowCrossMarketplaceDependenciesOn ?? []);
-  const dependencies = EXPECTED_PLUGIN_DEPENDENCIES.map((expected) => {
+  const dependencies = CURDX_PLUGIN_DEPENDENCIES.map((expected) => {
     const actual = declared.find((item) => item.name === expected.name);
     const marketplaceName = actual?.marketplace ?? null;
     return {
@@ -4548,7 +4568,7 @@ ${result.stderr ?? ""}`;
     }
   }
   const commandWorked = exitCode === 0;
-  const servers = EXPECTED_EXTERNAL_MCPS.map((expected) => {
+  const servers = CURDX_EXTERNAL_MCPS.map((expected) => {
     const configured = commandWorked ? expected.match.test(output) : null;
     return {
       id: expected.id,

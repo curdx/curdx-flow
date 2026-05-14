@@ -9,14 +9,19 @@ const __dirname = __ccd(__filename);
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// src/hooks/lib/capability-normalization.ts
-var KNOWN_CAPABILITY_TOKEN_RE = /\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|frontend[\s_-]*design|front[\s_-]*end[\s_-]*design|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b/gi;
-function stripKnownCapabilityTokens(input) {
-  return (input ?? "").replace(KNOWN_CAPABILITY_TOKEN_RE, " ");
+// src/registry/capability-tokens.ts
+var KNOWN_CAPABILITY_TOKEN_PATTERN = String.raw`\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b`;
+function knownCapabilityTokenRegex() {
+  return new RegExp(KNOWN_CAPABILITY_TOKEN_PATTERN, "gi");
 }
 
-// src/hooks/lib/tool-capabilities.ts
-var CAPABILITIES = {
+// src/hooks/lib/capability-normalization.ts
+function stripKnownCapabilityTokens(input) {
+  return (input ?? "").replace(knownCapabilityTokenRegex(), " ");
+}
+
+// src/registry/capabilities.ts
+var CURDX_TOOL_CAPABILITIES = {
   "context7": {
     id: "context7",
     name: "Context7",
@@ -91,21 +96,6 @@ var CAPABILITIES = {
     useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
     skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
     missingAction: "Install/enable ui-ux-pro-max from the ui-ux-pro-max-skill marketplace dependency."
-  },
-  "frontend-design": {
-    id: "frontend-design",
-    name: "frontend-design",
-    type: "plugin",
-    ownedBy: "frontend-design",
-    provisioning: "plugin-dependency",
-    curdxRole: ["recommend"],
-    doNotReimplement: true,
-    expectedByDefault: true,
-    invocation: "frontend-design plugin skill",
-    summary: "official Anthropic frontend design guidance for distinctive production-grade UI",
-    useWhen: "Use before implementing visible frontend experiences, components, pages, interaction design, responsive layout, or visual polish.",
-    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work.",
-    missingAction: "Install/enable frontend-design from the claude-plugins-official marketplace dependency."
   },
   "pua": {
     id: "pua",
@@ -207,11 +197,10 @@ var CAPABILITIES = {
     skipWhen: "Skip only for no-op direct changes."
   }
 };
-var ORDER = [
+var CURDX_TOOL_CAPABILITY_ORDER = [
   "context7",
   "docs-query",
   "claude-mem",
-  "frontend-design",
   "ui-ux-pro-max",
   "chrome-devtools-mcp",
   "browser-verification",
@@ -222,6 +211,86 @@ var ORDER = [
   "sequential-thinking",
   "pua"
 ];
+
+// src/registry/capability-rules.ts
+var RULES = {
+  context7: {
+    invocation: "Context7 MCP",
+    useWhen: "use the Context7 MCP before implementation when external library, SDK, API, or framework behavior matters.",
+    skipWhen: "Skip for pure local logic, typos, and code paths fully understood from this repository."
+  },
+  "claude-mem": {
+    invocation: "/claude-mem:mem-search",
+    useWhen: "Use /claude-mem:mem-search when similar work, prior decisions, or repeated failures may exist; use /claude-mem:make-plan only for genuinely phased work.",
+    skipWhen: "Skip when the task is new, obvious, and smaller than a short local edit."
+  },
+  "ui-ux-pro-max": {
+    invocation: "ui-ux-pro-max plugin skills",
+    useWhen: "Use when building or changing visible UI, interaction design, frontend layout, or visual quality.",
+    skipWhen: "Skip for backend-only changes, copy-only edits, and internal CLI/library work."
+  },
+  "chrome-devtools-mcp": {
+    invocation: "Chrome DevTools MCP",
+    useWhen: "Use for browser runtime behavior, UI regressions, DOM/CSS issues, network failures, and frontend verification.",
+    skipWhen: "Skip for backend-only code with no browser-facing behavior."
+  },
+  "sequential-thinking": {
+    invocation: "sequential-thinking MCP",
+    useWhen: "Use for architecture tradeoffs, migrations, security/data/release risk, or debugging where assumptions may change.",
+    skipWhen: "Skip for direct edits, simple lookups, and deterministic fixes."
+  },
+  pua: {
+    invocation: "/pua:pua-loop or /pua:p9",
+    useWhen: "Use after multiple failed attempts or for truly independent parallel work slices.",
+    skipWhen: "Skip on first-attempt failures, known fixes, and work that is sequential by dependency."
+  }
+};
+var RULE_ORDER = [
+  "context7",
+  "claude-mem",
+  "ui-ux-pro-max",
+  "chrome-devtools-mcp",
+  "sequential-thinking",
+  "pua"
+];
+function renderCurdxInstalledCapabilityRules(availableCapabilities) {
+  const available = new Set(availableCapabilities);
+  const lines = [
+    "Use installed capabilities by trigger, not by habit. Prefer the first matching rule; skip absent capabilities."
+  ];
+  for (const id of RULE_ORDER) {
+    if (!available.has(id)) continue;
+    const cap = RULES[id];
+    lines.push(`- ${cap.invocation}: ${cap.useWhen} ${cap.skipWhen}`);
+  }
+  return lines;
+}
+function renderCurdxCapabilityDecisionTree(availableCapabilities) {
+  const available = new Set(availableCapabilities);
+  const rules = [
+    "Can the edit be finished safely from local code in 1-2 steps? -> Do it directly."
+  ];
+  if (available.has("context7")) {
+    rules.push("Does correctness depend on external SDKs, APIs, or framework docs? -> use the Context7 MCP before editing; for Claude Code behavior, start from official Claude Code docs.");
+  }
+  if (available.has("claude-mem")) {
+    rules.push("Might similar work, a prior decision, or a repeated failure exist? -> Start with `/claude-mem:mem-search`.");
+  }
+  if (available.has("ui-ux-pro-max") || available.has("chrome-devtools-mcp")) {
+    rules.push("Is visible frontend behavior in scope? -> Use ui-ux-pro-max for UI decisions and Chrome DevTools MCP for runtime proof when installed.");
+  }
+  if (available.has("sequential-thinking")) {
+    rules.push("Is the work high-risk, architectural, or assumption-heavy? -> Use sequential-thinking after reading the relevant code.");
+  }
+  if (available.has("pua")) {
+    rules.push("Are there repeated failed attempts or truly independent parallel slices? -> Use `/pua:pua-loop` for recovery or `/pua:p9` for bounded parallel planning.");
+  }
+  return rules.map((rule, idx) => `${idx + 1}. ${rule}`);
+}
+
+// src/hooks/lib/tool-capabilities.ts
+var CAPABILITIES = CURDX_TOOL_CAPABILITIES;
+var ORDER = [...CURDX_TOOL_CAPABILITY_ORDER];
 var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|scaffold|starter|template|generator|initializer|initializr|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node|go|python|rust|cargo|maven|gradle|cookiecutter)\b|最新|依赖|框架|插件|官方|联网|搜索|文档|脚手架|初始化|生成器|模板/i;
 var MEMORY_RE = /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
 var UI_RE = /\b(ui|ux|frontend|front-end|browser|chrome|dom|css|html|layout|component|page|form|modal|responsive|visual|render|react|vue|vite|next\.?js|screenshot|interaction)\b|前端|页面|浏览器|样式|交互|组件|布局|视觉|截图/i;
@@ -358,15 +427,6 @@ function recommendToolCapabilities(input) {
     pushRecommendation(
       recs,
       available,
-      "frontend-design",
-      "implementation",
-      "visible frontend behavior or UI quality is in scope",
-      "Apply frontend-design guidance before changing visible UI; record when the task is too small or non-visual for design guidance to matter.",
-      { category: "verification", stackIds }
-    );
-    pushRecommendation(
-      recs,
-      available,
       "ui-ux-pro-max",
       "implementation",
       "visible frontend behavior or UI quality is in scope",
@@ -463,39 +523,10 @@ function recommendToolCapabilities(input) {
   return sortRecommendations(recs);
 }
 function renderInstalledCapabilityRules(availableCapabilities) {
-  const available = new Set(availableCapabilities);
-  const lines = [
-    "Use installed capabilities by trigger, not by habit. Prefer the first matching rule; skip absent capabilities."
-  ];
-  for (const id of ORDER) {
-    if (!available.has(id)) continue;
-    const cap = CAPABILITIES[id];
-    lines.push(`- ${cap.invocation}: ${cap.useWhen} ${cap.skipWhen}`);
-  }
-  return lines;
+  return renderCurdxInstalledCapabilityRules(availableCapabilities);
 }
 function renderCapabilityDecisionTree(availableCapabilities) {
-  const available = new Set(availableCapabilities);
-  const rules = [
-    "Can the edit be finished safely from local code in 1-2 steps? -> Do it directly."
-  ];
-  if (available.has("context7")) {
-    rules.push("Does correctness depend on external SDKs, APIs, or framework docs? -> use the Context7 MCP before editing; for Claude Code behavior, start from official Claude Code docs.");
-  }
-  if (available.has("claude-mem")) {
-    rules.push("Might similar work, a prior decision, or a repeated failure exist? -> Start with `/claude-mem:mem-search`.");
-  }
-  if (available.has("frontend-design") || available.has("ui-ux-pro-max") || available.has("chrome-devtools-mcp")) {
-    const design = available.has("frontend-design") ? "frontend-design" : "ui-ux-pro-max";
-    rules.push(`Is visible frontend behavior in scope? -> Use ${design} for UI decisions and Chrome DevTools MCP for runtime proof when installed.`);
-  }
-  if (available.has("sequential-thinking")) {
-    rules.push("Is the work high-risk, architectural, or assumption-heavy? -> Use sequential-thinking after reading the relevant code.");
-  }
-  if (available.has("pua")) {
-    rules.push("Are there repeated failed attempts or truly independent parallel slices? -> Use `/pua:pua-loop` for recovery or `/pua:p9` for bounded parallel planning.");
-  }
-  return rules.map((rule, idx) => `${idx + 1}. ${rule}`);
+  return renderCurdxCapabilityDecisionTree(availableCapabilities);
 }
 function parseList(value) {
   if (!value) return [];

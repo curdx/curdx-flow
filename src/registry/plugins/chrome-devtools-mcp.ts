@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import type { Pkg, PrereqResult } from '../types.ts';
+import { pluginDependencySpec } from '../capabilities.ts';
 import { isPluginInstalledAtScope } from '../../runner/state.ts';
 import {
   ensureMarketplace,
@@ -11,12 +12,10 @@ import {
 } from './_helpers.ts';
 import { run } from '../../runner/exec.ts';
 
-// Marketplace name comes from the repo's .claude-plugin/marketplace.json,
-// not from the GitHub repo name — here the repo is ChromeDevTools/chrome-devtools-mcp
-// but the marketplace identifier inside is "chrome-devtools-plugins".
-const PLUGIN_ID = 'chrome-devtools-mcp@chrome-devtools-plugins';
-const MARKETPLACE_NAME = 'chrome-devtools-plugins';
-const MARKETPLACE_SOURCE = 'ChromeDevTools/chrome-devtools-mcp';
+const SPEC = pluginDependencySpec('chrome-devtools-mcp');
+const PLUGIN_ID = SPEC.pluginId;
+const MARKETPLACE_NAME = SPEC.marketplace;
+const MARKETPLACE_SOURCE = SPEC.marketplaceSource;
 
 // Per-platform detection mirrors GoogleChrome/chrome-launcher's chrome-finder:
 // env-prefix × known suffix on Windows, canonical app-bundle path on macOS,
@@ -56,11 +55,10 @@ async function checkChrome(): Promise<boolean> {
 const chromeDevtoolsMcp: Pkg = {
   id: 'chrome-devtools-mcp',
   name: 'chrome-devtools-mcp',
-  description: 'ChromeDevTools/chrome-devtools-mcp — drive a real Chrome from Claude Code',
+  description: SPEC.description,
   type: 'plugin',
   required: true,
-  whenToUse:
-    'when debugging code that runs in a browser: perf traces, network / console inspection, DOM / CSS issues. Prefer snapshot over screenshot.',
+  whenToUse: SPEC.whenToUse,
   prereqCheck: async (t): Promise<PrereqResult> => {
     const major = Number(process.versions.node.split('.')[0] ?? '0');
     const minor = Number(process.versions.node.split('.')[1] ?? '0');

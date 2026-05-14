@@ -1,4 +1,5 @@
 import type { Pkg } from '../types.ts';
+import { pluginDependencySpec } from '../capabilities.ts';
 import { getMarketplacePluginVersion, isPluginInstalledAtScope } from '../../runner/state.ts';
 import {
   ensureMarketplace,
@@ -9,19 +10,19 @@ import {
   updatePluginById,
 } from './_helpers.ts';
 
-const PLUGIN_ID = 'ui-ux-pro-max@ui-ux-pro-max-skill';
-const PLUGIN_NAME = 'ui-ux-pro-max';
-const MARKETPLACE_NAME = 'ui-ux-pro-max-skill';
-const MARKETPLACE_SOURCE = 'nextlevelbuilder/ui-ux-pro-max-skill';
+const SPEC = pluginDependencySpec('ui-ux-pro-max');
+const PLUGIN_ID = SPEC.pluginId;
+const PLUGIN_NAME = SPEC.name;
+const MARKETPLACE_NAME = SPEC.marketplace;
+const MARKETPLACE_SOURCE = SPEC.marketplaceSource;
 
 const uiUxProMax: Pkg = {
   id: 'ui-ux-pro-max',
   name: 'ui-ux-pro-max',
-  description: 'nextlevelbuilder/ui-ux-pro-max-skill - UI/UX design intelligence',
+  description: SPEC.description,
   type: 'plugin',
   required: true,
-  whenToUse:
-    'auto-fires when building UI / UX / web components / pages. Best where visual quality, accessibility, responsive behavior, or design systems matter.',
+  whenToUse: SPEC.whenToUse,
   marketplaces: () => [MARKETPLACE_NAME],
   isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   latestVersion: () => getMarketplacePluginVersion(MARKETPLACE_NAME, PLUGIN_NAME),
