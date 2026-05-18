@@ -59,7 +59,27 @@ async function waitForHealth(cwd: string, timeoutMs = 3_000): Promise<unknown> {
   return last;
 }
 
+async function waitForUrlDown(url: string, timeoutMs = 3_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await fetch(url, { signal: AbortSignal.timeout(500) });
+    } catch {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 75));
+  }
+  return false;
+}
+
 afterEach(async () => {
+  for (const dir of workspaces) {
+    try {
+      stopDevRuntime({ cwd: dir });
+    } catch {
+      // Best-effort cleanup for tests that fail before their own finally block.
+    }
+  }
   if (originalStaticPort === undefined) delete process.env['CURDX_FLOW_STATIC_PORT'];
   else process.env['CURDX_FLOW_STATIC_PORT'] = originalStaticPort;
   await Promise.all(workspaces.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
@@ -136,6 +156,7 @@ describe('smart route and static frontend runtime', () => {
       expect(verifyDevRuntime({ cwd })).toMatchObject({ ok: true });
     } finally {
       expect(stopDevRuntime({ cwd })).toMatchObject({ ok: true });
+      expect(await waitForUrlDown(`http://127.0.0.1:${port}/`)).toBe(true);
     }
   });
 });

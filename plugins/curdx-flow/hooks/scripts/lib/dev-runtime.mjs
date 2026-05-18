@@ -8,6 +8,7 @@ const __dirname = __ccd(__filename);
 // src/hooks/lib/dev-runtime.ts
 import { spawn, spawnSync } from "node:child_process";
 import {
+  closeSync,
   existsSync as existsSync4,
   mkdirSync as mkdirSync2,
   openSync,
@@ -1236,6 +1237,7 @@ if (isDirectRun2()) {
 
 // src/hooks/lib/dev-runtime.ts
 var DEFAULT_STATIC_HTML_PORT = 8123;
+var STATIC_HTML_NODE_EVAL_PATTERN = /^node -e "eval\(Buffer\.from\('([A-Za-z0-9+/=]+)','base64'\)\.toString\('utf8'\)\)"$/;
 function staticHtmlPort() {
   const raw = process.env["CURDX_FLOW_STATIC_PORT"];
   if (raw === void 0 || raw.trim() === "") return DEFAULT_STATIC_HTML_PORT;
@@ -1359,6 +1361,20 @@ function staticHtmlServerCommand(rootAbs) {
   const encoded = Buffer.from(script, "utf8").toString("base64");
   return `node -e "eval(Buffer.from('${encoded}','base64').toString('utf8'))"`;
 }
+function spawnCommandFor(command) {
+  const staticHtmlMatch = STATIC_HTML_NODE_EVAL_PATTERN.exec(command);
+  if (staticHtmlMatch?.[1]) {
+    return {
+      command: process.execPath,
+      args: [
+        "-e",
+        `eval(Buffer.from('${staticHtmlMatch[1]}','base64').toString('utf8'))`
+      ],
+      shell: false
+    };
+  }
+  return { command, args: [], shell: true };
+}
 function detectRoot(projectRoot, root) {
   const fsPath = rootFsPath2(projectRoot, root);
   const pkg = readJsonFile(join3(fsPath, "package.json"));
@@ -1473,6 +1489,66 @@ function isPidAlive(pid) {
     return false;
   }
 }
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+function waitForPidExit(pid, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    if (!isPidAlive(pid)) return true;
+    sleepSync(50);
+  } while (Date.now() < deadline);
+  return !isPidAlive(pid);
+}
+function signalPid(pid, signal) {
+  try {
+    process.kill(-pid, signal);
+    return true;
+  } catch {
+    try {
+      process.kill(pid, signal);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+function terminatePidTree(pid) {
+  if (!isPidAlive(pid)) {
+    return {
+      signalSent: false,
+      exited: true,
+      forced: false,
+      alreadyStopped: true
+    };
+  }
+  if (process.platform === "win32") {
+    const result = spawnSync("taskkill", ["/pid", String(pid), "/t", "/f"], {
+      stdio: "ignore",
+      windowsHide: true
+    });
+    const exited2 = waitForPidExit(pid, 2e3);
+    return {
+      signalSent: result.status === 0 || exited2,
+      exited: exited2,
+      forced: result.status === 0,
+      alreadyStopped: false
+    };
+  }
+  const signalSent = signalPid(pid, "SIGTERM");
+  let exited = waitForPidExit(pid, 750);
+  let forced = false;
+  if (!exited) {
+    forced = signalPid(pid, "SIGKILL");
+    exited = waitForPidExit(pid, 1250);
+  }
+  return {
+    signalSent,
+    exited,
+    forced,
+    alreadyStopped: false
+  };
+}
 function readRuntimeState(projectRoot) {
   return readJsonFile(runtimeStatePath(projectRoot));
 }
@@ -1484,13 +1560,20 @@ function startDevRuntime(input = {}) {
     const root = plan.roots.find((candidate) => candidate.path === service.root);
     if (!root) continue;
     const logFd = openSync(service.logPath, "a");
-    const child = spawn(service.command, {
-      cwd: root.fsPath,
-      shell: true,
-      detached: true,
-      stdio: ["ignore", logFd, logFd],
-      env: process.env
-    });
+    let child;
+    try {
+      const command = spawnCommandFor(service.command);
+      child = spawn(command.command, command.args, {
+        cwd: root.fsPath,
+        shell: command.shell,
+        detached: true,
+        stdio: ["ignore", logFd, logFd],
+        env: process.env,
+        windowsHide: true
+      });
+    } finally {
+      closeSync(logFd);
+    }
     child.unref();
     if (typeof child.pid === "number") {
       services.push({
@@ -1586,20 +1669,14 @@ function stopDevRuntime(input = {}) {
   const plan = detectDevRuntime(input);
   const state = readRuntimeState(plan.projectRoot);
   const stopped = (state?.services ?? []).map((service) => {
-    let ok = false;
-    let alreadyStopped = false;
-    try {
-      process.kill(-service.pid, "SIGTERM");
-      ok = true;
-    } catch {
-      try {
-        process.kill(service.pid, "SIGTERM");
-        ok = true;
-      } catch {
-        alreadyStopped = !isPidAlive(service.pid);
-      }
-    }
-    return { ...service, stopped: ok, alreadyStopped };
+    const result = terminatePidTree(service.pid);
+    return {
+      ...service,
+      stopped: result.signalSent || result.exited || result.alreadyStopped,
+      alreadyStopped: result.alreadyStopped,
+      exited: result.exited,
+      forced: result.forced
+    };
   });
   rmSync(runtimeStatePath(plan.projectRoot), { force: true });
   return {
