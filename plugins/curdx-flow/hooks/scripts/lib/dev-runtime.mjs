@@ -321,6 +321,7 @@ function detectPackageManager(rootAbs) {
 }
 function hasManifestOrSource(rootAbs) {
   return [
+    "index.html",
     "package.json",
     "pom.xml",
     "build.gradle",
@@ -350,6 +351,10 @@ function classifyRoot(rootAbs, role) {
   ].join("\n");
   const buildText = `${pom}
 ${gradle}`;
+  if (isFile(path.join(rootAbs, "index.html")) && (isFile(path.join(rootAbs, "app.js")) || isFile(path.join(rootAbs, "styles.css")))) {
+    pushUnique(kinds, "frontend-app");
+    frameworks.push("static-html");
+  }
   if (isFile(path.join(rootAbs, ".claude-plugin", "plugin.json"))) {
     pushUnique(kinds, "claude-code-plugin");
     frameworks.push("claude-code-plugin");
@@ -691,6 +696,25 @@ function stripKnownCapabilityTokens(input) {
 
 // src/hooks/lib/stack-capabilities.ts
 var STACKS = {
+  "static-html": {
+    id: "static-html",
+    name: "Static HTML",
+    frameworks: ["static-html"],
+    goalPattern: /\b(static html|static frontend|static page|static web|vanilla js|vanilla javascript|plain html|html\/css\/js|index\.html|styles\.css|app\.js)\b|静态页面|原生\s*(js|javascript)/i,
+    manifestHints: ["index.html"],
+    docsQuery: "MDN documentation for HTML, CSS, DOM events, and browser behavior",
+    tdd: "Use small DOM/browser interaction checks for user-visible behavior.",
+    security: "Review DOM insertion, event handling, unsafe HTML, and local file serving assumptions.",
+    verifierCommands: ["node --check app.js"],
+    releaseCommands: ["node --check app.js"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
   "typescript": {
     id: "typescript",
     name: "TypeScript",
@@ -714,7 +738,7 @@ var STACKS = {
     id: "react",
     name: "React",
     frameworks: ["react"],
-    goalPattern: /\b(react|jsx|tsx|component|hook|frontend|ui)\b|前端|组件|页面/i,
+    goalPattern: /\b(react|jsx|tsx|react component|react hook)\b/i,
     manifestHints: ["package.json:react"],
     docsQuery: "React official documentation for current component and hook behavior",
     tdd: "Prefer component or interaction tests for user-visible behavior.",
@@ -733,7 +757,7 @@ var STACKS = {
     id: "vue",
     name: "Vue",
     frameworks: ["vue", "vite"],
-    goalPattern: /\b(vue|vue3|vite|pinia|vue router|component|frontend|ui)\b|前端|组件|页面/i,
+    goalPattern: /\b(vue|vue3|vite|pinia|vue router|vue component)\b/i,
     manifestHints: ["package.json:vue", "vite.config.*"],
     docsQuery: "Vue and Vite official documentation for current project setup and runtime behavior",
     tdd: "Prefer component or interaction tests; keep vue-tsc/typecheck and build gates.",
@@ -916,6 +940,7 @@ var STACKS = {
 var STACK_PRIORITY = {
   "claude-code-plugin": 110,
   "next": 100,
+  "static-html": 95,
   "react": 90,
   "vue": 90,
   "spring-cloud": 85,
@@ -926,6 +951,12 @@ var STACK_PRIORITY = {
   "typescript": 30,
   "node": 20
 };
+var RELEASE_GOAL_RE = /\b(release|publish|deploy|tag)\b|发布|部署|上线|打包|标签/i;
+var NPM_RELEASE_RE = /\bnpm\s+(publish|release|version|tag|dist-tag)\b|\bpublish(?:ing)?\s+(?:to\s+)?npm\b|\bnpm\s+package\b/i;
+function hasReleaseGoal(goal) {
+  const text = stripKnownCapabilityTokens(goal);
+  return RELEASE_GOAL_RE.test(text) || NPM_RELEASE_RE.test(text);
+}
 function normalizeText(input) {
   return (input ?? "").trim().replace(/\s+/g, " ");
 }
@@ -1097,7 +1128,7 @@ function selectQualityGates(input) {
       id: `${stack.id}-browser`,
       phase: "verification",
       required: route !== "direct-change",
-      command: "npm run test:e2e",
+      command: stack.id === "static-html" ? null : "npm run test:e2e",
       reason: "Browser-facing behavior needs Playwright or Chrome DevTools MCP evidence."
     });
   }
@@ -1111,11 +1142,12 @@ function selectQualityGates(input) {
       reason: stack.security
     });
   }
-  if (route === "epic-split" || /release|publish|tag|npm/i.test(semanticGoal)) {
+  const releaseGoal = hasReleaseGoal(input.goal);
+  if (route === "epic-split" || releaseGoal) {
     gates.push({
       id: `${stack.id}-release`,
       phase: "release",
-      required: /release|publish|tag|npm/i.test(semanticGoal),
+      required: releaseGoal,
       command: selectCommand(stack.releaseCommands, input.topology.roots, input.topology.projectRoot),
       reason: `Release-facing ${stack.name} work needs the stricter release gate.`
     });
@@ -1203,6 +1235,13 @@ if (isDirectRun2()) {
 }
 
 // src/hooks/lib/dev-runtime.ts
+var DEFAULT_STATIC_HTML_PORT = 8123;
+function staticHtmlPort() {
+  const raw = process.env["CURDX_FLOW_STATIC_PORT"];
+  if (raw === void 0 || raw.trim() === "") return DEFAULT_STATIC_HTML_PORT;
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 && value < 65536 ? value : DEFAULT_STATIC_HTML_PORT;
+}
 function readJsonFile(path2) {
   try {
     return JSON.parse(readFileSync4(path2, "utf8"));
@@ -1242,6 +1281,7 @@ function scriptNamesMatching(scripts, pattern) {
   return Object.entries(scripts).filter(([name, command]) => pattern.test(`${name} ${command}`)).map(([name]) => name);
 }
 function defaultUrlFor(root) {
+  if (root.frameworks.includes("static-html")) return [`http://127.0.0.1:${staticHtmlPort()}/`];
   if (root.frameworks.includes("vite")) return ["http://localhost:5173"];
   if (root.frameworks.includes("next") || root.frameworks.includes("react")) return ["http://localhost:3000"];
   if (root.frameworks.includes("spring-boot") || root.frameworks.includes("spring-cloud")) {
@@ -1270,6 +1310,9 @@ function javaCommands(rootAbs) {
   return { startCommand: null, verifyCommands: [] };
 }
 function nativeVerifyCommands(rootAbs) {
+  if (isStaticHtmlRoot(rootAbs) && existsSync4(join3(rootAbs, "app.js"))) {
+    return ["node --check app.js"];
+  }
   if (existsSync4(join3(rootAbs, "go.mod"))) {
     return ["go test ./...", "go vet ./..."];
   }
@@ -1288,6 +1331,36 @@ function nativeVerifyCommands(rootAbs) {
   }
   return [];
 }
+function isStaticHtmlRoot(rootAbs) {
+  return existsSync4(join3(rootAbs, "index.html")) && (existsSync4(join3(rootAbs, "app.js")) || existsSync4(join3(rootAbs, "styles.css")));
+}
+function shellSingleQuote(value) {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+function staticHtmlServerCommand(rootAbs) {
+  if (!isStaticHtmlRoot(rootAbs)) return null;
+  const port = staticHtmlPort();
+  const script = [
+    'const http=require("node:http"),fs=require("node:fs"),path=require("node:path");',
+    "const root=process.cwd();",
+    'const types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8"};',
+    "const server=http.createServer((req,res)=>{",
+    'let rel=decodeURIComponent(new URL(req.url,"http://127.0.0.1").pathname);',
+    'rel=rel==="/"?"index.html":rel.replace(/^[/\\\\]+/,"");',
+    "const file=path.resolve(root,path.normalize(rel));",
+    'if(file!==root&&!file.startsWith(root+path.sep)){res.writeHead(403);res.end("Forbidden");return;}',
+    "fs.readFile(file,(err,data)=>{",
+    'if(err){res.writeHead(404);res.end("Not found");return;}',
+    'res.writeHead(200,{"Content-Type":types[path.extname(file).toLowerCase()]||"application/octet-stream"});',
+    "res.end(data);",
+    "});",
+    "});",
+    `server.listen(${port},"127.0.0.1",()=>console.log("READY:http://127.0.0.1:${port}/"));`,
+    'process.on("SIGTERM",()=>server.close(()=>process.exit(0)));',
+    'process.on("SIGINT",()=>server.close(()=>process.exit(0)));'
+  ].join("");
+  return `node -e ${shellSingleQuote(script)}`;
+}
 function detectRoot(projectRoot, root) {
   const fsPath = rootFsPath2(projectRoot, root);
   const pkg = readJsonFile(join3(fsPath, "package.json"));
@@ -1305,8 +1378,9 @@ function detectRoot(projectRoot, root) {
     /(^|:|-)(e2e|browser|ui|acceptance)(:|-|$)|playwright|cypress|puppeteer/i
   );
   const java = javaCommands(fsPath);
+  const staticServer = staticHtmlServerCommand(fsPath);
   const urls = defaultUrlFor(root);
-  const startCommand = devScript !== null ? scriptCommand(packageManager, devScript) : java.startCommand;
+  const startCommand = devScript !== null ? scriptCommand(packageManager, devScript) : java.startCommand ?? staticServer;
   const healthCommands = urls.map((url) => `curl -fsS ${url}`);
   const verifyCommands = [
     ...verifyScriptNames.map((name) => scriptCommand(packageManager, name)),

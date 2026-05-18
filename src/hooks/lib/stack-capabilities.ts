@@ -18,6 +18,7 @@ import {
 import { stripKnownCapabilityTokens } from "./capability-normalization.js";
 
 export type StackCapabilityId =
+  | "static-html"
   | "typescript"
   | "react"
   | "vue"
@@ -110,6 +111,25 @@ interface StackCapabilityInput {
 }
 
 const STACKS: Record<StackCapabilityId, StackCapability> = {
+  "static-html": {
+    id: "static-html",
+    name: "Static HTML",
+    frameworks: ["static-html"],
+    goalPattern: /\b(static html|static frontend|static page|static web|vanilla js|vanilla javascript|plain html|html\/css\/js|index\.html|styles\.css|app\.js)\b|静态页面|原生\s*(js|javascript)/i,
+    manifestHints: ["index.html"],
+    docsQuery: "MDN documentation for HTML, CSS, DOM events, and browser behavior",
+    tdd: "Use small DOM/browser interaction checks for user-visible behavior.",
+    security: "Review DOM insertion, event handling, unsafe HTML, and local file serving assumptions.",
+    verifierCommands: ["node --check app.js"],
+    releaseCommands: ["node --check app.js"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded",
+    },
+  },
   "typescript": {
     id: "typescript",
     name: "TypeScript",
@@ -133,7 +153,7 @@ const STACKS: Record<StackCapabilityId, StackCapability> = {
     id: "react",
     name: "React",
     frameworks: ["react"],
-    goalPattern: /\b(react|jsx|tsx|component|hook|frontend|ui)\b|前端|组件|页面/i,
+    goalPattern: /\b(react|jsx|tsx|react component|react hook)\b/i,
     manifestHints: ["package.json:react"],
     docsQuery: "React official documentation for current component and hook behavior",
     tdd: "Prefer component or interaction tests for user-visible behavior.",
@@ -152,7 +172,7 @@ const STACKS: Record<StackCapabilityId, StackCapability> = {
     id: "vue",
     name: "Vue",
     frameworks: ["vue", "vite"],
-    goalPattern: /\b(vue|vue3|vite|pinia|vue router|component|frontend|ui)\b|前端|组件|页面/i,
+    goalPattern: /\b(vue|vue3|vite|pinia|vue router|vue component)\b/i,
     manifestHints: ["package.json:vue", "vite.config.*"],
     docsQuery: "Vue and Vite official documentation for current project setup and runtime behavior",
     tdd: "Prefer component or interaction tests; keep vue-tsc/typecheck and build gates.",
@@ -336,6 +356,7 @@ const STACKS: Record<StackCapabilityId, StackCapability> = {
 const STACK_PRIORITY: Record<StackCapabilityId, number> = {
   "claude-code-plugin": 110,
   "next": 100,
+  "static-html": 95,
   "react": 90,
   "vue": 90,
   "spring-cloud": 85,
@@ -346,6 +367,16 @@ const STACK_PRIORITY: Record<StackCapabilityId, number> = {
   "typescript": 30,
   "node": 20,
 };
+
+const RELEASE_GOAL_RE =
+  /\b(release|publish|deploy|tag)\b|发布|部署|上线|打包|标签/i;
+const NPM_RELEASE_RE =
+  /\bnpm\s+(publish|release|version|tag|dist-tag)\b|\bpublish(?:ing)?\s+(?:to\s+)?npm\b|\bnpm\s+package\b/i;
+
+function hasReleaseGoal(goal: string | undefined): boolean {
+  const text = stripKnownCapabilityTokens(goal);
+  return RELEASE_GOAL_RE.test(text) || NPM_RELEASE_RE.test(text);
+}
 
 function normalizeText(input: string | undefined): string {
   return (input ?? "").trim().replace(/\s+/g, " ");
@@ -560,7 +591,7 @@ export function selectQualityGates(input: StackCapabilityInput & { stackProfile:
       id: `${stack.id}-browser`,
       phase: "verification",
       required: route !== "direct-change",
-      command: "npm run test:e2e",
+      command: stack.id === "static-html" ? null : "npm run test:e2e",
       reason: "Browser-facing behavior needs Playwright or Chrome DevTools MCP evidence.",
     });
   }
@@ -576,11 +607,12 @@ export function selectQualityGates(input: StackCapabilityInput & { stackProfile:
     });
   }
 
-  if (route === "epic-split" || /release|publish|tag|npm/i.test(semanticGoal)) {
+  const releaseGoal = hasReleaseGoal(input.goal);
+  if (route === "epic-split" || releaseGoal) {
     gates.push({
       id: `${stack.id}-release`,
       phase: "release",
-      required: /release|publish|tag|npm/i.test(semanticGoal),
+      required: releaseGoal,
       command: selectCommand(stack.releaseCommands, input.topology.roots, input.topology.projectRoot),
       reason: `Release-facing ${stack.name} work needs the stricter release gate.`,
     });

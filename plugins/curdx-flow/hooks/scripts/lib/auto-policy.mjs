@@ -9,8 +9,9 @@ const __dirname = __ccd(__filename);
 import { fileURLToPath } from "node:url";
 import { basename } from "node:path";
 var LOW_RISK_RE = /\b(readme|docs?|documentation|typo|copy|wording|comment|comments|changelog|license|format text|rename label|css copy|style text)\b/i;
-var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|delete|remove|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
+var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
 var CRITICAL_RISK_RE = /\b(payment|billing|security|secret|secrets|password|token|oauth|authorization|permission|migration|data loss|release|publish|tag|hooks?\.json|plugin\.json|claude-plugin)\b/i;
+var DESTRUCTIVE_INTENT_RE = /\b(rm\s+-rf|delete\s+(file|files|directory|directories|folder|folders|branch|branches|tag|tags|database|schema|table|record|records|data|repo|repository)|remove\s+(file|files|directory|directories|folder|folders|branch|branches|tag|tags|database|schema|table|record|records|data|repo|repository)|drop\s+(database|schema|table)|wipe|purge|destroy)\b|删除(文件|目录|数据|数据库|表|仓库|分支|标签)|删库|清空数据/i;
 var EPIC_TRIAGE_RE = /\b(epic|multi-spec|multiple specs|multiple subsystems|cross-system|whole app|entire app|rewrite|rebuild|platform|framework migration|全量|重写|多个子系统|史诗)\b/i;
 var ADD_OR_FIX_RE = /\b(add|build|create|implement|support|fix|debug|repair|resolve|refactor|change|modify|update)\b/i;
 function normalizeWords(input) {
@@ -56,7 +57,7 @@ function classifyRisk(goal, files, fileCount) {
     risk = bumpRisk(risk, "low");
     reasons.push("small unclear change; keep validation targeted");
   }
-  if (HIGH_RISK_RE.test(goal) || files.some((f) => HIGH_RISK_RE.test(f))) {
+  if (HIGH_RISK_RE.test(goal) || DESTRUCTIVE_INTENT_RE.test(goal) || files.some((f) => HIGH_RISK_RE.test(f) || DESTRUCTIVE_INTENT_RE.test(f))) {
     risk = bumpRisk(risk, "high");
     reasons.push("high-risk domain or publish-critical file");
   }

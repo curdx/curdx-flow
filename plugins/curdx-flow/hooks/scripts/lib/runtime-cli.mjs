@@ -268,8 +268,9 @@ import { fileURLToPath as fileURLToPath4 } from "node:url";
 import { fileURLToPath } from "node:url";
 import { basename } from "node:path";
 var LOW_RISK_RE = /\b(readme|docs?|documentation|typo|copy|wording|comment|comments|changelog|license|format text|rename label|css copy|style text)\b/i;
-var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|delete|remove|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
+var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
 var CRITICAL_RISK_RE = /\b(payment|billing|security|secret|secrets|password|token|oauth|authorization|permission|migration|data loss|release|publish|tag|hooks?\.json|plugin\.json|claude-plugin)\b/i;
+var DESTRUCTIVE_INTENT_RE = /\b(rm\s+-rf|delete\s+(file|files|directory|directories|folder|folders|branch|branches|tag|tags|database|schema|table|record|records|data|repo|repository)|remove\s+(file|files|directory|directories|folder|folders|branch|branches|tag|tags|database|schema|table|record|records|data|repo|repository)|drop\s+(database|schema|table)|wipe|purge|destroy)\b|删除(文件|目录|数据|数据库|表|仓库|分支|标签)|删库|清空数据/i;
 var EPIC_TRIAGE_RE = /\b(epic|multi-spec|multiple specs|multiple subsystems|cross-system|whole app|entire app|rewrite|rebuild|platform|framework migration|全量|重写|多个子系统|史诗)\b/i;
 var ADD_OR_FIX_RE = /\b(add|build|create|implement|support|fix|debug|repair|resolve|refactor|change|modify|update)\b/i;
 function normalizeWords(input) {
@@ -315,7 +316,7 @@ function classifyRisk(goal2, files, fileCount) {
     risk = bumpRisk(risk, "low");
     reasons.push("small unclear change; keep validation targeted");
   }
-  if (HIGH_RISK_RE.test(goal2) || files.some((f) => HIGH_RISK_RE.test(f))) {
+  if (HIGH_RISK_RE.test(goal2) || DESTRUCTIVE_INTENT_RE.test(goal2) || files.some((f) => HIGH_RISK_RE.test(f) || DESTRUCTIVE_INTENT_RE.test(f))) {
     risk = bumpRisk(risk, "high");
     reasons.push("high-risk domain or publish-critical file");
   }
@@ -1028,6 +1029,7 @@ function detectPackageManager(rootAbs) {
 }
 function hasManifestOrSource(rootAbs) {
   return [
+    "index.html",
     "package.json",
     "pom.xml",
     "build.gradle",
@@ -1057,6 +1059,10 @@ function classifyRoot(rootAbs, role) {
   ].join("\n");
   const buildText = `${pom}
 ${gradle}`;
+  if (isFile(path.join(rootAbs, "index.html")) && (isFile(path.join(rootAbs, "app.js")) || isFile(path.join(rootAbs, "styles.css")))) {
+    pushUnique(kinds, "frontend-app");
+    frameworks.push("static-html");
+  }
   if (isFile(path.join(rootAbs, ".claude-plugin", "plugin.json"))) {
     pushUnique(kinds, "claude-code-plugin");
     frameworks.push("claude-code-plugin");
@@ -1399,11 +1405,11 @@ function stripKnownCapabilityTokens(input) {
 // src/hooks/lib/tool-capabilities.ts
 var CAPABILITIES = CURDX_TOOL_CAPABILITIES;
 var ORDER = [...CURDX_TOOL_CAPABILITY_ORDER];
-var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|scaffold|starter|template|generator|initializer|initializr|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node|go|python|rust|cargo|maven|gradle|cookiecutter)\b|最新|依赖|框架|插件|官方|联网|搜索|文档|脚手架|初始化|生成器|模板/i;
+var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|scaffold|starter|template|generator|initializer|initializr|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|node|go|python|rust|cargo|maven|gradle|cookiecutter)\b|最新|依赖|框架|插件|官方|联网|搜索|文档|脚手架|初始化|生成器|模板/i;
 var MEMORY_RE = /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
 var UI_RE = /\b(ui|ux|frontend|front-end|browser|chrome|dom|css|html|layout|component|page|form|modal|responsive|visual|render|react|vue|vite|next\.?js|screenshot|interaction)\b|前端|页面|浏览器|样式|交互|组件|布局|视觉|截图/i;
 var BROWSER_VERIFY_RE = /\b(browser|chrome|dom|css|network|console|performance|render|screenshot|e2e|playwright|visual regression|interaction)\b|浏览器|控制台|网络|性能|渲染|截图|端到端/i;
-var COMPLEX_RE = /\b(architecture|architect|migration|migrate|security|auth|authentication|authorization|permission|oauth|payment|billing|database|schema|release|publish|npm|tag|hook|subagent|multi[- ]?repo|monorepo|cross[- ]?system|concurrency|race|cache|rewrite|refactor)\b|架构|迁移|安全|权限|认证|数据库|发布|重写|并发|跨仓库|多仓库/i;
+var COMPLEX_RE = /\b(architecture|architect|migration|migrate|security|auth|authentication|authorization|permission|oauth|payment|billing|database|schema|release|publish|tag|hook|subagent|multi[- ]?repo|monorepo|cross[- ]?system|concurrency|race|cache|rewrite|refactor)\b|架构|迁移|安全|权限|认证|数据库|发布|重写|并发|跨仓库|多仓库/i;
 var STUCK_RE = /\b(stuck|failed|failure|fails|flaky|retry|debug|investigate|root cause|not working|broken|regression)\b|卡住|失败|报错|不行|修不好|定位|排查/i;
 var REPEATED_FAILURE_RE = /\b(repeated|multiple failed|failed twice|failed 2|again failed|keeps failing|stuck again)\b|连续失败|多次失败|失败两次|又失败|反复失败|一直失败/i;
 var PARALLEL_RE = /\b(parallel|multi-agent|team|decompose|split|epic|multiple subsystems|large refactor)\b|并行|多智能体|拆分|史诗|多模块/i;
@@ -1792,6 +1798,25 @@ function summarizeProjectBrain(cwd) {
 import { existsSync as existsSync4, readFileSync as readFileSync4, readdirSync as readdirSync3 } from "node:fs";
 import { isAbsolute as isAbsolute3, join as join3, resolve as resolve3 } from "node:path";
 var STACKS = {
+  "static-html": {
+    id: "static-html",
+    name: "Static HTML",
+    frameworks: ["static-html"],
+    goalPattern: /\b(static html|static frontend|static page|static web|vanilla js|vanilla javascript|plain html|html\/css\/js|index\.html|styles\.css|app\.js)\b|静态页面|原生\s*(js|javascript)/i,
+    manifestHints: ["index.html"],
+    docsQuery: "MDN documentation for HTML, CSS, DOM events, and browser behavior",
+    tdd: "Use small DOM/browser interaction checks for user-visible behavior.",
+    security: "Review DOM insertion, event handling, unsafe HTML, and local file serving assumptions.",
+    verifierCommands: ["node --check app.js"],
+    releaseCommands: ["node --check app.js"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
   "typescript": {
     id: "typescript",
     name: "TypeScript",
@@ -1815,7 +1840,7 @@ var STACKS = {
     id: "react",
     name: "React",
     frameworks: ["react"],
-    goalPattern: /\b(react|jsx|tsx|component|hook|frontend|ui)\b|前端|组件|页面/i,
+    goalPattern: /\b(react|jsx|tsx|react component|react hook)\b/i,
     manifestHints: ["package.json:react"],
     docsQuery: "React official documentation for current component and hook behavior",
     tdd: "Prefer component or interaction tests for user-visible behavior.",
@@ -1834,7 +1859,7 @@ var STACKS = {
     id: "vue",
     name: "Vue",
     frameworks: ["vue", "vite"],
-    goalPattern: /\b(vue|vue3|vite|pinia|vue router|component|frontend|ui)\b|前端|组件|页面/i,
+    goalPattern: /\b(vue|vue3|vite|pinia|vue router|vue component)\b/i,
     manifestHints: ["package.json:vue", "vite.config.*"],
     docsQuery: "Vue and Vite official documentation for current project setup and runtime behavior",
     tdd: "Prefer component or interaction tests; keep vue-tsc/typecheck and build gates.",
@@ -2017,6 +2042,7 @@ var STACKS = {
 var STACK_PRIORITY = {
   "claude-code-plugin": 110,
   "next": 100,
+  "static-html": 95,
   "react": 90,
   "vue": 90,
   "spring-cloud": 85,
@@ -2027,6 +2053,12 @@ var STACK_PRIORITY = {
   "typescript": 30,
   "node": 20
 };
+var RELEASE_GOAL_RE = /\b(release|publish|deploy|tag)\b|发布|部署|上线|打包|标签/i;
+var NPM_RELEASE_RE = /\bnpm\s+(publish|release|version|tag|dist-tag)\b|\bpublish(?:ing)?\s+(?:to\s+)?npm\b|\bnpm\s+package\b/i;
+function hasReleaseGoal(goal2) {
+  const text = stripKnownCapabilityTokens(goal2);
+  return RELEASE_GOAL_RE.test(text) || NPM_RELEASE_RE.test(text);
+}
 function normalizeText(input) {
   return (input ?? "").trim().replace(/\s+/g, " ");
 }
@@ -2198,7 +2230,7 @@ function selectQualityGates(input) {
       id: `${stack.id}-browser`,
       phase: "verification",
       required: route2 !== "direct-change",
-      command: "npm run test:e2e",
+      command: stack.id === "static-html" ? null : "npm run test:e2e",
       reason: "Browser-facing behavior needs Playwright or Chrome DevTools MCP evidence."
     });
   }
@@ -2212,11 +2244,12 @@ function selectQualityGates(input) {
       reason: stack.security
     });
   }
-  if (route2 === "epic-split" || /release|publish|tag|npm/i.test(semanticGoal)) {
+  const releaseGoal = hasReleaseGoal(input.goal);
+  if (route2 === "epic-split" || releaseGoal) {
     gates.push({
       id: `${stack.id}-release`,
       phase: "release",
-      required: /release|publish|tag|npm/i.test(semanticGoal),
+      required: releaseGoal,
       command: selectCommand(stack.releaseCommands, input.topology.roots, input.topology.projectRoot),
       reason: `Release-facing ${stack.name} work needs the stricter release gate.`
     });
@@ -2412,7 +2445,7 @@ function routeFromPolicy(policy) {
   if (policy.executionMode === "spec-lite") return "lite-spec";
   return "full-spec";
 }
-var STACK_RE = /\b(vue|vue3|vite|pinia|vue router|react|next\.?js|nuxt|spring|spring boot|spring cloud|maven|gradle|java|node|nestjs|fastapi|go|postgres|mysql|redis|docker)\b|前端|后端|全栈|全家桶/i;
+var STACK_RE = /\b(vue|vue3|vite|pinia|vue router|react|next\.?js|nuxt|static html|vanilla js|index\.html|styles\.css|app\.js|spring|spring boot|spring cloud|maven|gradle|java|node|nestjs|fastapi|go|postgres|mysql|redis|docker)\b|前端|后端|全栈|全家桶/i;
 var ARTIFACT_RE = /\b(prd|spec|requirements?|design doc|figma|wireframe|openapi|swagger|api doc|接口文档|产品文档|需求文档|设计稿|原型图)\b/i;
 var SCAFFOLD_RE = /\b(scaffold|bootstrap|init|starter|template|skeleton|create project|create app|new project|setup project)\b|脚手架|初始化|搭建项目|创建项目|项目骨架|先搭骨架|搭骨架/i;
 var PROTOTYPE_RE = /\b(prototype|poc|demo|spike|experiment|technical validation|prove|验证|原型|演示|技术验证|试验)\b/i;
@@ -2420,9 +2453,13 @@ var PRODUCT_RE = /\b(app|application|system|platform|saas|crm|dashboard|admin|po
 var PRODUCT_DOMAIN_HINT_RE = /\b(crm|customer|order|inventory|invoice|booking|calendar|todo|task|project|ticket|commerce|shop|blog|cms|dashboard|admin|user|auth|report)\b|客户|订单|库存|合同|发票|预约|日历|待办|任务|项目|工单|商城|电商|博客|内容|后台|用户|权限|登录|报表/i;
 var FIX_RE = /\b(fix|bug|debug|repair|resolve|broken|regression|修复|报错|失败|排查|定位)\b/i;
 var REFACTOR_RE = /\b(refactor|rewrite|cleanup|restructure|重构|重写|整理)\b/i;
-var RELEASE_RE = /\b(release|publish|deploy|ship|tag|npm|上线|发布|部署|打包)\b/i;
+var RELEASE_RE = /\b(release|publish|deploy|tag|上线|发布|部署|打包)\b/i;
+var NPM_RELEASE_RE2 = /\bnpm\s+(publish|release|version|tag|dist-tag)\b|\bpublish(?:ing)?\s+(?:to\s+)?npm\b|\bnpm\s+package\b/i;
 var DEMO_RE = /\b(demo|prototype|poc|演示|原型)\b/i;
 var PRODUCTION_RE = /\b(production|prod|ship|launch|deploy|release|上线|生产|发布|可用|能用)\b/i;
+function hasReleaseIntent(goal2) {
+  return RELEASE_RE.test(goal2) || NPM_RELEASE_RE2.test(goal2);
+}
 function classifyIntent(goal2, topology) {
   const semanticGoal = stripKnownCapabilityTokens(goal2);
   const artifactProvided = ARTIFACT_RE.test(semanticGoal);
@@ -2431,7 +2468,7 @@ function classifyIntent(goal2, topology) {
   if (artifactProvided) intentKind = "import-spec";
   else if (SCAFFOLD_RE.test(semanticGoal)) intentKind = "scaffold";
   else if (PROTOTYPE_RE.test(semanticGoal)) intentKind = "prototype";
-  else if (RELEASE_RE.test(semanticGoal)) intentKind = "release";
+  else if (hasReleaseIntent(semanticGoal)) intentKind = "release";
   else if (FIX_RE.test(semanticGoal)) intentKind = "fix";
   else if (REFACTOR_RE.test(semanticGoal)) intentKind = "refactor";
   else if (PRODUCT_RE.test(semanticGoal)) intentKind = "product";
@@ -3431,6 +3468,13 @@ import {
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { isAbsolute as isAbsolute5, join as join7, resolve as resolve4 } from "node:path";
+var DEFAULT_STATIC_HTML_PORT = 8123;
+function staticHtmlPort() {
+  const raw = process.env["CURDX_FLOW_STATIC_PORT"];
+  if (raw === void 0 || raw.trim() === "") return DEFAULT_STATIC_HTML_PORT;
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 && value < 65536 ? value : DEFAULT_STATIC_HTML_PORT;
+}
 function readJsonFile2(path3) {
   try {
     return JSON.parse(readFileSync8(path3, "utf8"));
@@ -3470,6 +3514,7 @@ function scriptNamesMatching(scripts, pattern) {
   return Object.entries(scripts).filter(([name, command]) => pattern.test(`${name} ${command}`)).map(([name]) => name);
 }
 function defaultUrlFor(root) {
+  if (root.frameworks.includes("static-html")) return [`http://127.0.0.1:${staticHtmlPort()}/`];
   if (root.frameworks.includes("vite")) return ["http://localhost:5173"];
   if (root.frameworks.includes("next") || root.frameworks.includes("react")) return ["http://localhost:3000"];
   if (root.frameworks.includes("spring-boot") || root.frameworks.includes("spring-cloud")) {
@@ -3498,6 +3543,9 @@ function javaCommands(rootAbs) {
   return { startCommand: null, verifyCommands: [] };
 }
 function nativeVerifyCommands(rootAbs) {
+  if (isStaticHtmlRoot(rootAbs) && existsSync8(join7(rootAbs, "app.js"))) {
+    return ["node --check app.js"];
+  }
   if (existsSync8(join7(rootAbs, "go.mod"))) {
     return ["go test ./...", "go vet ./..."];
   }
@@ -3516,6 +3564,36 @@ function nativeVerifyCommands(rootAbs) {
   }
   return [];
 }
+function isStaticHtmlRoot(rootAbs) {
+  return existsSync8(join7(rootAbs, "index.html")) && (existsSync8(join7(rootAbs, "app.js")) || existsSync8(join7(rootAbs, "styles.css")));
+}
+function shellSingleQuote(value) {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+function staticHtmlServerCommand(rootAbs) {
+  if (!isStaticHtmlRoot(rootAbs)) return null;
+  const port = staticHtmlPort();
+  const script = [
+    'const http=require("node:http"),fs=require("node:fs"),path=require("node:path");',
+    "const root=process.cwd();",
+    'const types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8"};',
+    "const server=http.createServer((req,res)=>{",
+    'let rel=decodeURIComponent(new URL(req.url,"http://127.0.0.1").pathname);',
+    'rel=rel==="/"?"index.html":rel.replace(/^[/\\\\]+/,"");',
+    "const file=path.resolve(root,path.normalize(rel));",
+    'if(file!==root&&!file.startsWith(root+path.sep)){res.writeHead(403);res.end("Forbidden");return;}',
+    "fs.readFile(file,(err,data)=>{",
+    'if(err){res.writeHead(404);res.end("Not found");return;}',
+    'res.writeHead(200,{"Content-Type":types[path.extname(file).toLowerCase()]||"application/octet-stream"});',
+    "res.end(data);",
+    "});",
+    "});",
+    `server.listen(${port},"127.0.0.1",()=>console.log("READY:http://127.0.0.1:${port}/"));`,
+    'process.on("SIGTERM",()=>server.close(()=>process.exit(0)));',
+    'process.on("SIGINT",()=>server.close(()=>process.exit(0)));'
+  ].join("");
+  return `node -e ${shellSingleQuote(script)}`;
+}
 function detectRoot(projectRoot, root) {
   const fsPath = rootFsPath2(projectRoot, root);
   const pkg = readJsonFile2(join7(fsPath, "package.json"));
@@ -3533,8 +3611,9 @@ function detectRoot(projectRoot, root) {
     /(^|:|-)(e2e|browser|ui|acceptance)(:|-|$)|playwright|cypress|puppeteer/i
   );
   const java = javaCommands(fsPath);
+  const staticServer = staticHtmlServerCommand(fsPath);
   const urls = defaultUrlFor(root);
-  const startCommand = devScript !== null ? scriptCommand(packageManager, devScript) : java.startCommand;
+  const startCommand = devScript !== null ? scriptCommand(packageManager, devScript) : java.startCommand ?? staticServer;
   const healthCommands = urls.map((url) => `curl -fsS ${url}`);
   const verifyCommands = [
     ...verifyScriptNames.map((name) => scriptCommand(packageManager, name)),
@@ -3769,7 +3848,8 @@ function stopDevRuntime(input = {}) {
 // src/hooks/lib/last-mile-orchestrator.ts
 import { basename as basename9 } from "node:path";
 import { fileURLToPath as fileURLToPath6 } from "node:url";
-var RELEASE_RE2 = /\b(release|publish|deploy|ship|tag|npm|version|changelog)\b|发布|部署|上线|打包|版本|标签|提测|灰度/i;
+var RELEASE_RE2 = /\b(release|publish|deploy|tag|version|changelog)\b|发布|部署|上线|打包|版本|标签|提测|灰度/i;
+var NPM_RELEASE_RE3 = /\bnpm\s+(publish|release|version|tag|dist-tag)\b|\bpublish(?:ing)?\s+(?:to\s+)?npm\b|\bnpm\s+package\b/i;
 var FAILURE_RE = /\b(fail|failed|failure|error|stuck|retry|debug|broken|regression)\b|失败|报错|卡住|重试|排查|定位|回归|崩溃|阻塞|无法|不通过/i;
 function normalize3(value) {
   return (value ?? "").trim().replace(/\s+/g, " ");
@@ -3787,7 +3867,7 @@ function missingCapabilityIds(route2) {
   return route2.recommendedCapabilities.filter((item) => item.availabilityState === "missing" && item.expectedByDefault).map((item) => item.id);
 }
 function isReleaseSensitive(goal2, route2) {
-  return route2.intent.intentKind === "release" || RELEASE_RE2.test(goal2) || route2.qualityGates.some((gate) => gate.id.endsWith("-release")) || route2.stackProfile.primary === "claude-code-plugin" && RELEASE_RE2.test(goal2);
+  return route2.intent.intentKind === "release" || RELEASE_RE2.test(goal2) || NPM_RELEASE_RE3.test(goal2) || route2.qualityGates.some((gate) => gate.id.endsWith("-release")) || route2.stackProfile.primary === "claude-code-plugin" && RELEASE_RE2.test(goal2);
 }
 function hasVerificationGap(input, snapshot2) {
   if (input.verification?.ok === false) return true;

@@ -14,8 +14,9 @@ import { fileURLToPath as fileURLToPath4 } from "node:url";
 import { fileURLToPath } from "node:url";
 import { basename } from "node:path";
 var LOW_RISK_RE = /\b(readme|docs?|documentation|typo|copy|wording|comment|comments|changelog|license|format text|rename label|css copy|style text)\b/i;
-var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|delete|remove|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
+var HIGH_RISK_RE = /\b(auth|authentication|authorization|permission|permissions|security|secret|secrets|token|password|oauth|payment|billing|invoice|migration|database|schema|release|publish|tag|manifest|plugin\.json|claude-plugin|hooks?\.json|hook|subagent|agent|sandbox|destructive|data loss|concurrency|race|cache|cost|pricing)\b/i;
 var CRITICAL_RISK_RE = /\b(payment|billing|security|secret|secrets|password|token|oauth|authorization|permission|migration|data loss|release|publish|tag|hooks?\.json|plugin\.json|claude-plugin)\b/i;
+var DESTRUCTIVE_INTENT_RE = /\b(rm\s+-rf|delete\s+(file|files|directory|directories|folder|folders|branch|branches|tag|tags|database|schema|table|record|records|data|repo|repository)|remove\s+(file|files|directory|directories|folder|folders|branch|branches|tag|tags|database|schema|table|record|records|data|repo|repository)|drop\s+(database|schema|table)|wipe|purge|destroy)\b|删除(文件|目录|数据|数据库|表|仓库|分支|标签)|删库|清空数据/i;
 var EPIC_TRIAGE_RE = /\b(epic|multi-spec|multiple specs|multiple subsystems|cross-system|whole app|entire app|rewrite|rebuild|platform|framework migration|全量|重写|多个子系统|史诗)\b/i;
 var ADD_OR_FIX_RE = /\b(add|build|create|implement|support|fix|debug|repair|resolve|refactor|change|modify|update)\b/i;
 function normalizeWords(input) {
@@ -61,7 +62,7 @@ function classifyRisk(goal, files, fileCount) {
     risk = bumpRisk(risk, "low");
     reasons.push("small unclear change; keep validation targeted");
   }
-  if (HIGH_RISK_RE.test(goal) || files.some((f) => HIGH_RISK_RE.test(f))) {
+  if (HIGH_RISK_RE.test(goal) || DESTRUCTIVE_INTENT_RE.test(goal) || files.some((f) => HIGH_RISK_RE.test(f) || DESTRUCTIVE_INTENT_RE.test(f))) {
     risk = bumpRisk(risk, "high");
     reasons.push("high-risk domain or publish-critical file");
   }
@@ -722,6 +723,7 @@ function detectPackageManager(rootAbs) {
 }
 function hasManifestOrSource(rootAbs) {
   return [
+    "index.html",
     "package.json",
     "pom.xml",
     "build.gradle",
@@ -751,6 +753,10 @@ function classifyRoot(rootAbs, role) {
   ].join("\n");
   const buildText = `${pom}
 ${gradle}`;
+  if (isFile(path.join(rootAbs, "index.html")) && (isFile(path.join(rootAbs, "app.js")) || isFile(path.join(rootAbs, "styles.css")))) {
+    pushUnique(kinds, "frontend-app");
+    frameworks.push("static-html");
+  }
   if (isFile(path.join(rootAbs, ".claude-plugin", "plugin.json"))) {
     pushUnique(kinds, "claude-code-plugin");
     frameworks.push("claude-code-plugin");
@@ -1285,11 +1291,11 @@ var CURDX_TOOL_CAPABILITY_ORDER = [
 // src/hooks/lib/tool-capabilities.ts
 var CAPABILITIES = CURDX_TOOL_CAPABILITIES;
 var ORDER = [...CURDX_TOOL_CAPABILITY_ORDER];
-var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|scaffold|starter|template|generator|initializer|initializr|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|npm|node|go|python|rust|cargo|maven|gradle|cookiecutter)\b|最新|依赖|框架|插件|官方|联网|搜索|文档|脚手架|初始化|生成器|模板/i;
+var EXTERNAL_DOCS_RE = /\b(api|sdk|library|libraries|framework|version|upgrade|dependency|dependencies|official docs?|latest docs?|claude code|plugin|mcp|hook|hooks|skill|skills|agent|agents|scaffold|starter|template|generator|initializer|initializr|react|vue|spring|spring boot|spring cloud|next\.?js|vite|webpack|node|go|python|rust|cargo|maven|gradle|cookiecutter)\b|最新|依赖|框架|插件|官方|联网|搜索|文档|脚手架|初始化|生成器|模板/i;
 var MEMORY_RE = /\b(previous|before|again|remember|memory|history|similar|repeated|regression|already solved|same bug|past decision)\b|之前|上次|记得|历史|做过|又|重复|老问题/i;
 var UI_RE = /\b(ui|ux|frontend|front-end|browser|chrome|dom|css|html|layout|component|page|form|modal|responsive|visual|render|react|vue|vite|next\.?js|screenshot|interaction)\b|前端|页面|浏览器|样式|交互|组件|布局|视觉|截图/i;
 var BROWSER_VERIFY_RE = /\b(browser|chrome|dom|css|network|console|performance|render|screenshot|e2e|playwright|visual regression|interaction)\b|浏览器|控制台|网络|性能|渲染|截图|端到端/i;
-var COMPLEX_RE = /\b(architecture|architect|migration|migrate|security|auth|authentication|authorization|permission|oauth|payment|billing|database|schema|release|publish|npm|tag|hook|subagent|multi[- ]?repo|monorepo|cross[- ]?system|concurrency|race|cache|rewrite|refactor)\b|架构|迁移|安全|权限|认证|数据库|发布|重写|并发|跨仓库|多仓库/i;
+var COMPLEX_RE = /\b(architecture|architect|migration|migrate|security|auth|authentication|authorization|permission|oauth|payment|billing|database|schema|release|publish|tag|hook|subagent|multi[- ]?repo|monorepo|cross[- ]?system|concurrency|race|cache|rewrite|refactor)\b|架构|迁移|安全|权限|认证|数据库|发布|重写|并发|跨仓库|多仓库/i;
 var STUCK_RE = /\b(stuck|failed|failure|fails|flaky|retry|debug|investigate|root cause|not working|broken|regression)\b|卡住|失败|报错|不行|修不好|定位|排查/i;
 var REPEATED_FAILURE_RE = /\b(repeated|multiple failed|failed twice|failed 2|again failed|keeps failing|stuck again)\b|连续失败|多次失败|失败两次|又失败|反复失败|一直失败/i;
 var PARALLEL_RE = /\b(parallel|multi-agent|team|decompose|split|epic|multiple subsystems|large refactor)\b|并行|多智能体|拆分|史诗|多模块/i;
@@ -1626,6 +1632,25 @@ function summarizeProjectBrain(cwd) {
 import { existsSync as existsSync4, readFileSync as readFileSync4, readdirSync as readdirSync3 } from "node:fs";
 import { isAbsolute as isAbsolute3, join as join3, resolve as resolve3 } from "node:path";
 var STACKS = {
+  "static-html": {
+    id: "static-html",
+    name: "Static HTML",
+    frameworks: ["static-html"],
+    goalPattern: /\b(static html|static frontend|static page|static web|vanilla js|vanilla javascript|plain html|html\/css\/js|index\.html|styles\.css|app\.js)\b|静态页面|原生\s*(js|javascript)/i,
+    manifestHints: ["index.html"],
+    docsQuery: "MDN documentation for HTML, CSS, DOM events, and browser behavior",
+    tdd: "Use small DOM/browser interaction checks for user-visible behavior.",
+    security: "Review DOM insertion, event handling, unsafe HTML, and local file serving assumptions.",
+    verifierCommands: ["node --check app.js"],
+    releaseCommands: ["node --check app.js"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
   "typescript": {
     id: "typescript",
     name: "TypeScript",
@@ -1649,7 +1674,7 @@ var STACKS = {
     id: "react",
     name: "React",
     frameworks: ["react"],
-    goalPattern: /\b(react|jsx|tsx|component|hook|frontend|ui)\b|前端|组件|页面/i,
+    goalPattern: /\b(react|jsx|tsx|react component|react hook)\b/i,
     manifestHints: ["package.json:react"],
     docsQuery: "React official documentation for current component and hook behavior",
     tdd: "Prefer component or interaction tests for user-visible behavior.",
@@ -1668,7 +1693,7 @@ var STACKS = {
     id: "vue",
     name: "Vue",
     frameworks: ["vue", "vite"],
-    goalPattern: /\b(vue|vue3|vite|pinia|vue router|component|frontend|ui)\b|前端|组件|页面/i,
+    goalPattern: /\b(vue|vue3|vite|pinia|vue router|vue component)\b/i,
     manifestHints: ["package.json:vue", "vite.config.*"],
     docsQuery: "Vue and Vite official documentation for current project setup and runtime behavior",
     tdd: "Prefer component or interaction tests; keep vue-tsc/typecheck and build gates.",
@@ -1851,6 +1876,7 @@ var STACKS = {
 var STACK_PRIORITY = {
   "claude-code-plugin": 110,
   "next": 100,
+  "static-html": 95,
   "react": 90,
   "vue": 90,
   "spring-cloud": 85,
@@ -1861,6 +1887,12 @@ var STACK_PRIORITY = {
   "typescript": 30,
   "node": 20
 };
+var RELEASE_GOAL_RE = /\b(release|publish|deploy|tag)\b|发布|部署|上线|打包|标签/i;
+var NPM_RELEASE_RE = /\bnpm\s+(publish|release|version|tag|dist-tag)\b|\bpublish(?:ing)?\s+(?:to\s+)?npm\b|\bnpm\s+package\b/i;
+function hasReleaseGoal(goal) {
+  const text = stripKnownCapabilityTokens(goal);
+  return RELEASE_GOAL_RE.test(text) || NPM_RELEASE_RE.test(text);
+}
 function normalizeText(input) {
   return (input ?? "").trim().replace(/\s+/g, " ");
 }
@@ -2032,7 +2064,7 @@ function selectQualityGates(input) {
       id: `${stack.id}-browser`,
       phase: "verification",
       required: route !== "direct-change",
-      command: "npm run test:e2e",
+      command: stack.id === "static-html" ? null : "npm run test:e2e",
       reason: "Browser-facing behavior needs Playwright or Chrome DevTools MCP evidence."
     });
   }
@@ -2046,11 +2078,12 @@ function selectQualityGates(input) {
       reason: stack.security
     });
   }
-  if (route === "epic-split" || /release|publish|tag|npm/i.test(semanticGoal)) {
+  const releaseGoal = hasReleaseGoal(input.goal);
+  if (route === "epic-split" || releaseGoal) {
     gates.push({
       id: `${stack.id}-release`,
       phase: "release",
-      required: /release|publish|tag|npm/i.test(semanticGoal),
+      required: releaseGoal,
       command: selectCommand(stack.releaseCommands, input.topology.roots, input.topology.projectRoot),
       reason: `Release-facing ${stack.name} work needs the stricter release gate.`
     });
@@ -2246,7 +2279,7 @@ function routeFromPolicy(policy) {
   if (policy.executionMode === "spec-lite") return "lite-spec";
   return "full-spec";
 }
-var STACK_RE = /\b(vue|vue3|vite|pinia|vue router|react|next\.?js|nuxt|spring|spring boot|spring cloud|maven|gradle|java|node|nestjs|fastapi|go|postgres|mysql|redis|docker)\b|前端|后端|全栈|全家桶/i;
+var STACK_RE = /\b(vue|vue3|vite|pinia|vue router|react|next\.?js|nuxt|static html|vanilla js|index\.html|styles\.css|app\.js|spring|spring boot|spring cloud|maven|gradle|java|node|nestjs|fastapi|go|postgres|mysql|redis|docker)\b|前端|后端|全栈|全家桶/i;
 var ARTIFACT_RE = /\b(prd|spec|requirements?|design doc|figma|wireframe|openapi|swagger|api doc|接口文档|产品文档|需求文档|设计稿|原型图)\b/i;
 var SCAFFOLD_RE = /\b(scaffold|bootstrap|init|starter|template|skeleton|create project|create app|new project|setup project)\b|脚手架|初始化|搭建项目|创建项目|项目骨架|先搭骨架|搭骨架/i;
 var PROTOTYPE_RE = /\b(prototype|poc|demo|spike|experiment|technical validation|prove|验证|原型|演示|技术验证|试验)\b/i;
@@ -2254,9 +2287,13 @@ var PRODUCT_RE = /\b(app|application|system|platform|saas|crm|dashboard|admin|po
 var PRODUCT_DOMAIN_HINT_RE = /\b(crm|customer|order|inventory|invoice|booking|calendar|todo|task|project|ticket|commerce|shop|blog|cms|dashboard|admin|user|auth|report)\b|客户|订单|库存|合同|发票|预约|日历|待办|任务|项目|工单|商城|电商|博客|内容|后台|用户|权限|登录|报表/i;
 var FIX_RE = /\b(fix|bug|debug|repair|resolve|broken|regression|修复|报错|失败|排查|定位)\b/i;
 var REFACTOR_RE = /\b(refactor|rewrite|cleanup|restructure|重构|重写|整理)\b/i;
-var RELEASE_RE = /\b(release|publish|deploy|ship|tag|npm|上线|发布|部署|打包)\b/i;
+var RELEASE_RE = /\b(release|publish|deploy|tag|上线|发布|部署|打包)\b/i;
+var NPM_RELEASE_RE2 = /\bnpm\s+(publish|release|version|tag|dist-tag)\b|\bpublish(?:ing)?\s+(?:to\s+)?npm\b|\bnpm\s+package\b/i;
 var DEMO_RE = /\b(demo|prototype|poc|演示|原型)\b/i;
 var PRODUCTION_RE = /\b(production|prod|ship|launch|deploy|release|上线|生产|发布|可用|能用)\b/i;
+function hasReleaseIntent(goal) {
+  return RELEASE_RE.test(goal) || NPM_RELEASE_RE2.test(goal);
+}
 function classifyIntent(goal, topology) {
   const semanticGoal = stripKnownCapabilityTokens(goal);
   const artifactProvided = ARTIFACT_RE.test(semanticGoal);
@@ -2265,7 +2302,7 @@ function classifyIntent(goal, topology) {
   if (artifactProvided) intentKind = "import-spec";
   else if (SCAFFOLD_RE.test(semanticGoal)) intentKind = "scaffold";
   else if (PROTOTYPE_RE.test(semanticGoal)) intentKind = "prototype";
-  else if (RELEASE_RE.test(semanticGoal)) intentKind = "release";
+  else if (hasReleaseIntent(semanticGoal)) intentKind = "release";
   else if (FIX_RE.test(semanticGoal)) intentKind = "fix";
   else if (REFACTOR_RE.test(semanticGoal)) intentKind = "refactor";
   else if (PRODUCT_RE.test(semanticGoal)) intentKind = "product";

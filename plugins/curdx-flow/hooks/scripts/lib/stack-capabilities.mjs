@@ -313,6 +313,7 @@ function detectPackageManager(rootAbs) {
 }
 function hasManifestOrSource(rootAbs) {
   return [
+    "index.html",
     "package.json",
     "pom.xml",
     "build.gradle",
@@ -342,6 +343,10 @@ function classifyRoot(rootAbs, role) {
   ].join("\n");
   const buildText = `${pom}
 ${gradle}`;
+  if (isFile(path.join(rootAbs, "index.html")) && (isFile(path.join(rootAbs, "app.js")) || isFile(path.join(rootAbs, "styles.css")))) {
+    pushUnique(kinds, "frontend-app");
+    frameworks.push("static-html");
+  }
   if (isFile(path.join(rootAbs, ".claude-plugin", "plugin.json"))) {
     pushUnique(kinds, "claude-code-plugin");
     frameworks.push("claude-code-plugin");
@@ -679,6 +684,25 @@ function stripKnownCapabilityTokens(input) {
 
 // src/hooks/lib/stack-capabilities.ts
 var STACKS = {
+  "static-html": {
+    id: "static-html",
+    name: "Static HTML",
+    frameworks: ["static-html"],
+    goalPattern: /\b(static html|static frontend|static page|static web|vanilla js|vanilla javascript|plain html|html\/css\/js|index\.html|styles\.css|app\.js)\b|静态页面|原生\s*(js|javascript)/i,
+    manifestHints: ["index.html"],
+    docsQuery: "MDN documentation for HTML, CSS, DOM events, and browser behavior",
+    tdd: "Use small DOM/browser interaction checks for user-visible behavior.",
+    security: "Review DOM insertion, event handling, unsafe HTML, and local file serving assumptions.",
+    verifierCommands: ["node --check app.js"],
+    releaseCommands: ["node --check app.js"],
+    browser: true,
+    contextBudget: {
+      "direct-change": "tiny",
+      "lite-spec": "focused",
+      "full-spec": "standard",
+      "epic-split": "expanded"
+    }
+  },
   "typescript": {
     id: "typescript",
     name: "TypeScript",
@@ -702,7 +726,7 @@ var STACKS = {
     id: "react",
     name: "React",
     frameworks: ["react"],
-    goalPattern: /\b(react|jsx|tsx|component|hook|frontend|ui)\b|前端|组件|页面/i,
+    goalPattern: /\b(react|jsx|tsx|react component|react hook)\b/i,
     manifestHints: ["package.json:react"],
     docsQuery: "React official documentation for current component and hook behavior",
     tdd: "Prefer component or interaction tests for user-visible behavior.",
@@ -721,7 +745,7 @@ var STACKS = {
     id: "vue",
     name: "Vue",
     frameworks: ["vue", "vite"],
-    goalPattern: /\b(vue|vue3|vite|pinia|vue router|component|frontend|ui)\b|前端|组件|页面/i,
+    goalPattern: /\b(vue|vue3|vite|pinia|vue router|vue component)\b/i,
     manifestHints: ["package.json:vue", "vite.config.*"],
     docsQuery: "Vue and Vite official documentation for current project setup and runtime behavior",
     tdd: "Prefer component or interaction tests; keep vue-tsc/typecheck and build gates.",
@@ -904,6 +928,7 @@ var STACKS = {
 var STACK_PRIORITY = {
   "claude-code-plugin": 110,
   "next": 100,
+  "static-html": 95,
   "react": 90,
   "vue": 90,
   "spring-cloud": 85,
@@ -914,6 +939,12 @@ var STACK_PRIORITY = {
   "typescript": 30,
   "node": 20
 };
+var RELEASE_GOAL_RE = /\b(release|publish|deploy|tag)\b|发布|部署|上线|打包|标签/i;
+var NPM_RELEASE_RE = /\bnpm\s+(publish|release|version|tag|dist-tag)\b|\bpublish(?:ing)?\s+(?:to\s+)?npm\b|\bnpm\s+package\b/i;
+function hasReleaseGoal(goal) {
+  const text = stripKnownCapabilityTokens(goal);
+  return RELEASE_GOAL_RE.test(text) || NPM_RELEASE_RE.test(text);
+}
 function normalizeText(input) {
   return (input ?? "").trim().replace(/\s+/g, " ");
 }
@@ -1088,7 +1119,7 @@ function selectQualityGates(input) {
       id: `${stack.id}-browser`,
       phase: "verification",
       required: route !== "direct-change",
-      command: "npm run test:e2e",
+      command: stack.id === "static-html" ? null : "npm run test:e2e",
       reason: "Browser-facing behavior needs Playwright or Chrome DevTools MCP evidence."
     });
   }
@@ -1102,11 +1133,12 @@ function selectQualityGates(input) {
       reason: stack.security
     });
   }
-  if (route === "epic-split" || /release|publish|tag|npm/i.test(semanticGoal)) {
+  const releaseGoal = hasReleaseGoal(input.goal);
+  if (route === "epic-split" || releaseGoal) {
     gates.push({
       id: `${stack.id}-release`,
       phase: "release",
-      required: /release|publish|tag|npm/i.test(semanticGoal),
+      required: releaseGoal,
       command: selectCommand(stack.releaseCommands, input.topology.roots, input.topology.projectRoot),
       reason: `Release-facing ${stack.name} work needs the stricter release gate.`
     });

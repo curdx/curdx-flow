@@ -93,6 +93,17 @@ interface RuntimeState {
   }>;
 }
 
+const DEFAULT_STATIC_HTML_PORT = 8123;
+
+function staticHtmlPort(): number {
+  const raw = process.env["CURDX_FLOW_STATIC_PORT"];
+  if (raw === undefined || raw.trim() === "") return DEFAULT_STATIC_HTML_PORT;
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 && value < 65536
+    ? value
+    : DEFAULT_STATIC_HTML_PORT;
+}
+
 function readJsonFile<T>(path: string): T | null {
   try {
     return JSON.parse(readFileSync(path, "utf8")) as T;
@@ -139,6 +150,7 @@ function scriptNamesMatching(scripts: Record<string, string>, pattern: RegExp): 
 }
 
 function defaultUrlFor(root: CodeRoot): string[] {
+  if (root.frameworks.includes("static-html")) return [`http://127.0.0.1:${staticHtmlPort()}/`];
   if (root.frameworks.includes("vite")) return ["http://localhost:5173"];
   if (root.frameworks.includes("next") || root.frameworks.includes("react")) return ["http://localhost:3000"];
   if (root.frameworks.includes("spring-boot") || root.frameworks.includes("spring-cloud")) {
@@ -173,6 +185,9 @@ function javaCommands(rootAbs: string): {
 }
 
 function nativeVerifyCommands(rootAbs: string): string[] {
+  if (isStaticHtmlRoot(rootAbs) && existsSync(join(rootAbs, "app.js"))) {
+    return ["node --check app.js"];
+  }
   if (existsSync(join(rootAbs, "go.mod"))) {
     return ["go test ./...", "go vet ./..."];
   }
@@ -195,6 +210,40 @@ function nativeVerifyCommands(rootAbs: string): string[] {
   return [];
 }
 
+function isStaticHtmlRoot(rootAbs: string): boolean {
+  return existsSync(join(rootAbs, "index.html")) &&
+    (existsSync(join(rootAbs, "app.js")) || existsSync(join(rootAbs, "styles.css")));
+}
+
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function staticHtmlServerCommand(rootAbs: string): string | null {
+  if (!isStaticHtmlRoot(rootAbs)) return null;
+  const port = staticHtmlPort();
+  const script = [
+    'const http=require("node:http"),fs=require("node:fs"),path=require("node:path");',
+    'const root=process.cwd();',
+    'const types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8"};',
+    'const server=http.createServer((req,res)=>{',
+    'let rel=decodeURIComponent(new URL(req.url,"http://127.0.0.1").pathname);',
+    'rel=rel==="/"?"index.html":rel.replace(/^[/\\\\]+/,"");',
+    'const file=path.resolve(root,path.normalize(rel));',
+    'if(file!==root&&!file.startsWith(root+path.sep)){res.writeHead(403);res.end("Forbidden");return;}',
+    'fs.readFile(file,(err,data)=>{',
+    'if(err){res.writeHead(404);res.end("Not found");return;}',
+    'res.writeHead(200,{"Content-Type":types[path.extname(file).toLowerCase()]||"application/octet-stream"});',
+    'res.end(data);',
+    '});',
+    '});',
+    `server.listen(${port},"127.0.0.1",()=>console.log("READY:http://127.0.0.1:${port}/"));`,
+    'process.on("SIGTERM",()=>server.close(()=>process.exit(0)));',
+    'process.on("SIGINT",()=>server.close(()=>process.exit(0)));',
+  ].join("");
+  return `node -e ${shellSingleQuote(script)}`;
+}
+
 function detectRoot(projectRoot: string, root: CodeRoot): DevRuntimeRoot {
   const fsPath = rootFsPath(projectRoot, root);
   const pkg = readJsonFile<PackageJson>(join(fsPath, "package.json"));
@@ -212,12 +261,13 @@ function detectRoot(projectRoot: string, root: CodeRoot): DevRuntimeRoot {
     /(^|:|-)(e2e|browser|ui|acceptance)(:|-|$)|playwright|cypress|puppeteer/i,
   );
   const java = javaCommands(fsPath);
+  const staticServer = staticHtmlServerCommand(fsPath);
   const urls = defaultUrlFor(root);
 
   const startCommand =
     devScript !== null
       ? scriptCommand(packageManager, devScript)
-      : java.startCommand;
+      : java.startCommand ?? staticServer;
   const healthCommands = urls.map((url) => `curl -fsS ${url}`);
   const verifyCommands = [
     ...verifyScriptNames.map((name) => scriptCommand(packageManager, name)),

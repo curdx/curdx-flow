@@ -240,6 +240,7 @@ When `--quick` causes this skill to generate phase artifacts inline instead of d
   curdx-flow verify run --phase execution --command "<exact Verify command>" --spec "$name"
   ```
   This command actually executes the verification, records `.curdx-state.json::verificationBlocks.execution` with the command, exit code, timestamp, and source mtime, and returns the verification exit code. If the verification fails, do not set `completed: true`; fix the issue and rerun the recorder.
+- If the goal, requirements, or acceptance criteria require browser evidence, Playwright, or Chrome DevTools MCP, `--check`/file-existence commands are not sufficient completion evidence. The quick run must first perform the real browser interaction, then record the shell verifier with `--description` containing the concrete browser proof: tool used, URL, action sequence, final DOM assertion, and console-error result. Do not mark completion when that proof is absent.
 - After recorded verification passes, mark the checkbox `[x]`, set `completed: true`, and leave `taskIndex` equal to the number of top-level checkbox tasks.
 
 ## Skill Discovery

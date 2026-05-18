@@ -118,6 +118,7 @@ Direct path:
    - For greenfield work (`intent.workspaceState == "empty"` or route `greenfield-spec`), include a walking-skeleton task before business slices. It must prove the selected project shape, contract, and dev runtime can start and verify together.
    - For scaffold or greenfield foundation work, prefer official or ecosystem-maintained scaffold generators for named stacks when current docs show one exists; self-author only when no trustworthy generator exists, the requested skeleton is intentionally smaller, or a custom skeleton is safer to verify.
    - Prefer `curdx-flow dev detect`, `curdx-flow dev up`, `curdx-flow dev health`, `curdx-flow dev verify`, and `curdx-flow dev down` for local runtime evidence when project scripts exist.
+   - If the source requirements explicitly require Chrome DevTools MCP, do not make the final verifier a file/tooling check such as `./verify.sh --check` by itself. Generate startup/check/cleanup steps that keep the server alive for browser interaction, and require `curdx-flow verify run --description` to include the concrete MCP proof: tool used, URL, add/toggle/delete or equivalent action sequence, DOM assertion, and console-error result.
 3. Wait for the Agent result. Require `TASKS_READY` before proceeding; if `TASKS_BLOCKED`, surface the blocking source items and stop.
 4. Read `$SPEC_PATH/tasks.md`.
 
@@ -146,6 +147,7 @@ Optional Agent Teams path:
 > - **Browser Verification**: Playwright CLI by default, Chrome DevTools MCP for GIS/WebGL/canvas/map/GPU/rendering or console/network/performance diagnosis, none only for non-browser work
 > - **Verification Tooling**: the Verification Tooling section from research.md (dev server commands, browser deps, ports, health endpoints)
 > - **Strategy**: the user's chosen verification strategy, or "auto" in quick mode
+> - **Lifecycle**: startup must keep the dev server alive until cleanup; short-lived background commands from a subshell are not valid evidence unless a health check proves the server remains reachable.
 </mandatory>
 
 ## Step 4: Artifact Review (Parallel Two-Stage)

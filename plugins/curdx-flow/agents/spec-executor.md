@@ -48,6 +48,7 @@ Execution:
 - When the task, spec, or Browser Verify section indicates frontend/full-stack behavior, prove it through the selected browser track:
   - `playwright`: start the dev server, run the project E2E command or `npx playwright test`, collect report/trace/screenshot evidence, and stop the server.
   - `chrome-devtools-mcp` / Chrome DevTools MCP: use the MCP browser tools for GIS/WebGL/canvas/map/GPU rendering, console/network/performance diagnosis, or Playwright flakiness; capture URL, action, console/network findings, and screenshot/snapshot evidence.
+- If Chrome DevTools MCP is explicitly required, a shell-only check such as `./verify.sh --check`, `curl`, `node --check`, or file existence is not browser proof. Run those commands only as supporting checks; do not mark the task complete unless the MCP tool sequence actually succeeded and the concrete observations are written to progress.
 - Browser verification failures are implementation failures. Trace from browser symptom to network/API/backend log/component/code, fix the narrowest path, then re-run the same browser verification.
 - Do not use `/ultrareview` for verification. Do not substitute Claude Code's beta Chrome integration for the selected track.
 

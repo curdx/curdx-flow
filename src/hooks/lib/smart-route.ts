@@ -266,7 +266,7 @@ function routeFromPolicy(policy: AutoPolicy): SmartRouteName {
 }
 
 const STACK_RE =
-  /\b(vue|vue3|vite|pinia|vue router|react|next\.?js|nuxt|spring|spring boot|spring cloud|maven|gradle|java|node|nestjs|fastapi|go|postgres|mysql|redis|docker)\b|前端|后端|全栈|全家桶/i;
+  /\b(vue|vue3|vite|pinia|vue router|react|next\.?js|nuxt|static html|vanilla js|index\.html|styles\.css|app\.js|spring|spring boot|spring cloud|maven|gradle|java|node|nestjs|fastapi|go|postgres|mysql|redis|docker)\b|前端|后端|全栈|全家桶/i;
 const ARTIFACT_RE =
   /\b(prd|spec|requirements?|design doc|figma|wireframe|openapi|swagger|api doc|接口文档|产品文档|需求文档|设计稿|原型图)\b/i;
 const SCAFFOLD_RE =
@@ -282,9 +282,15 @@ const FIX_RE =
 const REFACTOR_RE =
   /\b(refactor|rewrite|cleanup|restructure|重构|重写|整理)\b/i;
 const RELEASE_RE =
-  /\b(release|publish|deploy|ship|tag|npm|上线|发布|部署|打包)\b/i;
+  /\b(release|publish|deploy|tag|上线|发布|部署|打包)\b/i;
+const NPM_RELEASE_RE =
+  /\bnpm\s+(publish|release|version|tag|dist-tag)\b|\bpublish(?:ing)?\s+(?:to\s+)?npm\b|\bnpm\s+package\b/i;
 const DEMO_RE = /\b(demo|prototype|poc|演示|原型)\b/i;
 const PRODUCTION_RE = /\b(production|prod|ship|launch|deploy|release|上线|生产|发布|可用|能用)\b/i;
+
+function hasReleaseIntent(goal: string): boolean {
+  return RELEASE_RE.test(goal) || NPM_RELEASE_RE.test(goal);
+}
 
 function classifyIntent(goal: string, topology: ProjectTopology): SmartIntent {
   const semanticGoal = stripKnownCapabilityTokens(goal);
@@ -294,7 +300,7 @@ function classifyIntent(goal: string, topology: ProjectTopology): SmartIntent {
   if (artifactProvided) intentKind = "import-spec";
   else if (SCAFFOLD_RE.test(semanticGoal)) intentKind = "scaffold";
   else if (PROTOTYPE_RE.test(semanticGoal)) intentKind = "prototype";
-  else if (RELEASE_RE.test(semanticGoal)) intentKind = "release";
+  else if (hasReleaseIntent(semanticGoal)) intentKind = "release";
   else if (FIX_RE.test(semanticGoal)) intentKind = "fix";
   else if (REFACTOR_RE.test(semanticGoal)) intentKind = "refactor";
   else if (PRODUCT_RE.test(semanticGoal)) intentKind = "product";

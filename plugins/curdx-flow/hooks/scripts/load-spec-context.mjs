@@ -958,6 +958,7 @@ function detectPackageManager(rootAbs) {
 }
 function hasManifestOrSource(rootAbs) {
   return [
+    "index.html",
     "package.json",
     "pom.xml",
     "build.gradle",
@@ -987,6 +988,10 @@ function classifyRoot(rootAbs, role) {
   ].join("\n");
   const buildText = `${pom}
 ${gradle}`;
+  if (isFile(path3.join(rootAbs, "index.html")) && (isFile(path3.join(rootAbs, "app.js")) || isFile(path3.join(rootAbs, "styles.css")))) {
+    pushUnique(kinds, "frontend-app");
+    frameworks.push("static-html");
+  }
   if (isFile(path3.join(rootAbs, ".claude-plugin", "plugin.json"))) {
     pushUnique(kinds, "claude-code-plugin");
     frameworks.push("claude-code-plugin");
