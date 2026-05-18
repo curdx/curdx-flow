@@ -215,10 +215,6 @@ function isStaticHtmlRoot(rootAbs: string): boolean {
     (existsSync(join(rootAbs, "app.js")) || existsSync(join(rootAbs, "styles.css")));
 }
 
-function shellSingleQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
 function staticHtmlServerCommand(rootAbs: string): string | null {
   if (!isStaticHtmlRoot(rootAbs)) return null;
   const port = staticHtmlPort();
@@ -241,7 +237,8 @@ function staticHtmlServerCommand(rootAbs: string): string | null {
     'process.on("SIGTERM",()=>server.close(()=>process.exit(0)));',
     'process.on("SIGINT",()=>server.close(()=>process.exit(0)));',
   ].join("");
-  return `node -e ${shellSingleQuote(script)}`;
+  const encoded = Buffer.from(script, "utf8").toString("base64");
+  return `node -e "eval(Buffer.from('${encoded}','base64').toString('utf8'))"`;
 }
 
 function detectRoot(projectRoot: string, root: CodeRoot): DevRuntimeRoot {

@@ -3567,9 +3567,6 @@ function nativeVerifyCommands(rootAbs) {
 function isStaticHtmlRoot(rootAbs) {
   return existsSync8(join7(rootAbs, "index.html")) && (existsSync8(join7(rootAbs, "app.js")) || existsSync8(join7(rootAbs, "styles.css")));
 }
-function shellSingleQuote(value) {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
 function staticHtmlServerCommand(rootAbs) {
   if (!isStaticHtmlRoot(rootAbs)) return null;
   const port = staticHtmlPort();
@@ -3592,7 +3589,8 @@ function staticHtmlServerCommand(rootAbs) {
     'process.on("SIGTERM",()=>server.close(()=>process.exit(0)));',
     'process.on("SIGINT",()=>server.close(()=>process.exit(0)));'
   ].join("");
-  return `node -e ${shellSingleQuote(script)}`;
+  const encoded = Buffer.from(script, "utf8").toString("base64");
+  return `node -e "eval(Buffer.from('${encoded}','base64').toString('utf8'))"`;
 }
 function detectRoot(projectRoot, root) {
   const fsPath = rootFsPath2(projectRoot, root);

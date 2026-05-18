@@ -124,6 +124,7 @@ describe('smart route and static frontend runtime', () => {
     const plan = detectDevRuntime({ cwd });
     expect(plan.stackProfile.primary).toBe('static-html');
     expect(plan.services[0]?.command).toContain('node -e');
+    expect(plan.services[0]?.command).toContain('Buffer.from');
     expect(plan.health[0]?.command).toBe(`curl -fsS http://127.0.0.1:${port}/`);
     expect(plan.verification.baselineCommands).toContainEqual({ root: '.', command: 'node --check app.js' });
 
