@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "curdx-flow/state-ledger",
+  "title": "curdx-flow State Ledger",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "runId",
+    "goalId",
+    "workspaceRoot",
+    "mode",
+    "policy",
+    "scope",
+    "expectedJourney",
+    "status",
+    "verdictStatus",
+    "phase",
+    "startedAt",
+    "updatedAt",
+    "evidenceIds",
+    "missingEvidence",
+    "artifactIndexPath",
+    "dirtyBaseline",
+    "generatedFiles",
+    "nextAction"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "goalId": { "type": "string", "minLength": 1 },
+    "workspaceRoot": { "type": "string", "minLength": 1 },
+    "mode": { "type": "string", "enum": ["report-only", "fix", "release", "verification"] },
+    "policy": { "type": "object", "additionalProperties": true },
+    "scope": { "type": "object", "additionalProperties": true },
+    "expectedJourney": { "type": "object", "additionalProperties": true },
+    "status": {
+      "type": "string",
+      "enum": ["created", "running", "blocked", "partial", "complete", "review", "failed"]
+    },
+    "verdictStatus": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "complete",
+        "blocked",
+        "partial",
+        "manual-confirmation-required",
+        "release-ready",
+        "not-releasable",
+        "failed"
+      ]
+    },
+    "phase": { "type": "string", "minLength": 1 },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "evidenceIds": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "missingEvidence": {
+      "type": "array",
+      "items": {}
+    },
+    "artifactIndexPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.?(?:[\\\\/]|$)).+"
+    },
+    "dirtyBaseline": {
+      "type": "object",
+      "required": ["capturedAt", "files"],
+      "additionalProperties": true,
+      "properties": {
+        "capturedAt": { "type": "string", "format": "date-time" },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "status", "source"],
+            "additionalProperties": true,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.?(?:[\\\\/]|$)).+"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["modified", "staged", "untracked", "deleted", "renamed", "unknown"]
+              },
+              "source": { "type": "string", "const": "user-existing" }
+            }
+          }
+        }
+      }
+    },
+    "generatedFiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "category", "owner", "createdAt", "relatedRunId"],
+        "additionalProperties": true,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.?(?:[\\\\/]|$)).+"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "source-change",
+              "generated-verification-file",
+              "temporary-artifact",
+              "report",
+              "evidence",
+              "user-existing-file",
+              "external-tool-output"
+            ]
+          },
+          "owner": { "type": "string", "minLength": 1 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "relatedRunId": { "type": "string", "minLength": 1 },
+          "relatedEvidenceIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "originalCategory": {
+            "type": "string",
+            "enum": [
+              "source-change",
+              "generated-verification-file",
+              "temporary-artifact",
+              "report",
+              "evidence",
+              "user-existing-file",
+              "external-tool-output"
+            ]
+          },
+          "userExistingChangeReason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "nextAction": { "type": "object", "additionalProperties": true }
+  }
+}

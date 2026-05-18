@@ -81,6 +81,7 @@ The compatibility `autoPolicy` is stored in `.curdx-state.json`; behavior routin
 - Spec not found: run `/curdx-flow:status`, then `/curdx-flow:switch <name>` or `/curdx-flow:start <name> <goal>`.
 - Wrong active spec: run `/curdx-flow:switch <name>`.
 - Goal unavailable: run `/curdx-flow:implement --manual`, finish the current turn, then resume explicitly.
+- Goal blocked/update-needed: `curdx-flow doctor` and `curdx-flow goal` report `nativeGoal.readiness`; use manual resume until it recommends `native-goal`.
 - Loop stopped by caps: re-run `/curdx-flow:implement --max-task-iterations <n>` or `/curdx-flow:implement --max-global-iterations <n>` after checking `.progress.md`.
 - Need to change approved docs: run `/curdx-flow:refactor [spec-name]`.
 

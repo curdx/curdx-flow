@@ -1,0 +1,80 @@
+{
+  "evidence": {
+    "schemaVersion": 1,
+    "id": "",
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "source": "command",
+    "capabilityId": "npm-typecheck",
+    "trustLevel": "verified",
+    "status": "passed",
+    "summary": "npm run typecheck exited 0",
+    "artifacts": ["not-an-object"],
+    "startedAt": "not-a-date",
+    "completedAt": "2026-05-16T23:20:03.000Z",
+    "freshness": {},
+    "privacy": {},
+    "redactions": []
+  },
+  "releaseVerdict": {
+    "schemaVersion": 1,
+    "verdict": "release-ready",
+    "version": "7.2.1",
+    "npmTag": "7.2.1",
+    "claudePluginTag": "v7.2.1",
+    "checks": ["not-an-object"],
+    "missingEvidence": [],
+    "blockers": [],
+    "nextAction": {},
+    "riskLevel": "medium"
+  },
+  "artifactIndex": {
+    "schemaVersion": 1,
+    "id": "artifact-log-1",
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "evidenceId": "ev-command-1",
+    "type": "log",
+    "path": "/tmp/typecheck.log",
+    "summary": "",
+    "privacy": {
+      "classification": "local-only",
+      "containsSensitiveData": "no",
+      "redacted": true
+    },
+    "createdAt": "not-a-date"
+  },
+  "verificationReport": {
+    "schemaVersion": 1,
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "status": "passed",
+    "verdict": {},
+    "summary": "",
+    "evidenceRefs": [123],
+    "artifactIndex": ["not-an-object"],
+    "blockers": [],
+    "missingEvidence": [],
+    "generatedAt": "not-a-date",
+    "privacy": {}
+  },
+  "actionRiskPolicy": {
+    "schemaVersion": 1,
+    "policyId": "default-local",
+    "mode": "fix",
+    "defaultRiskLevel": "medium",
+    "rules": [
+      {
+        "id": "",
+        "actionType": "unknown-action",
+        "riskLevel": "severe",
+        "mutatesWorkspace": "sometimes",
+        "destructive": "no",
+        "requiresAuthorization": "maybe",
+        "allowedModes": ["fix", "danger"],
+        "allowedWriteRoots": ["../escape"]
+      }
+    ],
+    "noFalseCompletion": true
+  }
+}

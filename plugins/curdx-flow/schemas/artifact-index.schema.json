@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "curdx-flow/artifact-index",
+  "title": "curdx-flow Artifact Index Entry",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "runId",
+    "goalId",
+    "evidenceId",
+    "type",
+    "path",
+    "summary",
+    "privacy",
+    "createdAt"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "goalId": { "type": "string", "minLength": 1 },
+    "attemptId": { "type": "string", "minLength": 1 },
+    "evidenceId": { "type": "string", "minLength": 1 },
+    "type": {
+      "type": "string",
+      "enum": ["screenshot", "trace", "log", "request", "response", "report", "state", "other"]
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*(?:^|[\\\\/])\\.(?:[\\\\/]|$))(?!.*\\u0000).+"
+    },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "privacy": {
+      "type": "object",
+      "required": ["classification", "containsSensitiveData", "redacted"],
+      "additionalProperties": true,
+      "properties": {
+        "classification": {
+          "type": "string",
+          "enum": ["public", "internal", "confidential", "secret", "local-only"]
+        },
+        "containsSensitiveData": { "type": "boolean" },
+        "redacted": { "type": "boolean" }
+      }
+    },
+    "contentHash": { "type": "string", "minLength": 1 },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "api",
+  "scripts": {
+    "dev": "node ./scripts/fake-server.mjs"
+  },
+  "dependencies": {
+    "fastify": "^5.0.0"
+  }
+}

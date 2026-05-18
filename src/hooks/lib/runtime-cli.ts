@@ -35,6 +35,16 @@ import { decideLastMile } from "./last-mile-orchestrator.js";
 import { buildGoalBridge } from "./goal-bridge.js";
 import { appendBrainEvent, summarizeProjectBrain } from "./project-brain.js";
 import {
+  buildCapabilityMatrix,
+  buildExternalMcpReadiness,
+  buildNativeGoalReadiness,
+  buildPluginDependencyReadiness,
+  probeCommand,
+  readNativeGoalSettingsSources,
+  renderCapabilityMatrix,
+  type BuildCapabilityMatrixInput,
+} from "../../runtime/capabilities/index.ts";
+import {
   findSpec,
   bindSessionSpec,
   getDefaultDir,
@@ -167,12 +177,27 @@ function lastMile(argv: string[]): void {
 
 function goal(argv: string[]): void {
   const maxTurnsRaw = readArg("--max-turns", argv) ?? readArg("--max-global-iterations", argv);
+  const cwd = resolve(readArg("--cwd", argv) ?? process.cwd());
+  const claudeBin = process.env.CURDX_FLOW_CLAUDE_BIN ?? "claude";
+  const claudeProbe = probeCommand({
+    id: "claude-version",
+    command: claudeBin,
+    args: ["--version"],
+    cwd,
+    env: process.env,
+    timeoutMs: 1_000,
+  });
+  const nativeGoal = buildNativeGoalReadiness({
+    claudeProbe,
+    settingsSources: readNativeGoalSettingsSources({ cwd, env: process.env }),
+  });
   printJson(
     buildGoalBridge({
-      cwd: readArg("--cwd", argv),
+      cwd,
       spec: readArg("--spec", argv) ?? readArg("--name", argv),
       goal: readArg("--goal", argv),
       maxTurns: maxTurnsRaw === undefined ? undefined : Number(maxTurnsRaw),
+      nativeGoal,
     }),
   );
 }
@@ -273,30 +298,50 @@ function pluginDependencyDoctor(): unknown {
   );
   const declared = manifest?.dependencies ?? [];
   const allowlist = new Set(marketplace?.allowCrossMarketplaceDependenciesOn ?? []);
-  const dependencies = CURDX_PLUGIN_DEPENDENCIES.map((expected) => {
-    const actual = declared.find((item) => item.name === expected.name);
-    const marketplaceName = actual?.marketplace ?? null;
-    return {
-      name: expected.name,
-      type: "plugin",
-      expectedMarketplace: expected.marketplace,
-      declared: actual !== undefined,
-      marketplace: marketplaceName,
-      marketplaceMatches: marketplaceName === expected.marketplace,
-      crossMarketplaceAllowlisted: allowlist.has(expected.marketplace),
-      versionConstraint: actual?.version ?? null,
-      wheelFirst: true,
-      curdxRole: "recommend/gate; do not reimplement",
-    };
+  const envJson = process.env.CURDX_FLOW_PLUGIN_LIST_JSON;
+  const envExitCode = process.env.CURDX_FLOW_PLUGIN_LIST_EXIT_CODE;
+  const envError = process.env.CURDX_FLOW_PLUGIN_LIST_ERROR;
+  const bin = process.env.CURDX_FLOW_CLAUDE_BIN ?? "claude";
+  let source = "claude plugin list --json";
+  let pluginListJson: string | undefined;
+  let exitCode: number | null = null;
+  let error: string | null = null;
+
+  if (envJson !== undefined) {
+    source = "CURDX_FLOW_PLUGIN_LIST_JSON";
+    pluginListJson = envJson;
+    exitCode = envExitCode ? Number(envExitCode) : 0;
+    error = envError ?? null;
+  } else {
+    let result = spawnSync(bin, ["plugin", "list", "--json"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      timeout: 3000,
+      maxBuffer: 1024 * 1024,
+    });
+    source = "direct exec";
+    pluginListJson = result.stdout ?? "";
+    exitCode = result.status ?? null;
+    if (result.error) {
+      error = (result.error as Error).message;
+    } else if (exitCode !== 0 && result.stderr) {
+      error = result.stderr.trim();
+    }
+  }
+
+  const readiness = buildPluginDependencyReadiness({
+    expected: CURDX_PLUGIN_DEPENDENCIES,
+    manifestDependencies: declared,
+    marketplaceAllowlist: [...allowlist],
+    pluginListJson,
+    pluginListSource: source,
+    pluginListExitCode: exitCode,
+    pluginListError: error,
   });
+
   return {
-    ready: dependencies.every((item) =>
-      item.declared &&
-      item.marketplaceMatches &&
-      item.crossMarketplaceAllowlisted,
-    ),
-    dependencies,
-    warnings: dependencies
+    ...readiness,
+    warnings: readiness.dependencies
       .filter((item) => item.versionConstraint === null)
       .map((item) =>
         `${item.name} has no dependency version constraint; keep this intentional unless upstream tags are confirmed.`,
@@ -306,6 +351,8 @@ function pluginDependencyDoctor(): unknown {
 
 function externalMcpDoctor(): unknown {
   const envOutput = process.env.CURDX_FLOW_MCP_LIST_OUTPUT;
+  const envExitCode = process.env.CURDX_FLOW_MCP_LIST_EXIT_CODE;
+  const envError = process.env.CURDX_FLOW_MCP_LIST_ERROR;
   const bin = process.env.CURDX_FLOW_CLAUDE_BIN ?? "claude";
   let source = "claude mcp list";
   let output = "";
@@ -315,7 +362,8 @@ function externalMcpDoctor(): unknown {
   if (envOutput !== undefined) {
     source = "CURDX_FLOW_MCP_LIST_OUTPUT";
     output = envOutput;
-    exitCode = 0;
+    exitCode = envExitCode ? Number(envExitCode) : 0;
+    error = envError ?? null;
   } else {
     let result = spawnSync(bin, ["mcp", "list"], {
       cwd: process.cwd(),
@@ -324,43 +372,27 @@ function externalMcpDoctor(): unknown {
       maxBuffer: 1024 * 1024,
     });
     source = "direct exec";
-    if ((result.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
-      result = spawnSync("zsh", ["-lic", `${shellToken(bin)} mcp list`], {
-        cwd: process.cwd(),
-        encoding: "utf8",
-        timeout: 3000,
-        maxBuffer: 1024 * 1024,
-      });
-      source = "zsh fallback";
-    }
     output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
     exitCode = result.status ?? null;
     if (result.error) {
       error = (result.error as Error).message;
+    } else if (exitCode !== 0 && result.stderr) {
+      error = result.stderr.trim();
     }
   }
 
-  const commandWorked = exitCode === 0;
-  const servers = CURDX_EXTERNAL_MCPS.map((expected) => {
-    const configured = commandWorked ? expected.match.test(output) : null;
-    return {
-      id: expected.id,
-      type: "mcp",
-      expectedExternal: true,
-      bundledByCurdxFlow: false,
-      configured,
-      status: configured === true ? "available" : configured === false ? "missing" : "unknown",
-      installHint: expected.installHint,
-    };
+  const readiness = buildExternalMcpReadiness({
+    expected: CURDX_EXTERNAL_MCPS,
+    mcpListOutput: output,
+    mcpListSource: source,
+    mcpListExitCode: exitCode,
+    mcpListError: error,
   });
 
   return {
-    ready: servers.every((server) => server.configured === true),
-    source,
+    ...readiness,
     command: `${bin} mcp list`,
-    exitCode,
-    error,
-    servers,
+    error: readiness.commandError,
     note: "curdx-flow does not bundle these MCP servers; setup scripts or user MCP config own installation.",
   };
 }
@@ -373,7 +405,7 @@ function externalMcpWarnings(externalMcp: {
 }): string[] {
   if (externalMcp.ready === true) return [];
   const unknown = externalMcp.servers
-    ?.filter((server) => server.status !== "available")
+    ?.filter((server) => server.status !== "connected")
     .map((server) => `${server.id ?? "unknown"}:${server.status ?? "unknown"}`) ?? [];
   const suffix = unknown.length > 0 ? ` (${unknown.join(", ")})` : "";
   const command = externalMcp.error
@@ -1096,6 +1128,8 @@ async function verifyBlocks(argv: string[]): Promise<void> {
 
 function doctor(argv: string[]): void {
   const cwd = resolve(readArg("--cwd", argv) ?? process.cwd());
+  const mode = hasFlag(argv, "--deep") ? "deep" : "fast";
+  const human = hasFlag(argv, "--human") || readArg("--format", argv) === "human";
   const snap = buildWorkflowSnapshot({
     cwd,
     spec: readArg("--spec", argv),
@@ -1120,7 +1154,9 @@ function doctor(argv: string[]): void {
     join(scriptRoot(), "count-tasks.mjs"),
   ];
   const runtimeReady = expected.every((p) => existsSync(p));
-  const plugin = pluginHealthDoctor() as { ready?: boolean };
+  const plugin = pluginHealthDoctor() as BuildCapabilityMatrixInput["plugin"] & { ready?: boolean };
+  const pluginDependenciesReady =
+    (plugin as { dependencies?: { ready?: boolean } }).dependencies?.ready === true;
   const hookFreshness = hookFreshnessDoctor() as { fresh?: boolean; sourceAvailable?: boolean };
   const release = releaseDoctor() as { ready?: boolean };
   const externalMcp = externalMcpDoctor() as {
@@ -1129,6 +1165,58 @@ function doctor(argv: string[]): void {
     error?: string | null;
     servers?: Array<{ id?: string; status?: string }>;
   };
+  const browserVerification =
+    browserVerificationDoctor(cwd) as BuildCapabilityMatrixInput["browserVerification"];
+  const packageManager = detectPackageManager(cwd);
+  const claudeBin = process.env.CURDX_FLOW_CLAUDE_BIN ?? "claude";
+  const claudeProbe = probeCommand({
+    id: "claude-version",
+    command: claudeBin,
+    args: ["--version"],
+    cwd,
+    env: process.env,
+    timeoutMs: 1_000,
+  });
+  const nativeGoal = buildNativeGoalReadiness({
+    claudeProbe,
+    settingsSources: readNativeGoalSettingsSources({ cwd, env: process.env }),
+  });
+  const capabilityMatrix = buildCapabilityMatrix({
+    cwd,
+    mode,
+    packageManager,
+    claudeProbe,
+    npmProbe: probeCommand({
+      id: "npm-version",
+      command: "npm",
+      args: ["--version"],
+      cwd,
+      env: process.env,
+      timeoutMs: 1_000,
+    }),
+    plugin,
+    externalMcp,
+    nativeGoal,
+    browserVerification,
+    hookFreshness,
+    release,
+    ...(mode === "deep"
+      ? {
+          pluginValidationProbe: probeCommand({
+            id: "plugin-validation",
+            command: claudeBin,
+            args: ["plugin", "validate", pluginRoot()],
+            cwd,
+            env: process.env,
+            timeoutMs: 10_000,
+          }),
+        }
+      : {}),
+  });
+  if (human) {
+    process.stdout.write(renderCapabilityMatrix(capabilityMatrix));
+    return;
+  }
   const warnings = [
     ...externalMcpWarnings(externalMcp),
   ];
@@ -1137,15 +1225,22 @@ function doctor(argv: string[]): void {
     ok:
       runtimeReady &&
       plugin.ready === true &&
+      pluginDependenciesReady &&
+      nativeGoal.state === "available" &&
       externalMcp.ready === true &&
       release.ready !== false &&
       (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
     warnings,
     diagnostics: {
       externalMcpReady: externalMcp.ready === true,
+      pluginDependenciesReady,
+      nativeGoalReady: nativeGoal.state === "available",
+      goalExecutionDriver: nativeGoal.recommendedDriver,
       hookFreshnessFresh: hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true,
       releaseReady: release.ready !== false,
     },
+    capabilityMatrix,
+    nativeGoal,
     cwd,
     scripts: Object.fromEntries(expected.map((p) => [basename(p), existsSync(p)])),
     runtime: {
@@ -1168,7 +1263,7 @@ function doctor(argv: string[]): void {
     executionBrief,
     lastMile: lastMileDecision,
     externalMcp,
-    browserVerification: browserVerificationDoctor(cwd),
+    browserVerification,
     active: snap.active,
     spec: snap.spec,
     gates: snap.gates,

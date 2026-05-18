@@ -1,0 +1,159 @@
+{
+  "ready": {
+    "runId": "run-release-ready",
+    "goalId": "goal-release",
+    "version": "7.2.1",
+    "checks": [
+      {
+        "id": "version-parity",
+        "status": "passed",
+        "summary": "package, lockfile, plugin manifest, and marketplace versions match",
+        "required": true,
+        "evidenceRefs": ["ev-version-parity"]
+      },
+      {
+        "id": "plugin-validate",
+        "status": "passed",
+        "summary": "claude plugin validate ./plugins/curdx-flow passed",
+        "required": true,
+        "evidenceRefs": ["ev-plugin-validate"]
+      },
+      {
+        "id": "hook-freshness",
+        "status": "passed",
+        "summary": "generated hook bundles are fresh",
+        "required": true,
+        "evidenceRefs": ["ev-hook-freshness"]
+      }
+    ],
+    "requiredCheckIds": ["version-parity", "plugin-validate", "hook-freshness"],
+    "freshness": {
+      "currentCommit": "abc123",
+      "evidenceCommit": "abc123",
+      "evidenceVersion": "7.2.1",
+      "evidenceNpmTag": "v7.2.1",
+      "evidenceClaudePluginTag": "curdx-flow--v7.2.1"
+    },
+    "plannedCommands": [
+      { "executable": "npm", "argv": ["run", "check-versions"] },
+      { "executable": "claude", "argv": ["plugin", "validate", "./plugins/curdx-flow"] },
+      { "executable": "claude", "argv": ["plugin", "tag", "--dry-run"] }
+    ],
+    "expected": {
+      "verdict": "release-ready",
+      "published": false,
+      "riskLevel": "medium",
+      "blockers": 0
+    }
+  },
+  "failedCheck": {
+    "runId": "run-release-failed",
+    "goalId": "goal-release",
+    "version": "7.2.1",
+    "checks": [
+      {
+        "id": "plugin-validate",
+        "status": "failed",
+        "summary": "plugin manifest validation failed",
+        "required": true,
+        "evidenceRefs": ["ev-plugin-validate-failed"],
+        "remediation": "Fix plugin validation errors and rerun claude plugin validate ./plugins/curdx-flow.",
+        "riskLevel": "high"
+      }
+    ],
+    "requiredCheckIds": ["plugin-validate"],
+    "freshness": {
+      "currentCommit": "abc123",
+      "evidenceCommit": "abc123",
+      "evidenceVersion": "7.2.1",
+      "evidenceNpmTag": "v7.2.1",
+      "evidenceClaudePluginTag": "curdx-flow--v7.2.1"
+    },
+    "expected": {
+      "verdict": "not-releasable",
+      "blockerCheckId": "plugin-validate"
+    }
+  },
+  "staleEvidence": {
+    "runId": "run-release-stale",
+    "goalId": "goal-release",
+    "version": "7.2.1",
+    "checks": [
+      {
+        "id": "version-parity",
+        "status": "passed",
+        "summary": "version parity passed on an older commit",
+        "required": true,
+        "evidenceRefs": ["ev-version-parity-old"]
+      }
+    ],
+    "requiredCheckIds": ["version-parity"],
+    "freshness": {
+      "currentCommit": "new456",
+      "evidenceCommit": "old123",
+      "evidenceVersion": "7.2.1",
+      "evidenceNpmTag": "v7.2.1",
+      "evidenceClaudePluginTag": "curdx-flow--v7.2.1"
+    },
+    "expected": {
+      "verdict": "not-releasable",
+      "freshnessReason": "commit context mismatch"
+    }
+  },
+  "missingCheck": {
+    "runId": "run-release-missing",
+    "goalId": "goal-release",
+    "version": "7.2.1",
+    "checks": [
+      {
+        "id": "version-parity",
+        "status": "passed",
+        "summary": "version parity passed",
+        "required": true,
+        "evidenceRefs": ["ev-version-parity"]
+      }
+    ],
+    "requiredCheckIds": ["version-parity", "installed-smoke"],
+    "freshness": {
+      "currentCommit": "abc123",
+      "evidenceCommit": "abc123",
+      "evidenceVersion": "7.2.1",
+      "evidenceNpmTag": "v7.2.1",
+      "evidenceClaudePluginTag": "curdx-flow--v7.2.1"
+    },
+    "expected": {
+      "verdict": "not-releasable",
+      "missingEvidenceId": "installed-smoke-missing"
+    }
+  },
+  "forbiddenSideEffect": {
+    "runId": "run-release-side-effect",
+    "goalId": "goal-release",
+    "version": "7.2.1",
+    "checks": [
+      {
+        "id": "version-parity",
+        "status": "passed",
+        "summary": "version parity passed",
+        "required": true,
+        "evidenceRefs": ["ev-version-parity"]
+      }
+    ],
+    "requiredCheckIds": ["version-parity"],
+    "freshness": {
+      "currentCommit": "abc123",
+      "evidenceCommit": "abc123",
+      "evidenceVersion": "7.2.1",
+      "evidenceNpmTag": "v7.2.1",
+      "evidenceClaudePluginTag": "curdx-flow--v7.2.1"
+    },
+    "plannedCommands": [
+      { "executable": "claude", "argv": ["plugin", "tag", "--push"] },
+      { "executable": "npm", "argv": ["publish"] }
+    ],
+    "expected": {
+      "verdict": "not-releasable",
+      "sideEffectKinds": ["claude-plugin-tag-push", "npm-publish"]
+    }
+  }
+}

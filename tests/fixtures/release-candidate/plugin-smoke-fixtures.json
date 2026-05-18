@@ -1,0 +1,248 @@
+{
+  "base": {
+    "runId": "run-plugin-smoke",
+    "goalId": "goal-release",
+    "changedSurfaces": [
+      {
+        "id": "plugin-manifest",
+        "kind": "plugin-manifest",
+        "path": "plugins/curdx-flow/.claude-plugin/plugin.json",
+        "summary": "Plugin manifest and dependency metadata require Claude plugin validation."
+      },
+      {
+        "id": "help-skill",
+        "kind": "plugin-skill",
+        "path": "plugins/curdx-flow/skills/help/SKILL.md",
+        "summary": "Public slash command skill surface requires local plugin load smoke."
+      },
+      {
+        "id": "dev-agent",
+        "kind": "plugin-agent",
+        "path": "plugins/curdx-flow/agents/dev.md",
+        "summary": "Plugin agent frontmatter and load behavior require Claude plugin validation."
+      },
+      {
+        "id": "hook-config",
+        "kind": "plugin-hook",
+        "path": "plugins/curdx-flow/hooks/hooks.json",
+        "summary": "Hook configuration must validate against Claude Code hook schema."
+      },
+      {
+        "id": "release-schema",
+        "kind": "plugin-schema",
+        "path": "plugins/curdx-flow/schemas/release-verdict.schema.json",
+        "summary": "Release schema is shipped plugin surface and must remain loadable."
+      },
+      {
+        "id": "story-template",
+        "kind": "plugin-template",
+        "path": "plugins/curdx-flow/templates",
+        "summary": "Templates are shipped plugin assets referenced by skills."
+      },
+      {
+        "id": "verification-reference",
+        "kind": "plugin-reference",
+        "path": "plugins/curdx-flow/references",
+        "summary": "References are shipped plugin assets used by skill progressive disclosure."
+      },
+      {
+        "id": "curdx-bin",
+        "kind": "plugin-bin",
+        "path": "plugins/curdx-flow/bin/curdx-flow",
+        "summary": "Plugin-local runtime command must work from an isolated workspace."
+      }
+    ],
+    "claudeCli": {
+      "status": "available",
+      "binary": "claude",
+      "version": "2.1.142",
+      "supportsPluginDir": true,
+      "supportsPluginValidate": true,
+      "summary": "Claude CLI supports plugin validate and --plugin-dir smoke."
+    },
+    "commandEvidence": {
+      "pluginValidation": {
+        "command": "claude plugin validate ./plugins/curdx-flow",
+        "status": "passed",
+        "evidenceRefs": ["ev-plugin-validate"],
+        "summary": "Validation passed"
+      },
+      "installedSmoke": {
+        "command": "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc",
+        "status": "passed",
+        "evidenceRefs": ["ev-installed-smoke"],
+        "summary": "Installed smoke passed"
+      },
+      "build": {
+        "command": "npm run build",
+        "status": "passed",
+        "evidenceRefs": ["ev-build"],
+        "summary": "Build passed but is not a plugin validation substitute"
+      },
+      "typecheck": {
+        "command": "npm run typecheck",
+        "status": "passed",
+        "evidenceRefs": ["ev-typecheck"],
+        "summary": "Typecheck passed but is not a plugin validation substitute"
+      }
+    },
+    "smokeSurfaces": [
+      {
+        "id": "plugin-load",
+        "kind": "plugin-load",
+        "status": "passed",
+        "summary": "claude --plugin-dir loaded plugins/curdx-flow in a temp workspace.",
+        "evidenceRefs": ["ev-smoke-plugin-load"]
+      },
+      {
+        "id": "slash-command",
+        "kind": "slash-command",
+        "status": "passed",
+        "summary": "/curdx-flow:help and /curdx-flow:status were reachable.",
+        "evidenceRefs": ["ev-smoke-slash-command"]
+      },
+      {
+        "id": "hooks-non-blocking",
+        "kind": "hook-non-blocking",
+        "status": "passed",
+        "summary": "Hooks did not block help/status prompt execution.",
+        "evidenceRefs": ["ev-smoke-hooks"]
+      },
+      {
+        "id": "dependency-guidance",
+        "kind": "dependency-guidance",
+        "status": "passed",
+        "summary": "Doctor reported actionable external MCP dependency guidance without treating it as success-only evidence.",
+        "evidenceRefs": ["ev-smoke-dependency-guidance"]
+      },
+      {
+        "id": "runtime-bin",
+        "kind": "runtime-bin",
+        "status": "passed",
+        "summary": "plugins/curdx-flow/bin/curdx-flow doctor/snapshot/route ran from temp cwd.",
+        "evidenceRefs": ["ev-smoke-runtime-bin"]
+      },
+      {
+        "id": "isolated-workspace",
+        "kind": "isolated-workspace",
+        "status": "passed",
+        "summary": "Smoke used mkdtemp workspace and did not write user specs/state into the repo.",
+        "evidenceRefs": ["ev-smoke-isolated-workspace"]
+      }
+    ],
+    "smokeWorkspace": {
+      "cwd": "/tmp/curdx-flow-claudecc-smoke-fixture",
+      "isolated": true,
+      "repoMutationDetected": false,
+      "summary": "All smoke cwd values were temp directories."
+    }
+  },
+  "validationFailed": {
+    "patch": {
+      "commandEvidence": {
+        "pluginValidation": {
+          "command": "claude plugin validate ./plugins/curdx-flow",
+          "status": "failed",
+          "evidenceRefs": ["ev-plugin-validate"],
+          "summary": "invalid hooks/hooks.json command args"
+        }
+      }
+    }
+  },
+  "installedSmokeFailed": {
+    "patch": {
+      "commandEvidence": {
+        "installedSmoke": {
+          "command": "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc",
+          "status": "failed",
+          "evidenceRefs": ["ev-installed-smoke"],
+          "summary": "/curdx-flow:help did not load from --plugin-dir"
+        }
+      }
+    }
+  },
+  "dependencyGuidanceFailed": {
+    "patch": {
+      "smokeSurfaces": [
+        {
+          "id": "dependency-guidance",
+          "kind": "dependency-guidance",
+          "status": "failed",
+          "summary": "dependency guidance was missing for unavailable external MCP.",
+          "evidenceRefs": ["ev-smoke-dependency-guidance"]
+        }
+      ]
+    }
+  },
+  "hookNonBlockingFailed": {
+    "patch": {
+      "smokeSurfaces": [
+        {
+          "id": "hooks-non-blocking",
+          "kind": "hook-non-blocking",
+          "status": "failed",
+          "summary": "hook non-blocking check failed because help prompt was blocked.",
+          "evidenceRefs": ["ev-smoke-hooks"]
+        }
+      ]
+    }
+  },
+  "workspaceNotIsolated": {
+    "patch": {
+      "smokeWorkspace": {
+        "cwd": "/Users/wdx/opc/curdx-flow",
+        "isolated": false,
+        "repoMutationDetected": true,
+        "summary": "Smoke ran in repo workspace and created state files."
+      }
+    }
+  },
+  "claudeCliMissing": {
+    "patch": {
+      "claudeCli": {
+        "status": "missing",
+        "binary": "claude",
+        "summary": "Claude CLI was not found on PATH."
+      },
+      "commandEvidence": {
+        "pluginValidation": {
+          "command": "claude plugin validate ./plugins/curdx-flow",
+          "status": "missing",
+          "evidenceRefs": [],
+          "summary": "Claude CLI missing"
+        },
+        "installedSmoke": {
+          "command": "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc",
+          "status": "missing",
+          "evidenceRefs": [],
+          "summary": "Claude CLI missing"
+        }
+      }
+    }
+  },
+  "claudeCliUnsupported": {
+    "patch": {
+      "claudeCli": {
+        "status": "unsupported",
+        "binary": "claude",
+        "version": "2.0.0",
+        "supportsPluginDir": false,
+        "supportsPluginValidate": false,
+        "summary": "Claude CLI does not support required plugin smoke features.",
+        "unsupportedReasons": ["missing --plugin-dir", "missing plugin validate"]
+      }
+    }
+  },
+  "validationMissingButBuildPassed": {
+    "patch": {
+      "commandEvidence": {
+        "pluginValidation": {
+          "command": "claude plugin validate ./plugins/curdx-flow",
+          "status": "missing",
+          "evidenceRefs": [],
+          "summary": "Validation evidence not provided"
+        }
+      }
+    }
+  }
+}

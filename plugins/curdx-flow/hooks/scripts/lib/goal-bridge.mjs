@@ -9,6 +9,165 @@ const __dirname = __ccd(__filename);
 import { basename as basename8 } from "node:path";
 import { fileURLToPath as fileURLToPath7 } from "node:url";
 
+// src/runtime/capabilities/goal-readiness.ts
+var GOAL_CONDITION_LIMIT = 4e3;
+var NATIVE_GOAL_REQUIRED_VERSION = "2.1.139";
+function notGeneratedLength() {
+  return {
+    limit: GOAL_CONDITION_LIMIT,
+    actual: null,
+    original: null,
+    status: "not-generated"
+  };
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function parseClaudeCodeVersion(output) {
+  const match = output.match(/\b(\d+)\.(\d+)\.(\d+)\b/);
+  return match ? `${match[1]}.${match[2]}.${match[3]}` : null;
+}
+function compareVersions(a, b) {
+  const left = a.split(".").map((part) => Number(part));
+  const right = b.split(".").map((part) => Number(part));
+  for (let i = 0; i < 3; i++) {
+    const l = left[i] ?? 0;
+    const r = right[i] ?? 0;
+    if (l > r) return 1;
+    if (l < r) return -1;
+  }
+  return 0;
+}
+function hasBooleanSetting(value, key) {
+  if (Array.isArray(value)) {
+    return value.some((item) => hasBooleanSetting(item, key));
+  }
+  if (!isRecord(value)) return false;
+  for (const [entryKey, entryValue] of Object.entries(value)) {
+    if (entryKey === key && entryValue === true) return true;
+    if (typeof entryValue === "object" && entryValue !== null && hasBooleanSetting(entryValue, key)) {
+      return true;
+    }
+  }
+  return false;
+}
+function collectBlockers(sources) {
+  const blockers = [];
+  for (const source of sources) {
+    if (source.error || source.settings === void 0) continue;
+    const managed = source.managed === true;
+    if (hasBooleanSetting(source.settings, "disableAllHooks")) {
+      blockers.push({
+        id: "disableAllHooks",
+        source: source.source,
+        managed,
+        reason: "disableAllHooks disables Claude Code hooks, which makes native /goal unavailable."
+      });
+    }
+    if (managed && hasBooleanSetting(source.settings, "allowManagedHooksOnly")) {
+      blockers.push({
+        id: "allowManagedHooksOnly",
+        source: source.source,
+        managed,
+        reason: "Managed allowManagedHooksOnly prevents unmanaged plugin hooks, which blocks native /goal execution."
+      });
+    }
+  }
+  return blockers;
+}
+function fallbackAction(state, requiredVersion) {
+  switch (state) {
+    case "available":
+      return null;
+    case "update-needed":
+      return `Update Claude Code to ${requiredVersion} or newer, then rerun curdx-flow doctor; until then use /curdx-flow:implement --manual and resume explicitly.`;
+    case "blocked":
+      return "Use /curdx-flow:implement --manual for a resumable single-turn flow, or remove the hook-blocking Claude Code setting and rerun doctor.";
+    case "unavailable":
+      return "Install or fix the claude CLI, then rerun doctor; until then use manual/resumable curdx-flow commands only.";
+    case "unknown":
+      return "Use /curdx-flow:implement --manual until native /goal support can be confirmed.";
+  }
+}
+function buildNativeGoalReadiness(input = {}) {
+  const requiredVersion = input.requiredVersion ?? NATIVE_GOAL_REQUIRED_VERSION;
+  const conditionLength = input.conditionLength ?? notGeneratedLength();
+  const settingsSources = input.settingsSources ?? [];
+  const settingsErrors = settingsSources.filter((source) => source.error).map((source) => `${source.source}: ${source.error}`);
+  const blockers = collectBlockers(settingsSources);
+  const probe = input.claudeProbe;
+  let detectedVersion = null;
+  let state = "unknown";
+  let supported = "unknown";
+  let reason = "Native /goal support is unknown because claude --version was not checked.";
+  if (!probe) {
+    state = "unknown";
+  } else if (probe.error || probe.timedOut || probe.exitCode !== 0) {
+    state = "unavailable";
+    supported = false;
+    reason = probe.error || probe.stderr.trim() || `claude --version exited ${probe.exitCode}`;
+  } else {
+    detectedVersion = parseClaudeCodeVersion(`${probe.stdout}
+${probe.stderr}`);
+    if (!detectedVersion) {
+      state = "unknown";
+      supported = "unknown";
+      reason = "Native /goal support is unknown because claude --version output could not be parsed.";
+    } else if (compareVersions(detectedVersion, requiredVersion) < 0) {
+      state = "update-needed";
+      supported = false;
+      reason = `Claude Code ${detectedVersion} is below native /goal minimum ${requiredVersion}.`;
+    } else if (blockers.length > 0) {
+      state = "blocked";
+      supported = false;
+      reason = `Native /goal is blocked by Claude Code hook settings: ${blockers.map((blocker) => blocker.id).join(", ")}.`;
+    } else if (settingsErrors.length > 0) {
+      state = "unknown";
+      supported = "unknown";
+      reason = "Native /goal support is unknown because one or more settings sources could not be read.";
+    } else {
+      state = "available";
+      supported = true;
+      reason = `Claude Code ${detectedVersion} supports native /goal and no hook-blocking settings were detected.`;
+    }
+  }
+  return {
+    state,
+    supported,
+    requiredVersion,
+    detectedVersion,
+    reason,
+    hooksRequired: true,
+    blockers,
+    fallbackAction: fallbackAction(state, requiredVersion),
+    recommendedDriver: state === "available" ? "native-goal" : "manual-resume",
+    conditionLength,
+    settingsSources: settingsSources.map((source) => source.source),
+    warnings: settingsErrors
+  };
+}
+function evaluateNativeGoalConditionLength(input) {
+  const limit = input.limit ?? GOAL_CONDITION_LIMIT;
+  const actual = input.condition.length;
+  const original = input.originalLength ?? actual;
+  const status = input.compressed ? actual <= limit ? "compressed" : "over-limit" : actual <= limit ? "within-limit" : "over-limit";
+  return { limit, actual, original, status };
+}
+function attachNativeGoalConditionLength(readiness, conditionLength) {
+  const warnings = [...readiness.warnings];
+  if (conditionLength.status === "compressed") {
+    warnings.push("Native /goal condition was shortened to fit the 4000 character limit.");
+  }
+  if (conditionLength.status === "over-limit") {
+    warnings.push("Native /goal condition still exceeds the 4000 character limit.");
+  }
+  return {
+    ...readiness,
+    conditionLength,
+    warnings: [...new Set(warnings)]
+  };
+}
+
 // src/hooks/lib/workflow-snapshot.ts
 import { execFileSync } from "node:child_process";
 import { existsSync as existsSync4, readFileSync as readFileSync4, statSync as statSync4 } from "node:fs";
@@ -3313,7 +3472,6 @@ if (isDirectRun7()) {
 }
 
 // src/hooks/lib/goal-bridge.ts
-var GOAL_CONDITION_LIMIT = 4e3;
 function readArg8(name, argv) {
   const idx = argv.indexOf(name);
   if (idx === -1) return void 0;
@@ -3375,18 +3533,34 @@ function evidenceProtocol(snapshot, decision) {
     taskLine(snapshot),
     verificationLine(snapshot),
     "curdx-flow snapshot or last-mile output shows no blocking gates remain",
+    "missingEvidence is shown as empty, converted into a blocker, or explicitly marked manual-confirmation-required",
+    "the final verdict is shown as complete only when verifier evidence and gates are visible; otherwise it reports blocked, partial, or manual-confirmation-required",
     "the assistant outputs ALL_TASKS_COMPLETE only after the task and verifier evidence above is visible",
     ...capabilityEvidence(decision)
   ];
 }
 function compactCondition(parts, warnings) {
   let condition = parts.join(" ");
-  if (condition.length <= GOAL_CONDITION_LIMIT) return condition;
+  const originalLength = condition.length;
+  if (condition.length <= GOAL_CONDITION_LIMIT) {
+    return {
+      condition,
+      conditionLength: evaluateNativeGoalConditionLength({ condition, originalLength })
+    };
+  }
   warnings.push("Condition was shortened to fit Claude Code /goal's 4000 character limit.");
-  const suffix = " If incomplete or blocked, stop after the stated turn limit and report the blocker with next action.";
+  const suffix = " Critical completion evidence still required: transcript-visible verifier command, exitCode 0, missingEvidence status, final verdict, and no blocking gates. If incomplete or blocked, stop after the stated turn limit and report the blocker with next action.";
   const maxBody = GOAL_CONDITION_LIMIT - suffix.length;
   condition = condition.slice(0, Math.max(0, maxBody)).replace(/\s+\S*$/, "");
-  return `${condition}${suffix}`;
+  const compacted = `${condition}${suffix}`;
+  return {
+    condition: compacted,
+    conditionLength: evaluateNativeGoalConditionLength({
+      condition: compacted,
+      originalLength,
+      compressed: true
+    })
+  };
 }
 function buildGoalBridge(input = {}) {
   const cwd = input.cwd ?? process.cwd();
@@ -3416,24 +3590,33 @@ function buildGoalBridge(input = {}) {
   const evidence = evidenceProtocol(snapshot, decision);
   const target = specLabel(snapshot, input.spec);
   const userGoal = normalize4(input.goal);
-  const condition = compactCondition(
+  const { condition, conditionLength } = compactCondition(
     [
       `Complete curdx-flow implementation for ${target}.`,
-      userGoal ? `User goal: ${userGoal}.` : "",
-      "This goal is satisfied only when the conversation visibly shows:",
+      "This goal is satisfied only when transcript-visible evidence in the conversation visibly shows:",
       evidence.map((item, idx) => `${idx + 1}. ${item}.`).join(" "),
+      `Stop after ${maxTurns} goal turns if still incomplete and report the blocker, current task, verifier status, and next action instead of claiming completion.`,
       `If the evidence is not visible, continue by running curdx-flow snapshot/last-mile as needed, executing the next incomplete value-slice task, recording verifier evidence, and updating state.`,
-      `Stop after ${maxTurns} goal turns if still incomplete and report the blocker, current task, verifier status, and next action instead of claiming completion.`
+      userGoal ? `User goal context: ${userGoal}.` : ""
     ].filter(Boolean),
     warnings
   );
+  const readiness = attachNativeGoalConditionLength(
+    input.nativeGoal ?? buildNativeGoalReadiness(),
+    conditionLength
+  );
+  const startPrompt = readiness.recommendedDriver === "native-goal" ? "Run the slashCommand in Claude Code to let native /goal drive follow-up turns. If /goal becomes unavailable, use manual resume and keep the same evidence protocol; do not rely on Stop-hook continuation." : `Native /goal is not available: ${readiness.reason} Use /curdx-flow:implement --manual for one coordinator turn, keep the same evidence protocol, and resume explicitly; do not rely on Stop-hook continuation.`;
   return {
     version: 1,
     condition,
     slashCommand: `/goal ${condition}`,
-    startPrompt: "Run the slashCommand in Claude Code to let native /goal drive follow-up turns. If /goal is unavailable, use manual resume and keep the same evidence protocol; do not rely on Stop-hook continuation.",
+    startPrompt,
     evidenceProtocol: evidence,
-    warnings
+    warnings: [.../* @__PURE__ */ new Set([...warnings, ...readiness.warnings])],
+    readiness,
+    recommendedDriver: readiness.recommendedDriver,
+    fallbackAction: readiness.fallbackAction,
+    conditionLength
   };
 }
 function main8() {

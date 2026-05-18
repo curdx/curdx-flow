@@ -1,0 +1,46 @@
+{
+  "evidence": {
+    "schemaVersion": 1,
+    "runId": "run-1"
+  },
+  "stateLedger": {
+    "schemaVersion": 1,
+    "runId": "run-1"
+  },
+  "session": {
+    "schemaVersion": 1,
+    "sessionId": "session-1"
+  },
+  "adapterResult": {
+    "schemaVersion": 1,
+    "ok": true
+  },
+  "completionVerdict": {
+    "schemaVersion": 1,
+    "verdict": "complete"
+  },
+  "releaseVerdict": {
+    "schemaVersion": 1,
+    "verdict": "release-ready"
+  },
+  "actionRiskPolicy": {
+    "schemaVersion": 1,
+    "policyId": "default-local"
+  },
+  "hookGate": {
+    "schemaVersion": 1,
+    "eventName": "TaskCompleted"
+  },
+  "artifactIndex": {
+    "schemaVersion": 1,
+    "id": "artifact-log-1"
+  },
+  "verificationReport": {
+    "schemaVersion": 1,
+    "runId": "run-1"
+  },
+  "runtimeTopology": {
+    "schemaVersion": 1,
+    "workspaceRoot": "/repo"
+  }
+}

@@ -6,15 +6,209 @@ const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
 // src/hooks/task-completed-verifier.ts
-import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
-import { join as join7 } from "node:path";
-import process3 from "node:process";
+import { existsSync as existsSync7, readFileSync as readFileSync8 } from "node:fs";
+import { basename as basename9, join as join7 } from "node:path";
+import process4 from "node:process";
+
+// src/hooks/_shared/error-logger.ts
+import {
+  appendFileSync,
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync
+} from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
+import process2 from "node:process";
+var SETTINGS_PATH = path.join(homedir(), ".claude", "settings.json");
+var ERRORS_DIR = path.join(homedir(), ".claude", "curdx-flow");
+var ERRORS_LOG = path.join(ERRORS_DIR, "errors.jsonl");
+var MAX_LINE_BYTES = 4096;
+var MSG_MAX = 500;
+var STACK_MAX = 2e3;
+var STR_MAX = 500;
+var ROTATE_SIZE_BYTES = 10 * 1024 * 1024;
+var ROTATE_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
+var ROTATE_THROTTLE_N = 10;
+var ROTATE_KEEP = 5;
+var RENAME_RETRY_DELAYS_MS = [50, 200, 500];
+var cachedEnabled = null;
+function readEnabled() {
+  if (cachedEnabled !== null) return cachedEnabled;
+  try {
+    const raw = readFileSync(SETTINGS_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.errorLogEnabled === "boolean") {
+      cachedEnabled = parsed.errorLogEnabled;
+      return cachedEnabled;
+    }
+    cachedEnabled = true;
+    return cachedEnabled;
+  } catch {
+    process2.stderr.write("[error-logger] settings.json missing/corrupt, defaulting errorLogEnabled=true\n");
+    cachedEnabled = true;
+    return cachedEnabled;
+  }
+}
+function trunc(s, max) {
+  if (typeof s !== "string") return void 0;
+  return s.length <= max ? s : s.slice(0, max);
+}
+var KNOWN_KINDS = /* @__PURE__ */ new Set([
+  "stop_block_continuation",
+  "stop_block_cost_runaway",
+  "stop_block_verification_failed",
+  "stop_allow_early_exit",
+  "task_verify_pass",
+  "task_verify_fail",
+  "subagent_context_injected",
+  "subagent_injection_failed",
+  "stop_failure_rate_limit",
+  "stop_failure_other",
+  "unknown"
+]);
+function coerceKind(raw) {
+  return typeof raw === "string" && KNOWN_KINDS.has(raw) ? raw : "unknown";
+}
+function shouldRotate(filePath) {
+  try {
+    const st = statSync(filePath);
+    if (st.size > ROTATE_SIZE_BYTES) return true;
+    if (Date.now() - st.mtimeMs > ROTATE_AGE_MS) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+function safeRename(from, to) {
+  try {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (e) {
+      const code = e.code;
+      if (code === "EBUSY" || code === "EPERM") {
+        for (const ms of RENAME_RETRY_DELAYS_MS) {
+          const end = Date.now() + ms;
+          while (Date.now() < end) {
+          }
+          try {
+            renameSync(from, to);
+            return;
+          } catch {
+          }
+        }
+      }
+      try {
+        copyFileSync(from, to);
+        unlinkSync(from);
+      } catch {
+      }
+    }
+  } catch {
+  }
+}
+function pruneRotatedFiles(dir) {
+  try {
+    const entries = readdirSync(dir);
+    const rotated = [];
+    for (const name of entries) {
+      if (!name.startsWith("errors.") || !name.endsWith(".jsonl")) continue;
+      if (name === "errors.jsonl") continue;
+      const full = path.join(dir, name);
+      try {
+        rotated.push({ p: full, m: statSync(full).mtimeMs });
+      } catch {
+      }
+    }
+    rotated.sort((a, b) => b.m - a.m);
+    for (const { p } of rotated.slice(ROTATE_KEEP)) {
+      try {
+        unlinkSync(p);
+      } catch {
+      }
+    }
+  } catch {
+  }
+}
+var rotateCounter = 0;
+function rotateIfNeeded(filePath) {
+  try {
+    rotateCounter = (rotateCounter + 1) % ROTATE_THROTTLE_N;
+    if (rotateCounter !== 0) return;
+    if (!shouldRotate(filePath)) return;
+    const iso = (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+    const dir = path.dirname(filePath);
+    const target = path.join(dir, `errors.${iso}-${process2.pid}.jsonl`);
+    safeRename(filePath, target);
+    pruneRotatedFiles(dir);
+  } catch {
+  }
+}
+function logHookEvent(input, err) {
+  try {
+    if (!readEnabled()) return;
+    const stack = input.stack ?? err?.stack;
+    const msg = input.msg ?? err?.message;
+    const level = input.level ?? "info";
+    const kind = coerceKind(input.kind);
+    const record = {
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      level,
+      hook: trunc(input.hook, STR_MAX) ?? "",
+      event: trunc(input.event, STR_MAX) ?? "",
+      kind
+    };
+    const optionalEntries = [
+      ["msg", trunc(msg, MSG_MAX)],
+      ["cwd", trunc(input.cwd, STR_MAX)],
+      ["transcript_path", trunc(input.transcript_path, STR_MAX)],
+      ["spec", trunc(input.spec, STR_MAX)],
+      ["path", trunc(input.path, STR_MAX)],
+      ["stack", trunc(stack, STACK_MAX)],
+      ["correlationId", trunc(input.correlationId, STR_MAX)]
+    ];
+    for (const [k, v] of optionalEntries) {
+      if (v !== void 0) record[k] = v;
+    }
+    if (input.payload !== void 0) {
+      record.payload = input.payload;
+    }
+    let line = JSON.stringify(record);
+    if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
+      delete record.stack;
+      line = JSON.stringify(record);
+    }
+    if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
+      delete record.msg;
+      line = JSON.stringify(record);
+    }
+    if (Buffer.byteLength(line + "\n", "utf8") > MAX_LINE_BYTES) {
+      delete record.payload;
+      line = JSON.stringify(record);
+    }
+    try {
+      mkdirSync(ERRORS_DIR, { recursive: true });
+    } catch {
+    }
+    rotateIfNeeded(ERRORS_LOG);
+    appendFileSync(ERRORS_LOG, line + "\n");
+  } catch {
+  }
+}
+function logHookError(ctx, err) {
+  logHookEvent({ ...ctx, level: "error", kind: ctx.kind ?? "unknown" }, err);
+}
 
 // src/hooks/_shared/stdin.ts
-import process2 from "node:process";
+import process3 from "node:process";
 async function readStdinJson() {
   const chunks = [];
-  for await (const chunk of process2.stdin) {
+  for await (const chunk of process3.stdin) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
   const raw = Buffer.concat(chunks).toString("utf-8").trim();
@@ -23,7 +217,7 @@ async function readStdinJson() {
     return JSON.parse(raw);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    process2.stderr.write(`[hook] invalid stdin JSON: ${msg}
+    process3.stderr.write(`[hook] invalid stdin JSON: ${msg}
 `);
     throw e;
   }
@@ -32,10 +226,10 @@ async function readStdinJson() {
 // src/hooks/_shared/path-resolver.ts
 import {
   existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  statSync,
+  mkdirSync as mkdirSync2,
+  readFileSync as readFileSync2,
+  readdirSync as readdirSync2,
+  statSync as statSync2,
   writeFileSync
 } from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
@@ -50,7 +244,7 @@ function warn(msg) {
 }
 function isDir(p) {
   try {
-    return statSync(p).isDirectory();
+    return statSync2(p).isDirectory();
   } catch {
     return false;
   }
@@ -73,10 +267,10 @@ function sessionBindingPath(opts) {
 }
 function readSessionSpecBinding(opts) {
   const cwd = resolveCwd(opts);
-  const path2 = sessionBindingPath(opts);
-  if (!path2 || !existsSync(path2)) return null;
+  const path3 = sessionBindingPath(opts);
+  if (!path3 || !existsSync(path3)) return null;
   try {
-    const parsed = JSON.parse(readFileSync(path2, "utf8"));
+    const parsed = JSON.parse(readFileSync2(path3, "utf8"));
     if (parsed.version !== 1) return null;
     if (typeof parsed.sessionId !== "string" || typeof parsed.specPath !== "string") return null;
     if (!specPathExists(cwd, parsed.specPath)) return null;
@@ -113,7 +307,7 @@ function findRepoRoot(start) {
 function parseSpecsDirsFromSettings(settingsPath) {
   let raw;
   try {
-    raw = readFileSync(settingsPath, "utf8");
+    raw = readFileSync2(settingsPath, "utf8");
   } catch {
     return [];
   }
@@ -204,7 +398,7 @@ function resolveCurrent(opts) {
   if (!markerFs) return null;
   let content;
   try {
-    content = readFileSync(markerFs, "utf8");
+    content = readFileSync2(markerFs, "utf8");
   } catch {
     return null;
   }
@@ -309,7 +503,7 @@ async function walkSrcTree(dir) {
 }
 
 // src/hooks/lib/smart-route.ts
-import { existsSync as existsSync5, readFileSync as readFileSync5 } from "node:fs";
+import { existsSync as existsSync5, readFileSync as readFileSync6 } from "node:fs";
 import { basename as basename6, join as join5 } from "node:path";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
@@ -564,12 +758,12 @@ if (isDirectRun()) {
 // src/hooks/lib/project-topology.ts
 import {
   existsSync as existsSync2,
-  readFileSync as readFileSync2,
-  readdirSync as readdirSync2,
-  statSync as statSync2
+  readFileSync as readFileSync3,
+  readdirSync as readdirSync3,
+  statSync as statSync3
 } from "node:fs";
-import { homedir } from "node:os";
-import path, { basename as basename4, isAbsolute as isAbsolute2, relative, resolve } from "node:path";
+import { homedir as homedir2 } from "node:os";
+import path2, { basename as basename4, isAbsolute as isAbsolute2, relative, resolve } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var FRONTEND_KEY_RE = /^(frontend|front-end|web|ui|client|admin|前端)$/i;
 var BACKEND_KEY_RE = /^(backend|back-end|api|server|service|后端)$/i;
@@ -583,28 +777,28 @@ var CONTRACT_GOAL_RE = /\b(contract|openapi|swagger|api response|dto|schema|clie
 var AUTH_GOAL_RE = /\b(auth|login|logout|session|permission|oauth|jwt|登录|鉴权|权限)\b/i;
 function isDir2(p) {
   try {
-    return statSync2(p).isDirectory();
+    return statSync3(p).isDirectory();
   } catch {
     return false;
   }
 }
 function isFile(p) {
   try {
-    return statSync2(p).isFile();
+    return statSync3(p).isFile();
   } catch {
     return false;
   }
 }
 function readText(file) {
   try {
-    return readFileSync2(file, "utf8");
+    return readFileSync3(file, "utf8");
   } catch {
     return "";
   }
 }
 function meaningfulProjectEntries(projectRoot) {
   try {
-    return readdirSync2(projectRoot).filter((name) => {
+    return readdirSync3(projectRoot).filter((name) => {
       if (name === ".git" || name === ".hg" || name === ".svn") return false;
       if (name === ".DS_Store" || name === "Thumbs.db") return false;
       if (name === ".claude" || name === ".curdx") return false;
@@ -621,7 +815,7 @@ function normalizeSerializedPath(input) {
   return trimmed.replace(/\\/g, "/").replace(/\/+$/, "") || ".";
 }
 function toPosixPath(p) {
-  return p.split(path.sep).join("/");
+  return p.split(path2.sep).join("/");
 }
 function relativeOrDot(from, to) {
   const rel = toPosixPath(relative(from, to));
@@ -650,7 +844,7 @@ function cleanScalar(value) {
   return value.trim().replace(/^["']|["']$/g, "").replace(/\s+#.*$/, "").trim();
 }
 function parseCodeRootsFromCurdxSettings(projectRoot) {
-  const settingsPath = path.join(projectRoot, ".claude", "curdx-flow.local.md");
+  const settingsPath = path2.join(projectRoot, ".claude", "curdx-flow.local.md");
   if (!isFile(settingsPath)) return [];
   const block = extractFrontmatter(readText(settingsPath));
   const lines = block.split(/\r?\n/);
@@ -710,9 +904,9 @@ function parseCodeRootsFromCurdxSettings(projectRoot) {
 }
 function claudeMdCandidates(projectRoot) {
   return [
-    path.join(projectRoot, "CLAUDE.md"),
-    path.join(projectRoot, ".claude", "CLAUDE.md"),
-    path.join(projectRoot, "CLAUDE.local.md")
+    path2.join(projectRoot, "CLAUDE.md"),
+    path2.join(projectRoot, ".claude", "CLAUDE.md"),
+    path2.join(projectRoot, "CLAUDE.local.md")
   ];
 }
 function extractDevBlocks(raw) {
@@ -791,7 +985,7 @@ function parseRootsFromClaudeMd(projectRoot) {
 }
 function readJsonObject(file) {
   try {
-    const parsed = JSON.parse(readFileSync2(file, "utf8"));
+    const parsed = JSON.parse(readFileSync3(file, "utf8"));
     return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : void 0;
   } catch {
     return void 0;
@@ -820,14 +1014,14 @@ function hasAnyDep(pkg, names) {
   return names.some((name) => hasDep(pkg, name));
 }
 function detectPackageManager(rootAbs) {
-  if (isFile(path.join(rootAbs, "pnpm-lock.yaml")) || isFile(path.join(rootAbs, "pnpm-workspace.yaml"))) {
+  if (isFile(path2.join(rootAbs, "pnpm-lock.yaml")) || isFile(path2.join(rootAbs, "pnpm-workspace.yaml"))) {
     return "pnpm";
   }
-  if (isFile(path.join(rootAbs, "yarn.lock"))) return "yarn";
-  if (isFile(path.join(rootAbs, "package-lock.json"))) return "npm";
-  if (isFile(path.join(rootAbs, "bun.lockb")) || isFile(path.join(rootAbs, "bun.lock"))) return "bun";
-  if (isFile(path.join(rootAbs, "pom.xml"))) return "maven";
-  if (isFile(path.join(rootAbs, "build.gradle")) || isFile(path.join(rootAbs, "build.gradle.kts"))) return "gradle";
+  if (isFile(path2.join(rootAbs, "yarn.lock"))) return "yarn";
+  if (isFile(path2.join(rootAbs, "package-lock.json"))) return "npm";
+  if (isFile(path2.join(rootAbs, "bun.lockb")) || isFile(path2.join(rootAbs, "bun.lock"))) return "bun";
+  if (isFile(path2.join(rootAbs, "pom.xml"))) return "maven";
+  if (isFile(path2.join(rootAbs, "build.gradle")) || isFile(path2.join(rootAbs, "build.gradle.kts"))) return "gradle";
   return void 0;
 }
 function hasManifestOrSource(rootAbs) {
@@ -845,7 +1039,7 @@ function hasManifestOrSource(rootAbs) {
     "src",
     "app",
     "packages"
-  ].some((entry) => existsSync2(path.join(rootAbs, entry)));
+  ].some((entry) => existsSync2(path2.join(rootAbs, entry)));
 }
 function pushUnique(items, item) {
   if (!items.includes(item)) items.push(item);
@@ -853,15 +1047,15 @@ function pushUnique(items, item) {
 function classifyRoot(rootAbs, role) {
   const kinds = [];
   const frameworks = [];
-  const pkg = readJsonObject(path.join(rootAbs, "package.json"));
-  const pom = readText(path.join(rootAbs, "pom.xml"));
+  const pkg = readJsonObject(path2.join(rootAbs, "package.json"));
+  const pom = readText(path2.join(rootAbs, "pom.xml"));
   const gradle = [
-    readText(path.join(rootAbs, "build.gradle")),
-    readText(path.join(rootAbs, "build.gradle.kts"))
+    readText(path2.join(rootAbs, "build.gradle")),
+    readText(path2.join(rootAbs, "build.gradle.kts"))
   ].join("\n");
   const buildText = `${pom}
 ${gradle}`;
-  if (isFile(path.join(rootAbs, ".claude-plugin", "plugin.json"))) {
+  if (isFile(path2.join(rootAbs, ".claude-plugin", "plugin.json"))) {
     pushUnique(kinds, "claude-code-plugin");
     frameworks.push("claude-code-plugin");
   }
@@ -874,7 +1068,7 @@ ${gradle}`;
       pushUnique(kinds, "frontend-app");
       frameworks.push(hasDep(pkg, "nuxt") ? "nuxt" : "vue");
     }
-    if (hasDep(pkg, "vite") || isFile(path.join(rootAbs, "vite.config.ts")) || isFile(path.join(rootAbs, "vite.config.js"))) {
+    if (hasDep(pkg, "vite") || isFile(path2.join(rootAbs, "vite.config.ts")) || isFile(path2.join(rootAbs, "vite.config.js"))) {
       pushUnique(kinds, "frontend-app");
       if (!frameworks.includes("vite")) frameworks.push("vite");
     }
@@ -898,22 +1092,22 @@ ${gradle}`;
     pushUnique(kinds, "backend-service");
     frameworks.push("spring-cloud");
   }
-  if (isDir2(path.join(rootAbs, "src", "main", "java"))) {
+  if (isDir2(path2.join(rootAbs, "src", "main", "java"))) {
     pushUnique(kinds, "backend-service");
     if (!frameworks.includes("java")) frameworks.push("java");
   }
-  if (isFile(path.join(rootAbs, "go.mod"))) {
+  if (isFile(path2.join(rootAbs, "go.mod"))) {
     pushUnique(kinds, "backend-service");
     frameworks.push("go");
   }
-  if (isFile(path.join(rootAbs, "pyproject.toml"))) {
-    const pyproject = readText(path.join(rootAbs, "pyproject.toml"));
+  if (isFile(path2.join(rootAbs, "pyproject.toml"))) {
+    const pyproject = readText(path2.join(rootAbs, "pyproject.toml"));
     if (/(fastapi|django|flask)/i.test(pyproject)) {
       pushUnique(kinds, "backend-service");
       frameworks.push(/fastapi/i.test(pyproject) ? "fastapi" : /django/i.test(pyproject) ? "django" : "flask");
     }
   }
-  if (isFile(path.join(rootAbs, "Dockerfile")) || isFile(path.join(rootAbs, "docker-compose.yml")) || isFile(path.join(rootAbs, "docker-compose.yaml"))) {
+  if (isFile(path2.join(rootAbs, "Dockerfile")) || isFile(path2.join(rootAbs, "docker-compose.yml")) || isFile(path2.join(rootAbs, "docker-compose.yaml"))) {
     pushUnique(kinds, "infra");
   }
   if (role === "frontend") pushUnique(kinds, "frontend-app");
@@ -931,9 +1125,9 @@ ${gradle}`;
 function settingsAdditionalDirectories(projectRoot) {
   const entries = [];
   const candidates = [
-    { file: path.join(projectRoot, ".claude", "settings.json"), base: projectRoot },
-    { file: path.join(projectRoot, ".claude", "settings.local.json"), base: projectRoot },
-    { file: path.join(homedir(), ".claude", "settings.json"), base: path.join(homedir(), ".claude") }
+    { file: path2.join(projectRoot, ".claude", "settings.json"), base: projectRoot },
+    { file: path2.join(projectRoot, ".claude", "settings.local.json"), base: projectRoot },
+    { file: path2.join(homedir2(), ".claude", "settings.json"), base: path2.join(homedir2(), ".claude") }
   ];
   for (const candidate of candidates) {
     const parsed = readJsonObject(candidate.file);
@@ -973,11 +1167,11 @@ function siblingCandidates(projectRoot) {
   const currentLooksBackend = /^(backend|api|server|service|services)$/.test(currentBase);
   const currentLooksFrontend = /^(frontend|web|ui|client|admin)$/.test(currentBase);
   if (!currentLooksBackend && !currentLooksFrontend) return [];
-  const names = readdirSync2(parent).slice(0, 80);
+  const names = readdirSync3(parent).slice(0, 80);
   const out = [];
   for (const name of names) {
     if (name.startsWith(".")) continue;
-    const abs = path.join(parent, name);
+    const abs = path2.join(parent, name);
     if (abs === projectRoot || !isDir2(abs)) continue;
     const lower = name.toLowerCase();
     if (currentLooksBackend && /^(frontend|web|ui|client|admin)$/.test(lower)) {
@@ -1658,7 +1852,7 @@ if (isDirectRun3()) {
 }
 
 // src/hooks/lib/project-brain.ts
-import { appendFileSync, existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync3, statSync as statSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { appendFileSync as appendFileSync2, existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync4, statSync as statSync4, writeFileSync as writeFileSync2 } from "node:fs";
 import { join as join3, resolve as resolve2 } from "node:path";
 var MAX_REASON = 240;
 var MAX_COMMAND = 180;
@@ -1699,23 +1893,23 @@ function normalizeEvent(event) {
   return out;
 }
 function appendBrainEvent(cwd, event) {
-  const path2 = brainPath(cwd);
-  if (process.env.CURDX_FLOW_BRAIN === "off") return { ok: true, path: path2 };
+  const path3 = brainPath(cwd);
+  if (process.env.CURDX_FLOW_BRAIN === "off") return { ok: true, path: path3 };
   try {
-    mkdirSync2(join3(normalizeCwd(cwd), ".curdx"), { recursive: true });
-    appendFileSync(path2, JSON.stringify(normalizeEvent(event)) + "\n", "utf8");
-    compactBrainIfNeeded(path2);
-    return { ok: true, path: path2 };
+    mkdirSync3(join3(normalizeCwd(cwd), ".curdx"), { recursive: true });
+    appendFileSync2(path3, JSON.stringify(normalizeEvent(event)) + "\n", "utf8");
+    compactBrainIfNeeded(path3);
+    return { ok: true, path: path3 };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, path: path2, error: message };
+    return { ok: false, path: path3, error: message };
   }
 }
-function compactBrainIfNeeded(path2) {
+function compactBrainIfNeeded(path3) {
   try {
-    if (statSync3(path2).size <= MAX_BRAIN_BYTES) return;
-    const lines = readFileSync3(path2, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-MAX_BRAIN_LINES);
-    writeFileSync2(path2, lines.join("\n") + (lines.length > 0 ? "\n" : ""), "utf8");
+    if (statSync4(path3).size <= MAX_BRAIN_BYTES) return;
+    const lines = readFileSync4(path3, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-MAX_BRAIN_LINES);
+    writeFileSync2(path3, lines.join("\n") + (lines.length > 0 ? "\n" : ""), "utf8");
   } catch {
   }
 }
@@ -1733,10 +1927,10 @@ function parseBrainLine(line) {
   }
 }
 function readBrainEvents(cwd, limit = 100) {
-  const path2 = brainPath(cwd);
-  if (!existsSync3(path2)) return [];
+  const path3 = brainPath(cwd);
+  if (!existsSync3(path3)) return [];
   try {
-    const lines = readFileSync3(path2, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const lines = readFileSync4(path3, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     const parsed = lines.slice(Math.max(0, lines.length - Math.max(1, limit))).map(parseBrainLine).filter((event) => event !== null);
     return parsed;
   } catch {
@@ -1753,7 +1947,7 @@ function uniqueRecent(values, limit) {
   return out;
 }
 function summarizeProjectBrain(cwd) {
-  const path2 = brainPath(cwd);
+  const path3 = brainPath(cwd);
   const events = readBrainEvents(cwd, 200);
   const failures = events.filter((event) => event.type === "verification-blocked" || event.exitCode !== void 0 && event.exitCode !== 0).slice(-5).reverse().map((event) => ({
     timestamp: event.timestamp,
@@ -1768,8 +1962,8 @@ function summarizeProjectBrain(cwd) {
   );
   const compactEvent = events.filter((event) => event.type === "compact-summary" && event.summary).at(-1);
   return {
-    path: path2,
-    exists: existsSync3(path2),
+    path: path3,
+    exists: existsSync3(path3),
     totalEvents: events.length,
     lastUpdated: events.length > 0 ? events[events.length - 1]?.timestamp ?? null : null,
     stackHints: uniqueRecent(events.map((event) => event.stack), 5),
@@ -1785,7 +1979,7 @@ function summarizeProjectBrain(cwd) {
 }
 
 // src/hooks/lib/stack-capabilities.ts
-import { existsSync as existsSync4, readFileSync as readFileSync4, readdirSync as readdirSync3 } from "node:fs";
+import { existsSync as existsSync4, readFileSync as readFileSync5, readdirSync as readdirSync4 } from "node:fs";
 import { isAbsolute as isAbsolute3, join as join4, resolve as resolve3 } from "node:path";
 var STACKS = {
   "typescript": {
@@ -2031,7 +2225,7 @@ function rootFsPath(projectRoot, root) {
 }
 function readText2(file) {
   try {
-    return readFileSync4(file, "utf8");
+    return readFileSync5(file, "utf8");
   } catch {
     return "";
   }
@@ -2053,7 +2247,7 @@ function globPathExists(rootAbs, hint) {
     if (!part.includes("*")) return walk(join4(dir, part), idx + 1);
     let entries;
     try {
-      entries = readdirSync3(dir, { withFileTypes: true });
+      entries = readdirSync4(dir, { withFileTypes: true });
     } catch {
       return false;
     }
@@ -2327,7 +2521,7 @@ function loadActiveSpecFromPath(cwd, specPath) {
   let completed = false;
   if (existsSync5(statePath)) {
     try {
-      const parsed = JSON.parse(readFileSync5(statePath, "utf8"));
+      const parsed = JSON.parse(readFileSync6(statePath, "utf8"));
       if (typeof parsed.phase === "string" && parsed.phase.trim().length > 0) {
         phase = parsed.phase;
       }
@@ -2833,7 +3027,7 @@ import { fileURLToPath as fileURLToPath6 } from "node:url";
 
 // src/hooks/lib/workflow-snapshot.ts
 import { execFileSync } from "node:child_process";
-import { existsSync as existsSync6, readFileSync as readFileSync6, statSync as statSync4 } from "node:fs";
+import { existsSync as existsSync6, readFileSync as readFileSync7, statSync as statSync5 } from "node:fs";
 import { basename as basename7, isAbsolute as isAbsolute4, join as join6 } from "node:path";
 import { fileURLToPath as fileURLToPath5 } from "node:url";
 
@@ -2924,9 +3118,9 @@ function resolveSpecPath(input) {
   }
   return resolveCurrent({ cwd, sessionId: input.sessionId }) ?? void 0;
 }
-function readJsonFile(path2) {
+function readJsonFile(path3) {
   try {
-    return { ok: true, value: JSON.parse(readFileSync6(path2, "utf8")) };
+    return { ok: true, value: JSON.parse(readFileSync7(path3, "utf8")) };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -2935,7 +3129,7 @@ function artifact(specFs, filename) {
   const p = join6(specFs, filename);
   if (!existsSync6(p)) return { exists: false, path: p };
   try {
-    const st = statSync4(p);
+    const st = statSync5(p);
     return {
       exists: true,
       path: p,
@@ -2963,7 +3157,7 @@ function buildTaskSnapshot(specFs, state) {
   }
   let tasks = [];
   try {
-    tasks = parseTaskList(readFileSync6(tasksPath, "utf8"));
+    tasks = parseTaskList(readFileSync7(tasksPath, "utf8"));
   } catch {
     tasks = [];
   }
@@ -3422,13 +3616,24 @@ if (isDirectRun7()) {
 
 // src/hooks/task-completed-verifier.ts
 function passThrough() {
-  process3.stdout.write(JSON.stringify({ continue: true }));
-  process3.exit(0);
+  process4.stdout.write(JSON.stringify({ continue: true }));
+  process4.exit(0);
 }
 function emitBlock(reason) {
-  process3.stderr.write(`${reason}
+  process4.stderr.write(`${reason}
 `);
-  process3.exit(2);
+  process4.exit(2);
+}
+function buildTaskCompletedGateReason(input) {
+  const baseReason = input.reason === "missing" ? `missing verification block for phase '${input.phase}'` : input.reason ?? "verification failed";
+  const identity = [
+    typeof input.state.runId === "string" && input.state.runId.length > 0 ? `runId=${input.state.runId}` : void 0,
+    typeof input.state.goalId === "string" && input.state.goalId.length > 0 ? `goalId=${input.state.goalId}` : void 0,
+    `spec=${basename9(input.specDir)}`,
+    `phase=${input.phase}`
+  ].filter((item) => item !== void 0).join(" ");
+  const nextAction = typeof input.command === "string" && input.command.length > 0 ? `Re-run: ${input.command}.` : `Next action: run /curdx-flow:${input.phase} to record fresh verification evidence.`;
+  return `${baseReason}. ${identity}. ${nextAction}${input.verifierHint}${input.recoveryHint}`;
 }
 async function main8() {
   let input;
@@ -3443,7 +3648,7 @@ async function main8() {
   if (typeof input.task_id !== "string" || input.task_id.length === 0) {
     passThrough();
   }
-  const cwd = typeof input.cwd === "string" && input.cwd.length > 0 ? input.cwd : process3.cwd();
+  const cwd = typeof input.cwd === "string" && input.cwd.length > 0 ? input.cwd : process4.cwd();
   const specPath = resolveCurrent({ cwd, sessionId: input.session_id });
   if (!specPath) {
     passThrough();
@@ -3455,7 +3660,7 @@ async function main8() {
   }
   let state;
   try {
-    state = JSON.parse(readFileSync7(stateFile, "utf8"));
+    state = JSON.parse(readFileSync8(stateFile, "utf8"));
   } catch {
     passThrough();
   }
@@ -3463,7 +3668,25 @@ async function main8() {
   if (phase === null) {
     passThrough();
   }
-  const result = await verifyPhaseBlock(state, phase, specDir);
+  let result;
+  try {
+    result = await verifyPhaseBlock(state, phase, specDir);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logHookError(
+      {
+        hook: "task-completed-verifier",
+        event: "verify_phase_block",
+        msg,
+        stack: err instanceof Error ? err.stack ?? "" : "",
+        cwd,
+        spec: basename9(specDir)
+      },
+      err instanceof Error ? err : void 0
+    );
+    process4.stderr.write("[task-completed-verifier] verification helper error; failing open\n");
+    passThrough();
+  }
   if (!result.ok) {
     let verifierHint = "";
     let routeName = "unknown";
@@ -3501,14 +3724,30 @@ async function main8() {
       verifier,
       reason: result.reason ?? "verification failed"
     });
-    emitBlock(`${result.reason ?? "verification failed"}${verifierHint}${recoveryHint}`);
+    emitBlock(buildTaskCompletedGateReason({
+      state,
+      phase,
+      specDir,
+      reason: result.reason,
+      command: result.command,
+      verifierHint,
+      recoveryHint
+    }));
   }
-  process3.exit(0);
+  process4.exit(0);
 }
 main8().catch((err) => {
-  const stack = err instanceof Error ? err.stack ?? err.message : String(err);
-  process3.stderr.write(`[task-completed-verifier] ${stack}
-`);
-  emitBlock("internal error in verify-blocks; see logs");
+  const msg = err instanceof Error ? err.message : String(err);
+  logHookError(
+    {
+      hook: "task-completed-verifier",
+      event: "uncaught",
+      msg,
+      stack: err instanceof Error ? err.stack ?? "" : ""
+    },
+    err instanceof Error ? err : void 0
+  );
+  process4.stderr.write("[task-completed-verifier] internal error; failing open\n");
+  passThrough();
 });
 //# sourceMappingURL=task-completed-verifier.mjs.map

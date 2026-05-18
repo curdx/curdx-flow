@@ -7,16 +7,23 @@
 
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  attachNativeGoalConditionLength,
+  buildNativeGoalReadiness,
+  evaluateNativeGoalConditionLength,
+  GOAL_CONDITION_LIMIT,
+  type NativeGoalConditionLength,
+  type NativeGoalReadiness,
+} from "../../runtime/capabilities/goal-readiness.ts";
 import { buildWorkflowSnapshot, type WorkflowSnapshot } from "./workflow-snapshot.js";
 import { decideLastMile, type LastMileDecision } from "./last-mile-orchestrator.js";
-
-const GOAL_CONDITION_LIMIT = 4000;
 
 export interface GoalBridgeInput {
   cwd?: string;
   spec?: string;
   goal?: string;
   maxTurns?: number;
+  nativeGoal?: NativeGoalReadiness;
 }
 
 export interface GoalBridge {
@@ -26,6 +33,10 @@ export interface GoalBridge {
   startPrompt: string;
   evidenceProtocol: string[];
   warnings: string[];
+  readiness: NativeGoalReadiness;
+  recommendedDriver: NativeGoalReadiness["recommendedDriver"];
+  fallbackAction: string | null;
+  conditionLength: NativeGoalConditionLength;
 }
 
 function readArg(name: string, argv: string[]): string | undefined {
@@ -96,20 +107,39 @@ function evidenceProtocol(snapshot: WorkflowSnapshot, decision: LastMileDecision
     taskLine(snapshot),
     verificationLine(snapshot),
     "curdx-flow snapshot or last-mile output shows no blocking gates remain",
+    "missingEvidence is shown as empty, converted into a blocker, or explicitly marked manual-confirmation-required",
+    "the final verdict is shown as complete only when verifier evidence and gates are visible; otherwise it reports blocked, partial, or manual-confirmation-required",
     "the assistant outputs ALL_TASKS_COMPLETE only after the task and verifier evidence above is visible",
     ...capabilityEvidence(decision),
   ];
 }
 
-function compactCondition(parts: string[], warnings: string[]): string {
+function compactCondition(
+  parts: string[],
+  warnings: string[],
+): { condition: string; conditionLength: NativeGoalConditionLength } {
   let condition = parts.join(" ");
-  if (condition.length <= GOAL_CONDITION_LIMIT) return condition;
+  const originalLength = condition.length;
+  if (condition.length <= GOAL_CONDITION_LIMIT) {
+    return {
+      condition,
+      conditionLength: evaluateNativeGoalConditionLength({ condition, originalLength }),
+    };
+  }
 
   warnings.push("Condition was shortened to fit Claude Code /goal's 4000 character limit.");
-  const suffix = " If incomplete or blocked, stop after the stated turn limit and report the blocker with next action.";
+  const suffix = " Critical completion evidence still required: transcript-visible verifier command, exitCode 0, missingEvidence status, final verdict, and no blocking gates. If incomplete or blocked, stop after the stated turn limit and report the blocker with next action.";
   const maxBody = GOAL_CONDITION_LIMIT - suffix.length;
   condition = condition.slice(0, Math.max(0, maxBody)).replace(/\s+\S*$/, "");
-  return `${condition}${suffix}`;
+  const compacted = `${condition}${suffix}`;
+  return {
+    condition: compacted,
+    conditionLength: evaluateNativeGoalConditionLength({
+      condition: compacted,
+      originalLength,
+      compressed: true,
+    }),
+  };
 }
 
 export function buildGoalBridge(input: GoalBridgeInput = {}): GoalBridge {
@@ -141,26 +171,36 @@ export function buildGoalBridge(input: GoalBridgeInput = {}): GoalBridge {
   const evidence = evidenceProtocol(snapshot, decision);
   const target = specLabel(snapshot, input.spec);
   const userGoal = normalize(input.goal);
-  const condition = compactCondition(
+  const { condition, conditionLength } = compactCondition(
     [
       `Complete curdx-flow implementation for ${target}.`,
-      userGoal ? `User goal: ${userGoal}.` : "",
-      "This goal is satisfied only when the conversation visibly shows:",
+      "This goal is satisfied only when transcript-visible evidence in the conversation visibly shows:",
       evidence.map((item, idx) => `${idx + 1}. ${item}.`).join(" "),
-      `If the evidence is not visible, continue by running curdx-flow snapshot/last-mile as needed, executing the next incomplete value-slice task, recording verifier evidence, and updating state.`,
       `Stop after ${maxTurns} goal turns if still incomplete and report the blocker, current task, verifier status, and next action instead of claiming completion.`,
+      `If the evidence is not visible, continue by running curdx-flow snapshot/last-mile as needed, executing the next incomplete value-slice task, recording verifier evidence, and updating state.`,
+      userGoal ? `User goal context: ${userGoal}.` : "",
     ].filter(Boolean),
     warnings,
   );
+  const readiness = attachNativeGoalConditionLength(
+    input.nativeGoal ?? buildNativeGoalReadiness(),
+    conditionLength,
+  );
+  const startPrompt = readiness.recommendedDriver === "native-goal"
+    ? "Run the slashCommand in Claude Code to let native /goal drive follow-up turns. If /goal becomes unavailable, use manual resume and keep the same evidence protocol; do not rely on Stop-hook continuation."
+    : `Native /goal is not available: ${readiness.reason} Use /curdx-flow:implement --manual for one coordinator turn, keep the same evidence protocol, and resume explicitly; do not rely on Stop-hook continuation.`;
 
   return {
     version: 1,
     condition,
     slashCommand: `/goal ${condition}`,
-    startPrompt:
-      "Run the slashCommand in Claude Code to let native /goal drive follow-up turns. If /goal is unavailable, use manual resume and keep the same evidence protocol; do not rely on Stop-hook continuation.",
+    startPrompt,
     evidenceProtocol: evidence,
-    warnings,
+    warnings: [...new Set([...warnings, ...readiness.warnings])],
+    readiness,
+    recommendedDriver: readiness.recommendedDriver,
+    fallbackAction: readiness.fallbackAction,
+    conditionLength,
   };
 }
 

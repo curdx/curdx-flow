@@ -1,0 +1,34 @@
+{
+  "scenarios": [
+    {
+      "id": "successful-recovery",
+      "expectedFinalVerdict": "complete",
+      "expectedOwner": "agent",
+      "expectedRiskLevel": "low"
+    },
+    {
+      "id": "repeat-failure-cap",
+      "expectedFinalVerdict": "blocked",
+      "expectedOwner": "user",
+      "expectedRiskLevel": "high"
+    },
+    {
+      "id": "permission-blocker",
+      "expectedFinalVerdict": "manual-confirmation-required",
+      "expectedOwner": "user",
+      "expectedRiskLevel": "high"
+    },
+    {
+      "id": "external-service-blocker",
+      "expectedFinalVerdict": "blocked",
+      "expectedOwner": "external-system",
+      "expectedRiskLevel": "high"
+    },
+    {
+      "id": "path-changed-degraded",
+      "expectedFinalVerdict": "partial",
+      "expectedOwner": "agent",
+      "expectedRiskLevel": "medium"
+    }
+  ]
+}

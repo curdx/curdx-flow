@@ -6,9 +6,9 @@ const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
 // src/hooks/lib/runtime-cli.ts
-import { spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync9, readFileSync as readFileSync9, statSync as statSync6 } from "node:fs";
-import { basename as basename11, dirname, isAbsolute as isAbsolute6, join as join8, resolve as resolve5 } from "node:path";
+import { spawnSync as spawnSync3 } from "node:child_process";
+import { existsSync as existsSync10, readFileSync as readFileSync10, statSync as statSync6 } from "node:fs";
+import { basename as basename11, dirname, isAbsolute as isAbsolute6, join as join9, resolve as resolve5 } from "node:path";
 import { fileURLToPath as fileURLToPath8 } from "node:url";
 
 // src/registry/capabilities.ts
@@ -2997,7 +2997,7 @@ function gitSnapshot(cwd) {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     }).trim();
-    const status = execFileSync("git", ["status", "--porcelain"], {
+    const status2 = execFileSync("git", ["status", "--porcelain"], {
       cwd,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
@@ -3005,8 +3005,8 @@ function gitSnapshot(cwd) {
     return {
       available: true,
       ...branch ? { branch } : {},
-      dirty: status.length > 0,
-      changedFiles: status.length
+      dirty: status2.length > 0,
+      changedFiles: status2.length
     };
   } catch {
     return { available: false, dirty: false, changedFiles: 0 };
@@ -4178,7 +4178,233 @@ function buildExecutionBrief(input) {
 // src/hooks/lib/goal-bridge.ts
 import { basename as basename10 } from "node:path";
 import { fileURLToPath as fileURLToPath7 } from "node:url";
+
+// src/runtime/capabilities/goal-readiness.ts
+import { existsSync as existsSync9, readFileSync as readFileSync9 } from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { join as join8 } from "node:path";
 var GOAL_CONDITION_LIMIT = 4e3;
+var NATIVE_GOAL_REQUIRED_VERSION = "2.1.139";
+function notGeneratedLength() {
+  return {
+    limit: GOAL_CONDITION_LIMIT,
+    actual: null,
+    original: null,
+    status: "not-generated"
+  };
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function parseClaudeCodeVersion(output) {
+  const match = output.match(/\b(\d+)\.(\d+)\.(\d+)\b/);
+  return match ? `${match[1]}.${match[2]}.${match[3]}` : null;
+}
+function compareVersions(a, b) {
+  const left = a.split(".").map((part) => Number(part));
+  const right = b.split(".").map((part) => Number(part));
+  for (let i = 0; i < 3; i++) {
+    const l = left[i] ?? 0;
+    const r = right[i] ?? 0;
+    if (l > r) return 1;
+    if (l < r) return -1;
+  }
+  return 0;
+}
+function hasBooleanSetting(value, key) {
+  if (Array.isArray(value)) {
+    return value.some((item) => hasBooleanSetting(item, key));
+  }
+  if (!isRecord(value)) return false;
+  for (const [entryKey, entryValue] of Object.entries(value)) {
+    if (entryKey === key && entryValue === true) return true;
+    if (typeof entryValue === "object" && entryValue !== null && hasBooleanSetting(entryValue, key)) {
+      return true;
+    }
+  }
+  return false;
+}
+function collectBlockers(sources) {
+  const blockers = [];
+  for (const source of sources) {
+    if (source.error || source.settings === void 0) continue;
+    const managed = source.managed === true;
+    if (hasBooleanSetting(source.settings, "disableAllHooks")) {
+      blockers.push({
+        id: "disableAllHooks",
+        source: source.source,
+        managed,
+        reason: "disableAllHooks disables Claude Code hooks, which makes native /goal unavailable."
+      });
+    }
+    if (managed && hasBooleanSetting(source.settings, "allowManagedHooksOnly")) {
+      blockers.push({
+        id: "allowManagedHooksOnly",
+        source: source.source,
+        managed,
+        reason: "Managed allowManagedHooksOnly prevents unmanaged plugin hooks, which blocks native /goal execution."
+      });
+    }
+  }
+  return blockers;
+}
+function fallbackAction(state2, requiredVersion) {
+  switch (state2) {
+    case "available":
+      return null;
+    case "update-needed":
+      return `Update Claude Code to ${requiredVersion} or newer, then rerun curdx-flow doctor; until then use /curdx-flow:implement --manual and resume explicitly.`;
+    case "blocked":
+      return "Use /curdx-flow:implement --manual for a resumable single-turn flow, or remove the hook-blocking Claude Code setting and rerun doctor.";
+    case "unavailable":
+      return "Install or fix the claude CLI, then rerun doctor; until then use manual/resumable curdx-flow commands only.";
+    case "unknown":
+      return "Use /curdx-flow:implement --manual until native /goal support can be confirmed.";
+  }
+}
+function buildNativeGoalReadiness(input = {}) {
+  const requiredVersion = input.requiredVersion ?? NATIVE_GOAL_REQUIRED_VERSION;
+  const conditionLength = input.conditionLength ?? notGeneratedLength();
+  const settingsSources = input.settingsSources ?? [];
+  const settingsErrors = settingsSources.filter((source) => source.error).map((source) => `${source.source}: ${source.error}`);
+  const blockers = collectBlockers(settingsSources);
+  const probe = input.claudeProbe;
+  let detectedVersion = null;
+  let state2 = "unknown";
+  let supported = "unknown";
+  let reason = "Native /goal support is unknown because claude --version was not checked.";
+  if (!probe) {
+    state2 = "unknown";
+  } else if (probe.error || probe.timedOut || probe.exitCode !== 0) {
+    state2 = "unavailable";
+    supported = false;
+    reason = probe.error || probe.stderr.trim() || `claude --version exited ${probe.exitCode}`;
+  } else {
+    detectedVersion = parseClaudeCodeVersion(`${probe.stdout}
+${probe.stderr}`);
+    if (!detectedVersion) {
+      state2 = "unknown";
+      supported = "unknown";
+      reason = "Native /goal support is unknown because claude --version output could not be parsed.";
+    } else if (compareVersions(detectedVersion, requiredVersion) < 0) {
+      state2 = "update-needed";
+      supported = false;
+      reason = `Claude Code ${detectedVersion} is below native /goal minimum ${requiredVersion}.`;
+    } else if (blockers.length > 0) {
+      state2 = "blocked";
+      supported = false;
+      reason = `Native /goal is blocked by Claude Code hook settings: ${blockers.map((blocker) => blocker.id).join(", ")}.`;
+    } else if (settingsErrors.length > 0) {
+      state2 = "unknown";
+      supported = "unknown";
+      reason = "Native /goal support is unknown because one or more settings sources could not be read.";
+    } else {
+      state2 = "available";
+      supported = true;
+      reason = `Claude Code ${detectedVersion} supports native /goal and no hook-blocking settings were detected.`;
+    }
+  }
+  return {
+    state: state2,
+    supported,
+    requiredVersion,
+    detectedVersion,
+    reason,
+    hooksRequired: true,
+    blockers,
+    fallbackAction: fallbackAction(state2, requiredVersion),
+    recommendedDriver: state2 === "available" ? "native-goal" : "manual-resume",
+    conditionLength,
+    settingsSources: settingsSources.map((source) => source.source),
+    warnings: settingsErrors
+  };
+}
+function evaluateNativeGoalConditionLength(input) {
+  const limit = input.limit ?? GOAL_CONDITION_LIMIT;
+  const actual = input.condition.length;
+  const original = input.originalLength ?? actual;
+  const status2 = input.compressed ? actual <= limit ? "compressed" : "over-limit" : actual <= limit ? "within-limit" : "over-limit";
+  return { limit, actual, original, status: status2 };
+}
+function attachNativeGoalConditionLength(readiness, conditionLength) {
+  const warnings = [...readiness.warnings];
+  if (conditionLength.status === "compressed") {
+    warnings.push("Native /goal condition was shortened to fit the 4000 character limit.");
+  }
+  if (conditionLength.status === "over-limit") {
+    warnings.push("Native /goal condition still exceeds the 4000 character limit.");
+  }
+  return {
+    ...readiness,
+    conditionLength,
+    warnings: [...new Set(warnings)]
+  };
+}
+function settingSourceFromValue(value, source) {
+  if (isRecord(value) && "settings" in value) {
+    return {
+      source: typeof value.source === "string" ? value.source : source,
+      managed: value.managed === true,
+      exists: value.exists === false ? false : true,
+      settings: value.settings,
+      ...typeof value.error === "string" ? { error: value.error } : {}
+    };
+  }
+  return { source, exists: true, settings: value };
+}
+function fixtureSources(raw, source) {
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item, idx) => settingSourceFromValue(item, `${source}[${idx}]`));
+    }
+    if (isRecord(parsed) && Array.isArray(parsed.sources)) {
+      return parsed.sources.map((item, idx) => settingSourceFromValue(item, `${source}.sources[${idx}]`));
+    }
+    return [settingSourceFromValue(parsed, source)];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return [{ source, exists: true, error: `invalid settings fixture: ${message}` }];
+  }
+}
+function readJsonSettingsFile(path3, source, managed = false) {
+  if (!existsSync9(path3)) return null;
+  try {
+    return {
+      source,
+      managed,
+      exists: true,
+      settings: JSON.parse(readFileSync9(path3, "utf8"))
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { source, managed, exists: true, error: message };
+  }
+}
+function readNativeGoalSettingsSources(input) {
+  const env = { ...process.env, ...input.env ?? {} };
+  const fixture = env.CURDX_FLOW_NATIVE_GOAL_SETTINGS_JSON ?? env.CURDX_FLOW_GOAL_SETTINGS_JSON;
+  if (fixture !== void 0) return fixtureSources(fixture, "CURDX_FLOW_NATIVE_GOAL_SETTINGS_JSON");
+  if (env.CURDX_FLOW_NATIVE_GOAL_SETTINGS_ERROR) {
+    return [{ source: "CURDX_FLOW_NATIVE_GOAL_SETTINGS_ERROR", exists: true, error: env.CURDX_FLOW_NATIVE_GOAL_SETTINGS_ERROR }];
+  }
+  const home = input.home ?? env.HOME ?? env.USERPROFILE ?? homedir2();
+  const candidates = [
+    { path: join8(input.cwd, ".claude", "settings.json"), source: "project:.claude/settings.json" },
+    { path: join8(input.cwd, ".claude", "settings.local.json"), source: "project-local:.claude/settings.local.json" },
+    { path: join8(home, ".claude", "settings.json"), source: "user:~/.claude/settings.json" },
+    { path: "/Library/Application Support/ClaudeCode/managed-settings.json", source: "managed:macos", managed: true },
+    { path: "/etc/claude-code/managed-settings.json", source: "managed:linux", managed: true }
+  ];
+  const sources = [];
+  for (const candidate of candidates) {
+    const source = readJsonSettingsFile(candidate.path, candidate.source, candidate.managed === true);
+    if (source) sources.push(source);
+  }
+  return sources;
+}
+
+// src/hooks/lib/goal-bridge.ts
 function readArg8(name, argv) {
   const idx = argv.indexOf(name);
   if (idx === -1) return void 0;
@@ -4240,18 +4466,34 @@ function evidenceProtocol(snapshot2, decision) {
     taskLine(snapshot2),
     verificationLine(snapshot2),
     "curdx-flow snapshot or last-mile output shows no blocking gates remain",
+    "missingEvidence is shown as empty, converted into a blocker, or explicitly marked manual-confirmation-required",
+    "the final verdict is shown as complete only when verifier evidence and gates are visible; otherwise it reports blocked, partial, or manual-confirmation-required",
     "the assistant outputs ALL_TASKS_COMPLETE only after the task and verifier evidence above is visible",
     ...capabilityEvidence(decision)
   ];
 }
 function compactCondition(parts, warnings) {
   let condition = parts.join(" ");
-  if (condition.length <= GOAL_CONDITION_LIMIT) return condition;
+  const originalLength = condition.length;
+  if (condition.length <= GOAL_CONDITION_LIMIT) {
+    return {
+      condition,
+      conditionLength: evaluateNativeGoalConditionLength({ condition, originalLength })
+    };
+  }
   warnings.push("Condition was shortened to fit Claude Code /goal's 4000 character limit.");
-  const suffix = " If incomplete or blocked, stop after the stated turn limit and report the blocker with next action.";
+  const suffix = " Critical completion evidence still required: transcript-visible verifier command, exitCode 0, missingEvidence status, final verdict, and no blocking gates. If incomplete or blocked, stop after the stated turn limit and report the blocker with next action.";
   const maxBody = GOAL_CONDITION_LIMIT - suffix.length;
   condition = condition.slice(0, Math.max(0, maxBody)).replace(/\s+\S*$/, "");
-  return `${condition}${suffix}`;
+  const compacted = `${condition}${suffix}`;
+  return {
+    condition: compacted,
+    conditionLength: evaluateNativeGoalConditionLength({
+      condition: compacted,
+      originalLength,
+      compressed: true
+    })
+  };
 }
 function buildGoalBridge(input = {}) {
   const cwd = input.cwd ?? process.cwd();
@@ -4281,24 +4523,33 @@ function buildGoalBridge(input = {}) {
   const evidence = evidenceProtocol(snapshot2, decision);
   const target = specLabel(snapshot2, input.spec);
   const userGoal = normalize4(input.goal);
-  const condition = compactCondition(
+  const { condition, conditionLength } = compactCondition(
     [
       `Complete curdx-flow implementation for ${target}.`,
-      userGoal ? `User goal: ${userGoal}.` : "",
-      "This goal is satisfied only when the conversation visibly shows:",
+      "This goal is satisfied only when transcript-visible evidence in the conversation visibly shows:",
       evidence.map((item, idx) => `${idx + 1}. ${item}.`).join(" "),
+      `Stop after ${maxTurns} goal turns if still incomplete and report the blocker, current task, verifier status, and next action instead of claiming completion.`,
       `If the evidence is not visible, continue by running curdx-flow snapshot/last-mile as needed, executing the next incomplete value-slice task, recording verifier evidence, and updating state.`,
-      `Stop after ${maxTurns} goal turns if still incomplete and report the blocker, current task, verifier status, and next action instead of claiming completion.`
+      userGoal ? `User goal context: ${userGoal}.` : ""
     ].filter(Boolean),
     warnings
   );
+  const readiness = attachNativeGoalConditionLength(
+    input.nativeGoal ?? buildNativeGoalReadiness(),
+    conditionLength
+  );
+  const startPrompt = readiness.recommendedDriver === "native-goal" ? "Run the slashCommand in Claude Code to let native /goal drive follow-up turns. If /goal becomes unavailable, use manual resume and keep the same evidence protocol; do not rely on Stop-hook continuation." : `Native /goal is not available: ${readiness.reason} Use /curdx-flow:implement --manual for one coordinator turn, keep the same evidence protocol, and resume explicitly; do not rely on Stop-hook continuation.`;
   return {
     version: 1,
     condition,
     slashCommand: `/goal ${condition}`,
-    startPrompt: "Run the slashCommand in Claude Code to let native /goal drive follow-up turns. If /goal is unavailable, use manual resume and keep the same evidence protocol; do not rely on Stop-hook continuation.",
+    startPrompt,
     evidenceProtocol: evidence,
-    warnings
+    warnings: [.../* @__PURE__ */ new Set([...warnings, ...readiness.warnings])],
+    readiness,
+    recommendedDriver: readiness.recommendedDriver,
+    fallbackAction: readiness.fallbackAction,
+    conditionLength
   };
 }
 function main8() {
@@ -4324,6 +4575,884 @@ function isDirectRun8() {
 }
 if (isDirectRun8()) {
   main8();
+}
+
+// src/runtime/capabilities/doctor.ts
+function tri(value) {
+  if (typeof value === "boolean") return value;
+  if (value === "skipped") return "skipped";
+  return "unknown";
+}
+function status(input) {
+  return {
+    schemaVersion: 1,
+    ...input,
+    degraded: input.state === "degraded",
+    unavailable: input.state === "unavailable"
+  };
+}
+function probeStatus(input) {
+  const probe = input.probe;
+  const checkMode = input.checkMode ?? "fast";
+  if (!probe) {
+    return status({
+      id: input.id,
+      label: input.label,
+      category: input.category,
+      provider: input.provider,
+      provisioning: input.provisioning,
+      checkMode: "skipped",
+      state: "skipped",
+      configured: "unknown",
+      installed: "unknown",
+      callable: "skipped",
+      authorized: "unknown",
+      reason: `${input.command} was not probed in this doctor run.`,
+      skippedReason: `${input.command} was not probed in this doctor run.`,
+      evidenceImpact: input.evidenceImpact,
+      blocksCompletion: input.blocksCompletion ?? false,
+      blocksRelease: input.blocksRelease ?? false,
+      remediation: input.remediation,
+      durationMs: 0
+    });
+  }
+  if (probe.exitCode === 0 && !probe.error && !probe.timedOut) {
+    return status({
+      id: input.id,
+      label: input.label,
+      category: input.category,
+      provider: input.provider,
+      provisioning: input.provisioning,
+      checkMode,
+      state: "available",
+      configured: true,
+      installed: true,
+      callable: true,
+      authorized: "unknown",
+      reason: `${input.command} is callable.`,
+      evidenceImpact: input.evidenceImpact,
+      blocksCompletion: false,
+      blocksRelease: false,
+      remediation: null,
+      durationMs: probe.durationMs
+    });
+  }
+  const unavailable = probe.exitCode === null || Boolean(probe.error);
+  return status({
+    id: input.id,
+    label: input.label,
+    category: input.category,
+    provider: input.provider,
+    provisioning: input.provisioning,
+    checkMode,
+    state: unavailable ? "unavailable" : "degraded",
+    configured: "unknown",
+    installed: unavailable ? false : true,
+    callable: false,
+    authorized: "unknown",
+    reason: probe.error || probe.stderr.trim() || `${input.command} exited ${probe.exitCode}`,
+    evidenceImpact: input.evidenceImpact,
+    blocksCompletion: input.blocksCompletion ?? unavailable,
+    blocksRelease: input.blocksRelease ?? true,
+    remediation: input.remediation,
+    durationMs: probe.durationMs
+  });
+}
+function pluginValidationStatus(input) {
+  if (input.mode === "deep") {
+    return probeStatus({
+      id: "plugin-validation",
+      label: "Claude plugin validation",
+      category: "plugin-validation",
+      provider: "claude-code",
+      provisioning: "workflow",
+      probe: input.pluginValidationProbe,
+      command: "claude plugin validate",
+      checkMode: "deep",
+      evidenceImpact: ["plugin release evidence"],
+      blocksCompletion: false,
+      blocksRelease: true,
+      remediation: "claude plugin validate ./plugins/curdx-flow"
+    });
+  }
+  return status({
+    id: "plugin-validation",
+    label: "Claude plugin validation",
+    category: "plugin-validation",
+    provider: "claude-code",
+    provisioning: "workflow",
+    checkMode: "skipped",
+    state: "skipped",
+    configured: true,
+    installed: "unknown",
+    callable: "skipped",
+    authorized: "unknown",
+    reason: "Fast doctor does not run claude plugin validate; this is a deep release check.",
+    skippedReason: "Fast doctor does not run claude plugin validate; this is a deep release check.",
+    evidenceImpact: ["plugin release evidence"],
+    blocksCompletion: false,
+    blocksRelease: true,
+    remediation: "claude plugin validate ./plugins/curdx-flow",
+    durationMs: 0
+  });
+}
+function pluginDependencyStatus(id, label, fact) {
+  const configured = fact?.declared === true && fact.marketplaceMatches !== false && fact.crossMarketplaceAllowlisted !== false;
+  const readiness = fact?.readiness;
+  const installed = tri(fact?.installed);
+  const callable = tri(fact?.callable);
+  const authorized = tri(fact?.authorized ?? (configured ? true : false));
+  const blocksCompletion = typeof fact?.blocksCompletion === "boolean" ? fact.blocksCompletion : id === "chrome-devtools-mcp";
+  const blocksRelease = typeof fact?.blocksRelease === "boolean" ? fact.blocksRelease : true;
+  if (!configured) {
+    const notConfiguredInstalled = fact?.installed === void 0 ? false : installed;
+    return status({
+      id,
+      label,
+      category: "plugin-dependency",
+      provider: "plugin",
+      provisioning: "plugin-dependency",
+      checkMode: "fast",
+      state: "unavailable",
+      configured: false,
+      installed: notConfiguredInstalled,
+      callable: fact?.callable === void 0 ? "unknown" : callable,
+      authorized,
+      reason: fact?.reason ?? `${label} is not declared or trusted as a curdx-flow plugin dependency.`,
+      evidenceImpact: capabilityImpact(id),
+      blocksCompletion,
+      blocksRelease,
+      remediation: fact?.remediation ?? `Install/enable ${label} from its configured Claude Code marketplace dependency.`,
+      durationMs: 0
+    });
+  }
+  const state2 = readiness === "available" ? "available" : readiness === "degraded" ? "degraded" : readiness === "unavailable" ? "unavailable" : callable === false ? "degraded" : installed === false ? "unavailable" : "unknown";
+  return status({
+    id,
+    label,
+    category: "plugin-dependency",
+    provider: "plugin",
+    provisioning: "plugin-dependency",
+    checkMode: "fast",
+    state: state2,
+    configured: true,
+    installed,
+    callable,
+    authorized,
+    reason: fact?.reason ?? (callable === false ? `${label} is configured but not callable.` : `${label} is configured; installed/callable status needs dependency readiness check.`),
+    evidenceImpact: capabilityImpact(id),
+    blocksCompletion,
+    blocksRelease,
+    remediation: state2 === "available" ? null : fact?.remediation || (callable === false ? `Run Claude Code plugin diagnostics for ${label} and fix the callability error.` : `Run dependency readiness doctor for ${label}.`),
+    durationMs: 0
+  });
+}
+function externalMcpStatus(id, fact) {
+  const configured = tri(fact?.configured === null ? void 0 : fact?.configured);
+  const installed = tri(fact?.installed);
+  const callable = tri(fact?.callable);
+  const statusValue = fact?.status;
+  if (configured !== true) {
+    const unknown = configured === "unknown";
+    return status({
+      id,
+      label: id,
+      category: "external-mcp",
+      provider: "mcp",
+      provisioning: "external-mcp",
+      checkMode: "fast",
+      state: unknown ? "unknown" : "unavailable",
+      configured,
+      installed: unknown ? "unknown" : false,
+      callable: unknown ? "unknown" : false,
+      authorized: "unknown",
+      reason: unknown ? `${id} readiness is unknown because claude mcp list could not be confirmed.` : `${id} is not configured in Claude MCP list output.`,
+      evidenceImpact: capabilityImpact(id),
+      blocksCompletion: id === "context7",
+      blocksRelease: false,
+      remediation: fact?.fallback || fact?.installHint || `Configure the external ${id} MCP server; curdx-flow must not bundle it as a plugin dependency.`,
+      durationMs: 0
+    });
+  }
+  const state2 = callable === true || statusValue === "connected" ? "available" : callable === false || statusValue === "error" ? "degraded" : "unknown";
+  return status({
+    id,
+    label: id,
+    category: "external-mcp",
+    provider: "mcp",
+    provisioning: "external-mcp",
+    checkMode: "fast",
+    state: state2,
+    configured: true,
+    installed,
+    callable,
+    authorized: tri(fact?.authorized),
+    reason: state2 === "available" ? `${id} is configured and connected as an external MCP.` : state2 === "degraded" ? `${id} is configured but not callable from claude mcp list output.` : `${id} is configured; deep callability can be verified when the route requires it.`,
+    evidenceImpact: capabilityImpact(id),
+    blocksCompletion: id === "context7" && state2 !== "available",
+    blocksRelease: false,
+    remediation: state2 === "available" ? null : fact?.fallback || fact?.installHint || `Verify the external ${id} MCP server.`,
+    durationMs: 0
+  });
+}
+function capabilityImpact(id) {
+  switch (id) {
+    case "context7":
+      return ["current documentation evidence"];
+    case "sequential-thinking":
+      return ["high-risk reasoning evidence"];
+    case "chrome-devtools-mcp":
+      return ["browser evidence", "console/network evidence"];
+    case "ui-ux-pro-max":
+      return ["UI/UX review evidence"];
+    case "claude-mem":
+      return ["cross-session memory evidence"];
+    case "pua":
+      return ["repeated-failure recovery evidence"];
+    default:
+      return ["capability evidence"];
+  }
+}
+function browserStatuses(input) {
+  const playwright = input?.playwright;
+  const chrome = input?.chromeDevtoolsMcp;
+  const out = [];
+  out.push(status({
+    id: "playwright",
+    label: "Playwright",
+    category: "browser",
+    provider: "playwright",
+    provisioning: "project-script",
+    checkMode: playwright?.ready === true ? "skipped" : "fast",
+    state: playwright?.ready === true ? "skipped" : "unavailable",
+    configured: playwright?.ready === true,
+    installed: playwright?.dependency === true ? true : "unknown",
+    callable: "skipped",
+    authorized: "unknown",
+    reason: playwright?.ready === true ? `Playwright verifier candidate found${playwright.recommendedCommand ? `: ${playwright.recommendedCommand}` : ""}. Deep run skipped.` : "No Playwright/browser verifier candidate found.",
+    ...playwright?.ready === true ? { skippedReason: "Fast doctor does not run Playwright/browser verification." } : {},
+    evidenceImpact: ["browser evidence", "UI journey evidence"],
+    blocksCompletion: playwright?.ready !== true,
+    blocksRelease: false,
+    remediation: playwright?.ready === true ? null : "Add a Playwright/browser verification script or document a blocker.",
+    durationMs: 0
+  }));
+  if (chrome) {
+    const ready = chrome.ready === true;
+    const dependencyDeclared = chrome.dependencyDeclared === true;
+    const chromeInstalled = chrome.chromeInstalled === true;
+    out.push(status({
+      id: "chrome-runtime",
+      label: "Chrome runtime for Chrome DevTools MCP",
+      category: "browser",
+      provider: "chrome",
+      provisioning: "local-command",
+      checkMode: "fast",
+      state: ready ? "available" : dependencyDeclared && !chromeInstalled ? "degraded" : "unavailable",
+      configured: dependencyDeclared,
+      installed: chromeInstalled,
+      callable: ready ? "unknown" : false,
+      authorized: "unknown",
+      reason: ready ? "Chrome DevTools MCP dependency is declared and Chrome is installed." : dependencyDeclared ? "Chrome DevTools MCP is declared but Chrome is not installed or not discoverable." : "Chrome DevTools MCP is not declared.",
+      evidenceImpact: capabilityImpact("chrome-devtools-mcp"),
+      blocksCompletion: false,
+      blocksRelease: false,
+      remediation: ready ? null : "Install Chrome and enable chrome-devtools-mcp before relying on browser runtime evidence.",
+      durationMs: 0
+    }));
+  }
+  return out;
+}
+function hookFreshnessStatus(input) {
+  if (input?.sourceAvailable !== true) {
+    return status({
+      id: "hook-freshness",
+      label: "Hook bundle freshness",
+      category: "hook",
+      provider: "curdx-flow",
+      provisioning: "workflow",
+      checkMode: "skipped",
+      state: "skipped",
+      configured: "skipped",
+      installed: "skipped",
+      callable: "skipped",
+      authorized: "skipped",
+      reason: "Hook source is not available in this installed runtime; freshness is a source checkout check.",
+      evidenceImpact: ["plugin release evidence"],
+      blocksCompletion: false,
+      blocksRelease: false,
+      remediation: null,
+      durationMs: 0
+    });
+  }
+  const fresh = input.fresh === true;
+  return status({
+    id: "hook-freshness",
+    label: "Hook bundle freshness",
+    category: "hook",
+    provider: "curdx-flow",
+    provisioning: "workflow",
+    checkMode: "fast",
+    state: fresh ? "available" : "unavailable",
+    configured: true,
+    installed: true,
+    callable: fresh,
+    authorized: "skipped",
+    reason: fresh ? "Generated hook bundles are fresh." : "Generated hook bundles are stale.",
+    evidenceImpact: ["plugin release evidence", "hook protocol evidence"],
+    blocksCompletion: false,
+    blocksRelease: !fresh,
+    remediation: fresh ? null : input.checkCommand ?? "npm run check:hooks-fresh",
+    durationMs: 0
+  });
+}
+function nativeGoalStatus(input) {
+  const readiness = input ?? buildNativeGoalReadiness();
+  const state2 = readiness.state === "available" ? "available" : readiness.state === "unknown" ? "unknown" : "unavailable";
+  const detected = readiness.detectedVersion !== null;
+  return {
+    ...status({
+      id: "native-goal",
+      label: "Native /goal",
+      category: "core",
+      provider: "claude-code",
+      provisioning: "workflow",
+      checkMode: "fast",
+      state: state2,
+      configured: readiness.blockers.length > 0 ? false : detected ? true : "unknown",
+      installed: detected ? true : readiness.state === "unavailable" ? false : "unknown",
+      callable: readiness.state === "available" ? true : readiness.state === "unknown" ? "unknown" : false,
+      authorized: readiness.state === "available" ? true : readiness.blockers.length > 0 ? false : "unknown",
+      reason: readiness.reason,
+      evidenceImpact: ["long-task execution evidence", "transcript-visible completion evidence"],
+      blocksCompletion: readiness.state !== "available",
+      blocksRelease: false,
+      remediation: readiness.fallbackAction,
+      durationMs: 0
+    }),
+    supported: readiness.supported,
+    requiredVersion: readiness.requiredVersion,
+    detectedVersion: readiness.detectedVersion,
+    goalState: readiness.state,
+    blockers: readiness.blockers,
+    fallbackAction: readiness.fallbackAction,
+    recommendedDriver: readiness.recommendedDriver,
+    conditionLength: readiness.conditionLength,
+    warnings: readiness.warnings
+  };
+}
+function staticStatuses(input) {
+  const packageManager = input.packageManager;
+  return [
+    status({
+      id: "node",
+      label: "Node.js",
+      category: "core",
+      provider: "node",
+      provisioning: "local-command",
+      checkMode: "fast",
+      state: "available",
+      configured: true,
+      installed: true,
+      callable: true,
+      authorized: "skipped",
+      reason: `Current runtime is ${process.version}.`,
+      evidenceImpact: ["command evidence", "plugin runtime evidence"],
+      blocksCompletion: false,
+      blocksRelease: false,
+      remediation: null,
+      durationMs: 0
+    }),
+    status({
+      id: "package-manager",
+      label: "Package manager",
+      category: "package-manager",
+      provider: "npm",
+      provisioning: "local-command",
+      checkMode: "fast",
+      state: packageManager ? "available" : "unavailable",
+      configured: packageManager ? true : false,
+      installed: packageManager ? "unknown" : false,
+      callable: "unknown",
+      authorized: "skipped",
+      reason: packageManager ? `Detected package manager: ${packageManager}.` : "No package manager marker found.",
+      evidenceImpact: ["command evidence", "verification command evidence"],
+      blocksCompletion: packageManager === null,
+      blocksRelease: false,
+      remediation: packageManager ? null : "Add package.json/lockfile or document the project verifier command.",
+      durationMs: 0
+    }),
+    nativeGoalStatus(input.nativeGoal),
+    pluginValidationStatus(input),
+    status({
+      id: "release-readiness",
+      label: "Release readiness",
+      category: "release",
+      provider: "curdx-flow",
+      provisioning: "workflow",
+      checkMode: "fast",
+      state: input.release?.ready === false ? "degraded" : input.release?.ready === true ? "available" : "unknown",
+      configured: true,
+      installed: "skipped",
+      callable: input.release?.ready === false ? false : "unknown",
+      authorized: "unknown",
+      reason: input.release?.ready === false ? "Release readiness has one or more unresolved checks." : "Release readiness did not report a blocking failure.",
+      evidenceImpact: ["release evidence"],
+      blocksCompletion: false,
+      blocksRelease: input.release?.ready === false,
+      remediation: input.release?.ready === false ? "Run release readiness checks before tag/publish." : null,
+      durationMs: 0
+    })
+  ];
+}
+function sortCapabilities(capabilities) {
+  return [...capabilities].sort((a, b) => a.id.localeCompare(b.id));
+}
+function buildCapabilityMatrix(input) {
+  const pluginDeps = input.plugin?.dependencies?.dependencies ?? [];
+  const externalServers = input.externalMcp?.servers ?? [];
+  const capabilities = [
+    ...staticStatuses(input),
+    probeStatus({
+      id: "claude-code",
+      label: "Claude Code CLI",
+      provider: "claude-code",
+      category: "core",
+      provisioning: "local-command",
+      probe: input.claudeProbe,
+      command: "claude --version",
+      evidenceImpact: ["plugin validation evidence", "MCP/plugin command evidence", "native /goal evidence"],
+      blocksCompletion: true,
+      blocksRelease: true,
+      remediation: "Install or update Claude Code and ensure the claude command is callable."
+    }),
+    probeStatus({
+      id: "npm",
+      label: "npm",
+      provider: "npm",
+      category: "package-manager",
+      provisioning: "local-command",
+      probe: input.npmProbe,
+      command: "npm --version",
+      evidenceImpact: ["package verification evidence", "release evidence"],
+      blocksCompletion: false,
+      blocksRelease: true,
+      remediation: "Install npm or configure the project package manager verifier."
+    }),
+    ...CURDX_PLUGIN_DEPENDENCIES.map(
+      (dependency) => pluginDependencyStatus(
+        dependency.id,
+        dependency.name,
+        pluginDeps.find((fact) => fact.name === dependency.name)
+      )
+    ),
+    ...CURDX_EXTERNAL_MCPS.map(
+      (mcp) => externalMcpStatus(
+        mcp.id,
+        externalServers.find((server) => server.id === mcp.id)
+      )
+    ),
+    ...browserStatuses(input.browserVerification),
+    hookFreshnessStatus(input.hookFreshness)
+  ];
+  const deduped = /* @__PURE__ */ new Map();
+  for (const capability of capabilities) deduped.set(capability.id, capability);
+  const sorted = sortCapabilities([...deduped.values()]);
+  const blockers = sorted.filter(
+    (capability) => (capability.state === "unavailable" || capability.state === "degraded") && (capability.blocksCompletion || capability.blocksRelease)
+  );
+  const degraded = sorted.filter((capability) => capability.state === "degraded");
+  const nextActions = sorted.filter((capability) => capability.remediation && capability.state !== "available").map((capability) => ({
+    capabilityId: capability.id,
+    action: capability.remediation,
+    priority: capability.blocksRelease || capability.blocksCompletion ? "high" : capability.state === "degraded" ? "medium" : "low"
+  }));
+  return {
+    schemaVersion: 1,
+    generatedAt: input.generatedAt ?? (/* @__PURE__ */ new Date()).toISOString(),
+    cwd: input.cwd,
+    mode: input.mode ?? "fast",
+    summary: {
+      blockers: blockers.length,
+      degraded: degraded.length,
+      unavailable: sorted.filter((capability) => capability.state === "unavailable").length,
+      skippedDeepChecks: sorted.filter((capability) => capability.checkMode === "skipped").length
+    },
+    capabilities: sorted,
+    blockers,
+    degraded,
+    nextActions
+  };
+}
+
+// src/runtime/capabilities/probes.ts
+import { spawnSync as spawnSync2 } from "node:child_process";
+function fixtureMap(env) {
+  const raw = env.CURDX_FLOW_CAPABILITY_PROBES;
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+function fixtureResult(input, fixture) {
+  return {
+    id: input.id,
+    command: [input.command, ...input.args ?? []].join(" "),
+    exitCode: fixture.exitCode ?? 0,
+    stdout: fixture.stdout ?? "",
+    stderr: fixture.stderr ?? "",
+    ...fixture.error ? { error: fixture.error } : {},
+    durationMs: fixture.durationMs ?? 0,
+    timedOut: fixture.timedOut ?? false,
+    source: "fixture"
+  };
+}
+function probeCommand(input) {
+  const env = { ...process.env, ...input.env ?? {} };
+  const fixture = fixtureMap(env)[input.id];
+  if (fixture) return fixtureResult(input, fixture);
+  const startedAt = Date.now();
+  const result = spawnSync2(input.command, input.args ?? [], {
+    cwd: input.cwd,
+    env,
+    encoding: "utf8",
+    timeout: input.timeoutMs ?? 1e3,
+    maxBuffer: input.maxBuffer ?? 256 * 1024
+  });
+  const durationMs = Date.now() - startedAt;
+  const error = result.error;
+  const timedOut = error?.code === "ETIMEDOUT" || result.signal === "SIGTERM";
+  const errorMessage = timedOut ? `command timed out after ${input.timeoutMs ?? 1e3}ms` : error?.message;
+  return {
+    id: input.id,
+    command: [input.command, ...input.args ?? []].join(" "),
+    exitCode: result.status ?? null,
+    stdout: result.stdout ?? "",
+    stderr: result.stderr ?? "",
+    ...errorMessage ? { error: errorMessage } : {},
+    durationMs,
+    timedOut,
+    source: "exec"
+  };
+}
+
+// src/runtime/capabilities/readiness.ts
+function isRecord2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function stringValue(value) {
+  return typeof value === "string" && value.length > 0 ? value : void 0;
+}
+function booleanTri(value) {
+  return typeof value === "boolean" ? value : "unknown";
+}
+function splitPluginId(id) {
+  const at = id.lastIndexOf("@");
+  if (at <= 0) return { name: id, marketplace: "" };
+  return {
+    name: id.slice(0, at),
+    marketplace: id.slice(at + 1)
+  };
+}
+function parsePluginListJson(raw) {
+  if (raw === void 0) {
+    return { ok: false, plugins: [], parseError: null };
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    const items = Array.isArray(parsed) ? parsed : isRecord2(parsed) && Array.isArray(parsed.plugins) ? parsed.plugins : null;
+    if (!items) {
+      return { ok: false, plugins: [], parseError: "invalid plugin list json: expected an array or { plugins: [] }" };
+    }
+    const plugins = [];
+    for (const item of items) {
+      if (!isRecord2(item) || typeof item.id !== "string" || item.id.length === 0) continue;
+      const parts = splitPluginId(item.id);
+      plugins.push({
+        id: item.id,
+        name: stringValue(item.name) ?? parts.name,
+        marketplace: stringValue(item.marketplace) ?? parts.marketplace,
+        ...stringValue(item.version) ? { version: stringValue(item.version) } : {},
+        ...stringValue(item.scope) ? { scope: stringValue(item.scope) } : {},
+        ...typeof item.enabled === "boolean" ? { enabled: item.enabled } : {}
+      });
+    }
+    return { ok: true, plugins, parseError: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, plugins: [], parseError: `invalid plugin list json: ${message}` };
+  }
+}
+function pluginBlocksCompletion(id) {
+  return id === "chrome-devtools-mcp";
+}
+function dependencyRemediation(name, marketplace, issue) {
+  if (issue === "degraded") {
+    return `Enable ${name} from the ${marketplace} marketplace at user scope and rerun curdx-flow doctor.`;
+  }
+  if (issue === "unavailable") {
+    return `Install/enable ${name}@${marketplace} as a Claude Code plugin dependency; curdx-flow must not vendor or silently skip it.`;
+  }
+  return `Run claude plugin list --json and confirm ${name}@${marketplace} is installed and enabled.`;
+}
+function buildPluginDependencyReadiness(input) {
+  const source = input.pluginListSource ?? "not-probed";
+  const exitCode = input.pluginListExitCode ?? (input.pluginListJson === void 0 ? null : 0);
+  const commandError = input.pluginListError ?? null;
+  const allowlist = new Set(input.marketplaceAllowlist ?? []);
+  const parsed = exitCode === 0 && !commandError ? parsePluginListJson(input.pluginListJson) : { ok: false, plugins: [], parseError: null };
+  const expectedScope = input.expectedScope ?? "user";
+  const dependencies = input.expected.map((expected) => {
+    const actual = (input.manifestDependencies ?? []).find((item) => item.name === expected.name);
+    const marketplace = actual?.marketplace ?? null;
+    const declared = actual !== void 0;
+    const marketplaceMatches = marketplace === expected.marketplace;
+    const crossMarketplaceAllowlisted = allowlist.has(expected.marketplace);
+    const trustSatisfied = declared && marketplaceMatches && crossMarketplaceAllowlisted;
+    const exactInstalled = parsed.plugins.find((plugin) => plugin.id === expected.pluginId);
+    const sameNameInstalled = parsed.plugins.find(
+      (plugin) => plugin.name === expected.name && plugin.id !== expected.pluginId
+    );
+    const scope = exactInstalled?.scope ?? (exactInstalled ? expectedScope : null);
+    const enabled = exactInstalled ? booleanTri(exactInstalled.enabled) : parsed.ok ? false : "unknown";
+    const drift = [];
+    if (!declared) drift.push("manifest-missing");
+    if (declared && !marketplaceMatches) drift.push("manifest-marketplace-mismatch");
+    if (!crossMarketplaceAllowlisted) drift.push("marketplace-allowlist-missing");
+    if (parsed.parseError) drift.push("plugin-list-malformed");
+    if (commandError || exitCode !== 0) drift.push("plugin-list-unavailable");
+    if (parsed.ok && !exactInstalled) {
+      drift.push(sameNameInstalled ? "plugin-id-mismatch" : "plugin-missing");
+    }
+    if (exactInstalled && scope !== expectedScope) drift.push("plugin-scope-mismatch");
+    if (exactInstalled && exactInstalled.enabled === false) drift.push("plugin-disabled");
+    const manifestDrift = drift.some(
+      (item) => item === "manifest-missing" || item === "manifest-marketplace-mismatch" || item === "marketplace-allowlist-missing" || item === "plugin-id-mismatch"
+    );
+    const installed = exactInstalled ? true : parsed.ok ? false : "unknown";
+    const installedScope = scope;
+    const installedVersion = exactInstalled?.version ?? null;
+    const authorized = trustSatisfied ? true : false;
+    let callable = "unknown";
+    let readiness = "unknown";
+    if (!trustSatisfied || manifestDrift) {
+      readiness = "unavailable";
+      callable = false;
+    } else if (!parsed.ok || commandError || exitCode !== 0) {
+      readiness = "unknown";
+      callable = "unknown";
+    } else if (!exactInstalled) {
+      readiness = "unavailable";
+      callable = false;
+    } else if (scope !== expectedScope || exactInstalled.enabled === false) {
+      readiness = "degraded";
+      callable = false;
+    } else if (exactInstalled.enabled === true) {
+      readiness = "available";
+      callable = true;
+    }
+    const reason = readiness === "available" ? `${expected.name}@${expected.marketplace} is installed at ${installedScope} scope and enabled.` : readiness === "unknown" ? `${expected.name}@${expected.marketplace} readiness is unknown because installed plugin state was not confirmed.` : drift.length > 0 ? `${expected.name}@${expected.marketplace} readiness failed: ${drift.join(", ")}.` : `${expected.name}@${expected.marketplace} is not ready.`;
+    return {
+      id: expected.id,
+      name: expected.name,
+      type: "plugin",
+      expectedMarketplace: expected.marketplace,
+      expectedPluginId: expected.pluginId,
+      declared,
+      marketplace,
+      marketplaceMatches,
+      crossMarketplaceAllowlisted,
+      versionConstraint: actual?.version ?? null,
+      installed,
+      installedScope,
+      installedVersion,
+      enabled,
+      callable,
+      authorized,
+      trustSatisfied,
+      readiness,
+      blocksCompletion: pluginBlocksCompletion(expected.id) && readiness !== "available",
+      blocksRelease: readiness !== "available",
+      drift,
+      reason,
+      remediation: readiness === "available" ? "" : dependencyRemediation(expected.name, expected.marketplace, readiness),
+      pluginListSource: source,
+      pluginListExitCode: exitCode
+    };
+  });
+  return {
+    ready: dependencies.every((dependency) => dependency.readiness === "available"),
+    source,
+    exitCode,
+    parseError: parsed.parseError,
+    commandError,
+    dependencies
+  };
+}
+function parseMcpListOutput(raw) {
+  const entries = [];
+  const ignoredPluginProvidedServers = [];
+  const malformedLines = [];
+  for (const rawLine of raw.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (/^Checking\b/i.test(line)) continue;
+    if (line.startsWith("plugin:")) {
+      ignoredPluginProvidedServers.push(line);
+      continue;
+    }
+    const colonIdx = line.indexOf(":");
+    if (colonIdx <= 0) {
+      malformedLines.push(line);
+      continue;
+    }
+    const name = line.slice(0, colonIdx).trim();
+    if (!name || /\s/.test(name)) {
+      malformedLines.push(line);
+      continue;
+    }
+    const status2 = /✗|failed|error|not connected|disconnected/i.test(line) ? "error" : /✓|\bconnected\b/i.test(line) ? "connected" : "unknown";
+    entries.push({ name, rawLine: line, status: status2 });
+  }
+  return { entries, ignoredPluginProvidedServers, malformedLines };
+}
+function externalMcpFallback(id) {
+  if (id === "context7") {
+    return "Fallback: use official docs/web evidence or manual confirmation; latest Claude Code/plugin/MCP behavior remains uncertain until context7 is connected.";
+  }
+  if (id === "sequential-thinking") {
+    return "Fallback: perform explicit local reasoning and manual risk review; high-risk reasoning evidence remains degraded until sequential-thinking is connected.";
+  }
+  return "Fallback: document manual confirmation before relying on this external MCP evidence.";
+}
+function buildExternalMcpReadiness(input) {
+  const source = input.mcpListSource ?? "not-probed";
+  const exitCode = input.mcpListExitCode ?? (input.mcpListOutput === void 0 ? null : 0);
+  const commandError = input.mcpListError ?? null;
+  if (exitCode !== 0 || commandError) {
+    return {
+      ready: false,
+      source,
+      exitCode,
+      commandError: commandError ?? `claude mcp list exited ${exitCode}`,
+      malformedLines: [],
+      ignoredPluginProvidedServers: [],
+      servers: input.expected.map((expected) => ({
+        id: expected.id,
+        type: "mcp",
+        expectedExternal: true,
+        bundledByCurdxFlow: false,
+        configured: "unknown",
+        installed: "unknown",
+        callable: "unknown",
+        authorized: "unknown",
+        status: "unknown",
+        rawLine: null,
+        installHint: expected.installHint,
+        fallback: externalMcpFallback(expected.id),
+        source
+      }))
+    };
+  }
+  const parsed = parseMcpListOutput(input.mcpListOutput ?? "");
+  const servers = input.expected.map((expected) => {
+    const entry = parsed.entries.find(
+      (candidate) => expected.match.test(candidate.name) || expected.match.test(candidate.rawLine)
+    );
+    if (!entry) {
+      return {
+        id: expected.id,
+        type: "mcp",
+        expectedExternal: true,
+        bundledByCurdxFlow: false,
+        configured: false,
+        installed: false,
+        callable: false,
+        authorized: "unknown",
+        status: "missing",
+        rawLine: null,
+        installHint: expected.installHint,
+        fallback: externalMcpFallback(expected.id),
+        source
+      };
+    }
+    return {
+      id: expected.id,
+      type: "mcp",
+      expectedExternal: true,
+      bundledByCurdxFlow: false,
+      configured: true,
+      installed: true,
+      callable: entry.status === "connected" ? true : entry.status === "error" ? false : "unknown",
+      authorized: "unknown",
+      status: entry.status,
+      rawLine: entry.rawLine,
+      installHint: expected.installHint,
+      fallback: entry.status === "connected" ? "" : externalMcpFallback(expected.id),
+      source
+    };
+  });
+  return {
+    ready: servers.every((server) => server.status === "connected"),
+    source,
+    exitCode,
+    commandError: null,
+    malformedLines: parsed.malformedLines,
+    ignoredPluginProvidedServers: parsed.ignoredPluginProvidedServers,
+    servers
+  };
+}
+
+// src/runtime/capabilities/renderer.ts
+function overall(matrix) {
+  if (matrix.summary.blockers > 0) return "blocked";
+  if (matrix.summary.degraded > 0 || matrix.summary.unavailable > 0 || matrix.summary.skippedDeepChecks > 0) return "degraded";
+  return "ready";
+}
+function tri2(value) {
+  return String(value);
+}
+function row(capability) {
+  return [
+    capability.id,
+    capability.state,
+    `configured=${tri2(capability.configured)}`,
+    `installed=${tri2(capability.installed)}`,
+    `callable=${tri2(capability.callable)}`,
+    `authorized=${tri2(capability.authorized)}`,
+    capability.reason
+  ].join(" | ");
+}
+function renderCapabilityMatrix(matrix) {
+  const degraded = matrix.capabilities.filter(
+    (capability) => capability.state === "degraded" || capability.state === "unavailable"
+  );
+  const impacts = degraded.flatMap(
+    (capability) => capability.evidenceImpact.map((impact) => `- ${capability.id}: affects ${impact}`)
+  );
+  const nextActions = matrix.nextActions.length > 0 ? matrix.nextActions.map((action, index) => `${index + 1}. ${action.capabilityId}: ${action.action}`) : ["none"];
+  return [
+    "# curdx-flow Doctor",
+    "",
+    `Overall: ${overall(matrix)}`,
+    `Blockers: ${matrix.summary.blockers}`,
+    `Degraded: ${matrix.summary.degraded}`,
+    `Unavailable: ${matrix.summary.unavailable}`,
+    `Skipped deep checks: ${matrix.summary.skippedDeepChecks}`,
+    "",
+    "## Capability Matrix",
+    ...matrix.capabilities.map(row),
+    "",
+    "## Evidence Impact",
+    ...impacts.length > 0 ? impacts : ["none"],
+    "",
+    "## Next Actions",
+    ...nextActions,
+    ""
+  ].join("\n");
 }
 
 // src/hooks/lib/runtime-cli.ts
@@ -4377,8 +5506,8 @@ function repoRootFromPlugin() {
   return resolve5(pluginRoot(), "..", "..");
 }
 function runBundled(scriptName, args, cwd) {
-  const script = join8(scriptRoot(), `${scriptName}.mjs`);
-  const result = spawnSync2(process.execPath, [script, ...args], {
+  const script = join9(scriptRoot(), `${scriptName}.mjs`);
+  const result = spawnSync3(process.execPath, [script, ...args], {
     cwd: cwd ?? process.cwd(),
     encoding: "utf8",
     stdio: ["inherit", "pipe", "pipe"]
@@ -4438,12 +5567,27 @@ function lastMile(argv) {
 }
 function goal(argv) {
   const maxTurnsRaw = readArg9("--max-turns", argv) ?? readArg9("--max-global-iterations", argv);
+  const cwd = resolve5(readArg9("--cwd", argv) ?? process.cwd());
+  const claudeBin = process.env.CURDX_FLOW_CLAUDE_BIN ?? "claude";
+  const claudeProbe = probeCommand({
+    id: "claude-version",
+    command: claudeBin,
+    args: ["--version"],
+    cwd,
+    env: process.env,
+    timeoutMs: 1e3
+  });
+  const nativeGoal = buildNativeGoalReadiness({
+    claudeProbe,
+    settingsSources: readNativeGoalSettingsSources({ cwd, env: process.env })
+  });
   printJson(
     buildGoalBridge({
-      cwd: readArg9("--cwd", argv),
+      cwd,
       spec: readArg9("--spec", argv) ?? readArg9("--name", argv),
       goal: readArg9("--goal", argv),
-      maxTurns: maxTurnsRaw === void 0 ? void 0 : Number(maxTurnsRaw)
+      maxTurns: maxTurnsRaw === void 0 ? void 0 : Number(maxTurnsRaw),
+      nativeGoal
     })
   );
 }
@@ -4471,17 +5615,17 @@ function isDirectory(path3) {
 }
 function readJsonFile3(path3) {
   try {
-    return JSON.parse(readFileSync9(path3, "utf8"));
+    return JSON.parse(readFileSync10(path3, "utf8"));
   } catch {
     return null;
   }
 }
 function detectPackageManager3(cwd) {
-  if (existsSync9(join8(cwd, "pnpm-lock.yaml"))) return "pnpm";
-  if (existsSync9(join8(cwd, "bun.lockb")) || existsSync9(join8(cwd, "bun.lock"))) return "bun";
-  if (existsSync9(join8(cwd, "yarn.lock"))) return "yarn";
-  if (existsSync9(join8(cwd, "package-lock.json"))) return "npm";
-  if (existsSync9(join8(cwd, "package.json"))) return "npm";
+  if (existsSync10(join9(cwd, "pnpm-lock.yaml"))) return "pnpm";
+  if (existsSync10(join9(cwd, "bun.lockb")) || existsSync10(join9(cwd, "bun.lock"))) return "bun";
+  if (existsSync10(join9(cwd, "yarn.lock"))) return "yarn";
+  if (existsSync10(join9(cwd, "package-lock.json"))) return "npm";
+  if (existsSync10(join9(cwd, "package.json"))) return "npm";
   return null;
 }
 function scriptCommand2(packageManager, scriptName) {
@@ -4500,40 +5644,61 @@ function shellToken(value) {
   return /^[A-Za-z0-9_@%+=:,./-]+$/.test(value) ? value : `'${value.replace(/'/g, `'\\''`)}'`;
 }
 function pluginDependencyDoctor() {
-  const manifest = readJsonFile3(join8(pluginRoot(), ".claude-plugin", "plugin.json"));
+  const manifest = readJsonFile3(join9(pluginRoot(), ".claude-plugin", "plugin.json"));
   const marketplace = readJsonFile3(
-    join8(repoRootFromPlugin(), ".claude-plugin", "marketplace.json")
+    join9(repoRootFromPlugin(), ".claude-plugin", "marketplace.json")
   );
   const declared = manifest?.dependencies ?? [];
   const allowlist = new Set(marketplace?.allowCrossMarketplaceDependenciesOn ?? []);
-  const dependencies = CURDX_PLUGIN_DEPENDENCIES.map((expected) => {
-    const actual = declared.find((item) => item.name === expected.name);
-    const marketplaceName = actual?.marketplace ?? null;
-    return {
-      name: expected.name,
-      type: "plugin",
-      expectedMarketplace: expected.marketplace,
-      declared: actual !== void 0,
-      marketplace: marketplaceName,
-      marketplaceMatches: marketplaceName === expected.marketplace,
-      crossMarketplaceAllowlisted: allowlist.has(expected.marketplace),
-      versionConstraint: actual?.version ?? null,
-      wheelFirst: true,
-      curdxRole: "recommend/gate; do not reimplement"
-    };
+  const envJson = process.env.CURDX_FLOW_PLUGIN_LIST_JSON;
+  const envExitCode = process.env.CURDX_FLOW_PLUGIN_LIST_EXIT_CODE;
+  const envError = process.env.CURDX_FLOW_PLUGIN_LIST_ERROR;
+  const bin = process.env.CURDX_FLOW_CLAUDE_BIN ?? "claude";
+  let source = "claude plugin list --json";
+  let pluginListJson;
+  let exitCode = null;
+  let error = null;
+  if (envJson !== void 0) {
+    source = "CURDX_FLOW_PLUGIN_LIST_JSON";
+    pluginListJson = envJson;
+    exitCode = envExitCode ? Number(envExitCode) : 0;
+    error = envError ?? null;
+  } else {
+    let result = spawnSync3(bin, ["plugin", "list", "--json"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      timeout: 3e3,
+      maxBuffer: 1024 * 1024
+    });
+    source = "direct exec";
+    pluginListJson = result.stdout ?? "";
+    exitCode = result.status ?? null;
+    if (result.error) {
+      error = result.error.message;
+    } else if (exitCode !== 0 && result.stderr) {
+      error = result.stderr.trim();
+    }
+  }
+  const readiness = buildPluginDependencyReadiness({
+    expected: CURDX_PLUGIN_DEPENDENCIES,
+    manifestDependencies: declared,
+    marketplaceAllowlist: [...allowlist],
+    pluginListJson,
+    pluginListSource: source,
+    pluginListExitCode: exitCode,
+    pluginListError: error
   });
   return {
-    ready: dependencies.every(
-      (item) => item.declared && item.marketplaceMatches && item.crossMarketplaceAllowlisted
-    ),
-    dependencies,
-    warnings: dependencies.filter((item) => item.versionConstraint === null).map(
+    ...readiness,
+    warnings: readiness.dependencies.filter((item) => item.versionConstraint === null).map(
       (item) => `${item.name} has no dependency version constraint; keep this intentional unless upstream tags are confirmed.`
     )
   };
 }
 function externalMcpDoctor() {
   const envOutput = process.env.CURDX_FLOW_MCP_LIST_OUTPUT;
+  const envExitCode = process.env.CURDX_FLOW_MCP_LIST_EXIT_CODE;
+  const envError = process.env.CURDX_FLOW_MCP_LIST_ERROR;
   const bin = process.env.CURDX_FLOW_CLAUDE_BIN ?? "claude";
   let source = "claude mcp list";
   let output = "";
@@ -4542,57 +5707,42 @@ function externalMcpDoctor() {
   if (envOutput !== void 0) {
     source = "CURDX_FLOW_MCP_LIST_OUTPUT";
     output = envOutput;
-    exitCode = 0;
+    exitCode = envExitCode ? Number(envExitCode) : 0;
+    error = envError ?? null;
   } else {
-    let result = spawnSync2(bin, ["mcp", "list"], {
+    let result = spawnSync3(bin, ["mcp", "list"], {
       cwd: process.cwd(),
       encoding: "utf8",
       timeout: 3e3,
       maxBuffer: 1024 * 1024
     });
     source = "direct exec";
-    if (result.error?.code === "ENOENT") {
-      result = spawnSync2("zsh", ["-lic", `${shellToken(bin)} mcp list`], {
-        cwd: process.cwd(),
-        encoding: "utf8",
-        timeout: 3e3,
-        maxBuffer: 1024 * 1024
-      });
-      source = "zsh fallback";
-    }
     output = `${result.stdout ?? ""}
 ${result.stderr ?? ""}`;
     exitCode = result.status ?? null;
     if (result.error) {
       error = result.error.message;
+    } else if (exitCode !== 0 && result.stderr) {
+      error = result.stderr.trim();
     }
   }
-  const commandWorked = exitCode === 0;
-  const servers = CURDX_EXTERNAL_MCPS.map((expected) => {
-    const configured = commandWorked ? expected.match.test(output) : null;
-    return {
-      id: expected.id,
-      type: "mcp",
-      expectedExternal: true,
-      bundledByCurdxFlow: false,
-      configured,
-      status: configured === true ? "available" : configured === false ? "missing" : "unknown",
-      installHint: expected.installHint
-    };
+  const readiness = buildExternalMcpReadiness({
+    expected: CURDX_EXTERNAL_MCPS,
+    mcpListOutput: output,
+    mcpListSource: source,
+    mcpListExitCode: exitCode,
+    mcpListError: error
   });
   return {
-    ready: servers.every((server) => server.configured === true),
-    source,
+    ...readiness,
     command: `${bin} mcp list`,
-    exitCode,
-    error,
-    servers,
+    error: readiness.commandError,
     note: "curdx-flow does not bundle these MCP servers; setup scripts or user MCP config own installation."
   };
 }
 function externalMcpWarnings(externalMcp) {
   if (externalMcp.ready === true) return [];
-  const unknown = externalMcp.servers?.filter((server) => server.status !== "available").map((server) => `${server.id ?? "unknown"}:${server.status ?? "unknown"}`) ?? [];
+  const unknown = externalMcp.servers?.filter((server) => server.status !== "connected").map((server) => `${server.id ?? "unknown"}:${server.status ?? "unknown"}`) ?? [];
   const suffix = unknown.length > 0 ? ` (${unknown.join(", ")})` : "";
   const command = externalMcp.error ? `; command error: ${externalMcp.error}` : typeof externalMcp.exitCode === "number" ? `; exitCode=${externalMcp.exitCode}` : "";
   return [
@@ -4600,13 +5750,13 @@ function externalMcpWarnings(externalMcp) {
   ];
 }
 function releaseDoctor() {
-  const pkg = readJsonFile3(join8(repoRootFromPlugin(), "package.json"));
+  const pkg = readJsonFile3(join9(repoRootFromPlugin(), "package.json"));
   const lock = readJsonFile3(
-    join8(repoRootFromPlugin(), "package-lock.json")
+    join9(repoRootFromPlugin(), "package-lock.json")
   );
-  const manifest = readJsonFile3(join8(pluginRoot(), ".claude-plugin", "plugin.json"));
+  const manifest = readJsonFile3(join9(pluginRoot(), ".claude-plugin", "plugin.json"));
   const marketplace = readJsonFile3(
-    join8(repoRootFromPlugin(), ".claude-plugin", "marketplace.json")
+    join9(repoRootFromPlugin(), ".claude-plugin", "marketplace.json")
   );
   const marketplaceEntry = marketplace?.plugins?.find((item) => item.name === "curdx-flow");
   const versions = {
@@ -4641,7 +5791,7 @@ function isPluginSmokeScript(name, command) {
   return /claudecc|claude-code|claude code|plugin[-:]?smoke|plugin validate/i.test(`${name} ${command}`);
 }
 function detectProjectScripts(cwd) {
-  const pkg = readJsonFile3(join8(cwd, "package.json"));
+  const pkg = readJsonFile3(join9(cwd, "package.json"));
   const packageManager = detectPackageManager3(cwd);
   const scripts = pkg?.scripts ?? {};
   const allDependencies = { ...pkg?.dependencies ?? {}, ...pkg?.devDependencies ?? {} };
@@ -4669,21 +5819,21 @@ function detectProjectScripts(cwd) {
   };
 }
 function detectConfigFiles(cwd, filenames) {
-  return filenames.filter((name) => existsSync9(join8(cwd, name)));
+  return filenames.filter((name) => existsSync10(join9(cwd, name)));
 }
 function detectChrome() {
   const envPath = process.env.CHROME_PATH;
-  if (envPath && existsSync9(envPath)) {
+  if (envPath && existsSync10(envPath)) {
     return { installed: true, path: envPath, source: "CHROME_PATH" };
   }
   if (process.platform === "darwin") {
     const path3 = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-    return existsSync9(path3) ? { installed: true, path: path3, source: "macos-default" } : { installed: false, path: null, source: null };
+    return existsSync10(path3) ? { installed: true, path: path3, source: "macos-default" } : { installed: false, path: null, source: null };
   }
   if (process.platform === "win32") {
     const suffixes = [
-      join8("Google", "Chrome SxS", "Application", "chrome.exe"),
-      join8("Google", "Chrome", "Application", "chrome.exe")
+      join9("Google", "Chrome SxS", "Application", "chrome.exe"),
+      join9("Google", "Chrome", "Application", "chrome.exe")
     ];
     const prefixes = [
       process.env.LOCALAPPDATA,
@@ -4692,8 +5842,8 @@ function detectChrome() {
     ].filter((value) => Boolean(value));
     for (const prefix of prefixes) {
       for (const suffix of suffixes) {
-        const candidate = join8(prefix, suffix);
-        if (existsSync9(candidate)) {
+        const candidate = join9(prefix, suffix);
+        if (existsSync10(candidate)) {
           return { installed: true, path: candidate, source: "windows-default" };
         }
       }
@@ -4701,7 +5851,7 @@ function detectChrome() {
     return { installed: false, path: null, source: null };
   }
   for (const bin of ["google-chrome", "chromium", "chromium-browser"]) {
-    const found = spawnSync2("which", [bin], { encoding: "utf8" });
+    const found = spawnSync3("which", [bin], { encoding: "utf8" });
     if (found.status === 0) {
       return { installed: true, path: found.stdout.trim() || bin, source: "PATH" };
     }
@@ -4709,7 +5859,7 @@ function detectChrome() {
   return { installed: false, path: null, source: null };
 }
 function detectChromeDevtoolsDependency() {
-  const manifest = readJsonFile3(join8(pluginRoot(), ".claude-plugin", "plugin.json"));
+  const manifest = readJsonFile3(join9(pluginRoot(), ".claude-plugin", "plugin.json"));
   const dependency = manifest?.dependencies?.find((item) => item.name === "chrome-devtools-mcp");
   return {
     declared: dependency !== void 0,
@@ -4794,11 +5944,11 @@ function releaseTagParityDoctor(version) {
     output = envOutput;
     exitCode = envExitCode === void 0 ? 0 : Number(envExitCode);
     source = "CURDX_FLOW_GIT_LS_REMOTE_OUTPUT";
-  } else if (!existsSync9(join8(repoRoot, ".git"))) {
+  } else if (!existsSync10(join9(repoRoot, ".git"))) {
     checked = false;
     source = "not-git-worktree";
   } else {
-    const result = spawnSync2("git", [
+    const result = spawnSync3("git", [
       "-C",
       repoRoot,
       "ls-remote",
@@ -4859,7 +6009,7 @@ function collectCommandHooks(config) {
         const command = typeof hook.command === "string" ? hook.command : null;
         const args = Array.isArray(hook.args) ? hook.args.filter((arg) => typeof arg === "string") : [];
         const scriptArg = args[0] ?? null;
-        const scriptPath = scriptArg?.startsWith(prefix) === true ? join8(root, scriptArg.slice(prefix.length)) : null;
+        const scriptPath = scriptArg?.startsWith(prefix) === true ? join9(root, scriptArg.slice(prefix.length)) : null;
         out.push({
           event,
           command,
@@ -4868,7 +6018,7 @@ function collectCommandHooks(config) {
           execForm: command === "node" && scriptArg !== null && scriptArg.startsWith(prefix),
           scriptArg,
           scriptPath,
-          scriptExists: scriptPath === null ? null : existsSync9(scriptPath)
+          scriptExists: scriptPath === null ? null : existsSync10(scriptPath)
         });
       }
     }
@@ -4877,23 +6027,23 @@ function collectCommandHooks(config) {
 }
 function pluginHealthDoctor() {
   const root = pluginRoot();
-  const manifestPath = join8(root, ".claude-plugin", "plugin.json");
-  const hooksPath = join8(root, "hooks", "hooks.json");
-  const binPath = join8(root, "bin", "curdx-flow");
+  const manifestPath = join9(root, ".claude-plugin", "plugin.json");
+  const hooksPath = join9(root, "hooks", "hooks.json");
+  const binPath = join9(root, "bin", "curdx-flow");
   const manifest = readJsonFile3(manifestPath);
   const hooksConfig = readJsonFile3(hooksPath);
   const commandHooks = collectCommandHooks(hooksConfig);
   const shellFormHooks = commandHooks.filter((hook) => !hook.execForm || hook.shell !== null);
   const missingScripts = commandHooks.filter((hook) => hook.scriptExists === false);
   const validHooksObject = hooksConfig !== null && typeof hooksConfig.hooks === "object" && hooksConfig.hooks !== null;
-  const ready = existsSync9(root) && manifest !== null && manifest.name === "curdx-flow" && existsSync9(binPath) && validHooksObject && commandHooks.length > 0 && shellFormHooks.length === 0 && missingScripts.length === 0;
+  const ready = existsSync10(root) && manifest !== null && manifest.name === "curdx-flow" && existsSync10(binPath) && validHooksObject && commandHooks.length > 0 && shellFormHooks.length === 0 && missingScripts.length === 0;
   return {
     ready,
     root,
     dataDir: process.env.CLAUDE_PLUGIN_DATA ?? null,
     manifest: {
       path: manifestPath,
-      exists: existsSync9(manifestPath),
+      exists: existsSync10(manifestPath),
       valid: manifest !== null,
       name: manifest?.name ?? null,
       version: manifest?.version ?? null
@@ -4901,7 +6051,7 @@ function pluginHealthDoctor() {
     dependencies: pluginDependencyDoctor(),
     hooks: {
       path: hooksPath,
-      exists: existsSync9(hooksPath),
+      exists: existsSync10(hooksPath),
       valid: validHooksObject,
       commandHookCount: commandHooks.length,
       execForm: shellFormHooks.length === 0,
@@ -4918,32 +6068,32 @@ function pluginHealthDoctor() {
       }))
     },
     bin: {
-      curdxFlow: existsSync9(binPath),
+      curdxFlow: existsSync10(binPath),
       path: binPath
     }
   };
 }
 function hookFreshnessDoctor() {
-  const sourceRoot = join8(repoRootFromPlugin(), "src", "hooks");
-  const bundleRoot = join8(pluginRoot(), "hooks", "scripts");
+  const sourceRoot = join9(repoRootFromPlugin(), "src", "hooks");
+  const bundleRoot = join9(pluginRoot(), "hooks", "scripts");
   const pairs = [
     ["user-prompt-expansion-guard.ts", "user-prompt-expansion-guard.mjs"],
     ["user-prompt-submit-autopilot.ts", "user-prompt-submit-autopilot.mjs"],
     ["post-tool-batch-snapshot.ts", "post-tool-batch-snapshot.mjs"],
     ["post-compact-recorder.ts", "post-compact-recorder.mjs"],
     ["task-completed-verifier.ts", "task-completed-verifier.mjs"],
-    [join8("lib", "smart-route.ts"), join8("lib", "smart-route.mjs")],
-    [join8("lib", "tool-capabilities.ts"), join8("lib", "tool-capabilities.mjs")],
-    [join8("lib", "stack-capabilities.ts"), join8("lib", "stack-capabilities.mjs")],
-    [join8("lib", "dev-runtime.ts"), join8("lib", "dev-runtime.mjs")],
-    [join8("lib", "last-mile-orchestrator.ts"), join8("lib", "last-mile-orchestrator.mjs")],
-    [join8("lib", "runtime-cli.ts"), join8("lib", "runtime-cli.mjs")]
+    [join9("lib", "smart-route.ts"), join9("lib", "smart-route.mjs")],
+    [join9("lib", "tool-capabilities.ts"), join9("lib", "tool-capabilities.mjs")],
+    [join9("lib", "stack-capabilities.ts"), join9("lib", "stack-capabilities.mjs")],
+    [join9("lib", "dev-runtime.ts"), join9("lib", "dev-runtime.mjs")],
+    [join9("lib", "last-mile-orchestrator.ts"), join9("lib", "last-mile-orchestrator.mjs")],
+    [join9("lib", "runtime-cli.ts"), join9("lib", "runtime-cli.mjs")]
   ];
   const entries = pairs.map(([srcRel, bundleRel]) => {
-    const sourcePath = join8(sourceRoot, srcRel);
-    const bundlePath = join8(bundleRoot, bundleRel);
-    const sourceExists = existsSync9(sourcePath);
-    const bundleExists = existsSync9(bundlePath);
+    const sourcePath = join9(sourceRoot, srcRel);
+    const bundlePath = join9(bundleRoot, bundleRel);
+    const sourceExists = existsSync10(sourcePath);
+    const bundleExists = existsSync10(bundlePath);
     const sourceMtime = sourceExists ? statSync6(sourcePath).mtimeMs : null;
     const bundleMtime = bundleExists ? statSync6(bundlePath).mtimeMs : null;
     return {
@@ -4954,7 +6104,7 @@ function hookFreshnessDoctor() {
       fresh: sourceMtime === null || bundleMtime === null ? false : bundleMtime >= sourceMtime
     };
   });
-  const sourceAvailable = existsSync9(sourceRoot);
+  const sourceAvailable = existsSync10(sourceRoot);
   return {
     sourceAvailable,
     bundleRoot,
@@ -4965,7 +6115,7 @@ function hookFreshnessDoctor() {
   };
 }
 function resolveSpecPathForOutput(cwd, path3) {
-  const fsPath = isAbsolute6(path3) ? path3 : join8(cwd, path3);
+  const fsPath = isAbsolute6(path3) ? path3 : join9(cwd, path3);
   return { path: path3, fsPath };
 }
 function specs(argv) {
@@ -5109,7 +6259,7 @@ async function verify(argv) {
     process.stderr.write("verify run: no active spec\n");
     process.exit(2);
   }
-  const result = spawnSync2(command, {
+  const result = spawnSync3(command, {
     cwd,
     shell: true,
     stdio: "inherit",
@@ -5143,7 +6293,7 @@ async function verify(argv) {
       [phase]: block
     }
   });
-  const merge = spawnSync2(process.execPath, [join8(scriptRoot(), "merge-state.mjs"), snap.spec.statePath, patch], {
+  const merge = spawnSync3(process.execPath, [join9(scriptRoot(), "merge-state.mjs"), snap.spec.statePath, patch], {
     cwd,
     encoding: "utf8",
     stdio: ["inherit", "ignore", "pipe"]
@@ -5184,6 +6334,8 @@ async function verifyBlocks(argv) {
 }
 function doctor(argv) {
   const cwd = resolve5(readArg9("--cwd", argv) ?? process.cwd());
+  const mode = hasFlag2(argv, "--deep") ? "deep" : "fast";
+  const human = hasFlag2(argv, "--human") || readArg9("--format", argv) === "human";
   const snap = buildWorkflowSnapshot({
     cwd,
     spec: readArg9("--spec", argv),
@@ -5200,35 +6352,90 @@ function doctor(argv) {
   const executionBrief = buildExecutionBrief({ cwd, goal: goal2, routeFacts });
   const lastMileDecision = decideLastMile({ cwd, goal: goal2, routeFacts });
   const expected = [
-    join8(scriptRoot(), "workflow-snapshot.mjs"),
-    join8(scriptRoot(), "smart-route.mjs"),
-    join8(scriptRoot(), "last-mile-orchestrator.mjs"),
-    join8(scriptRoot(), "stack-capabilities.mjs"),
-    join8(scriptRoot(), "merge-state.mjs"),
-    join8(scriptRoot(), "count-tasks.mjs")
+    join9(scriptRoot(), "workflow-snapshot.mjs"),
+    join9(scriptRoot(), "smart-route.mjs"),
+    join9(scriptRoot(), "last-mile-orchestrator.mjs"),
+    join9(scriptRoot(), "stack-capabilities.mjs"),
+    join9(scriptRoot(), "merge-state.mjs"),
+    join9(scriptRoot(), "count-tasks.mjs")
   ];
-  const runtimeReady = expected.every((p) => existsSync9(p));
+  const runtimeReady = expected.every((p) => existsSync10(p));
   const plugin = pluginHealthDoctor();
+  const pluginDependenciesReady = plugin.dependencies?.ready === true;
   const hookFreshness = hookFreshnessDoctor();
   const release = releaseDoctor();
   const externalMcp = externalMcpDoctor();
+  const browserVerification = browserVerificationDoctor(cwd);
+  const packageManager = detectPackageManager3(cwd);
+  const claudeBin = process.env.CURDX_FLOW_CLAUDE_BIN ?? "claude";
+  const claudeProbe = probeCommand({
+    id: "claude-version",
+    command: claudeBin,
+    args: ["--version"],
+    cwd,
+    env: process.env,
+    timeoutMs: 1e3
+  });
+  const nativeGoal = buildNativeGoalReadiness({
+    claudeProbe,
+    settingsSources: readNativeGoalSettingsSources({ cwd, env: process.env })
+  });
+  const capabilityMatrix = buildCapabilityMatrix({
+    cwd,
+    mode,
+    packageManager,
+    claudeProbe,
+    npmProbe: probeCommand({
+      id: "npm-version",
+      command: "npm",
+      args: ["--version"],
+      cwd,
+      env: process.env,
+      timeoutMs: 1e3
+    }),
+    plugin,
+    externalMcp,
+    nativeGoal,
+    browserVerification,
+    hookFreshness,
+    release,
+    ...mode === "deep" ? {
+      pluginValidationProbe: probeCommand({
+        id: "plugin-validation",
+        command: claudeBin,
+        args: ["plugin", "validate", pluginRoot()],
+        cwd,
+        env: process.env,
+        timeoutMs: 1e4
+      })
+    } : {}
+  });
+  if (human) {
+    process.stdout.write(renderCapabilityMatrix(capabilityMatrix));
+    return;
+  }
   const warnings = [
     ...externalMcpWarnings(externalMcp)
   ];
   const root = pluginRoot();
   printJson({
-    ok: runtimeReady && plugin.ready === true && externalMcp.ready === true && release.ready !== false && (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
+    ok: runtimeReady && plugin.ready === true && pluginDependenciesReady && nativeGoal.state === "available" && externalMcp.ready === true && release.ready !== false && (hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true),
     warnings,
     diagnostics: {
       externalMcpReady: externalMcp.ready === true,
+      pluginDependenciesReady,
+      nativeGoalReady: nativeGoal.state === "available",
+      goalExecutionDriver: nativeGoal.recommendedDriver,
       hookFreshnessFresh: hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true,
       releaseReady: release.ready !== false
     },
+    capabilityMatrix,
+    nativeGoal,
     cwd,
-    scripts: Object.fromEntries(expected.map((p) => [basename11(p), existsSync9(p)])),
+    scripts: Object.fromEntries(expected.map((p) => [basename11(p), existsSync10(p)])),
     runtime: {
       ready: runtimeReady,
-      scripts: Object.fromEntries(expected.map((p) => [basename11(p), existsSync9(p)]))
+      scripts: Object.fromEntries(expected.map((p) => [basename11(p), existsSync10(p)]))
     },
     plugin,
     hookFreshness,
@@ -5246,7 +6453,7 @@ function doctor(argv) {
     executionBrief,
     lastMile: lastMileDecision,
     externalMcp,
-    browserVerification: browserVerificationDoctor(cwd),
+    browserVerification,
     active: snap.active,
     spec: snap.spec,
     gates: snap.gates,

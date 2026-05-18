@@ -1,0 +1,27 @@
+export { planCapabilityRoutes } from './capability-routing.ts';
+export { planUserJourneyVerification } from './user-journey.ts';
+export type {
+  CapabilityRouteDecision,
+  CapabilityRouteDecisionKind,
+  CapabilityRouteTrustLevel,
+  CapabilityRoutingPlan,
+  ExpectedApiInteraction,
+  ExpectedDataOutcome,
+  ExpectedUiState,
+  JourneyActionHint,
+  JourneyArtifactRequirement,
+  JourneyEntryPoint,
+  JourneyMissingEvidence,
+  JourneyPlanMode,
+  JourneyPlanningStatus,
+  JourneyPlanningVerdict,
+  JourneyRecoveryPlan,
+  JourneyRemainingRisk,
+  JourneyStep,
+  JourneyStepType,
+  PlanCapabilityRoutesInput,
+  PlanUserJourneyVerificationInput,
+  UserJourney,
+  UserJourneyHint,
+  UserJourneyVerificationPlan,
+} from './types.ts';

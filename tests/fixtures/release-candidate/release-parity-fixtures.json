@@ -1,0 +1,94 @@
+{
+  "base": {
+    "runId": "run-release-parity",
+    "goalId": "goal-release",
+    "versionSurfaces": {
+      "packageJson": "7.2.1",
+      "packageLockRoot": "7.2.1",
+      "packageLockPackageRoot": "7.2.1",
+      "pluginManifest": "7.2.1",
+      "marketplaceEntry": "7.2.1"
+    },
+    "expectedPluginDependencies": [
+      { "id": "pua", "name": "pua", "marketplace": "pua-skills", "pluginId": "pua@pua-skills" },
+      { "id": "claude-mem", "name": "claude-mem", "marketplace": "thedotmack", "pluginId": "claude-mem@thedotmack" },
+      { "id": "chrome-devtools-mcp", "name": "chrome-devtools-mcp", "marketplace": "chrome-devtools-plugins", "pluginId": "chrome-devtools-mcp@chrome-devtools-plugins" },
+      { "id": "ui-ux-pro-max", "name": "ui-ux-pro-max", "marketplace": "ui-ux-pro-max-skill", "pluginId": "ui-ux-pro-max@ui-ux-pro-max-skill" }
+    ],
+    "manifestDependencies": [
+      { "name": "pua", "marketplace": "pua-skills" },
+      { "name": "claude-mem", "marketplace": "thedotmack" },
+      { "name": "chrome-devtools-mcp", "marketplace": "chrome-devtools-plugins" },
+      { "name": "ui-ux-pro-max", "marketplace": "ui-ux-pro-max-skill" }
+    ],
+    "marketplaceAllowlist": ["pua-skills", "thedotmack", "chrome-devtools-plugins", "ui-ux-pro-max-skill"],
+    "registryPluginPackages": [
+      { "id": "pua", "type": "plugin", "required": true, "marketplaces": ["pua-skills"] },
+      { "id": "claude-mem", "type": "plugin", "required": true, "marketplaces": ["thedotmack"] },
+      { "id": "chrome-devtools-mcp", "type": "plugin", "required": true, "marketplaces": ["chrome-devtools-plugins"] },
+      { "id": "ui-ux-pro-max", "type": "plugin", "required": true, "marketplaces": ["ui-ux-pro-max-skill"] }
+    ],
+    "externalMcps": [
+      { "id": "context7", "provisioning": "external-mcp" },
+      { "id": "sequential-thinking", "provisioning": "external-mcp" }
+    ]
+  },
+  "versionMismatch": {
+    "patch": {
+      "versionSurfaces": {
+        "pluginManifest": "7.2.2"
+      }
+    },
+    "expected": {
+      "checkId": "version-parity",
+      "reasonIncludes": "plugins/curdx-flow/.claude-plugin/plugin.json"
+    }
+  },
+  "dependencyDrift": {
+    "patch": {
+      "manifestDependencies": [
+        { "name": "pua", "marketplace": "wrong-marketplace" },
+        { "name": "claude-mem", "marketplace": "thedotmack" },
+        { "name": "chrome-devtools-mcp", "marketplace": "chrome-devtools-plugins" },
+        { "name": "ui-ux-pro-max", "marketplace": "ui-ux-pro-max-skill" }
+      ]
+    },
+    "expected": {
+      "checkId": "plugin-dependency-parity",
+      "reasonIncludes": "wrong-marketplace"
+    }
+  },
+  "allowlistMissing": {
+    "patch": {
+      "marketplaceAllowlist": ["thedotmack", "chrome-devtools-plugins", "ui-ux-pro-max-skill"]
+    },
+    "expected": {
+      "checkId": "plugin-dependency-parity",
+      "reasonIncludes": "Marketplace allowlist is missing 'pua-skills'"
+    }
+  },
+  "allowlistExtra": {
+    "patch": {
+      "marketplaceAllowlist": ["pua-skills", "thedotmack", "chrome-devtools-plugins", "ui-ux-pro-max-skill", "unknown-marketplace"]
+    },
+    "expected": {
+      "checkId": "plugin-dependency-parity",
+      "reasonIncludes": "unexpected marketplace 'unknown-marketplace'"
+    }
+  },
+  "externalMcpModeledAsPluginDependency": {
+    "patch": {
+      "manifestDependencies": [
+        { "name": "pua", "marketplace": "pua-skills" },
+        { "name": "claude-mem", "marketplace": "thedotmack" },
+        { "name": "chrome-devtools-mcp", "marketplace": "chrome-devtools-plugins" },
+        { "name": "ui-ux-pro-max", "marketplace": "ui-ux-pro-max-skill" },
+        { "name": "context7", "marketplace": "context7" }
+      ]
+    },
+    "expected": {
+      "checkId": "external-mcp-boundary",
+      "reasonIncludes": "context7"
+    }
+  }
+}

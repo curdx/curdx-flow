@@ -1,0 +1,147 @@
+{
+  "base": {
+    "runId": "run-hook-freshness",
+    "goalId": "goal-release",
+    "buildEntries": [
+      "src/hooks/load-spec-context.ts",
+      "src/hooks/post-compact-recorder.ts",
+      "src/hooks/post-tool-batch-snapshot.ts",
+      "src/hooks/quick-mode-guard.ts",
+      "src/hooks/stop-failure-handler.ts",
+      "src/hooks/stop-watcher.ts",
+      "src/hooks/subagent-context-injector.ts",
+      "src/hooks/task-completed-verifier.ts",
+      "src/hooks/user-prompt-expansion-guard.ts",
+      "src/hooks/user-prompt-submit-autopilot.ts",
+      "src/hooks/update-spec-index.ts"
+    ],
+    "hooksJsonTargets": [
+      "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/user-prompt-submit-autopilot.mjs",
+      "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/user-prompt-expansion-guard.mjs",
+      "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/quick-mode-guard.mjs",
+      "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-watcher.mjs",
+      "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/load-spec-context.mjs",
+      "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/subagent-context-injector.mjs",
+      "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/task-completed-verifier.mjs",
+      "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-tool-batch-snapshot.mjs",
+      "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-compact-recorder.mjs",
+      "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-failure-handler.mjs"
+    ],
+    "generatedScripts": [
+      "hooks/scripts/load-spec-context.mjs",
+      "hooks/scripts/post-compact-recorder.mjs",
+      "hooks/scripts/post-tool-batch-snapshot.mjs",
+      "hooks/scripts/quick-mode-guard.mjs",
+      "hooks/scripts/stop-failure-handler.mjs",
+      "hooks/scripts/stop-watcher.mjs",
+      "hooks/scripts/subagent-context-injector.mjs",
+      "hooks/scripts/task-completed-verifier.mjs",
+      "hooks/scripts/user-prompt-expansion-guard.mjs",
+      "hooks/scripts/user-prompt-submit-autopilot.mjs",
+      "hooks/scripts/update-spec-index.mjs"
+    ],
+    "changes": {
+      "hookSourceChanged": true,
+      "buildScriptChanged": false,
+      "hooksJsonChanged": false,
+      "generatedBundlesChanged": true,
+      "hookBehaviorChanged": true
+    },
+    "generatedFresh": true,
+    "commandEvidence": {
+      "buildHooks": {
+        "command": "npm run build:hooks",
+        "status": "passed",
+        "evidenceRefs": ["ev-build-hooks"],
+        "summary": "build hooks passed"
+      },
+      "checkHooksFresh": {
+        "command": "npm run check:hooks-fresh",
+        "status": "passed",
+        "evidenceRefs": ["ev-check-hooks-fresh"],
+        "summary": "hook bundles fresh"
+      },
+      "testHooks": {
+        "command": "npm run test:hooks",
+        "status": "passed",
+        "evidenceRefs": ["ev-test-hooks"],
+        "summary": "hook protocol tests passed"
+      },
+      "pluginValidation": {
+        "command": "claude plugin validate ./plugins/curdx-flow",
+        "status": "passed",
+        "evidenceRefs": ["ev-plugin-validate"],
+        "summary": "plugin validation passed"
+      },
+      "installedSmoke": {
+        "command": "CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc",
+        "status": "passed",
+        "evidenceRefs": ["ev-installed-smoke"],
+        "summary": "installed smoke passed"
+      }
+    }
+  },
+  "staleGeneratedBundle": {
+    "patch": {
+      "generatedFresh": false
+    }
+  },
+  "manualBundleEdit": {
+    "patch": {
+      "changes": {
+        "hookSourceChanged": false,
+        "buildScriptChanged": false,
+        "hooksJsonChanged": false,
+        "generatedBundlesChanged": true,
+        "hookBehaviorChanged": false
+      }
+    }
+  },
+  "missingHookEntry": {
+    "patch": {
+      "generatedScripts": [
+        "hooks/scripts/load-spec-context.mjs",
+        "hooks/scripts/post-compact-recorder.mjs",
+        "hooks/scripts/post-tool-batch-snapshot.mjs",
+        "hooks/scripts/quick-mode-guard.mjs",
+        "hooks/scripts/stop-failure-handler.mjs",
+        "hooks/scripts/stop-watcher.mjs",
+        "hooks/scripts/subagent-context-injector.mjs",
+        "hooks/scripts/task-completed-verifier.mjs",
+        "hooks/scripts/user-prompt-expansion-guard.mjs",
+        "hooks/scripts/update-spec-index.mjs"
+      ]
+    }
+  },
+  "hooksJsonMismatch": {
+    "patch": {
+      "hooksJsonTargets": [
+        "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/not-built-hook.mjs"
+      ]
+    }
+  },
+  "hookProtocolMissing": {
+    "patch": {
+      "commandEvidence": {
+        "testHooks": {
+          "command": "npm run test:hooks",
+          "status": "missing",
+          "evidenceRefs": [],
+          "summary": "hook protocol tests not provided"
+        }
+      }
+    }
+  },
+  "pluginValidationMissing": {
+    "patch": {
+      "commandEvidence": {
+        "pluginValidation": {
+          "command": "claude plugin validate ./plugins/curdx-flow",
+          "status": "missing",
+          "evidenceRefs": [],
+          "summary": "plugin validation not provided"
+        }
+      }
+    }
+  }
+}

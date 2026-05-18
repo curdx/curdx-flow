@@ -1,0 +1,11 @@
+{
+  "name": "frontend-app",
+  "expectedStatus": "ready",
+  "expectedTopology": {
+    "overallType": "frontend"
+  },
+  "expectedCommands": ["install", "dev", "test", "typecheck"],
+  "expectedHealth": {
+    "frontend": "passed"
+  }
+}

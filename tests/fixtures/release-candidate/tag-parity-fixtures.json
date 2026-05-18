@@ -1,0 +1,116 @@
+{
+  "base": {
+    "runId": "run-tag-parity",
+    "goalId": "goal-release",
+    "version": "7.2.1",
+    "pluginName": "curdx-flow",
+    "remoteTags": {
+      "npm": {
+        "tag": "v7.2.1",
+        "exists": false,
+        "refs": [],
+        "evidenceRefs": ["ev-remote-npm-tag"],
+        "summary": "npm release tag v7.2.1 not found on origin"
+      },
+      "claudePlugin": {
+        "tag": "curdx-flow--v7.2.1",
+        "exists": false,
+        "refs": [],
+        "evidenceRefs": ["ev-remote-plugin-tag"],
+        "summary": "Claude plugin tag curdx-flow--v7.2.1 not found on origin"
+      }
+    },
+    "plannedCommands": [
+      {
+        "executable": "git",
+        "argv": ["ls-remote", "--tags", "origin", "v7.2.1"]
+      },
+      {
+        "executable": "git",
+        "argv": ["ls-remote", "--tags", "origin", "curdx-flow--v7.2.1"]
+      }
+    ]
+  },
+  "npmOnly": {
+    "patch": {
+      "remoteTags": {
+        "npm": {
+          "tag": "v7.2.1",
+          "exists": true,
+          "refs": ["abc123 refs/tags/v7.2.1"],
+          "evidenceRefs": ["ev-remote-npm-tag"],
+          "summary": "npm release tag v7.2.1 exists on origin"
+        }
+      }
+    }
+  },
+  "pluginOnly": {
+    "patch": {
+      "remoteTags": {
+        "claudePlugin": {
+          "tag": "curdx-flow--v7.2.1",
+          "exists": true,
+          "refs": ["def456 refs/tags/curdx-flow--v7.2.1"],
+          "evidenceRefs": ["ev-remote-plugin-tag"],
+          "summary": "Claude plugin tag curdx-flow--v7.2.1 exists on origin"
+        }
+      }
+    }
+  },
+  "bothTags": {
+    "patch": {
+      "remoteTags": {
+        "npm": {
+          "tag": "v7.2.1",
+          "exists": true,
+          "refs": ["abc123 refs/tags/v7.2.1"],
+          "evidenceRefs": ["ev-remote-npm-tag"],
+          "summary": "npm release tag v7.2.1 exists on origin"
+        },
+        "claudePlugin": {
+          "tag": "curdx-flow--v7.2.1",
+          "exists": true,
+          "refs": ["abc123 refs/tags/curdx-flow--v7.2.1"],
+          "evidenceRefs": ["ev-remote-plugin-tag"],
+          "summary": "Claude plugin tag curdx-flow--v7.2.1 exists on origin"
+        }
+      }
+    }
+  },
+  "tagMismatch": {
+    "patch": {
+      "npmTag": "v7.2.0",
+      "claudePluginTag": "curdx-flow--v7.2.0",
+      "remoteTags": {
+        "npm": {
+          "tag": "v7.2.0",
+          "exists": false,
+          "refs": [],
+          "evidenceRefs": ["ev-remote-npm-tag"],
+          "summary": "npm release tag v7.2.0 not found on origin"
+        },
+        "claudePlugin": {
+          "tag": "curdx-flow--v7.2.0",
+          "exists": false,
+          "refs": [],
+          "evidenceRefs": ["ev-remote-plugin-tag"],
+          "summary": "Claude plugin tag curdx-flow--v7.2.0 not found on origin"
+        }
+      }
+    }
+  },
+  "forbiddenSideEffects": {
+    "patch": {
+      "plannedCommands": [
+        {
+          "executable": "git",
+          "argv": ["tag", "v7.2.1"]
+        },
+        {
+          "executable": "claude",
+          "argv": ["plugin", "tag", "--push"]
+        }
+      ]
+    }
+  }
+}

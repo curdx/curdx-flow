@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "curdx-flow/session",
+  "title": "curdx-flow Session",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "sessionId",
+    "runId",
+    "goalId",
+    "status",
+    "currentStep",
+    "resumeSummary",
+    "checkpoints",
+    "missingEvidence",
+    "startedAt",
+    "updatedAt",
+    "nextAction"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "sessionId": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "goalId": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["active", "paused", "blocked", "completed", "abandoned"] },
+    "currentStep": { "type": "string", "minLength": 1 },
+    "resumeSummary": { "type": "string", "minLength": 1 },
+    "checkpoints": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "missingEvidence": {
+      "type": "array",
+      "items": {}
+    },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "nextAction": { "type": "object", "additionalProperties": true }
+  }
+}

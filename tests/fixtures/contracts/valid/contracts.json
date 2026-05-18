@@ -1,0 +1,422 @@
+{
+  "evidence": {
+    "schemaVersion": 1,
+    "id": "ev-command-1",
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "source": "command",
+    "capabilityId": "npm-typecheck",
+    "trustLevel": "verified",
+    "status": "passed",
+    "summary": "npm run typecheck exited 0",
+    "artifacts": [
+      {
+        "id": "artifact-log-1",
+        "type": "log",
+        "path": ".curdx/artifacts/logs/typecheck.log",
+        "summary": "typecheck output summary"
+      }
+    ],
+    "startedAt": "2026-05-16T23:20:00.000Z",
+    "completedAt": "2026-05-16T23:20:03.000Z",
+    "freshness": {
+      "validatedAt": "2026-05-16T23:20:03.000Z",
+      "targetHash": "sha256:target",
+      "commandHash": "sha256:command",
+      "environmentId": "local-node-22"
+    },
+    "privacy": {
+      "classification": "local-only",
+      "containsSecrets": false
+    },
+    "redactions": []
+  },
+  "stateLedger": {
+    "schemaVersion": 1,
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "workspaceRoot": "/repo",
+    "mode": "fix",
+    "policy": {
+      "noFalseCompletion": true
+    },
+    "scope": {
+      "summary": "contract baseline"
+    },
+    "expectedJourney": {
+      "summary": "schema and guards pass"
+    },
+    "status": "running",
+    "verdictStatus": "partial",
+    "phase": "contracts",
+    "startedAt": "2026-05-16T23:20:00.000Z",
+    "updatedAt": "2026-05-16T23:21:00.000Z",
+    "evidenceIds": ["ev-command-1"],
+    "missingEvidence": [],
+    "artifactIndexPath": ".curdx/artifacts/index.json",
+    "dirtyBaseline": {
+      "capturedAt": "2026-05-16T23:20:00.000Z",
+      "files": []
+    },
+    "generatedFiles": [
+      {
+        "path": ".curdx/evidence/run-1.jsonl",
+        "category": "evidence",
+        "owner": "curdx-flow",
+        "createdAt": "2026-05-16T23:20:03.000Z",
+        "relatedRunId": "run-1"
+      }
+    ],
+    "nextAction": {
+      "owner": "dev",
+      "summary": "run contract tests"
+    }
+  },
+  "session": {
+    "schemaVersion": 1,
+    "sessionId": "session-1",
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "status": "active",
+    "currentStep": "contract-tests",
+    "resumeSummary": "Continue by running tests/contracts.",
+    "checkpoints": [
+      {
+        "id": "checkpoint-1",
+        "summary": "schemas created",
+        "createdAt": "2026-05-16T23:21:00.000Z"
+      }
+    ],
+    "missingEvidence": [],
+    "startedAt": "2026-05-16T23:20:00.000Z",
+    "updatedAt": "2026-05-16T23:21:00.000Z",
+    "nextAction": {
+      "owner": "dev",
+      "summary": "finish guard implementation"
+    }
+  },
+  "adapterResult": {
+    "schemaVersion": 1,
+    "ok": true,
+    "status": "passed",
+    "capabilityId": "context7",
+    "inputs": {
+      "query": "Claude Code hooks"
+    },
+    "evidence": ["ev-command-1"],
+    "blockers": [],
+    "artifacts": [],
+    "diagnostics": [],
+    "retryable": false,
+    "confidence": 0.96,
+    "durationMs": 120
+  },
+  "completionVerdict": {
+    "schemaVersion": 1,
+    "verdict": "complete",
+    "why": "All required evidence is fresh and passing.",
+    "evidenceRefs": ["ev-command-1"],
+    "missingEvidence": [],
+    "nextAction": {
+      "owner": "reviewer",
+      "summary": "review implementation"
+    },
+    "owner": "curdx-flow",
+    "riskLevel": "low",
+    "confidence": 0.94,
+    "unverifiedScope": []
+  },
+  "releaseVerdict": {
+    "schemaVersion": 1,
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "generatedAt": "2026-05-16T23:30:00.000Z",
+    "verdict": "release-ready",
+    "version": "7.2.1",
+    "npmTag": "v7.2.1",
+    "claudePluginTag": "curdx-flow--v7.2.1",
+    "checks": [
+      {
+        "id": "plugin-validate",
+        "status": "passed",
+        "summary": "plugin validation passed"
+      }
+    ],
+    "missingEvidence": [],
+    "blockers": [],
+    "nextAction": {
+      "owner": "maintainer",
+      "summary": "request release authorization"
+    },
+    "riskLevel": "medium",
+    "trustLevel": "L4",
+    "freshness": {
+      "ok": true,
+      "reasons": [],
+      "context": {
+        "currentCommit": "abc123",
+        "version": "7.2.1",
+        "npmTag": "v7.2.1",
+        "claudePluginTag": "curdx-flow--v7.2.1",
+        "generatedAt": "2026-05-16T23:30:00.000Z",
+        "evidenceRefs": ["ev-release-plugin-validate"]
+      }
+    },
+    "sideEffects": [],
+    "published": false,
+    "publicationState": "not-published",
+    "summary": {
+      "headline": "未发布 / 可发布",
+      "publicationState": "not-published",
+      "statusLabel": "可发布",
+      "dryRunOnly": true
+    }
+  },
+  "actionRiskPolicy": {
+    "schemaVersion": 1,
+    "policyId": "default-local",
+    "mode": "fix",
+    "defaultRiskLevel": "medium",
+    "allowedWriteRoots": [
+      ".curdx/reports",
+      ".curdx/evidence",
+      ".curdx/artifacts",
+      ".curdx/state"
+    ],
+    "authorization": {
+      "authorized": false,
+      "releaseStageAuthorized": false
+    },
+    "rules": [
+      {
+        "id": "no-release-without-auth",
+        "actionType": "plugin-release",
+        "actionPattern": "release",
+        "riskLevel": "critical",
+        "mutatesWorkspace": false,
+        "destructive": false,
+        "requiresAuthorization": true,
+        "allowedModes": ["release"],
+        "requiresReleaseStage": true
+      }
+    ],
+    "noFalseCompletion": true
+  },
+  "hookGate": {
+    "schemaVersion": 1,
+    "eventName": "TaskCompleted",
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "decision": "block",
+    "reason": "missing fresh evidence",
+    "missingEvidence": ["browser evidence"],
+    "nextAction": {
+      "owner": "dev",
+      "summary": "run browser verification"
+    },
+    "failOpen": false,
+    "diagnostics": []
+  },
+  "artifactIndex": {
+    "schemaVersion": 1,
+    "id": "artifact-log-1",
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "attemptId": "attempt-1",
+    "evidenceId": "ev-command-1",
+    "type": "log",
+    "path": ".curdx/artifacts/logs/typecheck.log",
+    "summary": "typecheck output summary",
+    "privacy": {
+      "classification": "local-only",
+      "containsSensitiveData": false,
+      "redacted": true
+    },
+    "contentHash": "sha256:artifact",
+    "createdAt": "2026-05-16T23:20:03.000Z"
+  },
+  "runtimeTopology": {
+    "schemaVersion": 1,
+    "workspaceRoot": "/repo",
+    "generatedAt": "2026-05-17T10:00:00.000Z",
+    "overallType": "frontend",
+    "status": "ready",
+    "confidence": 0.84,
+    "packageManager": "npm",
+    "roots": [
+      {
+        "path": ".",
+        "type": "frontend",
+        "status": "ready",
+        "confidence": 0.84,
+        "packageManager": "npm",
+        "packageJsonPath": "package.json",
+        "name": "frontend-app",
+        "scripts": {
+          "dev": "vite",
+          "test": "vitest run"
+        },
+        "entryHints": [
+          {
+            "kind": "entry",
+            "source": "index.html",
+            "summary": "browser HTML entry exists",
+            "confidence": 0.82,
+            "path": "index.html"
+          }
+        ],
+        "scriptHints": [
+          {
+            "kind": "script",
+            "source": "script:dev",
+            "summary": "package script 'dev' is available",
+            "confidence": 0.72,
+            "scriptName": "dev",
+            "command": "vite"
+          }
+        ],
+        "serviceHints": [
+          {
+            "kind": "service",
+            "source": "script:dev",
+            "summary": "script 'dev' may start a local service",
+            "confidence": 0.74,
+            "scriptName": "dev",
+            "command": "vite"
+          }
+        ],
+        "apiHints": [],
+        "dataHints": [],
+        "browserHints": [
+          {
+            "kind": "browser",
+            "source": "dependency:vite",
+            "summary": "vite frontend dependency found",
+            "confidence": 0.74
+          }
+        ],
+        "validationHints": [
+          {
+            "kind": "validation",
+            "source": "script:test",
+            "summary": "script 'test' may validate the project",
+            "confidence": 0.76,
+            "scriptName": "test",
+            "command": "vitest run"
+          }
+        ],
+        "pluginHints": [],
+        "blockers": [],
+        "reasons": ["frontend framework or browser entry signals found"]
+      }
+    ],
+    "pluginRoots": [],
+    "blockers": [],
+    "hints": [
+      {
+        "kind": "browser",
+        "source": "dependency:vite",
+        "summary": "vite frontend dependency found",
+        "confidence": 0.74
+      }
+    ]
+  },
+  "verificationReport": {
+    "schemaVersion": 1,
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "status": "passed",
+    "verdict": {
+      "schemaVersion": 1,
+      "verdict": "complete",
+      "why": "All required evidence is fresh and passing.",
+      "evidenceRefs": ["ev-command-1"],
+      "missingEvidence": [],
+      "nextAction": {
+        "owner": "reviewer",
+        "summary": "review implementation"
+      },
+      "owner": "curdx-flow",
+      "riskLevel": "low",
+      "confidence": 0.94,
+      "unverifiedScope": []
+    },
+    "summary": "Contract baseline verified.",
+    "evidenceRefs": ["ev-command-1"],
+    "artifactIndex": [
+      {
+        "id": "artifact-log-1",
+        "evidenceId": "ev-command-1",
+        "type": "log",
+        "path": ".curdx/artifacts/logs/typecheck.log",
+        "summary": "typecheck output summary",
+        "privacy": {
+          "classification": "local-only",
+          "containsSensitiveData": false,
+          "redacted": true
+        }
+      }
+    ],
+    "blockers": [],
+    "missingEvidence": [],
+    "generatedAt": "2026-05-16T23:22:00.000Z",
+    "privacy": {
+      "classification": "local-only",
+      "containsSensitiveData": false,
+      "redacted": true,
+      "truncated": false
+    },
+    "transcriptSummary": "Verifier: npm run typecheck\nExit code: 0\nEvidence: ev-command-1 passed verified - npm run typecheck exited 0\nMissing evidence: none\nFinal verdict: complete",
+    "evidenceSummaries": [
+      {
+        "id": "ev-command-1",
+        "source": "command",
+        "capabilityId": "npm-typecheck",
+        "status": "passed",
+        "trustLevel": "verified",
+        "summary": "npm run typecheck exited 0",
+        "artifactRefs": ["artifact-log-1"],
+        "freshness": "validatedAt=2026-05-16T23:20:03.000Z, commandHash=sha256:command",
+        "unverifiedScope": []
+      }
+    ],
+    "artifactSummaries": [
+      {
+        "id": "artifact-log-1",
+        "evidenceId": "ev-command-1",
+        "type": "log",
+        "path": ".curdx/artifacts/logs/typecheck.log",
+        "summary": "typecheck output summary",
+        "privacy": {
+          "classification": "local-only",
+          "containsSensitiveData": false,
+          "redacted": true
+        }
+      }
+    ],
+    "sections": {
+      "blockers": [],
+      "missingEvidence": [],
+      "manualConfirmation": [],
+      "nextActions": [
+        {
+          "owner": "reviewer",
+          "summary": "review implementation",
+          "riskLevel": "low"
+        }
+      ],
+      "degradedCapabilities": [],
+      "unverifiedScope": []
+    },
+    "sourceChanges": {
+      "modifiedSource": false,
+      "summary": "No source file changes recorded by runtime state.",
+      "files": []
+    },
+    "reportOnly": false,
+    "verifier": {
+      "command": "npm run typecheck",
+      "exitCode": 0
+    }
+  }
+}

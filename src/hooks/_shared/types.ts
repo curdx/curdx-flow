@@ -217,6 +217,8 @@ export interface VerificationBlock {
 export interface CurdxState {
   version?: 1 | 2;
   // identity
+  runId?: string;
+  goalId?: string;
   source?: "spec" | "plan" | "direct";
   name?: string;
   basePath?: string;

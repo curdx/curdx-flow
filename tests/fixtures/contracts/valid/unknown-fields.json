@@ -1,0 +1,277 @@
+{
+  "evidence": {
+    "schemaVersion": 1,
+    "id": "ev-command-1",
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "source": "command",
+    "capabilityId": "npm-typecheck",
+    "trustLevel": "verified",
+    "status": "passed",
+    "summary": "npm run typecheck exited 0",
+    "artifacts": [],
+    "startedAt": "2026-05-16T23:20:00.000Z",
+    "completedAt": "2026-05-16T23:20:03.000Z",
+    "freshness": {
+      "validatedAt": "2026-05-16T23:20:03.000Z",
+      "targetSummary": "npm run typecheck in workspace root"
+    },
+    "privacy": {
+      "classification": "local-only",
+      "containsSecrets": false
+    },
+    "redactions": [],
+    "futureTopLevelField": {
+      "kept": true
+    }
+  },
+  "artifactIndex": {
+    "schemaVersion": 1,
+    "id": "artifact-log-1",
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "attemptId": "attempt-1",
+    "evidenceId": "ev-command-1",
+    "type": "log",
+    "path": ".curdx/artifacts/logs/typecheck.log",
+    "summary": "typecheck output summary",
+    "privacy": {
+      "classification": "local-only",
+      "containsSensitiveData": false,
+      "redacted": true
+    },
+    "createdAt": "2026-05-16T23:20:03.000Z",
+    "futureTopLevelField": {
+      "kept": true
+    }
+  },
+  "stateLedger": {
+    "schemaVersion": 1,
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "workspaceRoot": "/repo",
+    "mode": "fix",
+    "policy": {
+      "noFalseCompletion": true
+    },
+    "scope": {
+      "summary": "unknown fields"
+    },
+    "expectedJourney": {
+      "summary": "preserve future state fields"
+    },
+    "status": "running",
+    "verdictStatus": "partial",
+    "phase": "state",
+    "startedAt": "2026-05-16T23:20:00.000Z",
+    "updatedAt": "2026-05-16T23:21:00.000Z",
+    "evidenceIds": [],
+    "missingEvidence": [],
+    "artifactIndexPath": ".curdx/artifacts/index.jsonl",
+    "dirtyBaseline": {
+      "capturedAt": "2026-05-16T23:20:00.000Z",
+      "files": []
+    },
+    "generatedFiles": [],
+    "nextAction": {
+      "owner": "dev",
+      "summary": "continue"
+    },
+    "futureTopLevelField": {
+      "kept": true
+    }
+  },
+  "session": {
+    "schemaVersion": 1,
+    "sessionId": "session-1",
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "status": "active",
+    "currentStep": "state",
+    "resumeSummary": "Continue state recovery.",
+    "checkpoints": [],
+    "missingEvidence": [],
+    "startedAt": "2026-05-16T23:20:00.000Z",
+    "updatedAt": "2026-05-16T23:21:00.000Z",
+    "nextAction": {
+      "owner": "dev",
+      "summary": "continue"
+    },
+    "futureTopLevelField": {
+      "kept": true
+    }
+  },
+  "actionRiskPolicy": {
+    "schemaVersion": 1,
+    "policyId": "future-policy",
+    "mode": "fix",
+    "defaultRiskLevel": "medium",
+    "rules": [
+      {
+        "id": "future-rule",
+        "actionType": "source-edit",
+        "riskLevel": "medium",
+        "mutatesWorkspace": true,
+        "destructive": false,
+        "requiresAuthorization": false,
+        "allowedModes": ["fix"],
+        "futureRuleField": {
+          "kept": true
+        }
+      }
+    ],
+    "noFalseCompletion": true,
+    "futureTopLevelField": {
+      "kept": true
+    }
+  },
+  "runtimeTopology": {
+    "schemaVersion": 1,
+    "workspaceRoot": "/repo",
+    "generatedAt": "2026-05-17T10:00:00.000Z",
+    "overallType": "unknown",
+    "status": "needs-human-input",
+    "confidence": 0.18,
+    "packageManager": "unknown",
+    "roots": [
+      {
+        "path": ".",
+        "type": "unknown",
+        "status": "needs-human-input",
+        "confidence": 0.18,
+        "packageManager": "unknown",
+        "packageJsonPath": null,
+        "scripts": {},
+        "entryHints": [],
+        "scriptHints": [],
+        "serviceHints": [],
+        "apiHints": [],
+        "dataHints": [],
+        "browserHints": [],
+        "validationHints": [],
+        "pluginHints": [],
+        "blockers": [],
+        "reasons": ["not enough facts to classify runtime"],
+        "futureRootField": {
+          "kept": true
+        }
+      }
+    ],
+    "pluginRoots": [],
+    "blockers": [],
+    "hints": [],
+    "futureTopLevelField": {
+      "kept": true
+    }
+  },
+  "verificationReport": {
+    "schemaVersion": 1,
+    "runId": "run-1",
+    "goalId": "goal-1",
+    "status": "passed",
+    "verdict": {
+      "schemaVersion": 1,
+      "verdict": "complete",
+      "why": "All required evidence is fresh and passing.",
+      "evidenceRefs": ["ev-command-1"],
+      "missingEvidence": [],
+      "nextAction": {
+        "owner": "reviewer",
+        "summary": "review implementation"
+      },
+      "owner": "curdx-flow",
+      "riskLevel": "low",
+      "confidence": 0.94,
+      "unverifiedScope": []
+    },
+    "summary": "Unknown fields are preserved.",
+    "evidenceRefs": ["ev-command-1"],
+    "artifactIndex": [
+      {
+        "id": "artifact-log-1",
+        "evidenceId": "ev-command-1",
+        "type": "log",
+        "path": ".curdx/artifacts/logs/typecheck.log",
+        "summary": "typecheck output summary",
+        "privacy": {
+          "classification": "local-only",
+          "containsSensitiveData": false,
+          "redacted": true
+        },
+        "futureNestedField": {
+          "kept": true
+        }
+      }
+    ],
+    "blockers": [],
+    "missingEvidence": [],
+    "generatedAt": "2026-05-16T23:22:00.000Z",
+    "privacy": {
+      "classification": "local-only",
+      "containsSensitiveData": false,
+      "redacted": true,
+      "truncated": false
+    },
+    "transcriptSummary": "Verifier: npm run typecheck\nExit code: 0\nEvidence: ev-command-1 passed verified - npm run typecheck exited 0\nMissing evidence: none\nFinal verdict: complete",
+    "evidenceSummaries": [
+      {
+        "id": "ev-command-1",
+        "source": "command",
+        "capabilityId": "npm-typecheck",
+        "status": "passed",
+        "trustLevel": "verified",
+        "summary": "npm run typecheck exited 0",
+        "artifactRefs": ["artifact-log-1"],
+        "freshness": "validatedAt=2026-05-16T23:20:03.000Z",
+        "unverifiedScope": [],
+        "futureNestedField": {
+          "kept": true
+        }
+      }
+    ],
+    "artifactSummaries": [
+      {
+        "id": "artifact-log-1",
+        "evidenceId": "ev-command-1",
+        "type": "log",
+        "path": ".curdx/artifacts/logs/typecheck.log",
+        "summary": "typecheck output summary",
+        "privacy": {
+          "classification": "local-only",
+          "containsSensitiveData": false,
+          "redacted": true
+        }
+      }
+    ],
+    "sections": {
+      "blockers": [],
+      "missingEvidence": [],
+      "manualConfirmation": [],
+      "nextActions": [
+        {
+          "owner": "reviewer",
+          "summary": "review implementation",
+          "riskLevel": "low"
+        }
+      ],
+      "degradedCapabilities": [],
+      "unverifiedScope": [],
+      "futureNestedField": {
+        "kept": true
+      }
+    },
+    "sourceChanges": {
+      "modifiedSource": false,
+      "summary": "No source file changes recorded by runtime state.",
+      "files": []
+    },
+    "reportOnly": false,
+    "verifier": {
+      "command": "npm run typecheck",
+      "exitCode": 0
+    },
+    "futureTopLevelField": {
+      "kept": true
+    }
+  }
+}

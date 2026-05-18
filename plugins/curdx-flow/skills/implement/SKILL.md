@@ -142,17 +142,19 @@ curdx-flow goal --cwd "$PWD" --spec "$SPEC_PATH" --max-turns "$GOAL_TURNS"
 
 Treat the JSON as the execution driver contract:
 - `slashCommand` is the exact native `/goal` condition to run for unattended multi-turn execution.
+- `readiness` says whether native `/goal` is actually available in this Claude Code environment. Only recommend native `/goal` when `recommendedDriver` is `native-goal`.
+- `conditionLength` must be within the Claude Code limit; if it is `compressed`, keep the warning visible so the user knows the condition was shortened.
 - `condition` is transcript-verifiable. Claude must surface every proof needed by the goal evaluator; the evaluator will not run commands or read files by itself.
 - `evidenceProtocol` lists the proof that must appear before `ALL_TASKS_COMPLETE`.
-- `warnings` explains fallback cases such as `disableAllHooks` or managed `allowManagedHooksOnly`.
+- `warnings` explains fallback cases such as `disableAllHooks`, managed `allowManagedHooksOnly`, update-needed Claude Code versions, or condition compression.
 
 Default path:
-1. Show the `slashCommand` prominently before the coordinator prompt.
-2. Tell the user that native `/goal` drives follow-up turns. Do not claim unattended continuation unless that slash command is active.
+1. If `recommendedDriver` is `native-goal`, show the `slashCommand` prominently before the coordinator prompt.
+2. Tell the user that native `/goal` drives follow-up turns. Do not claim unattended continuation unless that slash command is active and readiness is available.
 3. Continue with the first coordinator turn using the prompt below.
 
 Manual fallback:
-- If `--manual` is present or `/goal` is unavailable, run only the current coordinator turn.
+- If `--manual` is present or `recommendedDriver` is `manual-resume`, run only the current coordinator turn.
 - Leave `.curdx-state.json` resumable and print the next action instead of relying on any Stop-hook continuation.
 - The Stop hook is now a deterministic safety/completion gate only; it must not be treated as the execution loop driver.
 

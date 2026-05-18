@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "curdx-flow/adapter-result",
+  "title": "curdx-flow Adapter Result",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "ok",
+    "status",
+    "capabilityId",
+    "inputs",
+    "evidence",
+    "blockers",
+    "artifacts",
+    "diagnostics",
+    "retryable",
+    "confidence",
+    "durationMs"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "ok": { "type": "boolean" },
+    "status": { "type": "string", "enum": ["passed", "failed", "blocked", "degraded", "skipped"] },
+    "capabilityId": { "type": "string", "minLength": 1 },
+    "inputs": { "type": "object", "additionalProperties": true },
+    "evidence": {
+      "type": "array",
+      "items": {}
+    },
+    "blockers": {
+      "type": "array",
+      "items": {}
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {}
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {}
+    },
+    "retryable": { "type": "boolean" },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "durationMs": { "type": "number", "minimum": 0 }
+  }
+}

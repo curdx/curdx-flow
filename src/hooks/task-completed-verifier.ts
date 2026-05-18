@@ -29,19 +29,20 @@
  *
  * Block paths (exit 2, signals Claude Code to intercept):
  *   6. `verifyPhaseBlock` returns `!ok`          → stderr reason + exit 2
- *   7. Unexpected throw in any of the above      → `{decision:"block", reason:
- *      "internal error in verify-blocks; see logs" + stack to stderr
+ *   7. Unexpected throw in any of the above      → diagnostics + `{continue:true}`
+ *      + exit 0 (internal hook faults are not evidence gaps)
  *
  * Spec: specs/spec-verification-iron-law/tasks.md Task 2.9 + design.md
  * "Two-Layer Verification" + AC-2.4.
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import process from "node:process";
+import { logHookError } from "./_shared/error-logger.js";
 import { readStdinJson } from "./_shared/stdin.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
-import { getVerificationPhase, verifyPhaseBlock } from "./lib/verify-blocks.js";
+import { getVerificationPhase, verifyPhaseBlock, type VerifyPhaseBlockResult } from "./lib/verify-blocks.js";
 import { classifySmartRoute } from "./lib/smart-route.js";
 import { decideLastMile } from "./lib/last-mile-orchestrator.js";
 import { appendBrainEvent } from "./lib/project-brain.js";
@@ -65,6 +66,31 @@ function passThrough(): never {
 function emitBlock(reason: string): never {
   process.stderr.write(`${reason}\n`);
   process.exit(2);
+}
+
+function buildTaskCompletedGateReason(input: {
+  state: CurdxState;
+  phase: string;
+  specDir: string;
+  reason?: string;
+  command?: string;
+  verifierHint: string;
+  recoveryHint: string;
+}): string {
+  const baseReason = input.reason === "missing"
+    ? `missing verification block for phase '${input.phase}'`
+    : input.reason ?? "verification failed";
+  const identity = [
+    typeof input.state.runId === "string" && input.state.runId.length > 0 ? `runId=${input.state.runId}` : undefined,
+    typeof input.state.goalId === "string" && input.state.goalId.length > 0 ? `goalId=${input.state.goalId}` : undefined,
+    `spec=${basename(input.specDir)}`,
+    `phase=${input.phase}`,
+  ].filter((item): item is string => item !== undefined).join(" ");
+  const nextAction = typeof input.command === "string" && input.command.length > 0
+    ? `Re-run: ${input.command}.`
+    : `Next action: run /curdx-flow:${input.phase} to record fresh verification evidence.`;
+
+  return `${baseReason}. ${identity}. ${nextAction}${input.verifierHint}${input.recoveryHint}`;
 }
 
 async function main(): Promise<void> {
@@ -121,7 +147,25 @@ async function main(): Promise<void> {
 
   // Path 6: run the shared gate. Same lib as Stop hook (D3 single source of
   // truth across 4 callers).
-  const result = await verifyPhaseBlock(state, phase, specDir);
+  let result: VerifyPhaseBlockResult;
+  try {
+    result = await verifyPhaseBlock(state, phase, specDir);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logHookError(
+      {
+        hook: "task-completed-verifier",
+        event: "verify_phase_block",
+        msg,
+        stack: err instanceof Error ? err.stack ?? "" : "",
+        cwd,
+        spec: basename(specDir),
+      },
+      err instanceof Error ? err : undefined,
+    );
+    process.stderr.write("[task-completed-verifier] verification helper error; failing open\n");
+    passThrough();
+  }
   if (!result.ok) {
     let verifierHint = "";
     let routeName = "unknown";
@@ -159,15 +203,32 @@ async function main(): Promise<void> {
       verifier,
       reason: result.reason ?? "verification failed",
     });
-    emitBlock(`${result.reason ?? "verification failed"}${verifierHint}${recoveryHint}`);
+    emitBlock(buildTaskCompletedGateReason({
+      state,
+      phase,
+      specDir,
+      reason: result.reason,
+      command: result.command,
+      verifierHint,
+      recoveryHint,
+    }));
   }
   process.exit(0);
 }
 
-// Path 7: top-level safety net. Unexpected throws → block with generic
-// message + stack to stderr for the error log.
+// Path 7: top-level safety net. Unexpected throws are non-deterministic hook
+// faults, not evidence gaps, so fail open and keep diagnostics off stdout.
 main().catch((err) => {
-  const stack = err instanceof Error ? err.stack ?? err.message : String(err);
-  process.stderr.write(`[task-completed-verifier] ${stack}\n`);
-  emitBlock("internal error in verify-blocks; see logs");
+  const msg = err instanceof Error ? err.message : String(err);
+  logHookError(
+    {
+      hook: "task-completed-verifier",
+      event: "uncaught",
+      msg,
+      stack: err instanceof Error ? err.stack ?? "" : "",
+    },
+    err instanceof Error ? err : undefined,
+  );
+  process.stderr.write("[task-completed-verifier] internal error; failing open\n");
+  passThrough();
 });

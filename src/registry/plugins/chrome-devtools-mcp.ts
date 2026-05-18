@@ -59,6 +59,7 @@ const chromeDevtoolsMcp: Pkg = {
   type: 'plugin',
   required: true,
   whenToUse: SPEC.whenToUse,
+  marketplaces: () => [MARKETPLACE_NAME],
   prereqCheck: async (t): Promise<PrereqResult> => {
     const major = Number(process.versions.node.split('.')[0] ?? '0');
     const minor = Number(process.versions.node.split('.')[1] ?? '0');
