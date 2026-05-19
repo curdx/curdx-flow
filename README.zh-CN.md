@@ -33,10 +33,16 @@ Claude Code 能写代码，但真实任务上会暴露三种典型失败：
 
 ## 30 秒安装
 
-推荐 npm 安装器 —— 会同步插件、companion plugins、marketplace 入口、`~/.claude/CLAUDE.md` 管理块。
+推荐 npm 安装器 —— 先让你选界面语言（中文 / English），然后进入交互式多选，自己勾选主插件、companion plugins、MCP servers；会同步 marketplace 入口和 `~/.claude/CLAUDE.md` 管理块。
 
 ```bash
-npm exec -- @curdx/flow@latest install curdx-flow --yes
+npx @curdx/flow install
+```
+
+CI / 脚本环境想跳过所有交互一次性全装：
+
+```bash
+npx @curdx/flow install --all --yes --lang zh
 ```
 
 在 Claude Code 里：
@@ -105,17 +111,17 @@ curdx-flow 是 Claude Code 插件，但也显式协调外部能力：
 
 ```bash
 # 查看安装状态
-npm exec -- @curdx/flow@latest status
+npx @curdx/flow status
 
 # 安装或更新插件 / MCP 能力
-npm exec -- @curdx/flow@latest install --all --yes
-npm exec -- @curdx/flow@latest update
+npx @curdx/flow install --all --yes
+npx @curdx/flow update
 
 # 分析 Claude Code 会话日志
-npm exec -- @curdx/flow@latest analyze
+npx @curdx/flow analyze
 
 # 校验当前 spec 的 verificationBlocks
-npm exec -- @curdx/flow@latest check
+npx @curdx/flow check
 ```
 
 插件内部也暴露 `curdx-flow` runtime CLI，供 skills 和 hooks 使用：
@@ -233,7 +239,7 @@ git push origin main vX.Y.Z curdx-flow--vX.Y.Z
 | 现象 | 处理 |
 | --- | --- |
 | 看不到 `/curdx-flow:*` | 跑 `claude plugin list`，确认 `curdx-flow@curdx` 已安装并启用。 |
-| 插件依赖缺失 | `npm exec -- @curdx/flow@latest install curdx-flow --yes` 重新同步。 |
+| 插件依赖缺失 | `npx @curdx/flow install curdx-flow --yes` 重新同步。 |
 | Chrome DevTools MCP 不可用 | 确认装了 `chrome-devtools-mcp@chrome-devtools-plugins` 且本机有 Chrome。 |
 | spec 卡在执行中 | `/curdx-flow:status` 看当前 phase，按建议恢复或 `/curdx-flow:cancel`。 |
 | 发布前不确定是否安全 | `npm run verify && claude plugin validate ./plugins/curdx-flow && CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc`。 |

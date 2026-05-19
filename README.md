@@ -33,10 +33,16 @@ It isn't another project management system. It's an **execution discipline layer
 
 ## 30-second install
 
-The recommended path — the npm installer wires up the plugin, its companion plugins, the marketplace entry, and the managed block in `~/.claude/CLAUDE.md`:
+The recommended path — the npm installer first asks for your language (中文 / English), then opens an interactive picker so you can choose the main plugin, companion plugins, and MCP servers yourself; it also syncs the marketplace entry and the managed block in `~/.claude/CLAUDE.md`:
 
 ```bash
-npm exec -- @curdx/flow@latest install curdx-flow --yes
+npx @curdx/flow install
+```
+
+CI / scripted environments? Skip prompts and install everything:
+
+```bash
+npx @curdx/flow install --all --yes --lang en
 ```
 
 Inside Claude Code:
@@ -105,17 +111,17 @@ When one is missing, `curdx-flow doctor` reports the degraded state and the fix 
 
 ```bash
 # Show install state
-npm exec -- @curdx/flow@latest status
+npx @curdx/flow status
 
 # Install or update plugins / MCP capabilities
-npm exec -- @curdx/flow@latest install --all --yes
-npm exec -- @curdx/flow@latest update
+npx @curdx/flow install --all --yes
+npx @curdx/flow update
 
 # Analyze Claude Code session logs
-npm exec -- @curdx/flow@latest analyze
+npx @curdx/flow analyze
 
 # Validate verificationBlocks for the current spec
-npm exec -- @curdx/flow@latest check
+npx @curdx/flow check
 ```
 
 The plugin also exposes a runtime `curdx-flow` CLI for skills and hooks:
@@ -233,7 +239,7 @@ git push origin main vX.Y.Z curdx-flow--vX.Y.Z
 | Symptom | Fix |
 | --- | --- |
 | `/curdx-flow:*` not visible | Run `claude plugin list`; confirm `curdx-flow@curdx` is installed and enabled. |
-| Plugin dependency missing | Re-sync via `npm exec -- @curdx/flow@latest install curdx-flow --yes`. |
+| Plugin dependency missing | Re-sync via `npx @curdx/flow install curdx-flow --yes`. |
 | Chrome DevTools MCP unavailable | Confirm `chrome-devtools-mcp@chrome-devtools-plugins` is installed and local Chrome is present. |
 | Spec stuck mid-execution | `/curdx-flow:status` for the current phase, then resume as advised or `/curdx-flow:cancel`. |
 | Unsure if release is safe | `npm run verify && claude plugin validate ./plugins/curdx-flow && CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc`. |
