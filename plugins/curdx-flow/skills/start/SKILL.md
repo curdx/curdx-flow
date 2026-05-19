@@ -230,7 +230,7 @@ For `lite-spec`, `full-spec`, `greenfield-spec`, `prototype`, and `import-spec`:
    ROUTE_JSON=$(curdx-flow route --name "$name" --goal "$goal" --flags "$ARGUMENTS")
    POLICY_JSON=$(printf '%s' "$ROUTE_JSON" | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(JSON.stringify(JSON.parse(s).policy)))')
    ```
-7. Initialize `.curdx-state.json` with:
+7. Initialize the spec state file. The file lives at `$basePath/.curdx-state.json` — never at the project root or anywhere else. Create the parent directory first if needed, then write the following shape:
    ```json
    {
      "version": 2,
@@ -254,6 +254,7 @@ For `lite-spec`, `full-spec`, `greenfield-spec`, `prototype`, and `import-spec`:
      "completed": false
    }
    ```
+   All later mutations to this file (verification blocks, completion markers, task index updates) must go through `curdx-flow verify run` or `curdx-flow state merge "$basePath/.curdx-state.json" '<patch>'`. Do not hand-edit `.curdx-state.json` with Write/Edit after creation — the CLI maintains schema invariants such as `verificationBlocks.execution.srcMtime` (epoch ms) that hand-written JSON routinely omits.
 8. Create `.progress.md` with the original goal and the selected behavior route.
 
 If policy computation fails, use this fallback cap:
@@ -275,6 +276,10 @@ When a spec state is created and router output includes `topology`, `intent`, or
 ## Quick Artifact Contract
 
 When `--quick` causes this skill to generate phase artifacts inline instead of delegating through each phase command:
+
+<mandatory>
+The quick path does not lift the runtime-CLI contract for `.curdx-state.json`. Even in `--quick --mode fast`, do not Write/Edit the state file beyond the initial schema in "New Spec Creation" step 7. Verification blocks must be produced by `curdx-flow verify run`, and completion/iteration mutations must use `curdx-flow state merge "$basePath/.curdx-state.json" '<patch>'`. Hand-written `verificationBlocks` invariably miss `srcMtime` and break `check-verification-blocks` / `verify-blocks` invariants.
+</mandatory>
 
 - `tasks.md` must still use the task-planner format contract.
 - Start `tasks.md` with `## Source Coverage Audit`.

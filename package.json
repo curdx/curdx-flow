@@ -40,6 +40,7 @@
     "test:runner": "vitest run tests/runner",
     "test:claudecc": "npm run build:hooks && node scripts/claudecc-smoke.mjs",
     "test:claudecc:e2e": "npm run build && npm run build:hooks && node scripts/claudecc-e2e-flow.mjs",
+    "test:claudecc:e2e:suite": "npm run build && npm run build:hooks && node scripts/claudecc-e2e-suite.mjs",
     "start": "node ./dist/index.mjs",
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm run test:contracts && npm run test:evidence && npm run test:state && npm run test:verdict && npm run test:reports && npm run test:policy && npm run test:capabilities && npm run test:planner && npm run test:browser && npm run test:api && npm run test:data && npm run test:fullstack && npm run test:discovery && npm run test:services && npm run test:readiness && npm run test:recovery && npm run test:release && npm run check-versions && npm run check:hooks-fresh && npm run build && npm run check:bundle && npm run test:hooks && npm run test:analyze && npm run test:runner && node scripts/check-verification-blocks.mjs",
