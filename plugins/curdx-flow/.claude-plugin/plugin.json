@@ -1,6 +1,6 @@
 {
   "name": "curdx-flow",
-  "version": "7.3.3",
+  "version": "7.3.4",
   "description": "Spec-driven development with task-by-task execution. Research, requirements, design, tasks, native goal-driven implementation, and epic triage for multi-spec feature decomposition.",
   "author": {
     "name": "curdx"
