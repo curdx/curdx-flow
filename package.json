@@ -6,6 +6,7 @@
   "bin": "./dist/index.mjs",
   "files": [
     "dist",
+    "docs/assets/readme",
     "CHANGELOG.md"
   ],
   "engines": {
