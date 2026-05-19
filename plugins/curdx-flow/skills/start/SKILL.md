@@ -72,6 +72,64 @@ Users do not need to know `--add-dir`. If routing returns a missing code root, s
 
 If `blocked-ask-user` includes `topology.missingRoots`, do not ask an open-ended question. Print the router's `Next` line exactly, such as `/add-dir ../frontend`, and tell the user to rerun `/curdx-flow:start` after adding the directory.
 
+## Pre-Question Discovery (Greenfield / Inception / Blocked)
+
+<mandatory>
+**For `product-inception`, `greenfield-spec`, `prototype`, `import-spec`, or `blocked-ask-user` routes with non-empty `intent.missingFacts`, you MUST fan out a Discovery subagent batch BEFORE asking the user any clarifying question and BEFORE writing any product-context artifact.**
+
+This is the Discovery domain of `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md`. The independence rules and anti-patterns in that doc apply here.
+</mandatory>
+
+### Why
+
+Asking the user before fanning out is an anti-pattern (#14 in bounded-parallel-dispatch). It serializes work that should be parallel, surfaces low-leverage questions whose answers are already in the codebase or memory, and produces interview options without `[Recommended]` grounded in facts. Anthropic's canonical guidance frames subagents as the primary tool for investigation precisely because main-context exploration "fills with file contents you won't reference again."
+
+### When this section fires
+
+All of the following must hold:
+
+1. Route ∈ {`product-inception`, `greenfield-spec`, `prototype`, `import-spec`, `blocked-ask-user`}
+2. `intent.missingFacts` is non-empty (parse from `curdx-flow route` output)
+3. At least one `missingFact` is answerable from: prior memory, this repo's files, or current external docs
+
+If route is `blocked-ask-user` AND `topology.missingRoots` is the only missing fact, skip this section and follow the `/add-dir` instruction above. Missing-roots is a deterministic user action, not a discoverable fact.
+
+### Fan-out composition (minimum 3 agents in ONE message)
+
+For empty workspaces and product-inception, dispatch ALL of these in a single message:
+
+```text
+1. general-purpose agent invoking mcp__plugin_claude-mem_mcp-search__smart_search
+   → Search user's claude-mem for prior decisions, failed attempts, similar projects
+   → Output cap: 250 words, concrete corpus/observation references
+
+2. Explore agent rooted at .planning/, docs/, CLAUDE.md, .gitignore, package.json
+   → Surface existing conventions, prior planning notes, declared stack
+   → Output cap: 200 words, file:line references
+
+3. N research-analyst agents — ONE per candidate stack OR prior-art topic in missingFacts
+   → Each agent owns ONE topic; never combine
+   → Output cap: 300 words per agent, cite sources
+   → If a candidate stack is named (e.g., "node-pty", "xterm.js"), prefer Context7 MCP via the agent's tool surface before generic web search
+```
+
+For non-empty workspaces or `blocked-ask-user` with codebase-resolvable facts, drop the research-analyst agents if `missingFacts` are all repo-internal.
+
+### Synthesis contract
+
+After all agents return, the coordinator MUST:
+
+1. **Cross-validate** memory hits against current repo state — claude-mem snapshots can be stale. A `function foo()` referenced in memory may have been renamed; treat memory as "what was true when written", not "what is true now". Verify with grep/Read before recommending.
+2. **Map every `missingFact` to evidence**: which agent answered it, with what citation. Unanswered facts become the user-decision interview questions.
+3. **Re-derive interview options with `[Recommended]`** grounded in the synthesis. No fabricated options; every option must trace to a finding or an explicit assumption marker.
+4. **Persist findings** to `.planning/discovery/<route>-<timestamp>.md` if `.planning/` exists, so re-runs and other sessions can reuse them.
+
+### What this section is NOT
+
+- Not a license to write product-context artifacts directly. Artifact writing still goes through the normal phase agents (research-analyst / product-manager / etc.) once a spec is created.
+- Not a replacement for the interview. It produces grounded interview options; the user still confirms the irreducible decisions.
+- Not for `direct-change`, `scaffold` (with clear stack), `lite-spec`, `full-spec`, `epic-split`, or `resume-current` routes. Those have their own dispatch patterns elsewhere.
+
 ## Hard Rules
 
 - Use behavior route names exactly as returned: `direct-change`, `lite-spec`, `full-spec`, `epic-split`, `scaffold`, `product-inception`, `greenfield-spec`, `prototype`, `import-spec`, `resume-current`, `blocked-ask-user`.

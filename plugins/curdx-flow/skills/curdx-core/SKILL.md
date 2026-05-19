@@ -159,6 +159,34 @@ curdx-flow follows a consistent branch strategy:
 
 The main agent is a coordinator, not an implementer. Delegate all work to subagents.
 
+### Fan-Out Heuristic
+
+The coordinator's default disposition is **fan out unless a cheaper path is provably sufficient**. This implements Anthropic's canonical guidance — *"Use [a subagent] when a side task would flood your main conversation with search results, logs, or file contents you won't reference again"* (`code.claude.com/docs/en/sub-agents`).
+
+**Fan out by default when ANY of these hold:**
+
+1. **Context pollution** — the work would read >3 files or >2 web pages whose raw content the main context won't reference again. Single-agent fan-out is correct usage; parallelism is a bonus, not a precondition.
+2. **Independent multi-topic** — ≥2 topics where independent input / independent output / independent context (the 3 criteria in `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md`) all hold.
+3. **Downstream synthesis** — findings will feed an artifact, interview question, or decision the coordinator owns.
+
+**Do NOT fan out when:**
+
+- Exact string match / known glob / single deterministic edit — `grep` and `Edit` beat 30-60s subagent overhead.
+- The route output already gives the answer (don't re-derive what `curdx-flow route` told you).
+- Debug investigation BEFORE sequential triage narrowed to ≤3 leads (anti-pattern #12, debug domain).
+- You're tempted to use a Discovery agent to write code or commit files — Discovery is read-only (anti-pattern #18).
+
+**Hard rules when you do fan out:**
+
+- ALL `Agent(...)` calls in ONE message for true parallelism (anti-pattern #3, research domain).
+- Each agent gets a self-contained brief: goal, context, output cap, scope fence (see `${CLAUDE_PLUGIN_ROOT}/references/prompt-optimization.md` and `${CLAUDE_PLUGIN_ROOT}/references/agent-output-contract.md`).
+- Coordinator synthesizes; coordinator does not parallel-do-the-same-work it delegated (system-prompt rule: *"avoid duplicating work that subagents are already doing"*).
+- Trust but verify — an agent's summary describes intent, not necessarily reality. Independently verify load-bearing claims before acting on them.
+
+**Pre-spec coordinator default** (the most common gap):
+
+For `product-inception`, `greenfield-spec`, `prototype`, `import-spec`, or `blocked-ask-user` with non-empty `intent.missingFacts`, fan out a **Discovery** batch (1 claude-mem search + 1 Explore at `.planning/`/`docs/`/`CLAUDE.md` + N research-analyst, one per candidate stack or prior-art topic) BEFORE asking the user any question or writing any product-context artifact. See `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md` Discovery domain and `${CLAUDE_PLUGIN_ROOT}/skills/start/SKILL.md` Pre-Question Discovery section.
+
 ## Skill Entrypoints
 
 curdx-flow is skills-only at the plugin surface.

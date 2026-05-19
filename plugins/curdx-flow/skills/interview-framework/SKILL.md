@@ -45,12 +45,34 @@ AskUserQuestion:
     - "Other"
 ```
 
-## Codebase-First Exploration
+## Parallel Codebase-First Discovery
 
-Before asking any question, determine whether the answer is a **codebase fact** or a **user decision**:
+Before asking ANY question, determine whether the answer is a **codebase fact**, a **prior-memory fact**, a **current-docs fact**, or a **user decision**:
 
-- **Codebase fact**: something discoverable by reading code, config, or existing specs (e.g., which framework is used, whether an interface already exists, what a file currently does). Use the Explore agent to find it. Never ask the user.
-- **User decision**: a preference, priority, trade-off, or constraint that only the user can answer (e.g., which approach to take, what the success criteria are, what's in scope). Ask via AskUserQuestion.
+- **Codebase fact**: discoverable by reading code, config, or existing specs (e.g., which framework is used, whether an interface already exists, what a file currently does). Delegate to an `Explore` subagent. Never ask the user.
+- **Prior-memory fact**: discoverable by querying the user's claude-mem history (e.g., "did we already decide on Postgres for this product?", "what stack did we pick last quarter?"). Delegate to a `general-purpose` subagent invoking `mcp__plugin_claude-mem_mcp-search__*` tools. Never ask the user.
+- **Current-docs fact**: discoverable from official docs of a named library/framework/SDK/API (e.g., "does node-pty support Windows?", "is OAuth-PKCE required for this provider?"). Delegate to a `research-analyst` subagent (preferring Context7 MCP via its tool surface). Never ask the user.
+- **User decision**: a preference, priority, trade-off, or constraint that only the user can answer (e.g., which of two viable approaches, what the success criteria are, what's in scope). Ask via `AskUserQuestion`.
+
+### Discover in parallel BEFORE the first question
+
+<mandatory>
+Before asking the FIRST interview question, the coordinator MUST fan out all discoverable facts in ONE message:
+
+- One `Explore` agent per orthogonal codebase concern
+- One `general-purpose` agent (claude-mem search) if the project has prior history
+- One `research-analyst` agent per named candidate library/framework
+</mandatory>
+
+Asking the user before exhausting parallel discovery is the **Question-before-discovery** anti-pattern (see `${CLAUDE_PLUGIN_ROOT}/references/bounded-parallel-dispatch.md` Discovery domain, anti-pattern #14). The interview becomes lower-leverage when its `[Recommended]` options aren't grounded in evidence.
+
+### Synthesis → interview
+
+After parallel discovery returns:
+
+1. Mark each pre-identified question as **answered by discovery** (drop from interview) or **still needs user decision** (keep).
+2. For kept questions, derive `[Recommended]` from synthesis findings; never fabricate a recommendation without evidence.
+3. Run the interview in a single tight pass. Re-discover only if a user answer materially changes the search space.
 
 Only ask what you cannot discover yourself.
 

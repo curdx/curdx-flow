@@ -16,6 +16,29 @@ Empty workspaces are not automatically small. Route by intent:
 | `prototype` | Build the thinnest proof tied to a success criterion. |
 | `import-spec` | Normalize the supplied artifact into phase artifacts with traceability. |
 
+## Discovery Fan-Out Before Writing
+
+Each product-context artifact must be backed by parallel Discovery subagents
+before the coordinator drafts it. Writing any of these from a single agent
+(or worse, from the main coordinator directly) is anti-pattern #15 in
+`bounded-parallel-dispatch.md` (Discovery domain).
+
+| Artifact | Discovery agents (dispatch in ONE message before drafting) |
+| --- | --- |
+| `docs/mission.md` | (a) `general-purpose` invoking claude-mem MCP search for prior product decisions or similar projects in user history; (b) `research-analyst` for target-user/problem-space prior art and competitive landscape; (c) `Explore` for any existing `mission.md`, `README.md`, `.planning/` notes, or PRD-shaped docs already in the repo. |
+| `docs/roadmap.md` | (a) `research-analyst` for "first-usable-slice" patterns in this product category (what's a walking skeleton for this kind of app?); (b) `Explore` for related specs in `./specs/` and any `.planning/roadmap*` or backlog notes; (c) `general-purpose` claude-mem search for prior roadmap iterations or scope decisions. |
+| `docs/tech-stack.md` | (a) N `research-analyst` agents — ONE per candidate stack/library named in `intent.missingFacts` or user prompt (e.g., one for "node-pty alternatives", one for "xterm.js fork landscape"); use Context7 MCP via the agent's tool surface for current docs; (b) `Explore` for existing `package.json`/`Cargo.toml`/`go.mod`/`requirements.txt` and any declared stack in `CLAUDE.md`; (c) `general-purpose` claude-mem search for prior stack decisions and rejected options. |
+| `docs/constitution.md` | (a) `Explore` for `CLAUDE.md`, `.editorconfig`, existing test commands, lint configs, CI files, `SECURITY.md`; (b) `research-analyst` for industry baselines on testing/security/UX/deployment for the chosen stack (only if stack is determined); (c) `general-purpose` claude-mem search for prior quality-bar decisions and incidents. |
+
+All four artifacts may share Discovery output — run the union of agents
+ONCE before drafting ANY artifact, then split synthesis four ways.
+A single Discovery fan-out for an empty workspace typically lands at
+4-8 agents in one message: 1 claude-mem + 1-2 Explore + 2-5 research-analyst.
+
+After Discovery returns, persist findings to
+`.planning/discovery/greenfield-<timestamp>.md` so subsequent phases
+(research, requirements, design) can reuse them without re-running fan-out.
+
 ## Product Context Artifacts
 
 For product greenfield work, create or reuse:
