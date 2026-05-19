@@ -1,4 +1,4 @@
-import { runStreaming, ensureOk } from '../../runner/exec.ts';
+import { runStreaming, ensureOk, type CmdResult } from '../../runner/exec.ts';
 import { clearStateCache, isMarketplaceAdded, isPluginInstalledAtScope } from '../../runner/state.ts';
 import type { InstallCtx } from '../types.ts';
 
@@ -21,10 +21,29 @@ export async function refreshMarketplace(marketplaceName: string, ctx: InstallCt
   clearStateCache();
 }
 
+// `claude plugin install` only writes the install record; it does NOT flip
+// settings.json#enabledPlugins[id] to true, so the plugin's skills never load
+// in Claude Code until enabled. Always pair install (and update, which
+// preserves but never enables) with an explicit enable that tolerates the
+// already-enabled non-zero exit.
+export async function enablePluginById(pluginId: string, ctx: InstallCtx): Promise<void> {
+  const r = await runStreaming('claude', ['plugin', 'enable', pluginId, '--scope', PLUGIN_SCOPE], ctx.log);
+  if (r.exitCode === 0 || isAlreadyEnabled(r)) {
+    clearStateCache();
+    return;
+  }
+  ensureOk(r, `plugin enable ${pluginId}`);
+}
+
+function isAlreadyEnabled(r: CmdResult): boolean {
+  return `${r.stdout}\n${r.stderr}`.toLowerCase().includes('already enabled');
+}
+
 export async function installPluginById(pluginId: string, ctx: InstallCtx): Promise<void> {
   const r = await runStreaming('claude', ['plugin', 'install', pluginId, '--scope', PLUGIN_SCOPE], ctx.log);
   ensureOk(r, `plugin install ${pluginId}`);
   clearStateCache();
+  await enablePluginById(pluginId, ctx);
 }
 
 export async function uninstallPluginById(pluginId: string, ctx: InstallCtx): Promise<void> {
@@ -38,4 +57,5 @@ export async function updatePluginById(pluginId: string, ctx: InstallCtx): Promi
   const r = await runStreaming('claude', ['plugin', 'update', pluginId, '--scope', PLUGIN_SCOPE], ctx.log);
   ensureOk(r, `plugin update ${pluginId}`);
   clearStateCache();
+  await enablePluginById(pluginId, ctx);
 }
