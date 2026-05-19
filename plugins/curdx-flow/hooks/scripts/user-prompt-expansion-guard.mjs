@@ -3233,7 +3233,7 @@ function instructionFor(phase, problems, plan, route, snapshot) {
   }
   if (problems.includes("ui-quality-risk")) {
     const uiUx = firstCapability(plan, "ui-ux-pro-max");
-    const design = uiUx !== void 0 && uiUx.availabilityState !== "missing" ? uiUx.invocation : "the available frontend design guidance";
+    const design = uiUx !== void 0 && uiUx.availabilityState !== "missing" ? uiUx.invocation : "the available ui-ux-pro-max guidance";
     return `Apply ${design} before changing visible UI, then keep browser evidence as the completion gate.`;
   }
   if (problems.includes("browser-evidence-needed")) {

@@ -93,11 +93,13 @@ describe('curdx capability registry', () => {
     ]));
   });
 
-  it('routes frontend design aliases to ui-ux-pro-max only', () => {
-    const removedDesignId = ['frontend', 'design'].join('-');
-    expect(canonicalPkgId('frontend design')).toBe('ui-ux-pro-max');
+  it('routes ui-ux-pro-max name variants and no longer aliases legacy frontend-design names', () => {
     expect(canonicalPkgId('uiuxmax')).toBe('ui-ux-pro-max');
-    expect(canonicalPkgId(removedDesignId)).toBe(removedDesignId);
+    expect(canonicalPkgId('ui-ux-max')).toBe('ui-ux-pro-max');
+    expect(canonicalPkgId('ui ux pro max')).toBe('ui-ux-pro-max');
+    expect(canonicalPkgId('frontend')).toBe('frontend');
+    expect(canonicalPkgId('frontend-design')).toBe('frontend-design');
+    expect(canonicalPkgId('frontend design')).toBe('frontend design');
   });
 
   it('renders CLAUDE.md rules from the shared capability source', () => {

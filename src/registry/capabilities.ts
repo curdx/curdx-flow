@@ -85,9 +85,6 @@ export const CURDX_PACKAGE_ALIASES: Record<string, CurdxPluginDependencyId> = {
   uiuxmax: "ui-ux-pro-max",
   "ui-ux-max": "ui-ux-pro-max",
   "ui ux pro max": "ui-ux-pro-max",
-  frontend: "ui-ux-pro-max",
-  "front-end-design": "ui-ux-pro-max",
-  "frontend design": "ui-ux-pro-max",
 };
 
 export function canonicalPkgId(id: string): string {
