@@ -335,6 +335,59 @@ function specsHasNonHiddenChildren(tmp) {
   return readdirSync(specsDir).some((name) => !name.startsWith('.'));
 }
 
+/**
+ * Read every event written to .curdx/brain.jsonl. Hooks under
+ * plugins/curdx-flow/hooks/scripts/ append structured records here on every
+ * lifecycle event (UserPromptSubmit, SubagentStart/Stop, Stop, PostCompact,
+ * verification-run, edit-batch, ...). This file is the canonical oracle for
+ * "did the hook actually fire?" — superior to scraping Claude's narrative.
+ */
+function readBrainEvents(tmp) {
+  const brainPath = join(tmp, '.curdx', 'brain.jsonl');
+  if (!existsSync(brainPath)) return null;
+  const lines = readFileSync(brainPath, 'utf8').split('\n').filter(Boolean);
+  return lines.map((line) => parseJson('brain event', line));
+}
+
+/**
+ * Validate hook side-effects on .curdx/brain.jsonl.
+ *
+ *  - `requireAnyEvent: true`   → at least one hook event was recorded
+ *  - `requireTypes: [...]`     → each listed type must appear at least once
+ *  - subagent-started count MUST equal subagent-stopped count (invariant
+ *    even when zero, since hooks fire as a pair)
+ *
+ * Stages that do not create a spec dir (e.g. direct-change) may legitimately
+ * have no brain.jsonl — pass `allowMissing: true` to soften that case.
+ */
+function validateHookEvents(stage, tmp, opts = {}) {
+  const events = readBrainEvents(tmp);
+  if (events === null) {
+    if (opts.allowMissing) return null;
+    throw new Error(
+      `brain.jsonl missing under ${tmp}/.curdx — hook chain never recorded an event`,
+    );
+  }
+  if (opts.requireAnyEvent !== false) {
+    assert(events.length > 0, `brain.jsonl is empty — no hook events recorded`);
+  }
+  for (const required of opts.requireTypes ?? []) {
+    assert(
+      events.some((e) => e.type === required),
+      `brain.jsonl missing required event type: ${required}`,
+    );
+  }
+  // Subagent lifecycle invariant: start/stop must come in pairs.
+  const started = events.filter((e) => e.type === 'subagent-started').length;
+  const stopped = events.filter((e) => e.type === 'subagent-stopped').length;
+  assert(
+    started === stopped,
+    `subagent lifecycle imbalanced: started=${started} stopped=${stopped}`,
+  );
+  log(stage, `hook events: ${events.length} total, subagents=${started}`);
+  return events;
+}
+
 // ---------------------- stages ----------------------
 
 const stageOrder = [
@@ -387,6 +440,7 @@ const stages = {
         );
         run(stage, 'final npm test must pass', 'npm', ['test'], { cwd: tmp });
         validateSpecArtifacts(tmp, 'greet-helper', { requireCompleted: true });
+        validateHookEvents(stage, tmp, { requireTypes: ['edit-batch'] });
         return { stage, status: 'PASS', tmp };
       } catch (err) {
         return { stage, status: 'FAIL', tmp, error: err.message };
@@ -467,6 +521,7 @@ const stages = {
           requireDriver: 'goal',
           requirePhaseFiles: ['tasks.md'],
         });
+        validateHookEvents(stage, tmp, { requireTypes: ['edit-batch'] });
         return { stage, status: 'PASS', tmp };
       } catch (err) {
         return { stage, status: 'FAIL', tmp, error: err.message };
@@ -511,6 +566,9 @@ const stages = {
           !specsHasNonHiddenChildren(tmp),
           'direct-change route should not create a spec subdir',
         );
+        // direct-change may not create .curdx/, but if it does the
+        // start/stop invariant still applies.
+        validateHookEvents(stage, tmp, { allowMissing: true });
         return { stage, status: 'PASS', tmp };
       } catch (err) {
         return { stage, status: 'FAIL', tmp, error: err.message };
@@ -664,6 +722,11 @@ const stages = {
         // Test file untouched
         const testSrc = readFileSync(join(tmp, 'test', 'greet.test.js'), 'utf8');
         assert(testSrc.includes('Ada Lovelace'), 'test file modified (scoring asset corruption)');
+        // Recovery should have at least one verification-run event since the
+        // first attempt fails and the skill must re-run after the fix.
+        validateHookEvents(stage, tmp, {
+          requireTypes: ['edit-batch', 'verification-run'],
+        });
         return { stage, status: 'PASS', tmp };
       } catch (err) {
         return { stage, status: 'FAIL', tmp, error: err.message };
@@ -754,6 +817,7 @@ const stages = {
           stateAfter.name === 'greet-helper',
           `refactor should reuse spec, got name=${stateAfter.name}`,
         );
+        validateHookEvents(stage, tmp, { requireTypes: ['edit-batch'] });
         return { stage, status: 'PASS', tmp };
       } catch (err) {
         return { stage, status: 'FAIL', tmp, error: err.message };
@@ -843,6 +907,7 @@ const stages = {
           state.executionDriver === 'manual',
           `executionDriver=${state.executionDriver}, expected manual`,
         );
+        validateHookEvents(stage, tmp, { requireTypes: ['edit-batch'] });
         return { stage, status: 'PASS', tmp };
       } catch (err) {
         return { stage, status: 'FAIL', tmp, error: err.message };
