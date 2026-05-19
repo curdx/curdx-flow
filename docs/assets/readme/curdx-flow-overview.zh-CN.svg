@@ -6,10 +6,6 @@
       <stop offset="0" stop-color="#0B1020"/>
       <stop offset="1" stop-color="#050817"/>
     </linearGradient>
-    <linearGradient id="ovGreenZh" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#BFDBFE"/>
-      <stop offset="1" stop-color="#3B82F6"/>
-    </linearGradient>
     <marker id="ovArrZh" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
       <path d="M0 0 L8 5 L0 10 Z" fill="#3B82F6"/>
     </marker>
@@ -25,9 +21,11 @@
   <text x="480" y="27" font-size="12" fill="#64748B" text-anchor="middle">— curdx-flow · 概览 —</text>
   <line x1="0" y1="44" x2="960" y2="44" stroke="#1F2937"/>
 
-  <text x="40" y="84" font-size="22" fill="#E5E7EB" font-weight="700">从 <tspan fill="#FBBF24">「帮我做这个」</tspan> 到 <tspan fill="url(#ovGreenZh)">有证据的「真的做完了」</tspan></text>
-  <text x="40" y="108" font-size="13" fill="#94A3B8">规格写进仓库 · 每次 PR 都带证据 · 跨会话可恢复</text>
+  <!-- Subtitle: native CJK rhythm, slightly larger body to balance Latin tspans -->
+  <text x="40" y="86" font-size="24" fill="#E5E7EB" font-weight="700">把 <tspan fill="#FBBF24">「帮我做这个」</tspan> 变成 <tspan fill="#60A5FA">「有证据的完成」</tspan></text>
+  <text x="40" y="112" font-size="13" fill="#94A3B8">规格写进仓库 · 每次 PR 都带证据 · 跨会话可恢复</text>
 
+  <!-- Panel 1: 目标 -->
   <g>
     <rect x="40" y="140" width="280" height="304" rx="14" fill="#111827" stroke="#1F2937"/>
     <rect x="40" y="140" width="280" height="32" rx="14" fill="#0F172A"/>
@@ -35,25 +33,26 @@
     <text x="56" y="161" font-size="10" fill="#64748B">01 · 目标</text>
     <circle cx="304" cy="156" r="3" fill="#FBBF24"/>
 
-    <text x="56" y="200" font-size="14" fill="#E5E7EB" font-weight="700">先说清楚“完成”是什么</text>
+    <text x="56" y="202" font-size="17" fill="#E5E7EB" font-weight="700">把目标说清楚</text>
 
-    <rect x="56" y="218" width="248" height="174" rx="10" fill="#020617" stroke="#1F2937"/>
-    <text x="72" y="244" font-size="11" fill="#64748B">$</text>
-    <text x="88" y="244" font-size="11" fill="#60A5FA">/curdx-flow:start</text>
-    <text x="72" y="266" font-size="11" fill="#E5E7EB">  todo-app</text>
-    <text x="72" y="288" font-size="11" fill="#94A3B8">  "新增/编辑/完成/删除,</text>
-    <text x="72" y="306" font-size="11" fill="#94A3B8">   并用浏览器验证"</text>
+    <rect x="56" y="222" width="248" height="170" rx="10" fill="#020617" stroke="#1F2937"/>
+    <text x="72" y="246" font-size="11" fill="#64748B">$</text>
+    <text x="88" y="246" font-size="11" fill="#60A5FA">/curdx-flow:start</text>
+    <text x="72" y="268" font-size="11" fill="#E5E7EB">  todo-app</text>
+    <text x="72" y="290" font-size="11" fill="#94A3B8">  "新增/编辑/完成/</text>
+    <text x="72" y="308" font-size="11" fill="#94A3B8">   删除，浏览器验证"</text>
     <text x="72" y="362" font-size="11" fill="#64748B">$</text>
     <rect x="86" y="352" width="9" height="13" fill="#60A5FA">
       <animate attributeName="opacity" values="1;0.15;1" dur="1.1s" repeatCount="indefinite"/>
     </rect>
 
-    <text x="56" y="420" font-size="10" fill="#64748B">一句话上手</text>
-    <text x="56" y="434" font-size="10" fill="#64748B">不用先学 agent / hook</text>
+    <text x="56" y="424" font-size="12" fill="#64748B">一句话上手，</text>
+    <text x="56" y="438" font-size="12" fill="#64748B">不用先学 agent / hook。</text>
   </g>
 
   <path d="M328 290 L360 290" stroke="#3B82F6" stroke-width="2" marker-end="url(#ovArrZh)"/>
 
+  <!-- Panel 2: 规格 -->
   <g>
     <rect x="368" y="140" width="280" height="304" rx="14" fill="#111827" stroke="#1F2937"/>
     <rect x="368" y="140" width="280" height="32" rx="14" fill="#0F172A"/>
@@ -61,23 +60,24 @@
     <text x="384" y="161" font-size="10" fill="#64748B">02 · spec/</text>
     <circle cx="632" cy="156" r="3" fill="#A78BFA"/>
 
-    <text x="384" y="200" font-size="14" fill="#E5E7EB" font-weight="700">把方案钉进项目文件</text>
+    <text x="384" y="202" font-size="17" fill="#E5E7EB" font-weight="700">把方案钉进文件</text>
 
-    <rect x="384" y="218" width="248" height="174" rx="10" fill="#020617" stroke="#1F2937"/>
-    <text x="400" y="244" font-size="11" fill="#64748B">specs/todo-app/</text>
-    <text x="412" y="266" font-size="11" fill="#E5E7EB">├── research.md</text>
-    <text x="412" y="286" font-size="11" fill="#E5E7EB">├── requirements.md</text>
-    <text x="412" y="306" font-size="11" fill="#E5E7EB">├── design.md</text>
-    <text x="412" y="326" font-size="11" fill="#E5E7EB">├── tasks.md</text>
-    <text x="412" y="346" font-size="11" fill="#94A3B8">└── .curdx-state.json</text>
-    <text x="400" y="376" font-size="10" fill="#60A5FA">↳ 可 review · 可恢复</text>
+    <rect x="384" y="222" width="248" height="170" rx="10" fill="#020617" stroke="#1F2937"/>
+    <text x="400" y="246" font-size="11" fill="#64748B">specs/todo-app/</text>
+    <text x="412" y="268" font-size="11" fill="#E5E7EB">├── research.md</text>
+    <text x="412" y="288" font-size="11" fill="#E5E7EB">├── requirements.md</text>
+    <text x="412" y="308" font-size="11" fill="#E5E7EB">├── design.md</text>
+    <text x="412" y="328" font-size="11" fill="#E5E7EB">├── tasks.md</text>
+    <text x="412" y="348" font-size="11" fill="#94A3B8">└── .curdx-state.json</text>
+    <text x="400" y="378" font-size="10" fill="#A78BFA">↳ 可 review · 可恢复</text>
 
-    <text x="384" y="420" font-size="10" fill="#64748B">需求 / 设计 / 任务</text>
-    <text x="384" y="434" font-size="10" fill="#64748B">落到仓库，不是聊天记录</text>
+    <text x="384" y="424" font-size="12" fill="#64748B">方案在仓库里，</text>
+    <text x="384" y="438" font-size="12" fill="#64748B">不在聊天记录里。</text>
   </g>
 
   <path d="M656 290 L688 290" stroke="#3B82F6" stroke-width="2" marker-end="url(#ovArrZh)"/>
 
+  <!-- Panel 3: 证据 -->
   <g>
     <rect x="696" y="140" width="224" height="304" rx="14" fill="#111827" stroke="#1F2937"/>
     <rect x="696" y="140" width="224" height="32" rx="14" fill="#0F172A"/>
@@ -85,39 +85,40 @@
     <text x="712" y="161" font-size="10" fill="#64748B">03 · 证据</text>
     <circle cx="904" cy="156" r="3" fill="#60A5FA"/>
 
-    <text x="712" y="200" font-size="14" fill="#E5E7EB" font-weight="700">完成 = 证据</text>
+    <text x="712" y="202" font-size="17" fill="#E5E7EB" font-weight="700">完成 = 证据</text>
 
-    <g font-size="11" fill="#E5E7EB">
-      <rect x="712" y="220" width="14" height="14" rx="3" fill="#0B1F3A" stroke="#60A5FA"/>
-      <path d="M715 227 L718 230 L723 224" stroke="#60A5FA" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <text x="734" y="231">测试通过</text>
+    <g font-size="12" fill="#E5E7EB">
+      <rect x="712" y="222" width="14" height="14" rx="3" fill="#0B1F3A" stroke="#60A5FA"/>
+      <path d="M715 229 L718 232 L723 226" stroke="#60A5FA" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="734" y="233">测试通过</text>
 
-      <rect x="712" y="244" width="14" height="14" rx="3" fill="#0B1F3A" stroke="#60A5FA"/>
-      <path d="M715 251 L718 254 L723 248" stroke="#60A5FA" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <text x="734" y="255">构建干净</text>
+      <rect x="712" y="246" width="14" height="14" rx="3" fill="#0B1F3A" stroke="#60A5FA"/>
+      <path d="M715 253 L718 256 L723 250" stroke="#60A5FA" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="734" y="257">构建干净</text>
 
-      <rect x="712" y="268" width="14" height="14" rx="3" fill="#0B1F3A" stroke="#60A5FA"/>
-      <path d="M715 275 L718 278 L723 272" stroke="#60A5FA" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <text x="734" y="279">浏览器验证</text>
+      <rect x="712" y="270" width="14" height="14" rx="3" fill="#0B1F3A" stroke="#60A5FA"/>
+      <path d="M715 277 L718 280 L723 274" stroke="#60A5FA" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="734" y="281">浏览器验证</text>
 
-      <rect x="712" y="292" width="14" height="14" rx="3" fill="#0B1F3A" stroke="#60A5FA"/>
-      <path d="M715 299 L718 302 L723 296" stroke="#60A5FA" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <text x="734" y="303">CI 绿灯</text>
+      <rect x="712" y="294" width="14" height="14" rx="3" fill="#0B1F3A" stroke="#60A5FA"/>
+      <path d="M715 301 L718 304 L723 298" stroke="#60A5FA" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="734" y="305">CI 通过</text>
 
-      <rect x="712" y="316" width="14" height="14" rx="3" fill="#0B1F3A" stroke="#60A5FA"/>
-      <path d="M715 323 L718 326 L723 320" stroke="#60A5FA" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <text x="734" y="327">发布 / npm</text>
+      <rect x="712" y="318" width="14" height="14" rx="3" fill="#0B1F3A" stroke="#60A5FA"/>
+      <path d="M715 325 L718 328 L723 322" stroke="#60A5FA" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="734" y="329">发布 / npm</text>
     </g>
-    <text x="712" y="372" font-size="10" fill="#60A5FA">写进 .curdx-state.json</text>
+    <text x="712" y="376" font-size="10" fill="#60A5FA">写进 .curdx-state.json</text>
 
-    <text x="712" y="420" font-size="10" fill="#64748B">不允许“看着没问题”</text>
-    <text x="712" y="434" font-size="10" fill="#64748B">不允许“静默通过”</text>
+    <text x="712" y="424" font-size="12" fill="#64748B">不允许"看着没问题"，</text>
+    <text x="712" y="438" font-size="12" fill="#64748B">不允许"静默通过"。</text>
   </g>
 
+  <!-- Footer chip -->
   <rect x="40" y="468" width="880" height="48" rx="10" fill="#0F172A" stroke="#1F2937"/>
   <text x="56" y="497" font-size="12" fill="#94A3B8">$ git diff +</text>
   <text x="170" y="497" font-size="12" fill="#60A5FA" font-weight="700">specs/</text>
-  <text x="220" y="497" font-size="12" fill="#94A3B8">+ verificationBlocks  →  唯一可信的“完成”形态</text>
+  <text x="220" y="497" font-size="12" fill="#94A3B8">+ verificationBlocks  →  唯一可信的"完成"形态</text>
   <text x="824" y="497" font-size="11" fill="#64748B" text-anchor="end">curdx-flow</text>
   <rect x="840" y="482" width="64" height="20" rx="10" fill="#0B1F3A" stroke="#60A5FA"/>
   <text x="872" y="496" font-size="11" fill="#60A5FA" text-anchor="middle" font-weight="700">v1 · ready</text>

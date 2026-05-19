@@ -6,10 +6,6 @@
       <stop offset="0" stop-color="#0B1020"/>
       <stop offset="1" stop-color="#050817"/>
     </linearGradient>
-    <linearGradient id="lpGZh" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#BFDBFE"/>
-      <stop offset="1" stop-color="#3B82F6"/>
-    </linearGradient>
     <marker id="lpArrZh" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
       <path d="M0 0 L8 5 L0 10 Z" fill="#3B82F6"/>
     </marker>
@@ -28,57 +24,63 @@
   <text x="480" y="27" font-size="12" fill="#64748B" text-anchor="middle">— curdx-flow · 闭环 —</text>
   <line x1="0" y1="44" x2="960" y2="44" stroke="#1F2937"/>
 
-  <text x="40" y="82" font-size="18" fill="#E5E7EB" font-weight="700">一个能暂停 · 能恢复 · 能重放的循环</text>
-  <text x="40" y="104" font-size="12" fill="#94A3B8">每一步都留下文件 · 每一次跳转都需要理由</text>
+  <text x="40" y="84" font-size="22" fill="#E5E7EB" font-weight="700">能暂停 · 能恢复 · 能重放的循环</text>
+  <text x="40" y="108" font-size="13" fill="#94A3B8">每一步都留下文件 · 每一次跳转都有理由</text>
 
+  <!-- Refactor return -->
   <path d="M820 144 Q480 92 140 144" stroke="#A78BFA" stroke-width="1.6" stroke-dasharray="4 4" fill="none" marker-end="url(#lpArrDimZh)"/>
-  <rect x="416" y="106" width="128" height="22" rx="11" fill="#1E1B4B" stroke="#A78BFA"/>
-  <text x="480" y="121" font-size="11" fill="#A78BFA" text-anchor="middle" font-weight="700">/refactor · 恢复</text>
+  <rect x="408" y="106" width="144" height="22" rx="11" fill="#1E1B4B" stroke="#A78BFA"/>
+  <text x="480" y="121" font-size="11" fill="#A78BFA" text-anchor="middle" font-weight="700">/refactor · 回头修正</text>
 
   <g>
+    <!-- 01 目标 -->
     <rect x="56" y="158" width="160" height="148" rx="12" fill="#111827" stroke="#1F2937"/>
     <text x="72" y="180" font-size="10" fill="#64748B">01</text>
-    <text x="96" y="180" font-size="10" fill="#FBBF24">目标</text>
+    <text x="96" y="180" font-size="11" fill="#FBBF24">目标</text>
     <text x="72" y="208" font-size="14" fill="#E5E7EB" font-weight="700">/start</text>
-    <text x="72" y="232" font-size="10" fill="#94A3B8">识别 / 路由 /</text>
-    <text x="72" y="246" font-size="10" fill="#94A3B8">恢复 / 拆分</text>
-    <rect x="72" y="260" width="128" height="32" rx="6" fill="#020617" stroke="#1F2937"/>
-    <text x="84" y="280" font-size="10" fill="#60A5FA">$ todo-app …</text>
+    <text x="72" y="234" font-size="11" fill="#94A3B8">识别 · 路由</text>
+    <text x="72" y="250" font-size="11" fill="#94A3B8">恢复 · 拆分</text>
+    <rect x="72" y="262" width="128" height="32" rx="6" fill="#020617" stroke="#1F2937"/>
+    <text x="84" y="282" font-size="10" fill="#60A5FA">$ todo-app …</text>
 
     <path d="M220 232 L246 232" stroke="#3B82F6" stroke-width="2" marker-end="url(#lpArrZh)"/>
 
+    <!-- 02 规格 -->
     <rect x="250" y="158" width="160" height="148" rx="12" fill="#111827" stroke="#1F2937"/>
     <text x="266" y="180" font-size="10" fill="#64748B">02</text>
-    <text x="290" y="180" font-size="10" fill="#A78BFA">规格</text>
+    <text x="290" y="180" font-size="11" fill="#A78BFA">规格</text>
     <text x="266" y="208" font-size="14" fill="#E5E7EB" font-weight="700">/research</text>
     <text x="266" y="224" font-size="14" fill="#E5E7EB" font-weight="700">/design</text>
-    <text x="266" y="246" font-size="10" fill="#94A3B8">事实 / 风险 /</text>
-    <text x="266" y="260" font-size="10" fill="#94A3B8">接口 / 范围</text>
-    <text x="266" y="288" font-size="10" fill="#A78BFA">research.md · design.md</text>
+    <text x="266" y="250" font-size="11" fill="#94A3B8">事实 · 风险</text>
+    <text x="266" y="266" font-size="11" fill="#94A3B8">接口 · 范围</text>
+    <text x="266" y="290" font-size="10" fill="#A78BFA">research.md · design.md</text>
 
     <path d="M414 232 L440 232" stroke="#3B82F6" stroke-width="2" marker-end="url(#lpArrZh)"/>
 
+    <!-- 03 任务 -->
     <rect x="444" y="158" width="160" height="148" rx="12" fill="#111827" stroke="#1F2937"/>
     <text x="460" y="180" font-size="10" fill="#64748B">03</text>
-    <text x="484" y="180" font-size="10" fill="#22D3EE">任务</text>
+    <text x="484" y="180" font-size="11" fill="#22D3EE">任务</text>
     <text x="460" y="208" font-size="14" fill="#E5E7EB" font-weight="700">/tasks</text>
-    <text x="460" y="232" font-size="10" fill="#94A3B8">价值切片，</text>
-    <text x="460" y="246" font-size="10" fill="#94A3B8">每个都带验证</text>
-    <text x="460" y="288" font-size="10" fill="#22D3EE">tasks.md</text>
+    <text x="460" y="234" font-size="11" fill="#94A3B8">价值切片，</text>
+    <text x="460" y="250" font-size="11" fill="#94A3B8">每个可验证</text>
+    <text x="460" y="290" font-size="10" fill="#22D3EE">tasks.md</text>
 
     <path d="M608 232 L634 232" stroke="#3B82F6" stroke-width="2" marker-end="url(#lpArrZh)"/>
 
+    <!-- 04 执行 -->
     <rect x="638" y="158" width="160" height="148" rx="12" fill="#111827" stroke="#1F2937"/>
     <text x="654" y="180" font-size="10" fill="#64748B">04</text>
-    <text x="678" y="180" font-size="10" fill="#60A5FA">执行</text>
+    <text x="678" y="180" font-size="11" fill="#60A5FA">执行</text>
     <text x="654" y="208" font-size="14" fill="#E5E7EB" font-weight="700">/implement</text>
-    <text x="654" y="232" font-size="10" fill="#94A3B8">spec-executor +</text>
-    <text x="654" y="246" font-size="10" fill="#94A3B8">qa-engineer</text>
+    <text x="654" y="232" font-size="10" fill="#94A3B8">spec-executor</text>
+    <text x="654" y="246" font-size="10" fill="#94A3B8">+ qa-engineer</text>
     <rect x="654" y="260" width="128" height="32" rx="6" fill="#020617" stroke="#1F2937"/>
     <text x="666" y="280" font-size="10" fill="#60A5FA">$ npm test ✓</text>
 
     <path d="M802 232 L828 232" stroke="#3B82F6" stroke-width="2" marker-end="url(#lpArrZh)"/>
 
+    <!-- 05 证据 -->
     <rect x="832" y="158" width="88" height="148" rx="12" fill="#0B1F3A" stroke="#60A5FA"/>
     <text x="848" y="180" font-size="10" fill="#60A5FA">05</text>
     <text x="848" y="208" font-size="14" fill="#E5E7EB" font-weight="700">证据</text>
@@ -89,8 +91,8 @@
 
   <rect x="40" y="346" width="880" height="62" rx="10" fill="#0F172A" stroke="#1F2937"/>
   <text x="56" y="372" font-size="11" fill="#64748B">$ /curdx-flow:status</text>
-  <text x="56" y="390" font-size="12" fill="#E5E7EB">→ 当前 spec · 当前阶段 · 下一步命令 · 缺失能力</text>
-  <text x="824" y="390" font-size="11" fill="#60A5FA" text-anchor="end" font-weight="700">不允许静默通过</text>
-  <rect x="836" y="378" width="68" height="18" rx="9" fill="#0B1F3A" stroke="#60A5FA"/>
-  <text x="870" y="391" font-size="10" fill="#60A5FA" text-anchor="middle">已开启</text>
+  <text x="56" y="390" font-size="12" fill="#E5E7EB">→ 当前 spec  ·  当前阶段  ·  下一步命令  ·  缺失能力</text>
+  <text x="800" y="390" font-size="11" fill="#60A5FA" text-anchor="end" font-weight="700">不允许静默通过</text>
+  <rect x="812" y="378" width="92" height="18" rx="9" fill="#0B1F3A" stroke="#60A5FA"/>
+  <text x="858" y="391" font-size="10" fill="#60A5FA" text-anchor="middle">已开启 enforce</text>
 </svg>
