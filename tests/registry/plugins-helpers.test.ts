@@ -91,3 +91,23 @@ describe('plugin install helpers', () => {
     await expect(installPluginById('foo@bar', ctx)).resolves.toBeUndefined();
   });
 });
+
+describe('plugin Pkg contract for ensure-enabled sweep', () => {
+  it('every plugin-type pkg exposes pluginId so installFlow can re-enable it', async () => {
+    const { PKGS } = await vi.importActual<typeof import('../../src/registry/index.ts')>(
+      '../../src/registry/index.ts',
+    );
+    const offenders = PKGS.filter((pkg) => pkg.type === 'plugin' && !pkg.pluginId).map((pkg) => pkg.id);
+    expect(offenders).toEqual([]);
+  });
+
+  it('pluginId matches the "name@marketplace" pattern Claude Code expects', async () => {
+    const { PKGS } = await vi.importActual<typeof import('../../src/registry/index.ts')>(
+      '../../src/registry/index.ts',
+    );
+    for (const pkg of PKGS) {
+      if (pkg.type !== 'plugin' || !pkg.pluginId) continue;
+      expect(pkg.pluginId, `${pkg.id} pluginId`).toMatch(/^[^@/\s]+@[^@/\s]+$/);
+    }
+  });
+});

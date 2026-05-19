@@ -56,6 +56,15 @@ export type Pkg = {
   slashNamespace?: string;
 
   /**
+   * Full "name@marketplace" id for plugin-type pkgs. The install flow reads this
+   * during the post-install "ensure enabled" sweep so it can flip a previously
+   * disabled plugin's enabledPlugins flag to true even when state was up_to_date
+   * (and the normal install/update path was therefore skipped). MCPs leave this
+   * unset.
+   */
+  pluginId?: string;
+
+  /**
    * Required by the @curdx/flow bundle. When true:
    * - Hidden from the interactive install multiselect (rendered in an "always installed" header instead).
    * - Auto-added to install targets even when the user passes `--ids` without listing it.

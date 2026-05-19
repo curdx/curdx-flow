@@ -25,6 +25,7 @@ const claudeMem: Pkg = {
   slashNamespace: SPEC.slashNamespace,
   whenToUse: SPEC.whenToUse,
   marketplaces: () => [MARKETPLACE_NAME],
+  pluginId: PLUGIN_ID,
   prereqCheck: (t) => ensureBun(t),
   isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   installedVersion: async () => {

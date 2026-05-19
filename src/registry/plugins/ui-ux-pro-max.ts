@@ -24,6 +24,7 @@ const uiUxProMax: Pkg = {
   required: true,
   whenToUse: SPEC.whenToUse,
   marketplaces: () => [MARKETPLACE_NAME],
+  pluginId: PLUGIN_ID,
   isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   latestVersion: () => getMarketplacePluginVersion(MARKETPLACE_NAME, PLUGIN_NAME),
   install: async (ctx) => {

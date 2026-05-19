@@ -295,3 +295,24 @@ export async function refreshMarketplaces(names: string[]): Promise<string[]> {
   await Promise.all(toRefresh.map((name) => reconcileMarketplaceCache(name)));
   return toRefresh;
 }
+
+// Read Claude Code's user-scope settings.json enabledPlugins map. Returns an
+// empty record on any error (file missing, JSON malformed, etc.) so callers
+// can treat absence as "unknown — assume not enabled" and conservatively
+// trigger a (no-op-if-already-enabled) enable call.
+const USER_SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json');
+
+export async function getEnabledPluginsMap(): Promise<Record<string, boolean>> {
+  try {
+    const raw = await fs.readFile(USER_SETTINGS_PATH, 'utf8');
+    const parsed = JSON.parse(raw) as { enabledPlugins?: Record<string, boolean> };
+    return parsed.enabledPlugins ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export async function isPluginEnabled(pluginId: string): Promise<boolean> {
+  const map = await getEnabledPluginsMap();
+  return map[pluginId] === true;
+}

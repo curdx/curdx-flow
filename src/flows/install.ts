@@ -3,8 +3,9 @@ import pc from 'picocolors';
 import { PKGS, findPkg } from '../registry/index.ts';
 import type { Pkg } from '../registry/types.ts';
 import { t } from '../i18n/index.ts';
-import { listMcp, listPlugins, refreshMarketplaces } from '../runner/state.ts';
+import { isPluginEnabled, listMcp, listPlugins, refreshMarketplaces } from '../runner/state.ts';
 import { syncFromState } from '../runner/claudeMd.ts';
+import { enablePluginById } from '../registry/plugins/_helpers.ts';
 
 export type InstallOptions = {
   ids?: string[];
@@ -184,6 +185,44 @@ function summarize(results: Result[]): void {
   p.note(lines.join('\n'), t('install.summaryTitle'));
 }
 
+// Post-install sweep: ensure every installed plugin pkg is also enabled in
+// ~/.claude/settings.json#enabledPlugins. Without this, an install flow that
+// resolves to up_to_date silently skips a disabled plugin — Claude Code then
+// continues to ignore the plugin's skills and slash commands. The check is
+// per-pkg cheap (one fs.readFile of settings.json, amortized via getEnabledPluginsMap
+// inside isPluginEnabled), and only triggers a `claude plugin enable` for
+// plugins that are actually disabled.
+async function ensureInstalledPluginsEnabled(): Promise<void> {
+  const toEnable: { name: string; pluginId: string }[] = [];
+  for (const pkg of PKGS) {
+    if (pkg.type !== 'plugin' || !pkg.pluginId) continue;
+    if (!(await pkg.isInstalled())) continue;
+    if (await isPluginEnabled(pkg.pluginId)) continue;
+    toEnable.push({ name: pkg.name, pluginId: pkg.pluginId });
+  }
+  if (toEnable.length === 0) return;
+
+  const log = p.taskLog({
+    title: `Enabling ${toEnable.length} installed plugin${toEnable.length === 1 ? '' : 's'} that ${toEnable.length === 1 ? 'was' : 'were'} disabled`,
+  });
+  let enabled = 0;
+  const failures: string[] = [];
+  for (const { name, pluginId } of toEnable) {
+    log.message(`enable ${name} (${pluginId})`);
+    try {
+      await enablePluginById(pluginId, { log, config: {}, t });
+      enabled++;
+    } catch (err) {
+      failures.push(`${name}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  if (failures.length === 0) {
+    log.success(`Enabled ${enabled} plugin${enabled === 1 ? '' : 's'}. Restart Claude Code to apply.`);
+  } else {
+    log.error(`Enabled ${enabled}/${toEnable.length}; failed:\n${failures.join('\n')}`);
+  }
+}
+
 async function maybeRefreshMarketplaces(opts: InstallOptions): Promise<void> {
   if (opts.noRefresh) return;
   const names = new Set<string>();
@@ -286,6 +325,10 @@ export async function installFlow(opts: InstallOptions = {}): Promise<void> {
     summarize(results);
   } finally {
     if (!userCancelled) {
+      // Idempotent enable sweep BEFORE syncFromState — the latter reads installed
+      // plugin state to render the CLAUDE.md block, and we want disabled-but-now-
+      // enabled plugins to flip first so the block reflects reality.
+      await ensureInstalledPluginsEnabled();
       await syncFromState({ skip: opts.noClaudeMd });
     }
   }

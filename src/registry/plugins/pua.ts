@@ -24,6 +24,7 @@ const pua: Pkg = {
   slashNamespace: SPEC.slashNamespace,
   whenToUse: SPEC.whenToUse,
   marketplaces: () => [MARKETPLACE_NAME],
+  pluginId: PLUGIN_ID,
   isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   installedVersion: async () => {
     const p = await findPluginAtScope(PLUGIN_ID, PLUGIN_SCOPE);

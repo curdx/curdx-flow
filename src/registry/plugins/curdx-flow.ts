@@ -23,6 +23,7 @@ const curdxFlow: Pkg = {
   whenToUse:
     'for spec-driven multi-task work — research → requirements → design → tasks → autonomous execution per task. Use when starting a feature that benefits from upfront spec; skip for one-shot fixes or simple edits.',
   marketplaces: () => [MARKETPLACE_NAME],
+  pluginId: PLUGIN_ID,
   isInstalled: () => isPluginInstalledAtScope(PLUGIN_ID, PLUGIN_SCOPE),
   installedVersion: async () => {
     const p = await findPluginAtScope(PLUGIN_ID, PLUGIN_SCOPE);
