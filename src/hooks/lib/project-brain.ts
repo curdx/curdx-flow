@@ -13,7 +13,9 @@ export type BrainEventType =
   | "verification-run"
   | "verification-blocked"
   | "last-mile-decision"
-  | "compact-summary";
+  | "compact-summary"
+  | "subagent-started"
+  | "subagent-stopped";
 
 export interface BrainEvent {
   version: 1;
@@ -28,6 +30,17 @@ export interface BrainEvent {
   reason?: string;
   summary?: string;
   files?: number;
+  // Subagent + cross-event correlation fields. Names mirror Claude Code's
+  // native hook input (session_id, agent_id, parent_agent_id, transcript_path,
+  // stop_reason) so external analyzers can join brain.jsonl against the
+  // transcript JSONL without bespoke renaming. session_id doubles as a
+  // trace_id and agent_id doubles as a span_id under OTel GenAI semantics.
+  sessionId?: string;
+  agentId?: string;
+  agentType?: string;
+  parentAgentId?: string;
+  transcriptPath?: string;
+  stopReason?: string;
 }
 
 export interface BrainWriteResult {
@@ -59,6 +72,8 @@ export interface BrainSummary {
 const MAX_REASON = 240;
 const MAX_COMMAND = 180;
 const MAX_SUMMARY = 900;
+const MAX_PATH = 400;
+const MAX_AGENT_FIELD = 120;
 const MAX_BRAIN_BYTES = 64 * 1024;
 const MAX_BRAIN_LINES = 400;
 
@@ -96,6 +111,12 @@ function normalizeEvent(event: Omit<BrainEvent, "version" | "timestamp">): Brain
   if (typeof event.files === "number" && Number.isFinite(event.files)) {
     out.files = Math.max(0, Math.floor(event.files));
   }
+  if (event.sessionId) out.sessionId = truncate(event.sessionId, MAX_AGENT_FIELD);
+  if (event.agentId) out.agentId = truncate(event.agentId, MAX_AGENT_FIELD);
+  if (event.agentType) out.agentType = truncate(event.agentType, MAX_AGENT_FIELD);
+  if (event.parentAgentId) out.parentAgentId = truncate(event.parentAgentId, MAX_AGENT_FIELD);
+  if (event.transcriptPath) out.transcriptPath = truncate(event.transcriptPath, MAX_PATH);
+  if (event.stopReason) out.stopReason = truncate(event.stopReason, MAX_REASON);
   return out;
 }
 
@@ -140,7 +161,9 @@ function parseBrainLine(line: string): BrainEvent | null {
       parsed.type !== "verification-run" &&
       parsed.type !== "verification-blocked" &&
       parsed.type !== "last-mile-decision" &&
-      parsed.type !== "compact-summary"
+      parsed.type !== "compact-summary" &&
+      parsed.type !== "subagent-started" &&
+      parsed.type !== "subagent-stopped"
     ) {
       return null;
     }

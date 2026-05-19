@@ -11,6 +11,8 @@ import { join, resolve } from "node:path";
 var MAX_REASON = 240;
 var MAX_COMMAND = 180;
 var MAX_SUMMARY = 900;
+var MAX_PATH = 400;
+var MAX_AGENT_FIELD = 120;
 var MAX_BRAIN_BYTES = 64 * 1024;
 var MAX_BRAIN_LINES = 400;
 function normalizeCwd(cwd) {
@@ -44,6 +46,12 @@ function normalizeEvent(event) {
   if (typeof event.files === "number" && Number.isFinite(event.files)) {
     out.files = Math.max(0, Math.floor(event.files));
   }
+  if (event.sessionId) out.sessionId = truncate(event.sessionId, MAX_AGENT_FIELD);
+  if (event.agentId) out.agentId = truncate(event.agentId, MAX_AGENT_FIELD);
+  if (event.agentType) out.agentType = truncate(event.agentType, MAX_AGENT_FIELD);
+  if (event.parentAgentId) out.parentAgentId = truncate(event.parentAgentId, MAX_AGENT_FIELD);
+  if (event.transcriptPath) out.transcriptPath = truncate(event.transcriptPath, MAX_PATH);
+  if (event.stopReason) out.stopReason = truncate(event.stopReason, MAX_REASON);
   return out;
 }
 function appendBrainEvent(cwd, event) {

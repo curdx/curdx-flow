@@ -39,6 +39,7 @@ import {
   IRON_LAW_SUMMARY,
   buildContextPayload,
 } from "./lib/build-context-payload.js";
+import { appendBrainEvent } from "./lib/project-brain.js";
 import type { CurdxState, HookOutput } from "./_shared/types.js";
 
 // Reference IRON_LAW_SUMMARY at module scope to keep tree-shaking honest:
@@ -84,6 +85,37 @@ runHook(async (input) => {
     if (typeof cwd !== "string" || cwd.length === 0) {
       return FAIL_OPEN as unknown as HookOutput;
     }
+
+    // Record SubagentStart in brain.jsonl regardless of whether spec-context
+    // injection succeeds below. This is the only signal that a subagent was
+    // dispatched at all — without it, post-hoc analyzers cannot observe
+    // Discovery fan-out behavior (Tier 0 #1 of the logging gap audit).
+    // appendBrainEvent returns BrainWriteResult instead of throwing, so this
+    // never violates the FAIL_OPEN contract.
+    const subagentInput = input as unknown as {
+      session_id?: unknown;
+      agent_id?: unknown;
+      agent_type?: unknown;
+      transcript_path?: unknown;
+      parent_agent_id?: unknown;
+    };
+    appendBrainEvent(cwd, {
+      type: "subagent-started",
+      sessionId:
+        typeof subagentInput.session_id === "string" ? subagentInput.session_id : undefined,
+      agentId:
+        typeof subagentInput.agent_id === "string" ? subagentInput.agent_id : undefined,
+      agentType:
+        typeof subagentInput.agent_type === "string" ? subagentInput.agent_type : undefined,
+      parentAgentId:
+        typeof subagentInput.parent_agent_id === "string"
+          ? subagentInput.parent_agent_id
+          : undefined,
+      transcriptPath:
+        typeof subagentInput.transcript_path === "string"
+          ? subagentInput.transcript_path
+          : undefined,
+    });
 
     // Resolve `<defaultSpecsDir>/.current-spec`. Returns POSIX-form serialized
     // spec path; we re-anchor with `path.join` for fs reads (Node tolerates

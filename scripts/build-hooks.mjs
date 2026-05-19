@@ -27,6 +27,7 @@ const HOOK_ENTRIES = [
   'src/hooks/stop-failure-handler.ts',
   'src/hooks/stop-watcher.ts',
   'src/hooks/subagent-context-injector.ts',
+  'src/hooks/subagent-stop-recorder.ts',
   'src/hooks/task-completed-verifier.ts',
   'src/hooks/user-prompt-expansion-guard.ts',
   'src/hooks/user-prompt-submit-autopilot.ts',

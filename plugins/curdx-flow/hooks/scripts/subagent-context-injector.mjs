@@ -6,8 +6,8 @@ const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
 // src/hooks/subagent-context-injector.ts
-import { existsSync as existsSync2, readFileSync as readFileSync3 } from "node:fs";
-import { join as join2 } from "node:path";
+import { existsSync as existsSync3, readFileSync as readFileSync4 } from "node:fs";
+import { join as join3 } from "node:path";
 import process5 from "node:process";
 
 // src/hooks/_shared/run-hook.ts
@@ -485,6 +485,77 @@ function buildContextPayload(state, specDir, opts) {
   return out;
 }
 
+// src/hooks/lib/project-brain.ts
+import { appendFileSync as appendFileSync2, existsSync as existsSync2, mkdirSync as mkdirSync3, readFileSync as readFileSync3, statSync as statSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { join as join2, resolve } from "node:path";
+var MAX_REASON = 240;
+var MAX_COMMAND = 180;
+var MAX_SUMMARY = 900;
+var MAX_PATH = 400;
+var MAX_AGENT_FIELD = 120;
+var MAX_BRAIN_BYTES = 64 * 1024;
+var MAX_BRAIN_LINES = 400;
+function normalizeCwd(cwd) {
+  return resolve(cwd ?? process.cwd());
+}
+function brainPath(cwd) {
+  return join2(normalizeCwd(cwd), ".curdx", "brain.jsonl");
+}
+function truncate(value, limit) {
+  if (value === void 0) return void 0;
+  const compact = value.trim().replace(/\s+/g, " ");
+  if (compact.length <= limit) return compact;
+  return `${compact.slice(0, Math.max(0, limit - 3))}...`;
+}
+function normalizeEvent(event) {
+  const out = {
+    version: 1,
+    type: event.type,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (event.route) out.route = event.route;
+  if (event.stack) out.stack = event.stack;
+  if (event.phase) out.phase = event.phase;
+  if (event.command) out.command = truncate(event.command, MAX_COMMAND);
+  if (typeof event.exitCode === "number" && Number.isFinite(event.exitCode)) {
+    out.exitCode = event.exitCode;
+  }
+  if (event.verifier) out.verifier = truncate(event.verifier, MAX_COMMAND);
+  if (event.reason) out.reason = truncate(event.reason, MAX_REASON);
+  if (event.summary) out.summary = truncate(event.summary, MAX_SUMMARY);
+  if (typeof event.files === "number" && Number.isFinite(event.files)) {
+    out.files = Math.max(0, Math.floor(event.files));
+  }
+  if (event.sessionId) out.sessionId = truncate(event.sessionId, MAX_AGENT_FIELD);
+  if (event.agentId) out.agentId = truncate(event.agentId, MAX_AGENT_FIELD);
+  if (event.agentType) out.agentType = truncate(event.agentType, MAX_AGENT_FIELD);
+  if (event.parentAgentId) out.parentAgentId = truncate(event.parentAgentId, MAX_AGENT_FIELD);
+  if (event.transcriptPath) out.transcriptPath = truncate(event.transcriptPath, MAX_PATH);
+  if (event.stopReason) out.stopReason = truncate(event.stopReason, MAX_REASON);
+  return out;
+}
+function appendBrainEvent(cwd, event) {
+  const path3 = brainPath(cwd);
+  if (process.env.CURDX_FLOW_BRAIN === "off") return { ok: true, path: path3 };
+  try {
+    mkdirSync3(join2(normalizeCwd(cwd), ".curdx"), { recursive: true });
+    appendFileSync2(path3, JSON.stringify(normalizeEvent(event)) + "\n", "utf8");
+    compactBrainIfNeeded(path3);
+    return { ok: true, path: path3 };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, path: path3, error: message };
+  }
+}
+function compactBrainIfNeeded(path3) {
+  try {
+    if (statSync3(path3).size <= MAX_BRAIN_BYTES) return;
+    const lines = readFileSync3(path3, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-MAX_BRAIN_LINES);
+    writeFileSync2(path3, lines.join("\n") + (lines.length > 0 ? "\n" : ""), "utf8");
+  } catch {
+  }
+}
+
 // src/hooks/subagent-context-injector.ts
 var FAIL_OPEN = { continue: true };
 runHook(async (input) => {
@@ -497,18 +568,27 @@ runHook(async (input) => {
     if (typeof cwd !== "string" || cwd.length === 0) {
       return FAIL_OPEN;
     }
+    const subagentInput = input;
+    appendBrainEvent(cwd, {
+      type: "subagent-started",
+      sessionId: typeof subagentInput.session_id === "string" ? subagentInput.session_id : void 0,
+      agentId: typeof subagentInput.agent_id === "string" ? subagentInput.agent_id : void 0,
+      agentType: typeof subagentInput.agent_type === "string" ? subagentInput.agent_type : void 0,
+      parentAgentId: typeof subagentInput.parent_agent_id === "string" ? subagentInput.parent_agent_id : void 0,
+      transcriptPath: typeof subagentInput.transcript_path === "string" ? subagentInput.transcript_path : void 0
+    });
     const specPath = resolveCurrent({ cwd, sessionId: input.session_id });
     if (!specPath) {
       return FAIL_OPEN;
     }
-    const specDirFs = join2(cwd, specPath);
-    const stateFile = join2(specDirFs, ".curdx-state.json");
-    if (!existsSync2(stateFile)) {
+    const specDirFs = join3(cwd, specPath);
+    const stateFile = join3(specDirFs, ".curdx-state.json");
+    if (!existsSync3(stateFile)) {
       return FAIL_OPEN;
     }
     let state;
     try {
-      state = JSON.parse(readFileSync3(stateFile, "utf8"));
+      state = JSON.parse(readFileSync4(stateFile, "utf8"));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       process5.stderr.write(
