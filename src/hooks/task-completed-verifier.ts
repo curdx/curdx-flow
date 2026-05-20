@@ -1,40 +1,3 @@
-/**
- * TaskCompleted hook — Layer-2 opt-in iron-law verification gate.
- *
- * Layer model (per design.md "Two-Layer Verification"):
- *   - Layer 1 (mandatory): Stop hook (`stop-watcher`) — runs on every spec
- *     loop iteration, gates ALL_TASKS_COMPLETE on a fresh verification block.
- *   - Layer 2 (opt-in)   : THIS hook — fires only when Anthropic's
- *     `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` env is set, providing an
- *     additional checkpoint at the per-Task tool boundary. Source does not
- *     gate on the env flag itself; the platform handles dispatch.
- *
- * Departures from `runHook` (used by the other 4 hooks):
- *   - Output contract differs: this hook intentionally writes a flat
- *     `{continue: true}` JSON for the pass-through paths (per AC-2.4 defensive
- *     guard). On block, it writes the reason to stderr and exits 2. Claude Code
- *     ignores stdout JSON for exit 2 hooks, so stderr is the user/model-visible
- *     channel.
- *   - Therefore stdin parsing, output emission, and exit-code control live
- *     directly in this file rather than going through the wrapper.
- *
- * Defensive-guard paths (FR-8: never block on malformed input):
- *   1. Invalid stdin JSON                        → `{continue:true}` + exit 0
- *   2. `hook_event_name !== "TaskCompleted"`     → `{continue:true}` + exit 0
- *   3. `task_id` absent                          → `{continue:true}` + exit 0
- *   4. No `.curdx-state.json` in active spec     → `{continue:true}` + exit 0
- *      (not a curdx spec — pass-through)
- *   5. State present, phase ∉ VerificationPhase  → `{continue:true}` + exit 0
- *      (legacy / unknown phase — fail-open per FR-8)
- *
- * Block paths (exit 2, signals Claude Code to intercept):
- *   6. `verifyPhaseBlock` returns `!ok`          → stderr reason + exit 2
- *   7. Unexpected throw in any of the above      → diagnostics + `{continue:true}`
- *      + exit 0 (internal hook faults are not evidence gaps)
- *
- * Spec: specs/spec-verification-iron-law/tasks.md Task 2.9 + design.md
- * "Two-Layer Verification" + AC-2.4.
- */
 
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -56,13 +19,11 @@ interface TaskCompletedStdin {
   [k: string]: unknown;
 }
 
-/** Emit `{continue:true}` and exit 0 — the canonical pass-through. */
 function passThrough(): never {
   process.stdout.write(JSON.stringify({ continue: true }));
   process.exit(0);
 }
 
-/** Emit a visible block reason and exit 2 — gate the TaskCompleted event. */
 function emitBlock(reason: string): never {
   process.stderr.write(`${reason}\n`);
   process.exit(2);

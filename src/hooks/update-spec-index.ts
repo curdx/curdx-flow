@@ -1,29 +1,3 @@
-/**
- * Spec Index Updater for curdx-flow.
- *
- * Behaviour mirrors v6 `update-spec-index.sh` (275 LOC):
- *   1. For every directory in `getSpecsDirs()`, count immediate non-hidden
- *      sub-dirs → "specsCount" entry in the directories array.
- *   2. For every spec returned by `listSpecs()`, read `<path>/.curdx-state.json`
- *      and surface phase/taskIndex/totalTasks/awaitingApproval. Fall back to
- *      file-based phase detection when the state file is missing or unreadable.
- *   3. Atomically write two outputs into `<defaultDir>/.index/`:
- *        - `index-state.json`  machine-readable shape
- *        - `index.md`          human-readable Markdown summary
- *
- * CLI flags (kept minimal, parity with v6 + spec):
- *   --quiet     suppress info log lines on stderr
- *   --dry-run   print resulting `index-state.json` to stdout, do NOT write
- *               either file. Used by the task verify pipeline.
- *
- * Path discipline (design.md "Cross-Platform Path Handling"):
- *   - `path.join`        for any path that hits the filesystem.
- *   - `path.posix.join`  for paths embedded in JSON/markdown so the on-disk
- *                        index stays byte-equal across operating systems.
- *
- * Error policy (FR-8): any thrown error → stderr log + `process.exit(0)`.
- * The script is invoked from other hooks/commands; never block callers.
- */
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, posix } from "node:path";
 import process from "node:process";
@@ -36,10 +10,6 @@ import {
   type SpecEntry,
 } from "./_shared/path-resolver.js";
 import { runHook } from "./_shared/run-hook.js";
-// NOTE: this CLI does NOT emit a HookOutput (it writes IndexState to a file
-// rather than emitting a decision to stdout). The type is imported here as
-// the canonical reference so the shared envelope module is the single source
-// of truth across all 4 hooks (per task 2.1).
 import type { HookOutput as _HookOutputRef } from "./_shared/types.js";
 import type { CurdxState } from "./_shared/types.js";
 type _UnusedHookOutput = _HookOutputRef;
@@ -86,7 +56,6 @@ function isDir(p: string): boolean {
   }
 }
 
-/** Count immediate non-hidden sub-directories of `dirFs` (filesystem path). */
 function countSpecsIn(dirFs: string): number {
   if (!isDir(dirFs)) return 0;
   let entries: string[];
@@ -103,29 +72,17 @@ function countSpecsIn(dirFs: string): number {
   return n;
 }
 
-/** Resolve a (possibly relative) serialized specs-dir to a filesystem path. */
 function specsDirFs(serialized: string, cwd: string): string {
-  // Absolute paths pass through; relative paths anchor at cwd.
-  if (serialized.startsWith("/") || /^[A-Za-z]:[\\/]/.test(serialized)) {
+    if (serialized.startsWith("/") || /^[A-Za-z]:[\\/]/.test(serialized)) {
     return serialized;
   }
   return join(cwd, serialized);
 }
 
-/**
- * `path-resolver.listSpecs()` returns paths joined via `posix.join`, which
- * strips a leading `./`. v6 bash kept the `./` prefix for relative dirs, so
- * for byte-equal-ish parity we re-attach it whenever the source specs-dir
- * was relative-with-dot-prefix. Absolute paths and bare relatives pass
- * through unchanged.
- */
 function preserveDotPrefix(specPath: string, specsDirs: string[]): string {
-  // If any configured dir is the literal "./..." form whose body matches the
-  // start of `specPath`, re-attach the "./".
-  for (const dir of specsDirs) {
+      for (const dir of specsDirs) {
     if (!dir.startsWith("./")) continue;
-    const body = dir.slice(2); // strip "./"
-    if (body && specPath.startsWith(`${body}/`)) {
+    const body = dir.slice(2);     if (body && specPath.startsWith(`${body}/`)) {
       return `./${specPath}`;
     }
   }

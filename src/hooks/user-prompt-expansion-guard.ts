@@ -1,6 +1,3 @@
-// UserPromptExpansion hook for curdx-flow slash skills.
-// Adds compact workflow context for direct `/curdx-flow:*` invocations and
-// blocks unknown curdx-flow command names before expansion.
 
 import { buildWorkflowSnapshot } from "./lib/workflow-snapshot.js";
 import { classifySmartRoute } from "./lib/smart-route.js";

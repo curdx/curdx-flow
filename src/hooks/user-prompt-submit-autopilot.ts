@@ -1,5 +1,3 @@
-// UserPromptSubmit hook: injects curdx-flow last-mile autopilot context for
-// normal coding prompts, not only explicit /curdx-flow slash commands.
 
 import { buildWorkflowSnapshot } from "./lib/workflow-snapshot.js";
 import { buildContextCapsule } from "./lib/build-context-payload.js";

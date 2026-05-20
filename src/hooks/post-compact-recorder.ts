@@ -1,5 +1,3 @@
-// PostCompact hook: persist Claude Code's official compact summary as
-// project-local recovery memory. Advisory only; never blocks a session.
 
 import { appendBrainEvent } from "./lib/project-brain.js";
 import { readStdinJson } from "./_shared/stdin.js";

@@ -1,5 +1,3 @@
-// PostToolBatch hook: injects compact curdx-flow drift context after batched
-// edits. It is advisory and fail-open.
 
 import { buildWorkflowSnapshot } from "./lib/workflow-snapshot.js";
 import { classifySmartRoute } from "./lib/smart-route.js";

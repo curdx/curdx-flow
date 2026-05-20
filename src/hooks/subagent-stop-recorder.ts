@@ -1,12 +1,3 @@
-// SubagentStop hook: record subagent termination as a brain event so
-// post-hoc analyzers can join brain.jsonl against the transcript JSONL.
-// Advisory only; this hook never blocks a session.
-//
-// Claude Code SubagentStop hook input (per code.claude.com/docs/en/hooks
-// as of 2026-05): session_id, transcript_path, cwd, hook_event_name,
-// agent_id, agent_type are guaranteed. parent_agent_id and stop_reason
-// are NOT in the documented contract — see anthropics/claude-code#14859
-// (still open as of 2026-05). We capture them defensively if present.
 
 import { appendBrainEvent } from "./lib/project-brain.js";
 import { readStdinJson } from "./_shared/stdin.js";
