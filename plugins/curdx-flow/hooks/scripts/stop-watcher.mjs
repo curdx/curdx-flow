@@ -449,16 +449,7 @@ function writeFileAtomic(path3, data) {
 }
 
 // src/hooks/lib/verify-blocks.ts
-import { promises as fs } from "node:fs";
 import { basename as basename2, join as join2 } from "node:path";
-var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
-  ".git",
-  "node_modules",
-  "dist",
-  ".curdx",
-  ".claude"
-]);
-var WALK_MAX_DEPTH = 6;
 var VERIFICATION_PHASES = [
   "research",
   "requirements",
@@ -485,7 +476,6 @@ async function verifyPhaseBlock(state, phase, specDir) {
       command: block.command
     };
   }
-  void await walkSrcTree(specDir);
   if (block.srcMtime > Date.parse(block.timestamp)) {
     const srcIso = new Date(block.srcMtime).toISOString();
     const specName = basename2(specDir);
@@ -507,33 +497,6 @@ async function verifyPhaseBlock(state, phase, specDir) {
     }
   }
   return { ok: true };
-}
-async function walkSrcTree(dir) {
-  let maxMtime = 0;
-  async function walk(current, depth) {
-    let entries;
-    try {
-      entries = await fs.readdir(current, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const abs = join2(current, entry.name);
-      if (entry.isDirectory()) {
-        if (WALK_SKIP_DIRS.has(entry.name)) continue;
-        if (depth >= WALK_MAX_DEPTH) continue;
-        await walk(abs, depth + 1);
-        continue;
-      }
-      try {
-        const st = await fs.stat(abs);
-        if (st.mtimeMs > maxMtime) maxMtime = st.mtimeMs;
-      } catch {
-      }
-    }
-  }
-  await walk(dir, 0);
-  return maxMtime;
 }
 
 // src/hooks/stop-watcher.ts

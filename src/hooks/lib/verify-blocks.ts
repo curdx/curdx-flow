@@ -157,13 +157,6 @@ export async function verifyPhaseBlock(
       command: block.command,
     };
   }
-  // Mandated FS-scan (design L324): walk the spec dir to compute the
-  // current max mtime. Awaited per task spec — bound to a void sink so
-  // the side-effect runs but is intentionally not consumed in the
-  // comparison below (the canonical stale check uses block.srcMtime
-  // directly, which merge-state populates with walkSrcTree's value at
-  // block-write time).
-  void (await walkSrcTree(specDir));
   if (block.srcMtime > Date.parse(block.timestamp)) {
     const srcIso = new Date(block.srcMtime).toISOString();
     // NFR-3: phase id + fix command + spec context all embedded in one

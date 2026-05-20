@@ -42,7 +42,6 @@ async function verifyPhaseBlock(state, phase, specDir) {
       command: block.command
     };
   }
-  void await walkSrcTree(specDir);
   if (block.srcMtime > Date.parse(block.timestamp)) {
     const srcIso = new Date(block.srcMtime).toISOString();
     const specName = basename(specDir);

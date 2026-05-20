@@ -30,12 +30,3 @@ Prefer Conventional Commit style seen in history, such as `feat(plugin): ...`, `
 ## Agent-Specific Notes
 
 Always respond in Simplified Chinese when working in this repository. Treat `plugins/curdx-flow` as the primary product surface. Keep dependency expectations aligned across the plugin manifest and registry, especially `pua`, `claude-mem`, `chrome-devtools-mcp`, `ui-ux-pro-max`, and external MCP capabilities.
-
-
-<claude-mem-context>
-# Memory Context
-
-# [curdx-flow] recent context, 2026-05-17 9:12pm EDT
-
-No previous sessions found.
-</claude-mem-context>
