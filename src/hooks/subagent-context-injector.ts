@@ -85,17 +85,11 @@ runHook(async (input) => {
       return FAIL_OPEN as unknown as HookOutput;
     }
 
-    // Completed spec → no injection. Coordinator should not dispatch
-    // subagents under a completed spec; if it does, this hook stays silent.
-    if (state.completed === true) {
+            if (state.completed === true) {
       return FAIL_OPEN as unknown as HookOutput;
     }
 
-    // Build compact CURDX SPEC DATA text block. We pass the original
-    // POSIX-form `specPath` (not the local fs join) so the payload is byte-
-    // stable across platforms — matches lib's "specDir is serialized form"
-    // contract used by the SessionStart payload as well.
-    const additionalContext = buildContextPayload(state, specPath, {
+                    const additionalContext = buildContextPayload(state, specPath, {
       forSubagent: true,
     });
 
@@ -108,10 +102,7 @@ runHook(async (input) => {
     };
     return out as unknown as HookOutput;
   } catch (e) {
-    // Any throw from the lib (PayloadOverBudgetError, unexpected) or fs
-    // surface lands here. FR-FailOpen: emit {continue:true} with stderr
-    // trace, never block dispatch.
-    const msg = e instanceof Error ? e.message : String(e);
+                const msg = e instanceof Error ? e.message : String(e);
     process.stderr.write(`[subagent-context-injector] ${msg}\n`);
     return FAIL_OPEN as unknown as HookOutput;
   }

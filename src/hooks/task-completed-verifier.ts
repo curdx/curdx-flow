@@ -55,27 +55,21 @@ function buildTaskCompletedGateReason(input: {
 }
 
 async function main(): Promise<void> {
-  // Path 1: stdin parse failure → pass-through. We can't use readStdinJson
-  // directly because it throws on bad JSON; we want fail-open here.
-  let input: TaskCompletedStdin;
+      let input: TaskCompletedStdin;
   try {
     input = await readStdinJson<TaskCompletedStdin>();
   } catch {
     passThrough();
   }
 
-  // Paths 2 & 3: AC-2.4 defensive guard.
-  if (input.hook_event_name !== "TaskCompleted") {
+    if (input.hook_event_name !== "TaskCompleted") {
     passThrough();
   }
   if (typeof input.task_id !== "string" || input.task_id.length === 0) {
     passThrough();
   }
 
-  // Path 4: locate the active spec's state file. Mirror stop-watcher's pattern:
-  // resolveCurrent → join(cwd, specPath). If anything is missing, pass-through
-  // (not a curdx spec or no active spec).
-  const cwd = typeof input.cwd === "string" && input.cwd.length > 0
+        const cwd = typeof input.cwd === "string" && input.cwd.length > 0
     ? input.cwd
     : process.cwd();
   const specPath = resolveCurrent({ cwd, sessionId: input.session_id });
@@ -88,27 +82,19 @@ async function main(): Promise<void> {
     passThrough();
   }
 
-  // Read state. JSON.parse failure here is treated as malformed → pass-through
-  // (FR-8 fail-open: a corrupt state file in the spec dir should not gate
-  // every TaskCompleted event in the session; the Stop hook owns the
-  // user-visible "corrupt state" path).
-  let state: CurdxState;
+          let state: CurdxState;
   try {
     state = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
   } catch {
     passThrough();
   }
 
-  // Path 5: phase ∉ VERIFICATION_PHASES → pass-through (legacy state, fail-open).
-  // Shared phase-detection lives in lib/verify-blocks.ts (Task 4.1 DRY).
-  const phase = getVerificationPhase(state);
+      const phase = getVerificationPhase(state);
   if (phase === null) {
     passThrough();
   }
 
-  // Path 6: run the shared gate. Same lib as Stop hook (D3 single source of
-  // truth across 4 callers).
-  let result: VerifyPhaseBlockResult;
+      let result: VerifyPhaseBlockResult;
   try {
     result = await verifyPhaseBlock(state, phase, specDir);
   } catch (err) {
@@ -177,8 +163,6 @@ async function main(): Promise<void> {
   process.exit(0);
 }
 
-// Path 7: top-level safety net. Unexpected throws are non-deterministic hook
-// faults, not evidence gaps, so fail open and keep diagnostics off stdout.
 main().catch((err) => {
   const msg = err instanceof Error ? err.message : String(err);
   logHookError(

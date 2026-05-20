@@ -78,10 +78,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  // Last-resort fail-open: any uncaught throw above (Promise rejection from
-  // stdin stream, exotic runtime errors, etc.) lands here. FR-H5 contract:
-  // log to stderr with the site tag, exit 0, never block the Claude session.
-  const msg = err instanceof Error ? err.message : String(err);
+        const msg = err instanceof Error ? err.message : String(err);
   process.stderr.write(`stop-failure-handler: ${msg}\n`);
   process.exit(0);
 });

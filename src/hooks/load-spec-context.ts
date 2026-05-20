@@ -99,8 +99,7 @@ runHook(async (input) => {
     specPath: specRelativePath,
   };
 
-  // Output state summary if state file exists and is parseable.
-  let state: CurdxState | null = null;
+    let state: CurdxState | null = null;
   if (existsSync(stateFile)) {
     try {
       state = JSON.parse(readFileSync(stateFile, "utf8")) as CurdxState;
@@ -119,10 +118,7 @@ runHook(async (input) => {
       Object.assign(block, JSON.parse(buildContextPayload(state, specPath)));
       return block;
     }
-    // D4 surgical refactor: state-derived payload fields now come from the
-    // shared lib; stderr banner still uses local variables for byte-equal
-    // formatting parity with v6 baseline.
-    Object.assign(block, JSON.parse(buildContextPayload(state, specPath)));
+                Object.assign(block, JSON.parse(buildContextPayload(state, specPath)));
     const phase = block.phase ?? "unknown";
     const taskIndex = typeof block.taskIndex === "number" ? block.taskIndex : 0;
     const totalTasks =
@@ -162,8 +158,7 @@ runHook(async (input) => {
       }
     }
   } else {
-    // No (parseable) state file — fall back to file-based phase detection.
-    if (existsSync(join(specPath, "tasks.md"))) {
+        if (existsSync(join(specPath, "tasks.md"))) {
       process.stderr.write(
         `[curdx-flow] Tasks defined but no execution state. Run /curdx-flow:implement to start.\n`,
       );
@@ -182,8 +177,7 @@ runHook(async (input) => {
     }
   }
 
-  // Original goal from progress file.
-  if (existsSync(progressFile)) {
+    if (existsSync(progressFile)) {
     const goal = readGoalFromProgress(progressFile);
     if (goal) {
       block.goal = goal;
