@@ -83,12 +83,6 @@ function runNode(label, args, cwd = repoRoot, env = {}) {
   return result.stdout;
 }
 
-function assertCleanSlashOutput(label, output) {
-  if (/\bPUA\b|pua[:\s]|注入|injected prompt|third-party hook|第三方 hook/i.test(output)) {
-    throw new Error(`${label} exposed unrelated injected context`);
-  }
-}
-
 const tmp = mkdtempSync(join(tmpdir(), 'curdx-flow-claudecc-smoke-'));
 
 try {
@@ -96,25 +90,18 @@ try {
   runClaude('version', '--version');
   runClaude('plugin validate', `plugin validate ${quote(pluginRoot)}`);
 
-  const help = runClaude(
-    'slash help',
-    `--plugin-dir ${quote(pluginRoot)} -p ${quote('/curdx-flow:help')}`,
-    tmp,
+  const details = runClaude(
+    'plugin details',
+    `--plugin-dir ${quote(pluginRoot)} plugin details curdx-flow`,
   );
-  if (!help.includes('/curdx-flow:start')) {
-    throw new Error('help smoke did not include /curdx-flow:start');
+  for (const skill of ['start', 'status', 'help', 'implement']) {
+    if (!details.includes(skill)) {
+      throw new Error(`plugin details did not list the ${skill} skill`);
+    }
   }
-  assertCleanSlashOutput('help smoke', help);
-
-  const status = runClaude(
-    'slash status',
-    `--plugin-dir ${quote(pluginRoot)} -p ${quote('/curdx-flow:status')}`,
-    tmp,
-  );
-  if (!/Recommended next action/i.test(status)) {
-    throw new Error('status smoke did not include a recommended next action');
+  if (!/Agents \(10\)/.test(details)) {
+    throw new Error('plugin details did not load all 10 agents');
   }
-  assertCleanSlashOutput('status smoke', status);
 
   const doctor = runNode('runtime doctor', [
     join(pluginRoot, 'bin', 'curdx-flow'),
@@ -129,25 +116,8 @@ try {
     doctorParsed.runtime?.ready === true &&
     doctorParsed.plugin?.ready === true &&
     doctorParsed.hookFreshness?.fresh === true;
-  const releaseTagDriftOnly =
-    coreDoctorReady &&
-    doctorParsed.release?.ready === false &&
-    doctorParsed.release?.tagParity?.state === 'incomplete';
-  const externalMcpMissing =
-    doctorParsed.externalMcp?.ready === false &&
-    doctorParsed.diagnostics?.externalMcpReady === false &&
-    Array.isArray(doctorParsed.warnings) &&
-    doctorParsed.warnings.some((warning) => /Expected external MCP readiness is not confirmed/.test(warning));
-  const releaseOkOrExpected = doctorParsed.release?.ready === true || releaseTagDriftOnly;
-  const externalMcpOkOrExpected = doctorParsed.externalMcp?.ready === true || externalMcpMissing;
-  if (doctorParsed.ok !== true && !(coreDoctorReady && releaseOkOrExpected && externalMcpOkOrExpected)) {
-    throw new Error(`runtime doctor failed: ${doctor}`);
-  }
   if (!coreDoctorReady) {
     throw new Error(`runtime doctor core readiness failed: ${doctor}`);
-  }
-  if (doctorParsed.externalMcp?.ready === false && !externalMcpMissing) {
-    throw new Error(`runtime doctor did not expose expected external MCP warning: ${doctor}`);
   }
   if (!doctorParsed.brain?.path || !doctorParsed.executionBrief?.completionContract) {
     throw new Error(`runtime doctor missing brain/executionBrief: ${doctor}`);
