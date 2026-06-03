@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import type { Pkg, PrereqResult } from '../types.ts';
-import { pluginDependencySpec } from '../capabilities.ts';
+import { pluginDependencySpec } from '../../core/capabilities/catalog.ts';
 import { isPluginInstalledAtScope } from '../../runner/state.ts';
 import {
   ensureMarketplace,

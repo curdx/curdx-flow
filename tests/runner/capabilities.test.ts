@@ -6,7 +6,7 @@ import {
   CURDX_PLUGIN_DEPENDENCIES,
   CURDX_TOOL_CAPABILITIES,
   canonicalPkgId,
-} from '../../src/registry/capabilities.ts';
+} from '../../src/core/capabilities/catalog.ts';
 import { PKGS } from '../../src/registry/index.ts';
 import { buildPluginDependencyReadiness } from '../../src/core/capabilities/index.ts';
 import { renderBlock } from '../../src/runner/claudeMd.ts';

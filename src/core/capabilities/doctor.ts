@@ -1,4 +1,4 @@
-import { CURDX_EXTERNAL_MCPS, CURDX_PLUGIN_DEPENDENCIES } from '../../registry/capabilities.ts';
+import { CURDX_EXTERNAL_MCPS, CURDX_PLUGIN_DEPENDENCIES } from './catalog.ts';
 import type {
   CapabilityCategory,
   CapabilityCheckMode,

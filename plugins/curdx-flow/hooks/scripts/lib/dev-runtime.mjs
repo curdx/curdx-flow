@@ -684,7 +684,7 @@ if (isDirectRun()) {
 import { existsSync as existsSync3, readFileSync as readFileSync3, readdirSync as readdirSync3 } from "node:fs";
 import { isAbsolute as isAbsolute3, join as join2, resolve as resolve2 } from "node:path";
 
-// src/registry/capability-tokens.ts
+// src/core/capabilities/tokens.ts
 var KNOWN_CAPABILITY_TOKEN_PATTERN = String.raw`\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b`;
 function knownCapabilityTokenRegex() {
   return new RegExp(KNOWN_CAPABILITY_TOKEN_PATTERN, "gi");

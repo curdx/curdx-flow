@@ -9,7 +9,7 @@ const __dirname = __ccd(__filename);
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// src/registry/capability-tokens.ts
+// src/core/capabilities/tokens.ts
 var KNOWN_CAPABILITY_TOKEN_PATTERN = String.raw`\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b`;
 function knownCapabilityTokenRegex() {
   return new RegExp(KNOWN_CAPABILITY_TOKEN_PATTERN, "gi");
@@ -20,7 +20,7 @@ function stripKnownCapabilityTokens(input) {
   return (input ?? "").replace(knownCapabilityTokenRegex(), " ");
 }
 
-// src/registry/capabilities.ts
+// src/core/capabilities/catalog.ts
 var CURDX_TOOL_CAPABILITIES = {
   "context7": {
     id: "context7",
@@ -212,7 +212,7 @@ var CURDX_TOOL_CAPABILITY_ORDER = [
   "pua"
 ];
 
-// src/registry/capability-rules.ts
+// src/core/capabilities/rules.ts
 var RULES = {
   context7: {
     invocation: "Context7 MCP",

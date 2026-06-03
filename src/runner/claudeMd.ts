@@ -8,7 +8,7 @@ import type { Pkg } from '../registry/types.ts';
 import {
   renderCurdxCapabilityDecisionTree,
   renderCurdxInstalledCapabilityRules,
-} from '../registry/capability-rules.ts';
+} from '../core/capabilities/rules.ts';
 import { t } from '../i18n/index.ts';
 import { getLang } from '../i18n/index.ts';
 

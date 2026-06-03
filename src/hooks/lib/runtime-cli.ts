@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import {
   CURDX_EXTERNAL_MCPS,
   CURDX_PLUGIN_DEPENDENCIES,
-} from "../../registry/capabilities.ts";
+} from "../../core/capabilities/catalog.ts";
 import { classifySmartRoute } from "./smart-route.js";
 import { buildWorkflowSnapshot } from "./workflow-snapshot.js";
 import { runVerificationCheck } from "./check-verification-blocks.js";

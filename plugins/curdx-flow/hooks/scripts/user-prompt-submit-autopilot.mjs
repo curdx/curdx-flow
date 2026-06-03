@@ -1673,7 +1673,7 @@ if (isDirectRun3()) {
 import { basename as basename5 } from "node:path";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
-// src/registry/capability-tokens.ts
+// src/core/capabilities/tokens.ts
 var KNOWN_CAPABILITY_TOKEN_PATTERN = String.raw`\b(?:claude-mem|context7|sequential-thinking|chrome-devtools-mcp|chrome devtools mcp|ui[\s_-]*ux[\s_-]*(?:pro[\s_-]*)?max|pua)\b`;
 function knownCapabilityTokenRegex() {
   return new RegExp(KNOWN_CAPABILITY_TOKEN_PATTERN, "gi");
@@ -1684,7 +1684,7 @@ function stripKnownCapabilityTokens(input) {
   return (input ?? "").replace(knownCapabilityTokenRegex(), " ");
 }
 
-// src/registry/capabilities.ts
+// src/core/capabilities/catalog.ts
 var CURDX_TOOL_CAPABILITIES = {
   "context7": {
     id: "context7",

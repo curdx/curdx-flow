@@ -6,7 +6,7 @@ import uiUxProMax from './plugins/ui-ux-pro-max.ts';
 import curdxFlow from './plugins/curdx-flow.ts';
 import sequentialThinking from './mcps/sequential-thinking.ts';
 import context7 from './mcps/context7.ts';
-import { canonicalPkgId } from './capabilities.ts';
+import { canonicalPkgId } from '../core/capabilities/catalog.ts';
 
 export const PKGS: Pkg[] = [
   pua,

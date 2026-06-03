@@ -1,7 +1,7 @@
 import type {
   CurdxExternalMcpSpec,
   CurdxPluginDependencySpec,
-} from '../../registry/capabilities.ts';
+} from './catalog.ts';
 import type { CapabilityTriState } from './types.ts';
 
 export type PluginDependencyReadiness = 'available' | 'degraded' | 'unavailable' | 'unknown';

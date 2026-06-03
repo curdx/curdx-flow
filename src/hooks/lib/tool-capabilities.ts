@@ -19,11 +19,11 @@ import {
   CURDX_TOOL_CAPABILITIES,
   CURDX_TOOL_CAPABILITY_ORDER,
   type CurdxToolCapabilityId,
-} from "../../registry/capabilities.ts";
+} from "../../core/capabilities/catalog.ts";
 import {
   renderCurdxCapabilityDecisionTree,
   renderCurdxInstalledCapabilityRules,
-} from "../../registry/capability-rules.ts";
+} from "../../core/capabilities/rules.ts";
 
 export type ToolCapabilityId = CurdxToolCapabilityId;
 

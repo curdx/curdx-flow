@@ -20,7 +20,7 @@ import { buildGoalBridge } from '../../../src/hooks/lib/goal-bridge.ts';
 import {
   CURDX_EXTERNAL_MCPS,
   CURDX_PLUGIN_DEPENDENCIES,
-} from '../../../src/registry/capabilities.ts';
+} from '../../../src/core/capabilities/catalog.ts';
 
 const workspaces: string[] = [];
 const runtimeCli = join(process.cwd(), 'plugins/curdx-flow/hooks/scripts/lib/runtime-cli.mjs');

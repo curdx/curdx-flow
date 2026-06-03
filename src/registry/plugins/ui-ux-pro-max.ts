@@ -1,5 +1,5 @@
 import type { Pkg } from '../types.ts';
-import { pluginDependencySpec } from '../capabilities.ts';
+import { pluginDependencySpec } from '../../core/capabilities/catalog.ts';
 import { getMarketplacePluginVersion, isPluginInstalledAtScope } from '../../runner/state.ts';
 import {
   ensureMarketplace,
