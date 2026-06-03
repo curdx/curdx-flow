@@ -58,10 +58,6 @@ const messages = {
   'status.headerType': '类型',
   'status.headerState': '状态',
 
-  'context7.askKey': '是否填写 context7 API Key？(回车跳过即用免费层)',
-  'context7.keyPlaceholder': '粘贴 API Key，留空跳过',
-  'context7.keyWarning': '注意：API Key 会以明文写入 ~/.claude.json，请妥善管理。',
-  'context7.dashboardHint': '可在 https://context7.com/dashboard 创建 API Key',
 
   'chrome.prereqNode': '需要 Node.js >= 20.19，当前版本 {current}',
   'chrome.prereqChrome': '需要本机已安装 Chrome（chrome-devtools-mcp 会调用本地浏览器）',

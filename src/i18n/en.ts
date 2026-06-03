@@ -60,10 +60,6 @@ const messages: Record<MessageKey, string> = {
   'status.headerType': 'Type',
   'status.headerState': 'State',
 
-  'context7.askKey': 'Provide a context7 API key? (Enter to skip and use the free tier)',
-  'context7.keyPlaceholder': 'Paste API key, or leave blank to skip',
-  'context7.keyWarning': 'Note: the API key is written to ~/.claude.json in plaintext.',
-  'context7.dashboardHint': 'Get a key at https://context7.com/dashboard',
 
   'chrome.prereqNode': 'Requires Node.js >= 20.19 (current: {current})',
   'chrome.prereqChrome': 'Requires Chrome installed locally (chrome-devtools-mcp drives the local browser)',
