@@ -2,9 +2,9 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import * as p from '@clack/prompts';
-import { listPlugins, listMcp } from './state.ts';
-import { PKGS } from '../registry/index.ts';
-import type { Pkg } from '../registry/types.ts';
+import { listPlugins, listMcp, isPluginInstalledAtScope, findPluginAtScope } from './state.ts';
+import { PLUGIN_SCOPE } from './plugin-cli.ts';
+import { companionPlugins, externalMcps, CURDX_TOOL_CAPABILITIES } from '../core/capabilities/catalog.ts';
 import {
   renderCurdxCapabilityDecisionTree,
   renderCurdxInstalledCapabilityRules,
@@ -134,28 +134,32 @@ export function removeBlock(existing: string, eol: '\n' | '\r\n'): string {
 
 // ---------- I/O: collect items ----------
 
-async function pkgToItem(pkg: Pkg): Promise<ManagedItem> {
-  let version: string | undefined;
-  if (pkg.installedVersion) {
-    const v = await pkg.installedVersion();
-    if (v) version = v;
-  }
-  return {
-    id: pkg.id,
-    name: pkg.name,
-    type: pkg.type,
-    version,
-    whenToUse: pkg.whenToUse,
-    slashNamespace: pkg.slashNamespace,
-  };
-}
-
 async function collectInstalledItems(): Promise<ManagedItem[]> {
-  await Promise.all([listPlugins(true), listMcp(true)]);
+  const [, mcps] = await Promise.all([listPlugins(true), listMcp(true)]);
   const items: ManagedItem[] = [];
-  for (const pkg of PKGS) {
-    if (await pkg.isInstalled()) {
-      items.push(await pkgToItem(pkg));
+  // Installable plugins: curdx-flow + the soft-detected companions, by native scope.
+  for (const c of companionPlugins()) {
+    if (!(await isPluginInstalledAtScope(c.pluginId, PLUGIN_SCOPE))) continue;
+    const found = await findPluginAtScope(c.pluginId, PLUGIN_SCOPE);
+    const version = found?.version && found.version !== 'unknown' ? found.version : undefined;
+    items.push({
+      id: c.id,
+      name: c.name,
+      type: 'plugin',
+      version,
+      whenToUse: c.whenToUse,
+      slashNamespace: c.slashNamespace,
+    });
+  }
+  // External MCPs are detect-only: matched against `claude mcp list`, never installed by us.
+  for (const spec of externalMcps()) {
+    if (mcps.some((m) => spec.match.test(m.name) || spec.match.test(m.raw))) {
+      items.push({
+        id: spec.id,
+        name: spec.id,
+        type: 'mcp',
+        whenToUse: CURDX_TOOL_CAPABILITIES[spec.id].useWhen,
+      });
     }
   }
   // Plugins first, then MCPs, alphabetic within group.
