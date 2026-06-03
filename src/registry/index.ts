@@ -1,22 +1,13 @@
 import type { Pkg } from './types.ts';
-import pua from './plugins/pua.ts';
-import claudeMem from './plugins/claude-mem.ts';
-import chromeDevtoolsMcp from './plugins/chrome-devtools-mcp.ts';
-import uiUxProMax from './plugins/ui-ux-pro-max.ts';
-import curdxFlow from './plugins/curdx-flow.ts';
+import { makeCatalogPluginPkgs } from './plugins/from-catalog.ts';
 import sequentialThinking from './mcps/sequential-thinking.ts';
 import context7 from './mcps/context7.ts';
 import { canonicalPkgId } from '../core/capabilities/catalog.ts';
 
-export const PKGS: Pkg[] = [
-  pua,
-  claudeMem,
-  chromeDevtoolsMcp,
-  uiUxProMax,
-  curdxFlow,
-  sequentialThinking,
-  context7,
-];
+// Plugin pkgs are generated from the shared capability catalog (curdx-flow + the
+// four companions); the two external MCPs keep their bespoke `claude mcp add`
+// install logic, which the catalog does not model.
+export const PKGS: Pkg[] = [...makeCatalogPluginPkgs(), sequentialThinking, context7];
 
 export function findPkg(id: string): Pkg | undefined {
   const canonical = canonicalPkgId(id);
