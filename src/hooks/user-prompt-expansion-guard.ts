@@ -5,24 +5,32 @@ import { buildExecutionBrief, compactExecutionBrief } from "./lib/execution-brie
 import { compactLastMileDecision, decideLastMile } from "./lib/last-mile-orchestrator.js";
 import { readStdinJson } from "./_shared/stdin.js";
 
-const KNOWN = new Set([
-  "curdx-flow:cancel",
-  "curdx-flow:design",
-  "curdx-flow:feedback",
-  "curdx-flow:help",
-  "curdx-flow:implement",
-  "curdx-flow:index",
-  "curdx-flow:new",
-  "curdx-flow:prompt-optimize",
-  "curdx-flow:refactor",
-  "curdx-flow:requirements",
-  "curdx-flow:research",
-  "curdx-flow:start",
-  "curdx-flow:status",
-  "curdx-flow:switch",
-  "curdx-flow:tasks",
-  "curdx-flow:triage",
+const BARE_KNOWN = new Set([
+  "cancel",
+  "design",
+  "feedback",
+  "help",
+  "implement",
+  "index",
+  "new",
+  "prompt-optimize",
+  "refactor",
+  "requirements",
+  "research",
+  "start",
+  "status",
+  "switch",
+  "tasks",
+  "triage",
 ]);
+
+const NAMESPACE = "curdx-flow:";
+
+function normalizeCommand(name: string): { isCurdx: boolean; bare: string } {
+  if (name.startsWith(NAMESPACE)) return { isCurdx: true, bare: name.slice(NAMESPACE.length) };
+  if (BARE_KNOWN.has(name)) return { isCurdx: true, bare: name };
+  return { isCurdx: false, bare: name };
+}
 
 const MAX_ADDITIONAL_CONTEXT_CHARS = 1200;
 
@@ -50,9 +58,10 @@ async function main(): Promise<void> {
 
   if (input.expansion_type !== "slash_command") return;
   const commandName = input.command_name ?? "";
-  if (!commandName.startsWith("curdx-flow:")) return;
+  const command = normalizeCommand(commandName);
+  if (!command.isCurdx) return;
 
-  if (!KNOWN.has(commandName)) {
+  if (!BARE_KNOWN.has(command.bare)) {
     process.stdout.write(
       JSON.stringify({
         decision: "block",
@@ -94,7 +103,7 @@ async function main(): Promise<void> {
       .map((gate) => gate.command ? `${gate.id}:${gate.command}` : gate.id)
       .join(",");
     const promptOptimizeHint =
-      commandName === "curdx-flow:prompt-optimize"
+      command.bare === "prompt-optimize"
         ? " advisory-only=true no-execution=true"
         : "";
     const context = [
@@ -121,7 +130,7 @@ async function main(): Promise<void> {
       }),
     );
   } catch {
-    // Fail open. Expansion hooks should never make curdx-flow unavailable.
+    return;
   }
 }
 

@@ -16,7 +16,7 @@
     ],
     "UserPromptExpansion": [
       {
-        "matcher": "curdx-flow:.*",
+        "matcher": "^(curdx-flow:.*|cancel|design|feedback|help|implement|index|new|prompt-optimize|refactor|requirements|research|start|status|switch|tasks|triage)$",
         "hooks": [
           {
             "type": "command",

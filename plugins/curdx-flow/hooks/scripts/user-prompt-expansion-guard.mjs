@@ -3593,24 +3593,30 @@ async function readStdinJson() {
 }
 
 // src/hooks/user-prompt-expansion-guard.ts
-var KNOWN = /* @__PURE__ */ new Set([
-  "curdx-flow:cancel",
-  "curdx-flow:design",
-  "curdx-flow:feedback",
-  "curdx-flow:help",
-  "curdx-flow:implement",
-  "curdx-flow:index",
-  "curdx-flow:new",
-  "curdx-flow:prompt-optimize",
-  "curdx-flow:refactor",
-  "curdx-flow:requirements",
-  "curdx-flow:research",
-  "curdx-flow:start",
-  "curdx-flow:status",
-  "curdx-flow:switch",
-  "curdx-flow:tasks",
-  "curdx-flow:triage"
+var BARE_KNOWN = /* @__PURE__ */ new Set([
+  "cancel",
+  "design",
+  "feedback",
+  "help",
+  "implement",
+  "index",
+  "new",
+  "prompt-optimize",
+  "refactor",
+  "requirements",
+  "research",
+  "start",
+  "status",
+  "switch",
+  "tasks",
+  "triage"
 ]);
+var NAMESPACE = "curdx-flow:";
+function normalizeCommand(name) {
+  if (name.startsWith(NAMESPACE)) return { isCurdx: true, bare: name.slice(NAMESPACE.length) };
+  if (BARE_KNOWN.has(name)) return { isCurdx: true, bare: name };
+  return { isCurdx: false, bare: name };
+}
 var MAX_ADDITIONAL_CONTEXT_CHARS = 1200;
 function limitContext(value) {
   if (value.length <= MAX_ADDITIONAL_CONTEXT_CHARS) return value;
@@ -3625,8 +3631,9 @@ async function main8() {
   }
   if (input.expansion_type !== "slash_command") return;
   const commandName = input.command_name ?? "";
-  if (!commandName.startsWith("curdx-flow:")) return;
-  if (!KNOWN.has(commandName)) {
+  const command = normalizeCommand(commandName);
+  if (!command.isCurdx) return;
+  if (!BARE_KNOWN.has(command.bare)) {
     process.stdout.write(
       JSON.stringify({
         decision: "block",
@@ -3662,7 +3669,7 @@ async function main8() {
       hookEvent: "UserPromptExpansion"
     });
     const topGates = route.qualityGates.filter((gate) => gate.required).slice(0, 3).map((gate) => gate.command ? `${gate.id}:${gate.command}` : gate.id).join(",");
-    const promptOptimizeHint = commandName === "curdx-flow:prompt-optimize" ? " advisory-only=true no-execution=true" : "";
+    const promptOptimizeHint = command.bare === "prompt-optimize" ? " advisory-only=true no-execution=true" : "";
     const context = [
       "curdx-flow expansion context:",
       `active=${snapshot.active}`,
@@ -3687,6 +3694,7 @@ async function main8() {
       })
     );
   } catch {
+    return;
   }
 }
 void main8();
