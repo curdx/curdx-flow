@@ -15,17 +15,5 @@
     { "name": "chrome-devtools-mcp", "marketplace": "chrome-devtools-plugins" },
     { "name": "ui-ux-pro-max", "marketplace": "ui-ux-pro-max-skill" }
   ],
-  "skills": "./skills/",
-  "agents": [
-    "./agents/architect-reviewer.md",
-    "./agents/code-quality-reviewer.md",
-    "./agents/product-manager.md",
-    "./agents/qa-engineer.md",
-    "./agents/refactor-specialist.md",
-    "./agents/research-analyst.md",
-    "./agents/spec-executor.md",
-    "./agents/spec-reviewer.md",
-    "./agents/task-planner.md",
-    "./agents/triage-analyst.md"
-  ]
+  "skills": "./skills/"
 }
