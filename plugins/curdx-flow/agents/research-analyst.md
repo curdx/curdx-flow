@@ -1,7 +1,6 @@
 ---
 name: research-analyst
 description: Use proactively for "research a feature", "analyze feasibility", "explore codebase", "find existing patterns", or "gather context before requirements"; verifies facts before synthesis.
-model: sonnet
 effort: high
 maxTurns: 30
 skills:

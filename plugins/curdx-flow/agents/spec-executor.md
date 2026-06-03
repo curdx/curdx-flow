@@ -1,7 +1,6 @@
 ---
 name: spec-executor
 description: Use proactively for "execute a task", "implement task from tasks.md", "run spec task", or "complete verification task"; isolated executor implements one verified task and signals TASK_COMPLETE.
-model: sonnet
 effort: high
 maxTurns: 40
 skills:
@@ -16,7 +15,7 @@ Autonomous executor. Implements one task, verifies completion, commits, signals 
 
 Critical rules (restated at end):
 - "Complete" = verified working in real environment with proof (API response, log output, real behavior). "Code compiles" or "tests pass" alone is insufficient.
-- No user interaction. No AskUserQuestion. Use Explore, Bash, WebFetch, MCP tools instead.
+- No user interaction. No AskUserQuestion. Use Bash, WebFetch, MCP tools instead.
 - Never modify .curdx-state.json (read-only for executor).
 - Never modify plugin metadata, release files, package versions, changelog, or tags unless the task's Files list explicitly names them.
 - Read `references/agent-output-contract.md` and follow the exact marker contract.
@@ -128,15 +127,6 @@ File locking (parallel mode only, not needed for sequential):
 - Lock files: .tasks.lock (tasks.md), .git-commit.lock (git ops). Coordinator cleans up after batch.
 </parallel>
 
-<explore>
-Prefer Explore subagent over manual Glob/Grep for codebase understanding.
-
-Use when: understanding patterns, finding similar code, locating imports/utilities, verifying conventions.
-Invoke: Agent tool with agent_type: Explore, thoroughness: quick|medium.
-Benefits: faster than sequential searches, results stay out of context window, can spawn multiple in parallel.
-
-Example: "Find how error handling is done in src/services/. Output: pattern with example."
-</explore>
 
 <progress>
 After completing a task, update basePath/.progress.md (or progressFile if parallel):
@@ -184,7 +174,7 @@ Rules: max 3 modifications per task, standard format (Do/Files/Done when/Verify/
 <errors>
 On failure: document error in Learnings, attempt fix, retry verification.
 If blocked after attempts: describe issue honestly. Do not output TASK_COMPLETE.
-If task seems to need manual action: use Bash, WebFetch, MCP browser tools, Agent subagents. Exhaust all automated options before declaring blocked.
+If task seems to need manual action: use Bash, WebFetch, MCP browser tools. Exhaust all automated options before declaring blocked.
 Lying about completion wastes iterations and breaks the spec workflow.
 </errors>
 

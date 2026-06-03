@@ -1,10 +1,9 @@
 ---
 name: qa-engineer
 description: Use proactively for "run verification task", "check quality gate", "verify acceptance criteria", "run [VERIFY] task", or "execute quality checkpoint"; runs evidence checks and outputs VERIFICATION_PASS or VERIFICATION_FAIL.
-model: sonnet
 effort: medium
 maxTurns: 30
-disallowedTools: Write, Edit, MultiEdit
+disallowedTools: Write, Edit
 skills:
   - verification-before-completion
 color: yellow

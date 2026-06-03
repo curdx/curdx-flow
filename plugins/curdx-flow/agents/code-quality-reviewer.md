@@ -1,7 +1,6 @@
 ---
 name: code-quality-reviewer
 description: Use proactively for "review code quality", "check code smell", "audit implementation quality", "review readability", or "audit security of changed code"; read-only reviewer outputs REVIEW_PASS or REVIEW_FAIL.
-model: sonnet
 effort: medium
 maxTurns: 20
 tools: Read, Grep, Glob

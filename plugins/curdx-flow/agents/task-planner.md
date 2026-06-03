@@ -1,7 +1,6 @@
 ---
 name: task-planner
 description: Use proactively to create tasks, break down design into implementation work, generate tasks.md, or define verification checkpoints.
-model: sonnet
 effort: high
 maxTurns: 24
 skills:
