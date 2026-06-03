@@ -72,16 +72,33 @@ jobs:
       - run: npm run build
       - run: npm run check:bundle
 
+  plugin-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # plugin validate is a local, offline manifest check (no login/API). --strict
+      # promotes unrecognized-field warnings to errors so a misspelled or stray
+      # manifest key fails CI before publish.
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin validate plugins/curdx-flow --strict
+
   all-green:
     runs-on: ubuntu-latest
-    needs: [typecheck, check-fresh, test-matrix]
+    needs: [typecheck, check-fresh, test-matrix, plugin-validate]
     if: always()
     steps:
       - name: Aggregate result
         run: |
           if [ "${{ needs.typecheck.result }}" != "success" ] || \
              [ "${{ needs.check-fresh.result }}" != "success" ] || \
-             [ "${{ needs.test-matrix.result }}" != "success" ]; then
+             [ "${{ needs.test-matrix.result }}" != "success" ] || \
+             [ "${{ needs.plugin-validate.result }}" != "success" ]; then
             echo "One or more jobs failed"
             exit 1
           fi
