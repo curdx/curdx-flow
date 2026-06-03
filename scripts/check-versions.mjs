@@ -1,18 +1,15 @@
 #!/usr/bin/env node
 // Version consistency gate. Run before npm publish / release.
 //
-// Asserts that the four version-bearing files all agree:
-//   1. package.json                                            (npm package)
-//   2. package-lock.json                                       (lockfile root)
-//   3. plugins/curdx-flow/.claude-plugin/plugin.json           (plugin manifest)
-//   4. .claude-plugin/marketplace.json (plugins[name=curdx-flow]) (marketplace index)
+// Asserts that the npm version-bearing files all agree:
+//   1. package.json                                  (npm package)
+//   2. package-lock.json                             (lockfile root + packages[""])
+//   3. plugins/curdx-flow/.claude-plugin/plugin.json (plugin manifest)
 //
-// Why: incident on 2026-04-27 — v5.0.0 plugin commit bumped plugin.json but
-// missed marketplace.json, so claude CLI kept advertising 4.9.1 and the
-// installer's update path silently no-op'd. This script makes that class of
-// drift a hard build failure.
+// The marketplace entry no longer carries a version (plugin.json is the single
+// source; `claude plugin tag` validates plugin<->marketplace agreement at tag time).
 //
-// Exits 0 when all four match, non-zero with a diff table when they don't.
+// Exits 0 when all match, non-zero with a diff table when they don't.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -34,23 +31,12 @@ function readJson(rel) {
 const pkg = readJson('package.json');
 const lock = readJson('package-lock.json');
 const pluginManifest = readJson('plugins/curdx-flow/.claude-plugin/plugin.json');
-const marketplace = readJson('.claude-plugin/marketplace.json');
-
-const marketplaceEntry = marketplace.plugins?.find((p) => p.name === 'curdx-flow');
-if (!marketplaceEntry) {
-  console.error('✗ .claude-plugin/marketplace.json has no plugins[name=curdx-flow] entry');
-  process.exit(2);
-}
 
 const checks = [
   { label: 'package.json', version: pkg.version },
   { label: 'package-lock.json (root)', version: lock.version },
   { label: 'package-lock.json (packages[""])', version: lock.packages?.['']?.version },
   { label: 'plugins/curdx-flow/.claude-plugin/plugin.json', version: pluginManifest.version },
-  {
-    label: '.claude-plugin/marketplace.json plugins[curdx-flow]',
-    version: marketplaceEntry.version,
-  },
 ];
 
 const distinct = new Set(checks.map((c) => c.version));
