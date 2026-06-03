@@ -1,11 +1,25 @@
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
-import { PKGS, findPkg } from '../registry/index.ts';
-import type { Pkg } from '../registry/types.ts';
+import { companionPlugins, canonicalPkgId, type PluginCompanion } from '../core/capabilities/catalog.ts';
 import { t } from '../i18n/index.ts';
-import { isPluginEnabled, listMcp, listPlugins, refreshMarketplaces } from '../runner/state.ts';
+import {
+  findPluginAtScope,
+  getMarketplacePluginVersion,
+  isPluginEnabled,
+  isPluginInstalledAtScope,
+  listPlugins,
+  refreshMarketplaces,
+} from '../runner/state.ts';
+import {
+  PLUGIN_SCOPE,
+  ensureMarketplace,
+  enablePluginById,
+  installPluginById,
+  uninstallPluginById,
+  updatePluginById,
+} from '../runner/plugin-cli.ts';
+import type { InstallCtx } from '../runner/types.ts';
 import { syncFromState } from '../runner/claudeMd.ts';
-import { enablePluginById } from '../registry/plugins/_helpers.ts';
 
 export type InstallOptions = {
   ids?: string[];
@@ -22,20 +36,28 @@ type DerivedState =
 
 type Result = { id: string; status: 'ok' | 'fail' | 'skip'; message?: string };
 
-async function deriveState(pkg: Pkg): Promise<DerivedState> {
-  if (!(await pkg.isInstalled())) return { kind: 'not_installed' };
-  const [installed, latest] = await Promise.all([
-    pkg.installedVersion?.() ?? Promise.resolve(null),
-    pkg.latestVersion?.() ?? Promise.resolve(null),
-  ]);
+function ctxFor(log: ReturnType<typeof p.taskLog>): InstallCtx {
+  return { log, config: {}, t };
+}
+
+function findCompanion(id: string): PluginCompanion | undefined {
+  const canonical = canonicalPkgId(id);
+  return companionPlugins().find((c) => c.id === canonical);
+}
+
+async function deriveState(c: PluginCompanion): Promise<DerivedState> {
+  if (!(await isPluginInstalledAtScope(c.pluginId, PLUGIN_SCOPE))) return { kind: 'not_installed' };
+  const found = await findPluginAtScope(c.pluginId, PLUGIN_SCOPE);
+  const installed = found?.version && found.version !== 'unknown' ? found.version : null;
+  const latest = await getMarketplacePluginVersion(c.marketplace, c.name);
   if (installed && latest && installed !== latest) {
     return { kind: 'update_available', current: installed, latest };
   }
   return { kind: 'up_to_date', version: installed };
 }
 
-function stateLabel(pkg: Pkg, s: DerivedState): string {
-  const head = `${pkg.name} ${pc.dim(`(${pkg.type})`)}`;
+function stateLabel(c: PluginCompanion, s: DerivedState): string {
+  const head = `${c.name} ${pc.dim('(plugin)')}`;
   switch (s.kind) {
     case 'not_installed':
       return `${head}  ${pc.yellow(`✗ ${t('pkg.notInstalled')}`)}`;
@@ -50,56 +72,58 @@ function stateLabel(pkg: Pkg, s: DerivedState): string {
   }
 }
 
-async function selectInteractive(
-  states: Map<string, DerivedState>,
-): Promise<Pkg[] | null> {
-  const requiredPkgs = PKGS.filter((pkg) => pkg.required);
-  const optionalPkgs = PKGS.filter((pkg) => !pkg.required);
+async function selectInteractive(states: Map<string, DerivedState>): Promise<PluginCompanion[] | null> {
+  const all = companionPlugins();
+  const requiredPkgs = all.filter((c) => c.required);
+  const optionalPkgs = all.filter((c) => !c.required);
 
   if (requiredPkgs.length > 0) {
-    const lines = requiredPkgs.map((pkg) => `  ${stateLabel(pkg, states.get(pkg.id)!)}`);
+    const lines = requiredPkgs.map((c) => `  ${stateLabel(c, states.get(c.id)!)}`);
     p.note(lines.join('\n'), t('install.requiredHeader'));
   }
 
-  const options = optionalPkgs.map((pkg) => {
-    const s = states.get(pkg.id)!;
-    return { value: pkg.id, label: stateLabel(pkg, s), hint: pkg.description };
-  });
-  const initialValues = optionalPkgs
-    .filter((pkg) => {
-      const s = states.get(pkg.id)!;
-      return s.kind === 'not_installed' || s.kind === 'update_available';
-    })
-    .map((pkg) => pkg.id);
+  let userPicked: PluginCompanion[] = [];
+  if (optionalPkgs.length > 0) {
+    const options = optionalPkgs.map((c) => {
+      const s = states.get(c.id)!;
+      return { value: c.id, label: stateLabel(c, s), hint: c.description };
+    });
+    const initialValues = optionalPkgs
+      .filter((c) => {
+        const s = states.get(c.id)!;
+        return s.kind === 'not_installed' || s.kind === 'update_available';
+      })
+      .map((c) => c.id);
 
-  const picked = await p.multiselect<string>({
-    message: t('install.selectPrompt'),
-    options,
-    initialValues,
-    required: false,
-  });
-  if (p.isCancel(picked)) return null;
-  const userPicked = (picked as string[]).map((id) => findPkg(id)).filter((x): x is Pkg => Boolean(x));
+    const picked = await p.multiselect<string>({
+      message: t('install.selectPrompt'),
+      options,
+      initialValues,
+      required: false,
+    });
+    if (p.isCancel(picked)) return null;
+    userPicked = (picked as string[]).map((id) => findCompanion(id)).filter((x): x is PluginCompanion => Boolean(x));
+  }
+
   // Required pkgs that need action (not_installed / update_available) are auto-included.
   // Up-to-date required pkgs are silently skipped — there's nothing to do.
-  const requiredAuto = requiredPkgs.filter((pkg) => states.get(pkg.id)?.kind !== 'up_to_date');
+  const requiredAuto = requiredPkgs.filter((c) => states.get(c.id)?.kind !== 'up_to_date');
   return [...requiredAuto, ...userPicked];
 }
 
-function selectFromIds(opts: InstallOptions): Pkg[] {
-  if (opts.all) return [...PKGS];
+function selectFromIds(opts: InstallOptions): PluginCompanion[] {
+  if (opts.all) return [...companionPlugins()];
   if (!opts.ids || opts.ids.length === 0) return [];
-  const found: Pkg[] = [];
+  const found: PluginCompanion[] = [];
   for (const id of opts.ids) {
-    const pkg = findPkg(id);
-    if (pkg) found.push(pkg);
+    const c = findCompanion(id);
+    if (c) found.push(c);
     else p.log.warn(`Unknown id: ${id}`);
   }
   return found;
 }
 
-async function runOne(pkg: Pkg, state: DerivedState, opts: InstallOptions): Promise<Result> {
-  // Reinstall confirmation only applies to up_to_date items the user selected anyway.
+async function runOne(c: PluginCompanion, state: DerivedState, opts: InstallOptions): Promise<Result> {
   let mode: 'install' | 'update' | 'reinstall';
   if (state.kind === 'not_installed') {
     mode = 'install';
@@ -109,63 +133,43 @@ async function runOne(pkg: Pkg, state: DerivedState, opts: InstallOptions): Prom
     // up_to_date — selected explicitly. Ask before nuking.
     if (!opts.yes) {
       const ans = await p.confirm({
-        message: t('install.confirmReinstall', { name: pkg.name }),
+        message: t('install.confirmReinstall', { name: c.name }),
         initialValue: false,
       });
       if (p.isCancel(ans) || ans === false) {
-        return { id: pkg.id, status: 'skip', message: t('install.skippedReinstall', { name: pkg.name }) };
+        return { id: c.id, status: 'skip', message: t('install.skippedReinstall', { name: c.name }) };
       }
     }
     mode = 'reinstall';
   }
 
-  if (pkg.prereqCheck) {
-    const r = await pkg.prereqCheck(t);
-    if (!r.ok) {
-      p.log.warn(t('install.prereqFail', { name: pkg.name, reason: r.reason }));
-      return { id: pkg.id, status: 'skip', message: r.reason };
-    }
-  }
-
-  let config: Record<string, string> = {};
-  if (pkg.configPrompts && mode !== 'update') {
-    // Don't re-prompt config on update — keep existing settings.
-    const cfg = await pkg.configPrompts({ t });
-    if (cfg === null) return { id: pkg.id, status: 'skip', message: t('app.cancelled') };
-    config = cfg;
-  }
-
   const titleKey = mode === 'update' ? 'install.updating' : 'install.starting';
-  const titleVars: Record<string, string> = { name: pkg.name };
+  const titleVars: Record<string, string> = { name: c.name };
   if (mode === 'update' && state.kind === 'update_available') {
     titleVars['version'] = state.latest;
   }
   const log = p.taskLog({ title: t(titleKey, titleVars) });
+  const ctx = ctxFor(log);
 
   try {
     if (mode === 'reinstall') {
       log.message(t('reinstall.uninstalling'));
-      await pkg.uninstall({ log, config, t });
+      await uninstallPluginById(c.pluginId, ctx);
       log.message(t('reinstall.installing'));
-      await pkg.install({ log, config, t });
+      await ensureMarketplace(c.marketplace, c.marketplaceSource, ctx);
+      await installPluginById(c.pluginId, ctx);
     } else if (mode === 'update') {
-      if (pkg.update) {
-        await pkg.update({ log, config, t });
-      } else {
-        log.message(t('reinstall.uninstalling'));
-        await pkg.uninstall({ log, config, t });
-        log.message(t('reinstall.installing'));
-        await pkg.install({ log, config, t });
-      }
+      await updatePluginById(c.pluginId, ctx);
     } else {
-      await pkg.install({ log, config, t });
+      await ensureMarketplace(c.marketplace, c.marketplaceSource, ctx);
+      await installPluginById(c.pluginId, ctx);
     }
-    log.success(t('install.success', { name: pkg.name }));
-    return { id: pkg.id, status: 'ok' };
+    log.success(t('install.success', { name: c.name }));
+    return { id: c.id, status: 'ok' };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    log.error(`${t('install.failed', { name: pkg.name })}\n${msg}`);
-    return { id: pkg.id, status: 'fail', message: msg };
+    log.error(`${t('install.failed', { name: c.name })}\n${msg}`);
+    return { id: c.id, status: 'fail', message: msg };
   }
 }
 
@@ -185,35 +189,34 @@ function summarize(results: Result[]): void {
   p.note(lines.join('\n'), t('install.summaryTitle'));
 }
 
-// Post-install sweep: ensure every installed plugin pkg is also enabled in
-// ~/.claude/settings.json#enabledPlugins. Without this, an install flow that
-// resolves to up_to_date silently skips a disabled plugin — Claude Code then
-// continues to ignore the plugin's skills and slash commands. The check is
-// per-pkg cheap (one fs.readFile of settings.json, amortized via getEnabledPluginsMap
-// inside isPluginEnabled), and only triggers a `claude plugin enable` for
-// plugins that are actually disabled.
+// Post-install safety-net: ensure every installed companion plugin is also enabled in
+// ~/.claude/settings.json#enabledPlugins. `claude plugin install` writes the install
+// record but does not flip enabled, so a disabled-but-installed plugin's skills never
+// load. One cheap `isPluginEnabled` probe per companion, `claude plugin enable` only for
+// the ones actually disabled. Guarantees the bootstrap enables curdx-flow even when its
+// state resolved to up_to_date.
 async function ensureInstalledPluginsEnabled(): Promise<void> {
-  const toEnable: { name: string; pluginId: string }[] = [];
-  for (const pkg of PKGS) {
-    if (pkg.type !== 'plugin' || !pkg.pluginId) continue;
-    if (!(await pkg.isInstalled())) continue;
-    if (await isPluginEnabled(pkg.pluginId)) continue;
-    toEnable.push({ name: pkg.name, pluginId: pkg.pluginId });
+  const toEnable: PluginCompanion[] = [];
+  for (const c of companionPlugins()) {
+    if (!(await isPluginInstalledAtScope(c.pluginId, PLUGIN_SCOPE))) continue;
+    if (await isPluginEnabled(c.pluginId)) continue;
+    toEnable.push(c);
   }
   if (toEnable.length === 0) return;
 
   const log = p.taskLog({
     title: `Enabling ${toEnable.length} installed plugin${toEnable.length === 1 ? '' : 's'} that ${toEnable.length === 1 ? 'was' : 'were'} disabled`,
   });
+  const ctx = ctxFor(log);
   let enabled = 0;
   const failures: string[] = [];
-  for (const { name, pluginId } of toEnable) {
-    log.message(`enable ${name} (${pluginId})`);
+  for (const c of toEnable) {
+    log.message(`enable ${c.name} (${c.pluginId})`);
     try {
-      await enablePluginById(pluginId, { log, config: {}, t });
+      await enablePluginById(c.pluginId, ctx);
       enabled++;
     } catch (err) {
-      failures.push(`${name}: ${err instanceof Error ? err.message : String(err)}`);
+      failures.push(`${c.name}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   if (failures.length === 0) {
@@ -225,10 +228,7 @@ async function ensureInstalledPluginsEnabled(): Promise<void> {
 
 async function maybeRefreshMarketplaces(opts: InstallOptions): Promise<void> {
   if (opts.noRefresh) return;
-  const names = new Set<string>();
-  for (const pkg of PKGS) {
-    if (pkg.marketplaces) for (const n of pkg.marketplaces()) names.add(n);
-  }
+  const names = new Set(companionPlugins().map((c) => c.marketplace));
   if (names.size === 0) return;
   const sp = p.spinner();
   sp.start(t('marketplace.refreshing'));
@@ -241,63 +241,50 @@ async function maybeRefreshMarketplaces(opts: InstallOptions): Promise<void> {
 }
 
 export async function installFlow(opts: InstallOptions = {}): Promise<void> {
-  // Default: sync CLAUDE.md at end of flow regardless of whether anything was
-  // actually installed — the user may be running this for the first time after
-  // upgrading flow with everything already installed, and we still want the
-  // managed block to reflect current state. Only an explicit user cancellation
-  // (Ctrl+C / multiselect cancel) suppresses the sync.
+  // Default: sync CLAUDE.md at end of flow regardless of whether anything was actually
+  // installed — first run after upgrade may have everything installed already and we
+  // still want the managed block current. Only explicit cancellation suppresses the sync.
   let userCancelled = false;
   try {
     await maybeRefreshMarketplaces(opts);
 
     const explicit = opts.all || (opts.ids && opts.ids.length > 0);
-    const candidates = explicit ? selectFromIds(opts) : [...PKGS];
+    const candidates = explicit ? selectFromIds(opts) : [...companionPlugins()];
     if (candidates.length === 0) {
       p.log.info(t('install.nothingSelected'));
       return;
     }
 
-    // Required pkgs must enter the state map even if user's --ids list omits them,
-    // so we can decide whether they need action. `--all` already covers everything.
+    // Required pkgs must enter the state map even if --ids omits them, so we can decide
+    // whether they need action. --all already covers everything.
     if (opts.ids && opts.ids.length > 0) {
-      for (const pkg of PKGS) {
-        if (pkg.required && !candidates.some((c) => c.id === pkg.id)) {
-          candidates.push(pkg);
-        }
+      for (const c of companionPlugins()) {
+        if (c.required && !candidates.some((x) => x.id === c.id)) candidates.push(c);
       }
     }
 
-    // Derive state for everything (used both for label rendering and for dispatch).
-    // Wrap in spinner: this triggers `claude plugin list --json` + `claude mcp list`
-    // (the latter does an MCP server health check, can take 5-15s).
     const stateMap = new Map<string, DerivedState>();
     const sp = p.spinner();
     sp.start(t('state.checking'));
     try {
-      // Warm both list caches in parallel; subsequent per-pkg checks are in-memory.
-      await Promise.all([listPlugins(), listMcp()]);
+      await listPlugins();
       await Promise.all(
-        candidates.map(async (pkg) => {
-          stateMap.set(pkg.id, await deriveState(pkg));
+        candidates.map(async (c) => {
+          stateMap.set(c.id, await deriveState(c));
         }),
       );
     } finally {
       sp.stop(t('state.checked', { count: candidates.length }));
     }
 
-    let targets: Pkg[];
+    let targets: PluginCompanion[];
     if (explicit) {
-      // For `--ids X` mode, drop auto-added required pkgs that are already up-to-date.
-      // The user didn't list them, and there's nothing to do — skip silently to avoid
-      // a noisy reinstall confirmation prompt in runOne. Required pkgs the user DID
-      // list (`--ids curdx-flow`) stay in targets and follow the normal up_to_date
-      // → reinstall confirmation path. `--all` keeps everything as-is.
       if (opts.ids && opts.ids.length > 0) {
-        const userListedIds = new Set(opts.ids);
-        targets = candidates.filter((pkg) => {
-          if (!pkg.required) return true;
-          if (userListedIds.has(pkg.id)) return true;
-          return stateMap.get(pkg.id)?.kind !== 'up_to_date';
+        const userListedIds = new Set(opts.ids.map((id) => canonicalPkgId(id)));
+        targets = candidates.filter((c) => {
+          if (!c.required) return true;
+          if (userListedIds.has(c.id)) return true;
+          return stateMap.get(c.id)?.kind !== 'up_to_date';
         });
       } else {
         targets = candidates;
@@ -318,16 +305,13 @@ export async function installFlow(opts: InstallOptions = {}): Promise<void> {
     }
 
     const results: Result[] = [];
-    for (const pkg of targets) {
-      const state = stateMap.get(pkg.id) ?? { kind: 'not_installed' as const };
-      results.push(await runOne(pkg, state, opts));
+    for (const c of targets) {
+      const state = stateMap.get(c.id) ?? { kind: 'not_installed' as const };
+      results.push(await runOne(c, state, opts));
     }
     summarize(results);
   } finally {
     if (!userCancelled) {
-      // Idempotent enable sweep BEFORE syncFromState — the latter reads installed
-      // plugin state to render the CLAUDE.md block, and we want disabled-but-now-
-      // enabled plugins to flip first so the block reflects reality.
       await ensureInstalledPluginsEnabled();
       await syncFromState({ skip: opts.noClaudeMd });
     }

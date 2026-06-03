@@ -1,9 +1,9 @@
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
-import { PKGS, findPkg } from '../registry/index.ts';
-import type { Pkg } from '../registry/types.ts';
+import { companionPlugins, canonicalPkgId, type PluginCompanion } from '../core/capabilities/catalog.ts';
 import { t } from '../i18n/index.ts';
-import { listMcp, listPlugins } from '../runner/state.ts';
+import { isPluginInstalledAtScope, listPlugins } from '../runner/state.ts';
+import { PLUGIN_SCOPE, uninstallPluginById } from '../runner/plugin-cli.ts';
 import { syncFromState } from '../runner/claudeMd.ts';
 
 export type UninstallOptions = {
@@ -14,17 +14,15 @@ export type UninstallOptions = {
 
 type Result = { id: string; status: 'ok' | 'fail'; message?: string };
 
-async function getInstalled(): Promise<Pkg[]> {
-  const states = await Promise.all(PKGS.map(async (pkg) => ({ pkg, installed: await pkg.isInstalled() })));
-  return states.filter((s) => s.installed).map((s) => s.pkg);
-}
-
-async function probeInstalled(): Promise<Pkg[]> {
+async function probeInstalled(): Promise<PluginCompanion[]> {
   const sp = p.spinner();
   sp.start(t('state.checking'));
   try {
-    await Promise.all([listPlugins(), listMcp()]);
-    const installed = await getInstalled();
+    await listPlugins();
+    const states = await Promise.all(
+      companionPlugins().map(async (c) => ({ c, installed: await isPluginInstalledAtScope(c.pluginId, PLUGIN_SCOPE) })),
+    );
+    const installed = states.filter((s) => s.installed).map((s) => s.c);
     sp.stop(t('state.checked', { count: installed.length }));
     return installed;
   } catch (err) {
@@ -38,20 +36,15 @@ export async function uninstallFlow(opts: UninstallOptions = {}): Promise<void> 
   try {
     const installed = await probeInstalled();
 
-    let targets: Pkg[];
+    let targets: PluginCompanion[];
     if (opts.ids && opts.ids.length > 0) {
       targets = [];
       for (const id of opts.ids) {
-        const pkg = findPkg(id);
-        if (!pkg) {
-          p.log.warn(`Unknown id: ${id}`);
-          continue;
-        }
-        if (!installed.some((x) => x.id === pkg.id)) {
-          p.log.warn(`${pkg.name}: ${t('pkg.notInstalled')}`);
-          continue;
-        }
-        targets.push(pkg);
+        const canonical = canonicalPkgId(id);
+        const c = companionPlugins().find((x) => x.id === canonical);
+        if (!c) { p.log.warn(`Unknown id: ${id}`); continue; }
+        if (!installed.some((x) => x.id === c.id)) { p.log.warn(`${c.name}: ${t('pkg.notInstalled')}`); continue; }
+        targets.push(c);
       }
     } else {
       if (installed.length === 0) {
@@ -60,19 +53,15 @@ export async function uninstallFlow(opts: UninstallOptions = {}): Promise<void> 
       }
       const picked = await p.multiselect<string>({
         message: t('uninstall.selectPrompt'),
-        options: installed.map((pkg) => ({
-          value: pkg.id,
-          label: `${pkg.name} ${pc.dim(`(${pkg.type})`)}`,
-          hint: pkg.description,
+        options: installed.map((c) => ({
+          value: c.id,
+          label: `${c.name} ${pc.dim('(plugin)')}`,
+          hint: c.description,
         })),
         required: false,
       });
-      if (p.isCancel(picked)) {
-        userCancelled = true;
-        p.cancel(t('app.cancelled'));
-        return;
-      }
-      targets = (picked as string[]).map((id) => findPkg(id)).filter((x): x is Pkg => Boolean(x));
+      if (p.isCancel(picked)) { userCancelled = true; p.cancel(t('app.cancelled')); return; }
+      targets = (picked as string[]).map((id) => installed.find((c) => c.id === id)).filter((x): x is PluginCompanion => Boolean(x));
     }
 
     if (targets.length === 0) {
@@ -93,26 +82,23 @@ export async function uninstallFlow(opts: UninstallOptions = {}): Promise<void> 
     }
 
     const results: Result[] = [];
-    for (const pkg of targets) {
-      const log = p.taskLog({ title: t('uninstall.starting', { name: pkg.name }) });
+    for (const c of targets) {
+      const log = p.taskLog({ title: t('uninstall.starting', { name: c.name }) });
       try {
-        await pkg.uninstall({ log, config: {}, t });
-        log.success(t('uninstall.success', { name: pkg.name }));
-        results.push({ id: pkg.id, status: 'ok' });
+        await uninstallPluginById(c.pluginId, { log, config: {}, t });
+        log.success(t('uninstall.success', { name: c.name }));
+        results.push({ id: c.id, status: 'ok' });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        log.error(`${t('uninstall.failed', { name: pkg.name })}\n${msg}`);
-        results.push({ id: pkg.id, status: 'fail', message: msg });
+        log.error(`${t('uninstall.failed', { name: c.name })}\n${msg}`);
+        results.push({ id: c.id, status: 'fail', message: msg });
       }
     }
 
     const ok = results.filter((r) => r.status === 'ok').length;
     const fail = results.filter((r) => r.status === 'fail').length;
     p.note(
-      [
-        pc.green(t('install.summaryOk', { count: ok })),
-        pc.red(t('install.summaryFail', { count: fail })),
-      ].join('\n'),
+      [pc.green(t('install.summaryOk', { count: ok })), pc.red(t('install.summaryFail', { count: fail }))].join('\n'),
       t('install.summaryTitle'),
     );
   } finally {
