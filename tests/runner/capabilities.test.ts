@@ -12,20 +12,16 @@ import { buildPluginDependencyReadiness } from '../../src/core/capabilities/inde
 import { renderBlock } from '../../src/runner/claudeMd.ts';
 
 describe('curdx capability registry', () => {
-  it('keeps plugin manifest dependencies aligned to the source registry', () => {
+  it('declares no hard plugin dependencies (companions are soft, runtime-detected)', () => {
     const manifest = JSON.parse(
       readFileSync('plugins/curdx-flow/.claude-plugin/plugin.json', 'utf8'),
-    ) as { dependencies?: Array<{ name?: string; marketplace?: string }> };
+    ) as { dependencies?: unknown };
     const marketplace = JSON.parse(
       readFileSync('.claude-plugin/marketplace.json', 'utf8'),
-    ) as { allowCrossMarketplaceDependenciesOn?: string[] };
+    ) as { allowCrossMarketplaceDependenciesOn?: unknown };
 
-    const expected = CURDX_PLUGIN_DEPENDENCIES.map(({ name, marketplace }) => ({ name, marketplace }));
-
-    expect(manifest.dependencies).toEqual(expected);
-    expect(marketplace.allowCrossMarketplaceDependenciesOn).toEqual(
-      expected.map((dependency) => dependency.marketplace),
-    );
+    expect(manifest.dependencies ?? []).toEqual([]);
+    expect(marketplace.allowCrossMarketplaceDependenciesOn ?? []).toEqual([]);
   });
 
   it('keeps plugin registry modules aligned with dependency specs', () => {
