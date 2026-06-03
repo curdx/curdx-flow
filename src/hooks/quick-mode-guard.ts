@@ -9,9 +9,10 @@ const QUICK_MODE_REASON =
 
 const DENY: DenyDecisionOutput = {
   hookSpecificOutput: {
+    hookEventName: "PreToolUse",
     permissionDecision: "deny",
+    permissionDecisionReason: QUICK_MODE_REASON,
   },
-  systemMessage: QUICK_MODE_REASON,
 };
 
 runHook(async (input) => {

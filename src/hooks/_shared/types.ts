@@ -28,7 +28,8 @@
  * Note: PreToolUse permission decisions (quick-mode-guard) do NOT use the
  * top-level `decision` field — Claude Code's schema rejects values other
  * than `"approve"|"block"` there. Allow path emits nothing; deny path uses
- * the `hookSpecificOutput.permissionDecision` shape only.
+ * `hookSpecificOutput` with `hookEventName:"PreToolUse"`, `permissionDecision:"deny"`,
+ * and the rationale in `permissionDecisionReason`.
  */
 export type HookDecision = "block";
 
@@ -84,9 +85,10 @@ export interface ContextBlockOutput {
  */
 export interface DenyDecisionOutput {
   hookSpecificOutput: {
+    hookEventName: "PreToolUse";
     permissionDecision: "deny";
+    permissionDecisionReason: string;
   };
-  systemMessage: string;
 }
 
 /**

@@ -434,9 +434,10 @@ function resolveCurrent(opts) {
 var QUICK_MODE_REASON = "Quick mode active: do NOT ask the user any questions. Make opinionated decisions autonomously. Choose the simplest, most conventional approach.";
 var DENY = {
   hookSpecificOutput: {
-    permissionDecision: "deny"
-  },
-  systemMessage: QUICK_MODE_REASON
+    hookEventName: "PreToolUse",
+    permissionDecision: "deny",
+    permissionDecisionReason: QUICK_MODE_REASON
+  }
 };
 runHook(async (input) => {
   const cwd = input?.cwd;
