@@ -23,6 +23,7 @@ const HOOK_ENTRIES = [
   'src/hooks/load-spec-context.ts',
   'src/hooks/post-compact-recorder.ts',
   'src/hooks/post-tool-batch-snapshot.ts',
+  'src/hooks/post-tool-edit-stamp.ts',
   'src/hooks/quick-mode-guard.ts',
   'src/hooks/stop-failure-handler.ts',
   'src/hooks/stop-watcher.ts',

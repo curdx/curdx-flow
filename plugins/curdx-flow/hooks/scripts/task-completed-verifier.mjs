@@ -451,6 +451,15 @@ async function verifyPhaseBlock(state, phase, specDir) {
       command: block.command
     };
   }
+  if (typeof state.lastSrcEditMs === "number" && state.lastSrcEditMs > Date.parse(block.timestamp)) {
+    const editIso = new Date(state.lastSrcEditMs).toISOString();
+    const specName = basename2(specDir);
+    return {
+      ok: false,
+      reason: `Stale evidence for phase '${phase}': src edited at ${editIso}, last verified at ${block.timestamp}. Re-run: ${block.command}. Spec: ${specName}.`,
+      command: block.command
+    };
+  }
   if (phase === "execution" && typeof block.taskIndex === "number") {
     const currentTaskIndex = typeof state.taskIndex === "number" ? state.taskIndex : 0;
     if (block.taskIndex !== currentTaskIndex) {

@@ -42,6 +42,20 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-tool-edit-stamp.mjs"],
+            "timeout": 10,
+            "statusMessage": "Stamping curdx-flow source edit time"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
@@ -64,7 +78,6 @@
             "command": "node",
             "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/load-spec-context.mjs"],
             "timeout": 15,
-            "async": true,
             "statusMessage": "Loading active spec context"
           }
         ]

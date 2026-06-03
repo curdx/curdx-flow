@@ -171,6 +171,18 @@ export async function verifyPhaseBlock(
       command: block.command,
     };
   }
+  if (
+    typeof state.lastSrcEditMs === "number" &&
+    state.lastSrcEditMs > Date.parse(block.timestamp)
+  ) {
+    const editIso = new Date(state.lastSrcEditMs).toISOString();
+    const specName = basename(specDir);
+    return {
+      ok: false,
+      reason: `Stale evidence for phase '${phase}': src edited at ${editIso}, last verified at ${block.timestamp}. Re-run: ${block.command}. Spec: ${specName}.`,
+      command: block.command,
+    };
+  }
   // Task-level granularity (v7.2.0): when an execution-phase block was
   // recorded against a specific `taskIndex`, refuse to let it gate a later
   // task. This closes the phase-level loophole where evidence from task N

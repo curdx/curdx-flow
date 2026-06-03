@@ -359,6 +359,7 @@ export interface CurdxState {
   epicName?: string;
   // verification iron-law (design D2): per-phase Verify command outcomes
   verificationBlocks?: Partial<Record<VerificationPhase, VerificationBlock>>;
+  lastSrcEditMs?: number;
   // completion marker (v7.1.0)
   completed?: boolean;
   completedAt?: string;

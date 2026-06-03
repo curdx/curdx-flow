@@ -298,6 +298,38 @@ describe('Claude Code hook boundary behavior', () => {
     expect(stale.stderr).toContain('goal-stale');
   });
 
+  it('blocks TaskCompleted when source is edited after the verification block', async () => {
+    const editedWorkspace = await createLegacySpecWorkspace({
+      phase: 'execution',
+      taskIndex: 0,
+      totalTasks: 1,
+      completed: false,
+      runId: 'run-edited',
+      goalId: 'goal-edited',
+      verificationBlocks: {
+        execution: {
+          command: 'npm run verify',
+          exitCode: 0,
+          timestamp: '2026-05-17T01:00:00.000Z',
+          srcMtime: 0,
+          taskIndex: 0,
+        },
+      },
+      lastSrcEditMs: Date.parse('2026-05-17T01:00:00.000Z') + 60_000,
+    });
+
+    const edited = await runHookScript('task-completed-verifier.mjs', {
+      hook_event_name: 'TaskCompleted',
+      cwd: editedWorkspace,
+      session_id: 'session-1',
+      task_id: 'task-1',
+    });
+
+    expect(edited.exitCode).toBe(2);
+    expect(edited.stderr).toContain('src edited');
+    expect(edited.stderr).toContain('run-edited');
+  });
+
   it('fails open for TaskCompleted missing task_id and malformed legacy state', async () => {
     const noTaskId = await runHookScript('task-completed-verifier.mjs', {
       hook_event_name: 'TaskCompleted',
