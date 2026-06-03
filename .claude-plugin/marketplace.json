@@ -6,12 +6,6 @@
   "metadata": {
     "description": "Claude Code plugins curated and bundled by curdx-flow"
   },
-  "allowCrossMarketplaceDependenciesOn": [
-    "pua-skills",
-    "thedotmack",
-    "chrome-devtools-plugins",
-    "ui-ux-pro-max-skill"
-  ],
   "plugins": [
     {
       "name": "curdx-flow",
