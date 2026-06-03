@@ -46,9 +46,19 @@ async function runInstaller(): Promise<{ ok: true } | { ok: false; error: string
   return { ok: true };
 }
 
-export async function ensureBun(t: Translate): Promise<PrereqResult> {
+export async function ensureBun(
+  t: Translate,
+  opts: { assumeYes?: boolean } = {},
+): Promise<PrereqResult> {
   const found = await findBun();
   if (found) return { ok: true };
+
+  // Non-interactive (--yes / CI): never prompt or auto-run the bun.sh installer without
+  // consent. Report the gap so the companion is skipped, mirroring the pre-rewrite
+  // behavior where the confirm cancelled in a non-TTY run.
+  if (opts.assumeYes) {
+    return { ok: false, reason: t('bun.missing') };
+  }
 
   p.log.warn(t('bun.missing'));
   p.log.info(t('bun.installerSource'));

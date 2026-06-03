@@ -61,8 +61,6 @@ const messages: Record<MessageKey, string> = {
   'status.headerState': 'State',
 
 
-  'chrome.prereqNode': 'Requires Node.js >= 20.19 (current: {current})',
-  'chrome.prereqChrome': 'Requires Chrome installed locally (chrome-devtools-mcp drives the local browser)',
 
   'bun.missing': 'Bun runtime not found — claude-mem\'s background worker requires Bun.',
   'bun.installerSource': 'Bun installer source: https://bun.sh (curl on macOS/Linux, PowerShell irm on Windows).',

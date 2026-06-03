@@ -1,7 +1,8 @@
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
 import { companionPlugins, canonicalPkgId, type PluginCompanion } from '../core/capabilities/catalog.ts';
-import { t } from '../i18n/index.ts';
+import { ensureBun } from '../runner/ensureBun.ts';
+import { t, type Translate } from '../i18n/index.ts';
 import {
   findPluginAtScope,
   getMarketplacePluginVersion,
@@ -18,8 +19,16 @@ import {
   uninstallPluginById,
   updatePluginById,
 } from '../runner/plugin-cli.ts';
-import type { InstallCtx } from '../runner/types.ts';
+import type { InstallCtx, PrereqResult } from '../runner/types.ts';
 import { syncFromState } from '../runner/claudeMd.ts';
+
+// Companion prerequisite guards (native-first keeps this minimal — a side-table keyed by
+// companion id, so the catalog stays data-only). claude-mem's worker requires Bun; the
+// bootstrap is the convenience path where users expect that hand-holding. Native
+// `claude plugin install` has no such guard.
+const PREREQS: Record<string, (t: Translate, opts: { assumeYes?: boolean }) => Promise<PrereqResult>> = {
+  'claude-mem': ensureBun,
+};
 
 export type InstallOptions = {
   ids?: string[];
@@ -141,6 +150,15 @@ async function runOne(c: PluginCompanion, state: DerivedState, opts: InstallOpti
       }
     }
     mode = 'reinstall';
+  }
+
+  const prereq = PREREQS[c.id];
+  if (prereq) {
+    const r = await prereq(t, { assumeYes: opts.yes === true });
+    if (!r.ok) {
+      p.log.warn(t('install.prereqFail', { name: c.name, reason: r.reason }));
+      return { id: c.id, status: 'skip', message: r.reason };
+    }
   }
 
   const titleKey = mode === 'update' ? 'install.updating' : 'install.starting';

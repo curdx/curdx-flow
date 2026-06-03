@@ -59,8 +59,6 @@ const messages = {
   'status.headerState': '状态',
 
 
-  'chrome.prereqNode': '需要 Node.js >= 20.19，当前版本 {current}',
-  'chrome.prereqChrome': '需要本机已安装 Chrome（chrome-devtools-mcp 会调用本地浏览器）',
 
   'bun.missing': '未检测到 Bun，claude-mem 的后台 worker 依赖 Bun 运行。',
   'bun.installerSource': 'Bun 安装脚本来源：https://bun.sh（macOS/Linux 用 curl，Windows 用 powershell irm）。',
