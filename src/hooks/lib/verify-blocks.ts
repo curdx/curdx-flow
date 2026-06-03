@@ -2,15 +2,8 @@ import { promises as fs } from "node:fs";
 import { basename, join } from "node:path";
 
 import type { CurdxState, VerificationPhase } from "../_shared/types.ts";
+import { WALK_SKIP_DIRS } from "../_shared/source-tree.ts";
 import { crossCheckPhase } from "./evidence-bridge.ts";
-
-const WALK_SKIP_DIRS = new Set([
-  ".git",
-  "node_modules",
-  "dist",
-  ".curdx",
-  ".claude",
-]);
 
 const WALK_MAX_DEPTH = 6;
 

@@ -52,6 +52,7 @@ export interface PluginDependencyReadinessFact extends Record<string, unknown> {
 
 export interface PluginDependencyReadinessResult {
   ready: boolean;
+  requiredReady: boolean;
   source: string;
   exitCode: number | null;
   parseError: string | null;
@@ -204,6 +205,7 @@ export function buildPluginDependencyReadiness(
     const marketplaceMatches = marketplace === expected.marketplace;
     const crossMarketplaceAllowlisted = allowlist.has(expected.marketplace);
     const trustSatisfied = declared && marketplaceMatches && crossMarketplaceAllowlisted;
+    const soft = !declared;
     const exactInstalled = parsed.plugins.find((plugin) => plugin.id === expected.pluginId);
     const sameNameInstalled = parsed.plugins.find((plugin) =>
       plugin.name === expected.name && plugin.id !== expected.pluginId,
@@ -232,11 +234,11 @@ export function buildPluginDependencyReadiness(
     const installed: CapabilityTriState = exactInstalled ? true : parsed.ok ? false : 'unknown';
     const installedScope = scope;
     const installedVersion = exactInstalled?.version ?? null;
-    const authorized: CapabilityTriState = trustSatisfied ? true : false;
+    const authorized: CapabilityTriState = (soft ? installed === true : trustSatisfied) ? true : false;
     let callable: CapabilityTriState = 'unknown';
     let readiness: PluginDependencyReadiness = 'unknown';
 
-    if (!trustSatisfied || manifestDrift) {
+    if (!soft && (!trustSatisfied || manifestDrift)) {
       readiness = 'unavailable';
       callable = false;
     } else if (!parsed.ok || commandError || exitCode !== 0) {
@@ -257,9 +259,11 @@ export function buildPluginDependencyReadiness(
       ? `${expected.name}@${expected.marketplace} is installed at ${installedScope} scope and enabled.`
       : readiness === 'unknown'
         ? `${expected.name}@${expected.marketplace} readiness is unknown because installed plugin state was not confirmed.`
-        : drift.length > 0
-          ? `${expected.name}@${expected.marketplace} readiness failed: ${drift.join(', ')}.`
-          : `${expected.name}@${expected.marketplace} is not ready.`;
+        : soft
+          ? `${expected.name}@${expected.marketplace} is an optional companion; curdx-flow degrades gracefully when it is absent.`
+          : drift.length > 0
+            ? `${expected.name}@${expected.marketplace} readiness failed: ${drift.join(', ')}.`
+            : `${expected.name}@${expected.marketplace} is not ready.`;
 
     return {
       id: expected.id,
@@ -280,11 +284,15 @@ export function buildPluginDependencyReadiness(
       authorized,
       trustSatisfied,
       readiness,
-      blocksCompletion: pluginBlocksCompletion(expected.id) && readiness !== 'available',
-      blocksRelease: readiness !== 'available',
+      blocksCompletion: pluginBlocksCompletion(expected.id) && declared && readiness !== 'available',
+      blocksRelease: declared && readiness !== 'available',
       drift,
       reason,
-      remediation: readiness === 'available' ? '' : dependencyRemediation(expected.name, expected.marketplace, readiness),
+      remediation: readiness === 'available'
+        ? ''
+        : soft
+          ? `Optional: add ${expected.marketplace} and install ${expected.name} to enable its companion capability.`
+          : dependencyRemediation(expected.name, expected.marketplace, readiness),
       pluginListSource: source,
       pluginListExitCode: exitCode,
     };
@@ -292,6 +300,9 @@ export function buildPluginDependencyReadiness(
 
   return {
     ready: dependencies.every((dependency) => dependency.readiness === 'available'),
+    requiredReady: dependencies.every(
+      (dependency) => !dependency.declared || dependency.readiness === 'available',
+    ),
     source,
     exitCode,
     parseError: parsed.parseError,

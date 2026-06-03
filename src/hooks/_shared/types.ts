@@ -58,6 +58,12 @@ export interface HookStdin {
   hook_event_name?: string;
   tool_name?: string;
   tool_use_id?: string;
+  /**
+   * PostToolUse payloads carry the tool call's input. Edit/Write expose the
+   * edited file's absolute path here; the freshness edit-stamp uses it to
+   * stamp only real workspace-source edits, not doc/spec/state writes.
+   */
+  tool_input?: { file_path?: string };
 }
 
 /**

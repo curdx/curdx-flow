@@ -278,7 +278,9 @@ function pluginDependencyStatus(
   label: string,
   fact: PluginDependencyFact | undefined,
 ): CapabilityStatus {
-  const configured = fact?.declared === true && fact.marketplaceMatches !== false && fact.crossMarketplaceAllowlisted !== false;
+  const configured = fact?.declared === true
+    ? fact.marketplaceMatches !== false && fact.crossMarketplaceAllowlisted !== false
+    : fact?.installed === true;
   const readiness = fact?.readiness;
   const installed = tri(fact?.installed);
   const callable = tri(fact?.callable);

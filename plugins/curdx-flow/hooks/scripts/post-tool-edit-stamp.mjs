@@ -7,7 +7,7 @@ const __dirname = __ccd(__filename);
 
 // src/hooks/post-tool-edit-stamp.ts
 import { existsSync as existsSync2, readFileSync as readFileSync3 } from "node:fs";
-import { join as join2 } from "node:path";
+import { isAbsolute as isAbsolute2, join as join2, relative } from "node:path";
 
 // src/hooks/_shared/run-hook.ts
 import path2 from "node:path";
@@ -439,11 +439,33 @@ function writeFileAtomic(path3, data) {
   renameSync2(tmp, path3);
 }
 
+// src/hooks/_shared/source-tree.ts
+var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  ".curdx",
+  ".claude"
+]);
+function isWorkspaceSourceEdit(relPath) {
+  if (!relPath) return false;
+  const norm = relPath.replace(/\\/g, "/").replace(/^\.\//, "");
+  if (norm === ".." || norm.startsWith("../")) return false;
+  const first = norm.split("/")[0] ?? "";
+  return !WALK_SKIP_DIRS.has(first);
+}
+
 // src/hooks/post-tool-edit-stamp.ts
 runHook(async (input) => {
   const cwd = input?.cwd;
   if (!cwd) {
     return;
+  }
+  const editedPath = input?.tool_input?.file_path;
+  if (typeof editedPath === "string" && isAbsolute2(editedPath)) {
+    if (!isWorkspaceSourceEdit(relative(cwd, editedPath))) {
+      return;
+    }
   }
   const specPath = resolveCurrent({ cwd, sessionId: input.session_id });
   if (!specPath) {

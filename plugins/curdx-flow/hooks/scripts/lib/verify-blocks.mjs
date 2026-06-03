@@ -9,6 +9,15 @@ const __dirname = __ccd(__filename);
 import { promises as fs } from "node:fs";
 import { basename as basename2, join } from "node:path";
 
+// src/hooks/_shared/source-tree.ts
+var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  ".curdx",
+  ".claude"
+]);
+
 // src/hooks/lib/evidence-bridge.ts
 import { createHash } from "node:crypto";
 import { basename } from "node:path";
@@ -1935,13 +1944,6 @@ async function crossCheckPhase(base, state, phase, block, workspaceRoot, specDir
 }
 
 // src/hooks/lib/verify-blocks.ts
-var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
-  ".git",
-  "node_modules",
-  "dist",
-  ".curdx",
-  ".claude"
-]);
 var WALK_MAX_DEPTH = 6;
 var VERIFICATION_PHASES = [
   "research",

@@ -2928,9 +2928,9 @@ function detectPackageManager(rootAbs) {
   if (isFile(path2.join(rootAbs, "pnpm-lock.yaml")) || isFile(path2.join(rootAbs, "pnpm-workspace.yaml"))) {
     return "pnpm";
   }
+  if (isFile(path2.join(rootAbs, "bun.lockb")) || isFile(path2.join(rootAbs, "bun.lock"))) return "bun";
   if (isFile(path2.join(rootAbs, "yarn.lock"))) return "yarn";
   if (isFile(path2.join(rootAbs, "package-lock.json"))) return "npm";
-  if (isFile(path2.join(rootAbs, "bun.lockb")) || isFile(path2.join(rootAbs, "bun.lock"))) return "bun";
   if (isFile(path2.join(rootAbs, "pom.xml"))) return "maven";
   if (isFile(path2.join(rootAbs, "build.gradle")) || isFile(path2.join(rootAbs, "build.gradle.kts"))) return "gradle";
   return void 0;

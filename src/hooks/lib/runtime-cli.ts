@@ -1157,7 +1157,7 @@ function doctor(argv: string[]): void {
   const runtimeReady = expected.every((p) => existsSync(p));
   const plugin = pluginHealthDoctor() as BuildCapabilityMatrixInput["plugin"] & { ready?: boolean };
   const pluginDependenciesReady =
-    (plugin as { dependencies?: { ready?: boolean } }).dependencies?.ready === true;
+    (plugin as { dependencies?: { requiredReady?: boolean } }).dependencies?.requiredReady === true;
   const hookFreshness = hookFreshnessDoctor() as { fresh?: boolean; sourceAvailable?: boolean };
   const release = releaseDoctor() as { ready?: boolean };
   const externalMcp = externalMcpDoctor() as {

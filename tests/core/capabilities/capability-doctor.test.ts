@@ -520,7 +520,7 @@ describe('capability doctor matrix', () => {
     expect(() => JSON.parse(human.stdout)).toThrow();
   }, 15_000);
 
-  it('keeps doctor ok false when a plugin dependency is missing even if external MCPs are connected', async () => {
+  it('treats an absent soft companion as advisory, not a release blocker', async () => {
     const workspace = await createWorkspace();
     await mkdir(join(workspace, 'node_modules'), { recursive: true });
     await writeFile(join(workspace, 'package.json'), JSON.stringify({
@@ -549,10 +549,14 @@ describe('capability doctor matrix', () => {
       capabilityMatrix?: CapabilityMatrix;
     };
 
-    expect(parsed.ok).toBe(false);
-    expect(parsed.diagnostics?.pluginDependenciesReady).toBe(false);
     expect(validateCapabilityMatrix(parsed.capabilityMatrix)).toMatchObject({ ok: true });
-    expect(parsed.capabilityMatrix?.blockers.map((capability) => capability.id)).toContain('pua');
+    // The companions are not declared in the manifest (soft-detected at runtime),
+    // so an absent one must never gate doctor or land in the release blockers.
+    expect(parsed.diagnostics?.pluginDependenciesReady).toBe(true);
+    expect(parsed.capabilityMatrix?.blockers.map((capability) => capability.id)).not.toContain('pua');
+    const byId = new Map((parsed.capabilityMatrix?.capabilities ?? []).map((c) => [c.id, c]));
+    expect(byId.get('pua')).toMatchObject({ state: 'unavailable', blocksRelease: false });
+    expect(byId.get('chrome-devtools-mcp')).toMatchObject({ state: 'available' });
   });
 
   it('normalizes plugin dependency readiness from claude plugin list JSON fixtures', () => {

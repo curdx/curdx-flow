@@ -1020,9 +1020,9 @@ function detectPackageManager(rootAbs) {
   if (isFile(path.join(rootAbs, "pnpm-lock.yaml")) || isFile(path.join(rootAbs, "pnpm-workspace.yaml"))) {
     return "pnpm";
   }
+  if (isFile(path.join(rootAbs, "bun.lockb")) || isFile(path.join(rootAbs, "bun.lock"))) return "bun";
   if (isFile(path.join(rootAbs, "yarn.lock"))) return "yarn";
   if (isFile(path.join(rootAbs, "package-lock.json"))) return "npm";
-  if (isFile(path.join(rootAbs, "bun.lockb")) || isFile(path.join(rootAbs, "bun.lock"))) return "bun";
   if (isFile(path.join(rootAbs, "pom.xml"))) return "maven";
   if (isFile(path.join(rootAbs, "build.gradle")) || isFile(path.join(rootAbs, "build.gradle.kts"))) return "gradle";
   return void 0;
@@ -3429,6 +3429,8 @@ function resolveActiveSpecDir(specsDir) {
 // src/hooks/lib/verify-blocks.ts
 import { promises as fs } from "node:fs";
 import { basename as basename7, join as join6 } from "node:path";
+
+// src/hooks/_shared/source-tree.ts
 var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
   ".git",
   "node_modules",
@@ -3436,6 +3438,8 @@ var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
   ".curdx",
   ".claude"
 ]);
+
+// src/hooks/lib/verify-blocks.ts
 var WALK_MAX_DEPTH = 6;
 async function walkSrcTree(dir) {
   let maxMtime = 0;
@@ -4879,7 +4883,7 @@ function pluginValidationStatus(input) {
   });
 }
 function pluginDependencyStatus(id, label, fact) {
-  const configured = fact?.declared === true && fact.marketplaceMatches !== false && fact.crossMarketplaceAllowlisted !== false;
+  const configured = fact?.declared === true ? fact.marketplaceMatches !== false && fact.crossMarketplaceAllowlisted !== false : fact?.installed === true;
   const readiness = fact?.readiness;
   const installed = tri(fact?.installed);
   const callable = tri(fact?.callable);
@@ -5394,6 +5398,7 @@ function buildPluginDependencyReadiness(input) {
     const marketplaceMatches = marketplace === expected.marketplace;
     const crossMarketplaceAllowlisted = allowlist.has(expected.marketplace);
     const trustSatisfied = declared && marketplaceMatches && crossMarketplaceAllowlisted;
+    const soft = !declared;
     const exactInstalled = parsed.plugins.find((plugin) => plugin.id === expected.pluginId);
     const sameNameInstalled = parsed.plugins.find(
       (plugin) => plugin.name === expected.name && plugin.id !== expected.pluginId
@@ -5417,10 +5422,10 @@ function buildPluginDependencyReadiness(input) {
     const installed = exactInstalled ? true : parsed.ok ? false : "unknown";
     const installedScope = scope;
     const installedVersion = exactInstalled?.version ?? null;
-    const authorized = trustSatisfied ? true : false;
+    const authorized = (soft ? installed === true : trustSatisfied) ? true : false;
     let callable = "unknown";
     let readiness = "unknown";
-    if (!trustSatisfied || manifestDrift) {
+    if (!soft && (!trustSatisfied || manifestDrift)) {
       readiness = "unavailable";
       callable = false;
     } else if (!parsed.ok || commandError || exitCode !== 0) {
@@ -5436,7 +5441,7 @@ function buildPluginDependencyReadiness(input) {
       readiness = "available";
       callable = true;
     }
-    const reason = readiness === "available" ? `${expected.name}@${expected.marketplace} is installed at ${installedScope} scope and enabled.` : readiness === "unknown" ? `${expected.name}@${expected.marketplace} readiness is unknown because installed plugin state was not confirmed.` : drift.length > 0 ? `${expected.name}@${expected.marketplace} readiness failed: ${drift.join(", ")}.` : `${expected.name}@${expected.marketplace} is not ready.`;
+    const reason = readiness === "available" ? `${expected.name}@${expected.marketplace} is installed at ${installedScope} scope and enabled.` : readiness === "unknown" ? `${expected.name}@${expected.marketplace} readiness is unknown because installed plugin state was not confirmed.` : soft ? `${expected.name}@${expected.marketplace} is an optional companion; curdx-flow degrades gracefully when it is absent.` : drift.length > 0 ? `${expected.name}@${expected.marketplace} readiness failed: ${drift.join(", ")}.` : `${expected.name}@${expected.marketplace} is not ready.`;
     return {
       id: expected.id,
       name: expected.name,
@@ -5456,17 +5461,20 @@ function buildPluginDependencyReadiness(input) {
       authorized,
       trustSatisfied,
       readiness,
-      blocksCompletion: pluginBlocksCompletion(expected.id) && readiness !== "available",
-      blocksRelease: readiness !== "available",
+      blocksCompletion: pluginBlocksCompletion(expected.id) && declared && readiness !== "available",
+      blocksRelease: declared && readiness !== "available",
       drift,
       reason,
-      remediation: readiness === "available" ? "" : dependencyRemediation(expected.name, expected.marketplace, readiness),
+      remediation: readiness === "available" ? "" : soft ? `Optional: add ${expected.marketplace} and install ${expected.name} to enable its companion capability.` : dependencyRemediation(expected.name, expected.marketplace, readiness),
       pluginListSource: source,
       pluginListExitCode: exitCode
     };
   });
   return {
     ready: dependencies.every((dependency) => dependency.readiness === "available"),
+    requiredReady: dependencies.every(
+      (dependency) => !dependency.declared || dependency.readiness === "available"
+    ),
     source,
     exitCode,
     parseError: parsed.parseError,
@@ -6543,7 +6551,7 @@ function doctor(argv) {
   ];
   const runtimeReady = expected.every((p) => existsSync10(p));
   const plugin = pluginHealthDoctor();
-  const pluginDependenciesReady = plugin.dependencies?.ready === true;
+  const pluginDependenciesReady = plugin.dependencies?.requiredReady === true;
   const hookFreshness = hookFreshnessDoctor();
   const release = releaseDoctor();
   const externalMcp = externalMcpDoctor();
