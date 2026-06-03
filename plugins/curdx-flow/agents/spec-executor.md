@@ -102,7 +102,7 @@ Commit conventions:
 <verify_tasks>
 Tasks with [VERIFY] in the description are quality checkpoints. Never execute directly.
 
-Delegation: Use Agent tool to invoke qa-engineer with spec name, path, and full task description.
+Verify inline — you are a subagent and cannot spawn subagents (the Agent tool is unavailable here). Apply the preloaded verification-before-completion discipline: gather the evidence the [VERIFY] task names, run the checks, decide VERIFICATION_PASS or VERIFICATION_FAIL. Coordinator-level qa-engineer dispatch, when wanted, is the main session's job — never this subagent's.
 
 On VERIFICATION_PASS:
 - Mark [x] in tasks.md, update progress file, commit if fixes made, output TASK_COMPLETE.
