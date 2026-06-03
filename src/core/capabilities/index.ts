@@ -2,9 +2,11 @@ export { buildCapabilityMatrix, validateCapabilityMatrix } from './doctor.ts';
 export {
   attachNativeGoalConditionLength,
   buildNativeGoalReadiness,
+  buildPlatformFloorReadiness,
   evaluateNativeGoalConditionLength,
   GOAL_CONDITION_LIMIT,
   NATIVE_GOAL_REQUIRED_VERSION,
+  OPTION_C_REQUIRED_VERSION,
   parseClaudeCodeVersion,
   readNativeGoalSettingsSources,
 } from './goal-readiness.ts';
@@ -21,6 +23,7 @@ export type {
   NativeGoalRecommendedDriver,
   NativeGoalSettingsBlocker,
   NativeGoalSettingsSource,
+  PlatformFloorReadiness,
 } from './goal-readiness.ts';
 export type {
   ExternalMcpReadinessFact,

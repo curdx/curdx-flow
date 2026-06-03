@@ -4349,6 +4349,7 @@ import { homedir as homedir2 } from "node:os";
 import { join as join8 } from "node:path";
 var GOAL_CONDITION_LIMIT = 4e3;
 var NATIVE_GOAL_REQUIRED_VERSION = "2.1.139";
+var OPTION_C_REQUIRED_VERSION = "2.1.154";
 function notGeneratedLength() {
   return {
     limit: GOAL_CONDITION_LIMIT,
@@ -4374,6 +4375,23 @@ function compareVersions(a, b) {
     if (l < r) return -1;
   }
   return 0;
+}
+function buildPlatformFloorReadiness(detectedVersion, requiredVersion = OPTION_C_REQUIRED_VERSION) {
+  if (detectedVersion === null) {
+    return {
+      requiredVersion,
+      detectedVersion: null,
+      meetsFloor: null,
+      reason: `Claude Code version could not be detected; curdx-flow requires ${requiredVersion} or newer.`
+    };
+  }
+  const meetsFloor = compareVersions(detectedVersion, requiredVersion) >= 0;
+  return {
+    requiredVersion,
+    detectedVersion,
+    meetsFloor,
+    reason: meetsFloor ? `Claude Code ${detectedVersion} meets the curdx-flow ${requiredVersion} minimum.` : `Claude Code ${detectedVersion} is below the curdx-flow minimum ${requiredVersion}; update Claude Code to ${requiredVersion} or newer.`
+  };
 }
 function hasBooleanSetting(value, key) {
   if (Array.isArray(value)) {
@@ -6544,6 +6562,7 @@ function doctor(argv) {
     claudeProbe,
     settingsSources: readNativeGoalSettingsSources({ cwd, env: process.env })
   });
+  const platformFloor = buildPlatformFloorReadiness(nativeGoal.detectedVersion);
   const capabilityMatrix = buildCapabilityMatrix({
     cwd,
     mode,
@@ -6576,10 +6595,14 @@ function doctor(argv) {
   });
   if (human) {
     process.stdout.write(renderCapabilityMatrix(capabilityMatrix));
+    process.stdout.write(`
+Platform floor: ${platformFloor.reason}
+`);
     return;
   }
   const warnings = [
-    ...externalMcpWarnings(externalMcp)
+    ...externalMcpWarnings(externalMcp),
+    ...platformFloor.meetsFloor === false ? [platformFloor.reason] : []
   ];
   const root = pluginRoot();
   printJson({
@@ -6591,10 +6614,12 @@ function doctor(argv) {
       nativeGoalReady: nativeGoal.state === "available",
       goalExecutionDriver: nativeGoal.recommendedDriver,
       hookFreshnessFresh: hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true,
-      releaseReady: release.ready !== false
+      releaseReady: release.ready !== false,
+      platformFloorMet: platformFloor.meetsFloor
     },
     capabilityMatrix,
     nativeGoal,
+    platformFloor,
     cwd,
     scripts: Object.fromEntries(expected.map((p) => [basename11(p), existsSync10(p)])),
     runtime: {

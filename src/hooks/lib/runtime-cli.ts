@@ -38,6 +38,7 @@ import {
   buildCapabilityMatrix,
   buildExternalMcpReadiness,
   buildNativeGoalReadiness,
+  buildPlatformFloorReadiness,
   buildPluginDependencyReadiness,
   probeCommand,
   readNativeGoalSettingsSources,
@@ -1181,6 +1182,7 @@ function doctor(argv: string[]): void {
     claudeProbe,
     settingsSources: readNativeGoalSettingsSources({ cwd, env: process.env }),
   });
+  const platformFloor = buildPlatformFloorReadiness(nativeGoal.detectedVersion);
   const capabilityMatrix = buildCapabilityMatrix({
     cwd,
     mode,
@@ -1215,10 +1217,12 @@ function doctor(argv: string[]): void {
   });
   if (human) {
     process.stdout.write(renderCapabilityMatrix(capabilityMatrix));
+    process.stdout.write(`\nPlatform floor: ${platformFloor.reason}\n`);
     return;
   }
   const warnings = [
     ...externalMcpWarnings(externalMcp),
+    ...(platformFloor.meetsFloor === false ? [platformFloor.reason] : []),
   ];
   const root = pluginRoot();
   printJson({
@@ -1238,9 +1242,11 @@ function doctor(argv: string[]): void {
       goalExecutionDriver: nativeGoal.recommendedDriver,
       hookFreshnessFresh: hookFreshness.sourceAvailable !== true || hookFreshness.fresh === true,
       releaseReady: release.ready !== false,
+      platformFloorMet: platformFloor.meetsFloor,
     },
     capabilityMatrix,
     nativeGoal,
+    platformFloor,
     cwd,
     scripts: Object.fromEntries(expected.map((p) => [basename(p), existsSync(p)])),
     runtime: {

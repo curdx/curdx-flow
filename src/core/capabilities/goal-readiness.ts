@@ -6,6 +6,14 @@ import type { CommandProbeResult } from './types.ts';
 
 export const GOAL_CONDITION_LIMIT = 4000;
 export const NATIVE_GOAL_REQUIRED_VERSION = '2.1.139';
+export const OPTION_C_REQUIRED_VERSION = '2.1.154';
+
+export interface PlatformFloorReadiness {
+  requiredVersion: string;
+  detectedVersion: string | null;
+  meetsFloor: boolean | null;
+  reason: string;
+}
 
 export type NativeGoalReadinessState =
   | 'available'
@@ -100,6 +108,29 @@ function compareVersions(a: string, b: string): number {
     if (l < r) return -1;
   }
   return 0;
+}
+
+export function buildPlatformFloorReadiness(
+  detectedVersion: string | null,
+  requiredVersion: string = OPTION_C_REQUIRED_VERSION,
+): PlatformFloorReadiness {
+  if (detectedVersion === null) {
+    return {
+      requiredVersion,
+      detectedVersion: null,
+      meetsFloor: null,
+      reason: `Claude Code version could not be detected; curdx-flow requires ${requiredVersion} or newer.`,
+    };
+  }
+  const meetsFloor = compareVersions(detectedVersion, requiredVersion) >= 0;
+  return {
+    requiredVersion,
+    detectedVersion,
+    meetsFloor,
+    reason: meetsFloor
+      ? `Claude Code ${detectedVersion} meets the curdx-flow ${requiredVersion} minimum.`
+      : `Claude Code ${detectedVersion} is below the curdx-flow minimum ${requiredVersion}; update Claude Code to ${requiredVersion} or newer.`,
+  };
 }
 
 function hasBooleanSetting(value: unknown, key: string): boolean {
