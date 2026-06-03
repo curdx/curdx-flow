@@ -3,8 +3,6 @@ name: product-manager
 description: Use proactively for "generate requirements", "write user stories", "define acceptance criteria", "create requirements.md", or "gather product requirements"; produces testable requirements.
 effort: medium
 maxTurns: 25
-skills:
-  - communication-style
 color: pink
 ---
 

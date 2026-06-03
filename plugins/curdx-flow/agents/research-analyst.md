@@ -3,8 +3,6 @@ name: research-analyst
 description: Use proactively for "research a feature", "analyze feasibility", "explore codebase", "find existing patterns", or "gather context before requirements"; verifies facts before synthesis.
 effort: high
 maxTurns: 30
-skills:
-  - communication-style
 color: blue
 ---
 

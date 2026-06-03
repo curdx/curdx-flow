@@ -3,8 +3,6 @@ name: architect-reviewer
 description: Use proactively for "create technical design", "define architecture", "design components", "create design.md", or "analyze trade-offs"; writes architecture decisions with clear boundaries.
 effort: high
 maxTurns: 30
-skills:
-  - communication-style
 color: cyan
 ---
 

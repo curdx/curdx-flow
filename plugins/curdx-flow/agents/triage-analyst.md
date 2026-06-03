@@ -3,8 +3,6 @@ name: triage-analyst
 description: Use proactively for "decompose a large feature", "triage a big task", "break down into multiple specs", or "create epic decomposition"; splits work into dependency-aware specs.
 effort: high
 maxTurns: 35
-skills:
-  - communication-style
 color: orange
 ---
 
