@@ -9,7 +9,6 @@ export {
   readNativeGoalSettingsSources,
 } from './goal-readiness.ts';
 export { probeCommand } from './probes.ts';
-export { planCapabilityRemediation } from './remediation.ts';
 export { buildExternalMcpReadiness, buildPluginDependencyReadiness } from './readiness.ts';
 export { renderCapabilityMatrix } from './renderer.ts';
 export type { BuildCapabilityMatrixInput } from './doctor.ts';
@@ -29,14 +28,6 @@ export type {
   PluginDependencyReadinessFact,
   PluginDependencyReadinessResult,
 } from './readiness.ts';
-export type {
-  AttemptedRemediationAction,
-  CapabilityRemediationAction,
-  CapabilityRemediationKind,
-  CapabilityRemediationPlan,
-  CapabilityRemediationStatus,
-  PlanCapabilityRemediationInput,
-} from './remediation.ts';
 export type {
   CapabilityCategory,
   CapabilityCheckMode,
