@@ -94,6 +94,7 @@ async function walkSrcTree(dir) {
         const st = await fs.stat(abs);
         if (st.mtimeMs > maxMtime) maxMtime = st.mtimeMs;
       } catch {
+        continue;
       }
     }
   }
