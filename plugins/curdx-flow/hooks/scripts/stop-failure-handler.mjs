@@ -80,12 +80,13 @@ function compactBrainIfNeeded(path) {
 }
 
 // src/hooks/stop-failure-handler.ts
-var MATCHER_DESCRIPTIONS = {
+var ERROR_TYPE_DESCRIPTIONS = {
   rate_limit: "Anthropic API 429 \u2014 request throttled",
   authentication_failed: "Anthropic API 401 \u2014 credentials rejected",
   oauth_org_not_allowed: "Org-level OAuth deny \u2014 workspace not permitted",
   billing_error: "Account billing fault \u2014 payment / quota issue",
   invalid_request: "Malformed request from Claude \u2014 client-side bug",
+  model_not_found: "Requested model unavailable",
   server_error: "Anthropic 5xx \u2014 upstream server error",
   max_output_tokens: "Hit response token limit \u2014 output truncated",
   unknown: "Catch-all \u2014 Claude Code did not classify the failure"
@@ -94,12 +95,25 @@ function readStdin() {
   return new Promise((resolve2, reject) => {
     const chunks = [];
     process2.stdin.on("data", (chunk) => chunks.push(chunk));
-    process2.stdin.on(
-      "end",
-      () => resolve2(Buffer.concat(chunks).toString("utf8"))
-    );
+    process2.stdin.on("end", () => resolve2(Buffer.concat(chunks).toString("utf8")));
     process2.stdin.on("error", reject);
   });
+}
+function readString(obj, key) {
+  const value = obj[key];
+  return typeof value === "string" && value.length > 0 ? value : void 0;
+}
+function extractErrorType(obj) {
+  for (const key of ["error_type", "errorType", "matcher"]) {
+    const value = readString(obj, key);
+    if (value) return value;
+  }
+  for (const value of Object.values(obj)) {
+    if (typeof value === "string" && value in ERROR_TYPE_DESCRIPTIONS && value !== "unknown") {
+      return value;
+    }
+  }
+  return "unknown";
 }
 async function main() {
   let raw = "";
@@ -120,17 +134,21 @@ async function main() {
     process2.stderr.write("stop-failure-handler: malformed stdin\n");
     process2.exit(0);
   }
-  const matcher = typeof payload === "object" && payload !== null && "matcher" in payload && typeof payload.matcher === "string" ? payload.matcher : "unknown";
-  const cwd = typeof payload === "object" && payload !== null && "cwd" in payload && typeof payload.cwd === "string" ? payload.cwd : void 0;
-  const description = MATCHER_DESCRIPTIONS[matcher] ?? `unrecognised matcher (echoed verbatim from stdin)`;
+  if (typeof payload !== "object" || payload === null) {
+    process2.exit(0);
+  }
+  const obj = payload;
+  const errorType = extractErrorType(obj);
+  const cwd = readString(obj, "cwd");
+  const description = ERROR_TYPE_DESCRIPTIONS[errorType] ?? "unrecognised error_type (echoed verbatim from stdin)";
   if (cwd !== void 0) {
     appendBrainEvent(cwd, {
       type: "last-mile-decision",
       phase: "recovering",
-      reason: `StopFailure ${matcher}: ${description}`
+      reason: `StopFailure ${errorType}: ${description}`
     });
   }
-  process2.stderr.write(`[StopFailure:${matcher}] ${description}
+  process2.stderr.write(`[StopFailure:${errorType}] ${description}
 `);
   process2.exit(0);
 }
