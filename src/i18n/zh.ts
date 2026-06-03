@@ -52,8 +52,6 @@ const messages = {
   'update.starting': '开始更新 "{name}"',
   'update.success': '"{name}" 更新成功',
   'update.failed': '"{name}" 更新失败',
-  'update.mcpAutoNote': '"{name}" 通过 npx -y 启动，每次运行自动拉取最新版本，无需手动更新。',
-  'update.context7Note': 'context7 是远端 HTTP 服务，由服务端自动更新，本地无需操作。',
 
   'status.title': '当前状态',
   'status.headerName': '名称',

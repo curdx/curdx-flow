@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CmdResult } from '../../src/runner/exec.ts';
-import type { InstallCtx } from '../../src/registry/types.ts';
+import type { InstallCtx } from '../../src/runner/types.ts';
 
 const runStreamingMock = vi.fn<(cmd: string, args: string[], log: unknown) => Promise<CmdResult>>();
 const clearStateCacheMock = vi.fn();
@@ -38,7 +38,7 @@ const ctx = {
   t: ((k: string) => k) as InstallCtx['t'],
 } as unknown as InstallCtx;
 
-describe('plugin install helpers', () => {
+describe('native plugin-CLI primitives', () => {
   beforeEach(() => {
     runStreamingMock.mockReset();
     clearStateCacheMock.mockReset();
@@ -48,7 +48,7 @@ describe('plugin install helpers', () => {
   });
 
   it('installPluginById invokes install then enable, in that order', async () => {
-    const { installPluginById } = await import('../../src/registry/plugins/_helpers.ts');
+    const { installPluginById } = await import('../../src/runner/plugin-cli.ts');
     runStreamingMock.mockResolvedValueOnce(ok).mockResolvedValueOnce(ok);
 
     await installPluginById('foo@bar', ctx);
@@ -59,7 +59,7 @@ describe('plugin install helpers', () => {
   });
 
   it('updatePluginById invokes update then enable, in that order', async () => {
-    const { updatePluginById } = await import('../../src/registry/plugins/_helpers.ts');
+    const { updatePluginById } = await import('../../src/runner/plugin-cli.ts');
     runStreamingMock.mockResolvedValueOnce(ok).mockResolvedValueOnce(ok);
 
     await updatePluginById('foo@bar', ctx);
@@ -70,7 +70,7 @@ describe('plugin install helpers', () => {
   });
 
   it('enablePluginById tolerates the "already enabled" non-zero exit (idempotent)', async () => {
-    const { enablePluginById } = await import('../../src/registry/plugins/_helpers.ts');
+    const { enablePluginById } = await import('../../src/runner/plugin-cli.ts');
     runStreamingMock.mockResolvedValueOnce(alreadyEnabled);
 
     await expect(enablePluginById('foo@bar', ctx)).resolves.toBeUndefined();
@@ -78,36 +78,16 @@ describe('plugin install helpers', () => {
   });
 
   it('enablePluginById still throws on genuine non-zero exits', async () => {
-    const { enablePluginById } = await import('../../src/registry/plugins/_helpers.ts');
+    const { enablePluginById } = await import('../../src/runner/plugin-cli.ts');
     runStreamingMock.mockResolvedValueOnce(realFailure);
 
     await expect(enablePluginById('foo@bar', ctx)).rejects.toThrow(/plugin enable foo@bar/);
   });
 
   it('installPluginById survives a dependency-already-enabled tail (regression: pua dep)', async () => {
-    const { installPluginById } = await import('../../src/registry/plugins/_helpers.ts');
+    const { installPluginById } = await import('../../src/runner/plugin-cli.ts');
     runStreamingMock.mockResolvedValueOnce(ok).mockResolvedValueOnce(alreadyEnabled);
 
     await expect(installPluginById('foo@bar', ctx)).resolves.toBeUndefined();
-  });
-});
-
-describe('plugin Pkg contract for ensure-enabled sweep', () => {
-  it('every plugin-type pkg exposes pluginId so installFlow can re-enable it', async () => {
-    const { PKGS } = await vi.importActual<typeof import('../../src/registry/index.ts')>(
-      '../../src/registry/index.ts',
-    );
-    const offenders = PKGS.filter((pkg) => pkg.type === 'plugin' && !pkg.pluginId).map((pkg) => pkg.id);
-    expect(offenders).toEqual([]);
-  });
-
-  it('pluginId matches the "name@marketplace" pattern Claude Code expects', async () => {
-    const { PKGS } = await vi.importActual<typeof import('../../src/registry/index.ts')>(
-      '../../src/registry/index.ts',
-    );
-    for (const pkg of PKGS) {
-      if (pkg.type !== 'plugin' || !pkg.pluginId) continue;
-      expect(pkg.pluginId, `${pkg.id} pluginId`).toMatch(/^[^@/\s]+@[^@/\s]+$/);
-    }
   });
 });

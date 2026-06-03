@@ -54,8 +54,6 @@ const messages: Record<MessageKey, string> = {
   'update.starting': 'Updating "{name}"',
   'update.success': '"{name}" updated',
   'update.failed': '"{name}" failed to update',
-  'update.mcpAutoNote': '"{name}" runs via npx -y and auto-pulls latest on every launch. No manual update needed.',
-  'update.context7Note': 'context7 is a remote HTTP service, updated server-side. No local action needed.',
 
   'status.title': 'Current status',
   'status.headerName': 'Name',

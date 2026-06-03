@@ -6,8 +6,9 @@ import {
   CURDX_PLUGIN_DEPENDENCIES,
   CURDX_TOOL_CAPABILITIES,
   canonicalPkgId,
+  companionPlugins,
+  externalMcps,
 } from '../../src/core/capabilities/catalog.ts';
-import { PKGS } from '../../src/registry/index.ts';
 import { buildPluginDependencyReadiness } from '../../src/core/capabilities/index.ts';
 import { renderBlock } from '../../src/runner/claudeMd.ts';
 
@@ -24,21 +25,22 @@ describe('curdx capability registry', () => {
     expect(marketplace.allowCrossMarketplaceDependenciesOn ?? []).toEqual([]);
   });
 
-  it('keeps plugin registry modules aligned with dependency specs', () => {
+  it('companion plugins align with the dependency catalog and expose a valid pluginId', () => {
     const dependencyIds = CURDX_PLUGIN_DEPENDENCIES.map((dependency) => dependency.id).sort();
-    const pluginPackages = PKGS
-      .filter((pkg) => pkg.type === 'plugin' && pkg.id !== 'curdx-flow')
-      .map((pkg) => pkg.id)
+    const companionIds = companionPlugins()
+      .filter((c) => c.id !== 'curdx-flow')
+      .map((c) => c.id)
       .sort();
 
-    expect(pluginPackages).toEqual(dependencyIds);
+    expect(companionIds).toEqual(dependencyIds);
 
-    for (const dependency of CURDX_PLUGIN_DEPENDENCIES) {
-      const pkg = PKGS.find((item) => item.id === dependency.id);
-      expect(pkg, dependency.id).toBeDefined();
-      expect(pkg?.type).toBe('plugin');
-      expect(pkg?.required).toBe(true);
-      expect(pkg?.marketplaces?.()).toContain(dependency.marketplace);
+    // curdx-flow self + every companion must be installable: required, valid
+    // name@marketplace pluginId (the ensure-enabled sweep relies on it), and a
+    // non-empty marketplace source for `claude plugin marketplace add`.
+    for (const c of companionPlugins()) {
+      expect(c.required, c.id).toBe(true);
+      expect(c.pluginId, `${c.id} pluginId`).toMatch(/^[^@/\s]+@[^@/\s]+$/);
+      expect(c.marketplaceSource.length, `${c.id} marketplaceSource`).toBeGreaterThan(0);
     }
   });
 
@@ -49,10 +51,13 @@ describe('curdx capability registry', () => {
     const manifestDependencyNames = new Set((manifest.dependencies ?? []).map((item) => item.name));
     const pluginDependencyIds = new Set<string>(CURDX_PLUGIN_DEPENDENCIES.map((dependency) => dependency.id));
 
+    const externalMcpIds = new Set(externalMcps().map((spec) => spec.id));
     for (const mcp of CURDX_EXTERNAL_MCPS) {
       expect(pluginDependencyIds.has(mcp.id)).toBe(false);
       expect(manifestDependencyNames.has(mcp.id)).toBe(false);
-      expect(PKGS.find((pkg) => pkg.id === mcp.id)?.type).toBe('mcp');
+      // detect-only: present in the external-MCP set, never an installable plugin companion.
+      expect(externalMcpIds.has(mcp.id)).toBe(true);
+      expect(companionPlugins().some((c) => c.id === mcp.id)).toBe(false);
       expect(CURDX_TOOL_CAPABILITIES[mcp.id].provisioning).toBe('external-mcp');
     }
   });
