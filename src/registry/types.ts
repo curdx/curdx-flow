@@ -1,15 +1,9 @@
-import type { taskLog } from '@clack/prompts';
 import type { Translate } from '../i18n/index.ts';
+import type { InstallCtx, PrereqResult } from '../runner/types.ts';
+
+export type { InstallCtx, PrereqResult };
 
 export type PkgType = 'plugin' | 'mcp';
-
-export type PrereqResult = { ok: true } | { ok: false; reason: string };
-
-export type InstallCtx = {
-  log: ReturnType<typeof taskLog>;
-  config: Record<string, string>;
-  t: Translate;
-};
 
 export type ConfigCtx = {
   t: Translate;

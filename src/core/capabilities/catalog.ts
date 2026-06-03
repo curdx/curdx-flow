@@ -98,6 +98,44 @@ export function pluginDependencySpec(id: CurdxPluginDependencyId): CurdxPluginDe
   return spec;
 }
 
+// A plugin the @curdx/flow bootstrap can install via the native plugin-CLI: the
+// curdx-flow product itself plus the four soft-detected companions. Same shape as
+// CurdxPluginDependencySpec but with a plain string id so the self entry fits.
+export interface PluginCompanion {
+  id: string;
+  name: string;
+  marketplace: string;
+  marketplaceSource: string;
+  pluginId: string;
+  description: string;
+  whenToUse: string;
+  slashNamespace?: string;
+  required: boolean;
+}
+
+export const CURDX_FLOW_SELF_SPEC: PluginCompanion = {
+  id: "curdx-flow",
+  name: "curdx-flow",
+  marketplace: "curdx",
+  marketplaceSource: "curdx/curdx-flow",
+  pluginId: "curdx-flow@curdx",
+  description: "curdx-flow — spec-driven dev with autonomous task execution",
+  whenToUse:
+    "for spec-driven multi-task work — research → requirements → design → tasks → autonomous execution per task. Use when starting a feature that benefits from upfront spec; skip for one-shot fixes or simple edits.",
+  slashNamespace: "/curdx-flow:*",
+  required: true,
+};
+
+// The one model the native-first bootstrap, status, and CLAUDE.md sync all consume:
+// installable plugins (curdx-flow + companions) and detect-only external MCPs.
+export function companionPlugins(): PluginCompanion[] {
+  return [CURDX_FLOW_SELF_SPEC, ...CURDX_PLUGIN_DEPENDENCIES];
+}
+
+export function externalMcps(): readonly CurdxExternalMcpSpec[] {
+  return CURDX_EXTERNAL_MCPS;
+}
+
 export const CURDX_TOOL_CAPABILITIES = {
   "context7": {
     id: "context7",

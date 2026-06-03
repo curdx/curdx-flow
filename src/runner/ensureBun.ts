@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import * as p from '@clack/prompts';
-import type { PrereqResult } from '../registry/types.ts';
+import type { PrereqResult } from './types.ts';
 import type { Translate } from '../i18n/index.ts';
 import { run } from './exec.ts';
 

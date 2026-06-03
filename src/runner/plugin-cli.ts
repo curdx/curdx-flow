@@ -1,6 +1,6 @@
 import { runStreaming, ensureOk, type CmdResult } from './exec.ts';
 import { clearStateCache, isMarketplaceAdded, isPluginInstalledAtScope } from './state.ts';
-import type { InstallCtx } from '../registry/types.ts';
+import type { InstallCtx } from './types.ts';
 
 export const PLUGIN_SCOPE = 'user';
 
