@@ -33,16 +33,13 @@ It isn't another project management system. It's an **execution discipline layer
 
 ## 30-second install
 
-The recommended path — the npm installer first asks for your language (中文 / English), then opens an interactive picker so you can choose the main plugin, companion plugins, and MCP servers yourself; it also syncs the marketplace entry and the managed block in `~/.claude/CLAUDE.md`:
+Requires Claude Code **v2.1.154 or newer** (check with `claude --version`; `curdx-flow doctor` surfaces the floor as `platformFloor`).
+
+Native marketplace install is the primary path:
 
 ```bash
-npx @curdx/flow install
-```
-
-CI / scripted environments? Skip prompts and install everything:
-
-```bash
-npx @curdx/flow install --all --yes --lang en
+claude plugin marketplace add curdx/curdx-flow
+claude plugin install curdx-flow@curdx
 ```
 
 Inside Claude Code:
@@ -52,14 +49,13 @@ Inside Claude Code:
 /curdx-flow:start todo-app build a todo app with create/edit/complete/delete, browser-verified
 ```
 
-You can also install via Claude Code's native commands:
+Optionally, the `@curdx/flow` npm installer is a convenience bootstrap: it asks for your language (中文 / English), opens an interactive picker for the optional companion plugins and MCP servers, and writes the managed block in `~/.claude/CLAUDE.md`. Companion plugins are **soft-detected at runtime, not hard dependencies** — curdx-flow installs and runs without them (degraded, with a `doctor` hint):
 
 ```bash
-claude plugin marketplace add curdx/curdx-flow
-claude plugin install curdx-flow@curdx
+npx @curdx/flow install
 ```
 
-> Prefer the `@curdx/flow` installer — it keeps companion plugins and capability descriptors in sync. The native `claude plugin install` is better for debugging the marketplace or pointing at a local plugin directory.
+CI / scripted environments? Skip prompts and add everything: `npx @curdx/flow install --all --yes --lang en`.
 
 ## Workflow
 
@@ -92,7 +88,7 @@ The typical path:
 
 ## Capabilities it coordinates
 
-curdx-flow is a Claude Code plugin, but it also explicitly detects and uses these:
+curdx-flow is a Claude Code plugin. The companions below are **soft-detected at runtime** — none is a hard dependency in the manifest, so curdx-flow installs and runs without them:
 
 | Capability | Type | How curdx-flow uses it |
 | --- | --- | --- |
@@ -176,16 +172,20 @@ Ground rules:
 ## Repo structure
 
 ```text
-src/                       # TypeScript CLI, registry, hooks source
-plugins/curdx-flow/        # The Claude Code plugin itself
-  .claude-plugin/           # plugin.json
+src/
+  core/                     # differentiated core: capabilities, contracts, evidence, verdict
+  hooks/                    # Claude Code hook source + shared runtime libraries (hooks/lib)
+  flows/                    # optional npm bootstrap (companion picker + CLAUDE.md sync) + analyze
+  registry/                 # legacy companion-install layer (native `claude plugin` is primary)
+  i18n/ runner/ ui/         # CLI plumbing for the optional bootstrap
+plugins/curdx-flow/         # The Claude Code plugin itself
+  .claude-plugin/           # plugin.json (+ $schema)
   skills/                   # /curdx-flow:* slash skills
   agents/                   # executor, reviewer, QA, architect, PM, …
-  hooks/                    # Claude Code hook configs + generators
-  schemas/                  # state, evidence, report schemas
-scripts/                   # build, version bump, validation, Claude Code smoke
-tests/                     # Vitest tests
-_bmad-output/              # committed planning + implementation baselines
+  hooks/                    # Claude Code hook configs + committed script bundles
+  schemas/                  # state / evidence / report contract schemas
+scripts/                    # build, version bump, validation, Claude Code smoke
+tests/                      # Vitest tests
 ```
 
 ## Local development
@@ -243,6 +243,7 @@ git push origin main vX.Y.Z curdx-flow--vX.Y.Z
 | Chrome DevTools MCP unavailable | Confirm `chrome-devtools-mcp@chrome-devtools-plugins` is installed and local Chrome is present. |
 | Spec stuck mid-execution | `/curdx-flow:status` for the current phase, then resume as advised or `/curdx-flow:cancel`. |
 | Unsure if release is safe | `npm run verify && claude plugin validate ./plugins/curdx-flow && CURDX_FLOW_CLAUDE_BIN=claude npm run test:claudecc`. |
+| `.curdx/` appearing in your repo | Local advisory log (route decisions, edit batches, subagent lifecycle). Capped at 64 KB, never network-uploaded. Add `.curdx/` to your `.gitignore` to keep it out of commits. Set `CURDX_FLOW_BRAIN=off` to disable recording entirely. |
 
 ## References
 

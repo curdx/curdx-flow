@@ -33,16 +33,13 @@ Claude Code 能写代码，但真实任务上会暴露三种典型失败：
 
 ## 30 秒安装
 
-推荐 npm 安装器 —— 先让你选界面语言（中文 / English），然后进入交互式多选，自己勾选主插件、companion plugins、MCP servers；会同步 marketplace 入口和 `~/.claude/CLAUDE.md` 管理块。
+需要 Claude Code **v2.1.154 或更新版本**（用 `claude --version` 查看；`curdx-flow doctor` 会以 `platformFloor` 暴露这个最低底线）。
+
+首选用 Claude Code 原生 marketplace 命令安装：
 
 ```bash
-npx @curdx/flow install
-```
-
-CI / 脚本环境想跳过所有交互一次性全装：
-
-```bash
-npx @curdx/flow install --all --yes --lang zh
+claude plugin marketplace add curdx/curdx-flow
+claude plugin install curdx-flow@curdx
 ```
 
 在 Claude Code 里：
@@ -52,14 +49,13 @@ npx @curdx/flow install --all --yes --lang zh
 /curdx-flow:start todo-app 做一个可以增删改查的 Todo 前端，并用浏览器验证
 ```
 
-也可以直接用 Claude Code 插件命令：
+可选：`@curdx/flow` npm 安装器是一个便捷 bootstrap —— 先让你选界面语言（中文 / English），再进入交互式多选勾选可选的 companion plugins 和 MCP servers，并写入 `~/.claude/CLAUDE.md` 管理块。companion plugins 是**运行时软探测、并非硬依赖** —— 没有它们 curdx-flow 也能安装运行（降级，并由 `doctor` 给出提示）：
 
 ```bash
-claude plugin marketplace add curdx/curdx-flow
-claude plugin install curdx-flow@curdx
+npx @curdx/flow install
 ```
 
-> 一般优先用 `@curdx/flow` 安装器，它会同步 companion plugins 和能力说明；`claude plugin install` 更适合调试 marketplace 或本地插件目录。
+CI / 脚本环境想跳过交互一次性全装：`npx @curdx/flow install --all --yes --lang zh`。
 
 ## 工作流
 
@@ -92,7 +88,7 @@ claude plugin install curdx-flow@curdx
 
 ## 它会协调的能力
 
-curdx-flow 是 Claude Code 插件，但也显式协调外部能力：
+curdx-flow 是 Claude Code 插件。下列 companion 都是**运行时软探测** —— manifest 里没有任何硬依赖，缺了它们 curdx-flow 也能安装运行：
 
 | 能力 | 类型 | curdx-flow 怎么用 |
 | --- | --- | --- |
@@ -176,16 +172,20 @@ specs/
 ## 仓库结构
 
 ```text
-src/                       # TypeScript CLI、registry、hooks 源码
-plugins/curdx-flow/        # Claude Code 插件主体
-  .claude-plugin/           # plugin.json
+src/
+  core/                     # 差异化核心：capabilities、contracts、evidence、verdict
+  hooks/                    # Claude Code hook 源码 + 共享运行时库（hooks/lib）
+  flows/                    # 可选 npm bootstrap（companion 选择器 + CLAUDE.md 同步）+ analyze
+  registry/                 # 遗留的 companion 安装层（原生 `claude plugin` 为主）
+  i18n/ runner/ ui/         # 可选 bootstrap 的 CLI 基础设施
+plugins/curdx-flow/         # Claude Code 插件主体
+  .claude-plugin/           # plugin.json（含 $schema）
   skills/                   # /curdx-flow:* slash skills
   agents/                   # 执行、评审、QA、架构、PM 等代理
-  hooks/                    # Claude Code hook 配置与生成脚本
-  schemas/                  # 状态、证据、报告 schema
+  hooks/                    # Claude Code hook 配置与已提交脚本 bundle
+  schemas/                  # 状态、证据、报告契约 schema
 scripts/                   # 构建、版本、校验、Claude Code smoke
 tests/                     # Vitest 测试
-_bmad-output/              # 已提交的规划与实现基线文档
 ```
 
 ## 本地开发

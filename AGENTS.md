@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository ships `@curdx/flow`, a Node/TypeScript CLI and Claude Code plugin bundle. `src/` contains CLI source: `flows/` handles install, update, status, and analysis; `registry/` defines plugins and MCP servers; `hooks/` contains hook source and shared runtime libraries. The core product lives in `plugins/curdx-flow/`, including `.claude-plugin/plugin.json`, `skills/`, `agents/`, `hooks/`, `schemas/`, `templates`, and `references/`. Generated hook bundles are committed under `plugins/curdx-flow/hooks/scripts/`; update them with `npm run build:hooks`. Automation scripts live in `scripts/`, and tests live under `tests/**/*.test.ts`.
+This repository ships `@curdx/flow`, a Node/TypeScript CLI and Claude Code plugin bundle. `src/` contains: `core/` — the differentiated core (`capabilities`, `contracts`, `evidence`, `verdict`); `hooks/` — hook source and shared runtime libraries (`src/hooks/lib`); `flows/` — the optional npm bootstrap (companion picker + `~/.claude/CLAUDE.md` sync) plus `analyze`; `registry/` — the legacy companion-install layer (native `claude plugin` commands are primary); and `i18n/`, `runner/`, `ui/` CLI plumbing. The core product lives in `plugins/curdx-flow/`, including `.claude-plugin/plugin.json`, `skills/`, `agents/`, `hooks/`, `schemas/`, `templates`, and `references/`. Generated hook bundles are committed under `plugins/curdx-flow/hooks/scripts/`; update them with `npm run build:hooks`. Automation scripts live in `scripts/`, and tests live under `tests/**/*.test.ts`.
 
 ## Build, Test, and Development Commands
 
@@ -29,4 +29,4 @@ Prefer Conventional Commit style seen in history, such as `feat(plugin): ...`, `
 
 ## Agent-Specific Notes
 
-Always respond in Simplified Chinese when working in this repository. Treat `plugins/curdx-flow` as the primary product surface. Keep dependency expectations aligned across the plugin manifest and registry, especially `pua`, `claude-mem`, `chrome-devtools-mcp`, `ui-ux-pro-max`, and external MCP capabilities.
+Always respond in Simplified Chinese when working in this repository. Treat `plugins/curdx-flow` as the primary product surface. Companion plugins (`pua`, `claude-mem`, `chrome-devtools-mcp`, `ui-ux-pro-max`) and external MCPs (`context7`, `sequential-thinking`) are **soft-detected at runtime — not hard dependencies** in the plugin manifest; curdx-flow must install and degrade gracefully when they are absent. The shared capability descriptors live in `src/core/capabilities/` (`catalog`, `rules`, `tokens`).
