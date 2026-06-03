@@ -1,8 +1,0 @@
-{
-  "name": "monorepo-fixture",
-  "packageManager": "npm@10.0.0",
-  "workspaces": ["apps/*"],
-  "scripts": {
-    "test": "node -e \"console.log('root tests pass')\""
-  }
-}

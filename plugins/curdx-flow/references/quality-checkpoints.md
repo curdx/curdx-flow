@@ -1,7 +1,5 @@
 # Quality Checkpoints
 
-> Used by: task-planner agent
-
 ## Purpose
 
 Quality gate checkpoints are inserted throughout the task list to catch type errors, lint issues, and regressions early. They prevent accumulation of technical debt and make debugging easier by limiting the scope of potential issues.

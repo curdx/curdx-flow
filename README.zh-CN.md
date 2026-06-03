@@ -175,9 +175,9 @@ specs/
 src/
   core/                     # 差异化核心：capabilities、contracts、evidence、verdict
   hooks/                    # Claude Code hook 源码 + 共享运行时库（hooks/lib）
-  flows/                    # 可选 npm bootstrap（companion 选择器 + CLAUDE.md 同步）+ analyze
-  registry/                 # 遗留的 companion 安装层（原生 `claude plugin` 为主）
-  i18n/ runner/ ui/         # 可选 bootstrap 的 CLI 基础设施
+  flows/                    # 可选 npm bootstrap（companion 选择器 + CLAUDE.md 同步）
+  analyze/                  # 本地观测：会话 jsonl + errors.jsonl → markdown 报告
+  cli/ i18n/ runner/ ui/    # 可选 bootstrap 的 CLI 基础设施
 plugins/curdx-flow/         # Claude Code 插件主体
   .claude-plugin/           # plugin.json（含 $schema）
   skills/                   # /curdx-flow:* slash skills

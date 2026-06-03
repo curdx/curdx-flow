@@ -2,8 +2,6 @@
 
 > Single source of truth for the curdx-flow two-stage review protocol. This file is intentionally
 > compaction-resilient — every other surface (agent prompts, entrypoint skills, drift test) points back here.
-> Used by: `agents/spec-reviewer.md`, `agents/code-quality-reviewer.md`,
-> `skills/design/SKILL.md`, `skills/tasks/SKILL.md`, `tests/runner/two-stage-review.test.ts`.
 
 ## Why two reviewers
 

@@ -1,7 +1,5 @@
 # Sizing Rules
 
-> Used by: task-planner agent
-
 Use behavior routes and value slices. Avoid abstract size labels in prompts or task files.
 
 ## Route Targets

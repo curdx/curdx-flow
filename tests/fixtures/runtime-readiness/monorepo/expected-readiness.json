@@ -1,8 +1,0 @@
-{
-  "name": "monorepo",
-  "expectedStatus": "blocked",
-  "expectedTopology": {
-    "overallType": "monorepo"
-  },
-  "expectedCommands": ["install", "dev", "test"]
-}

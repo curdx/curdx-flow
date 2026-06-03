@@ -1,7 +1,5 @@
 # Verification Layers
 
-> Used by: implement.md
-
 Completion verification runs BEFORE advancing taskIndex after a task reports
 TASK_COMPLETE. Layers 1-2 always run. Layer 3 runs only when AutoPolicy says it
 should.

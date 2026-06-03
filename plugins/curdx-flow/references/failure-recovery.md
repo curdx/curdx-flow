@@ -1,7 +1,5 @@
 # Failure Recovery
 
-> Used by: implement.md
-
 ## Parse Failure Output
 
 When spec-executor does not output TASK_COMPLETE, parse the failure output to extract error details.

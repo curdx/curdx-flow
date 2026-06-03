@@ -1,7 +1,5 @@
 # Branch Management
 
-> Used by: start.md, implement.md
-
 This reference contains branch and worktree management logic executed as the first step of the start command, before any spec files are created.
 
 ## Step 1: Check Current Branch

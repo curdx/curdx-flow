@@ -1,7 +1,5 @@
 # Phase Rules
 
-> Used by: implement.md, task-planner agent
-
 All specs follow one of three workflows based on intent classification:
 - **GREENFIELD** intent → POC-first workflow (5 phases)
 - **Non-greenfield** intent (TRIVIAL, REFACTOR, MID_SIZED) → TDD Red-Green-Yellow workflow (4 phases)

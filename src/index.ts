@@ -142,8 +142,6 @@ const statusCmd = defineCommand({
   },
 });
 
-const SUBCOMMANDS = new Set(['install', 'uninstall', 'update', 'status', 'analyze', 'check']);
-
 // Help text for the `check` subcommand. Surfaced when the user runs
 // `npx @curdx/flow check --help` or `--help` is forwarded after `check`.
 // Kept as a top-level constant so it stays in sync with the citty meta block

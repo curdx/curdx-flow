@@ -1,9 +1,0 @@
-{
-  "name": "claude-code-plugin-like",
-  "expectedStatus": "blocked",
-  "expectedTopology": {
-    "overallType": "claude-code-plugin"
-  },
-  "expectedCommands": ["plugin-validation"],
-  "expectedSkipCategories": ["external-tool"]
-}

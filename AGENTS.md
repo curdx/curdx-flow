@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository ships `@curdx/flow`, a Node/TypeScript CLI and Claude Code plugin bundle. `src/` contains: `core/` — the differentiated core (`capabilities`, `contracts`, `evidence`, `verdict`); `hooks/` — hook source and shared runtime libraries (`src/hooks/lib`); `flows/` — the optional npm bootstrap (companion picker + `~/.claude/CLAUDE.md` sync) plus `analyze`; `registry/` — the legacy companion-install layer (native `claude plugin` commands are primary); and `i18n/`, `runner/`, `ui/` CLI plumbing. The core product lives in `plugins/curdx-flow/`, including `.claude-plugin/plugin.json`, `skills/`, `agents/`, `hooks/`, `schemas/`, `templates`, and `references/`. Generated hook bundles are committed under `plugins/curdx-flow/hooks/scripts/`; update them with `npm run build:hooks`. Automation scripts live in `scripts/`, and tests live under `tests/**/*.test.ts`.
+This repository ships `@curdx/flow`, a Node/TypeScript CLI and Claude Code plugin bundle. `src/` contains: `core/` — the differentiated core (`capabilities`, `contracts`, `evidence`, `verdict`); `hooks/` — hook source and shared runtime libraries (`src/hooks/lib`); `flows/` — the optional npm bootstrap (companion picker + `~/.claude/CLAUDE.md` sync); `analyze/` — local observability (session jsonl + `errors.jsonl` → markdown report); and `cli/`, `i18n/`, `runner/`, `ui/` CLI plumbing. The core product lives in `plugins/curdx-flow/`, including `.claude-plugin/plugin.json`, `skills/`, `agents/`, `hooks/`, `schemas/`, `templates`, and `references/`. Generated hook bundles are committed under `plugins/curdx-flow/hooks/scripts/`; update them with `npm run build:hooks`. Automation scripts live in `scripts/`, and tests live under `tests/**/*.test.ts`.
 
 ## Build, Test, and Development Commands
 
@@ -17,7 +17,7 @@ This repository ships `@curdx/flow`, a Node/TypeScript CLI and Claude Code plugi
 
 ## Coding Style & Naming Conventions
 
-Use TypeScript ESM targeting Node 20+. Match the existing style: two-space indentation, single quotes, semicolons, kebab-case filenames for hooks and scripts, and `.ts` extensions on local imports. Prefer explicit return types for exported helpers and public workflow functions. Keep plugin command names, skill folders, marketplace identifiers, and hook script paths stable unless the manifest, registry, and generated bundles are updated together.
+Use TypeScript ESM targeting Node 20+. Match the existing style: two-space indentation, single quotes, semicolons, kebab-case filenames for hooks and scripts, and `.ts` extensions on local imports. Prefer explicit return types for exported helpers and public workflow functions. Keep plugin command names, skill folders, marketplace identifiers, and hook script paths stable unless the manifest, catalog, and generated bundles are updated together.
 
 ## Testing Guidelines
 

@@ -1,7 +1,5 @@
 # Browser Verification Policy
 
-> Used by: task-planner, spec-executor, qa-engineer, verification-before-completion.
-
 ## Purpose
 
 curdx-flow must prove full-stack and frontend work in a real running system before claiming completion. Unit tests, type checks, and build success are necessary but not enough when behavior depends on a browser, frontend/backend integration, routing, auth, API calls, rendering, canvas, maps, or WebGL.

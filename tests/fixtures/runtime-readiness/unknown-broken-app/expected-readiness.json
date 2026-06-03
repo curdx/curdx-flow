@@ -1,9 +1,0 @@
-{
-  "name": "unknown-broken-app",
-  "expectedStatus": "blocked",
-  "expectedTopology": {
-    "overallType": "unknown"
-  },
-  "expectedCommands": [],
-  "expectedBlockerCategories": ["topology", "dependency"]
-}

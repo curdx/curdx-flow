@@ -34,7 +34,6 @@ const realFailure: CmdResult = {
 
 const ctx = {
   log: { message: vi.fn() },
-  config: {},
   t: ((k: string) => k) as InstallCtx['t'],
 } as unknown as InstallCtx;
 

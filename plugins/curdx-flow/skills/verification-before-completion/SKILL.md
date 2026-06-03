@@ -6,13 +6,13 @@ version: 0.2.0
 user-invocable: false
 ---
 
-# Reality Verification
+# Verification Before Completion
 
 For fix goals: reproduce the failure BEFORE work, verify resolution AFTER.
 
 ## Scope
 
-This skill was expanded in v7.x to cover phase-exit / commit / tag / release boundaries beyond the original task-level VF scope. Triggers retained: verify a fix, reproduce failure, BEFORE/AFTER, VF task, reality check, mock-only tests, phase exit.
+This skill covers task-level verification plus phase-exit / commit / tag / release boundaries. Triggers: verify a fix, reproduce failure, BEFORE/AFTER, VF task, reality check, mock-only tests, phase exit.
 
 ## Goal Detection
 

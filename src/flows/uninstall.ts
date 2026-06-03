@@ -85,7 +85,7 @@ export async function uninstallFlow(opts: UninstallOptions = {}): Promise<void> 
     for (const c of targets) {
       const log = p.taskLog({ title: t('uninstall.starting', { name: c.name }) });
       try {
-        await uninstallPluginById(c.pluginId, { log, config: {}, t });
+        await uninstallPluginById(c.pluginId, { log, t });
         log.success(t('uninstall.success', { name: c.name }));
         results.push({ id: c.id, status: 'ok' });
       } catch (err) {

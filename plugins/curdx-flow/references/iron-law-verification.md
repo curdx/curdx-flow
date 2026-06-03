@@ -2,8 +2,6 @@
 
 > Single source of truth for the curdx-flow Iron Law. This file is intentionally
 > compaction-resilient — every other surface (hooks, skill, CLI) points back here.
-> Used by: `verification-before-completion` skill, `stop-watcher` hook,
-> `task-completed-verifier` hook, `npm run verify`, `npx curdx-flow check`.
 
 ## Iron Law
 

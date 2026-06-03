@@ -92,7 +92,7 @@ export async function updateFlow(opts: UpdateOptions = {}): Promise<void> {
     for (const c of targets) {
       const log = p.taskLog({ title: t('update.starting', { name: c.name }) });
       try {
-        await updatePluginById(c.pluginId, { log, config: {}, t });
+        await updatePluginById(c.pluginId, { log, t });
         log.success(t('update.success', { name: c.name }));
         results.push({ id: c.id, status: 'ok' });
       } catch (err) {

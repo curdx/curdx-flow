@@ -375,7 +375,7 @@ describe('completion verdict evaluator', () => {
         mode: 'report-only',
         generatedFiles: [
           {
-            path: 'src/runtime/policy/action-risk-policy.ts',
+            path: 'src/core/verdict/evaluator.ts',
             category: 'source-change',
             owner: 'curdx-flow',
             createdAt: '2026-05-17T00:58:00.000Z',
@@ -396,7 +396,7 @@ describe('completion verdict evaluator', () => {
         expect.objectContaining({
           id: 'report-only-write-boundary',
           source: 'state',
-          reason: expect.stringContaining('src/runtime/policy/action-risk-policy.ts'),
+          reason: expect.stringContaining('src/core/verdict/evaluator.ts'),
         }),
       ],
     });

@@ -175,9 +175,9 @@ Ground rules:
 src/
   core/                     # differentiated core: capabilities, contracts, evidence, verdict
   hooks/                    # Claude Code hook source + shared runtime libraries (hooks/lib)
-  flows/                    # optional npm bootstrap (companion picker + CLAUDE.md sync) + analyze
-  registry/                 # legacy companion-install layer (native `claude plugin` is primary)
-  i18n/ runner/ ui/         # CLI plumbing for the optional bootstrap
+  flows/                    # optional npm bootstrap (companion picker + CLAUDE.md sync)
+  analyze/                  # local observability: session jsonl + errors.jsonl → markdown report
+  cli/ i18n/ runner/ ui/    # CLI plumbing for the optional bootstrap
 plugins/curdx-flow/         # The Claude Code plugin itself
   .claude-plugin/           # plugin.json (+ $schema)
   skills/                   # /curdx-flow:* slash skills

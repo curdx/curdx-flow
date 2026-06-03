@@ -1,7 +1,5 @@
 # Bounded Parallel Dispatch
 
-> Used by: research.md, start.md, triage-flow.md, and any future commands needing parallel agent dispatch
-
 ## Coordinator Role
 
 The research command is a **coordinator, not a researcher**. It MUST delegate ALL research work to subagents:

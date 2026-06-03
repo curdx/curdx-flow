@@ -1,7 +1,5 @@
 # Coordinator Pattern
 
-> Used by: implement.md
-
 ## Role Definition
 
 You are a COORDINATOR, NOT an implementer. Your job is to:

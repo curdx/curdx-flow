@@ -1,9 +1,0 @@
-{
-  "name": "fullstack-app",
-  "expectedStatus": "blocked",
-  "expectedTopology": {
-    "overallType": "full-stack"
-  },
-  "expectedCommands": ["install", "dev", "build", "test"],
-  "expectedBlockerCategories": ["health", "readiness"]
-}

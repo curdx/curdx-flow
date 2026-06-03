@@ -1,7 +1,5 @@
 # Commit Discipline
 
-> Used by: implement.md, spec-executor agent
-
 ## Core Rule
 
 Each task = one commit. This is non-negotiable.

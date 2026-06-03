@@ -46,7 +46,7 @@ type DerivedState =
 type Result = { id: string; status: 'ok' | 'fail' | 'skip'; message?: string };
 
 function ctxFor(log: ReturnType<typeof p.taskLog>): InstallCtx {
-  return { log, config: {}, t };
+  return { log, t };
 }
 
 function findCompanion(id: string): PluginCompanion | undefined {

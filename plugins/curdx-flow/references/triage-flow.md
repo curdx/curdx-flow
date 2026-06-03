@@ -1,7 +1,5 @@
 # Triage Flow: Explore-Brainstorm-Validate-Finalize
 
-> Used by: triage.md
-
 ## Overview
 
 The triage flow decomposes a large feature into multiple specs. It uses two research passes (explore + validate) sandwiching a brainstorming/decomposition phase.

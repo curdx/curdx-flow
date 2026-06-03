@@ -4,8 +4,6 @@ const messages = {
   'app.cancelled': '已取消。',
 
   'lang.prompt': '请选择界面语言 / Please choose your language',
-  'lang.zh': '中文',
-  'lang.en': 'English',
 
   'menu.title': '想做什么？',
   'menu.install': '安装 / 重装插件和 MCP',
@@ -16,7 +14,6 @@ const messages = {
 
   'pkg.installed': '已安装',
   'pkg.notInstalled': '未安装',
-  'pkg.unknown': '未知',
   'pkg.upToDateWithVersion': '已安装 v{version}',
   'pkg.updateAvailable': '已安装 v{current} → v{latest} 可用',
 
@@ -82,17 +79,6 @@ const messages = {
   'claudeMd.removed': '已从 CLAUDE.md 移除 @curdx/flow 区块',
   'claudeMd.skipped': '已跳过 CLAUDE.md 同步（--no-claude-md）',
   'claudeMd.failed': 'CLAUDE.md 同步失败：{error}',
-
-  'analyze.description': '解析 Claude Code session jsonl + curdx-flow errors.jsonl，输出 markdown 报告',
-  'analyze.helpSummary': 'analyze — 本地观测：合并 ~/.claude/projects/<cwd-encoded>/<sessionId>.jsonl 与 ~/.claude/curdx-flow/errors.jsonl，渲染 7 段 markdown（hook 失败 / slash command 频次 / subagent 调度 / spec 漏斗 / hook 时延 P50/P95/P99 / schema 漂移 / parentUuid 链完整性）',
-  'analyze.flags.json': '输出 JSON 而非 markdown（CI 友好；与 --out 互斥语义：JSON 不写文件）',
-  'analyze.flags.out': '把 markdown 报告写入指定文件（缺省写到 stdout）',
-  'analyze.flags.limit': '表格段 Top-N 截断（默认 10；传 0 视为无意义回落 10）',
-  'analyze.flags.since': '只统计相对窗口内的事件，例如 `7d` / `24h` / `30m`（默认全量；--since 与增量 offset 缓存共存，缓存命中时直接 replay 上次报告）',
-  'analyze.flags.project': '指定 ~/.claude/projects/ 下的 encoded-cwd 子目录；缺省按当前 git 仓库根目录推断（非 git 目录退化为空报告 + warning）',
-  'analyze.flags.includePrompts': '关闭默认 redact，把原始 prompt 文本透出（仅本地调试，谨慎使用；D-9 白名单默认裁剪所有未在白名单字段）',
-  'analyze.warning.noProject': '未能从 cwd 推断到 ~/.claude/projects/ 子目录（非 git 仓库或无对应 session）；输出空报告，请用 --project 显式指定',
-  'analyze.warning.schemaFallback': 'plugins/curdx-flow/schemas/transcript-events.json 未找到，回落到内置最小白名单——schema 漂移诊断可能漏报',
 };
 
 export default messages;
