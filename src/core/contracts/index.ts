@@ -185,6 +185,7 @@ export interface HookGateOutput extends Record<string, unknown> {
     | 'PostToolBatch'
     | 'SessionStart'
     | 'SubagentStart'
+    | 'SubagentStop'
     | 'TaskCompleted'
     | 'PostCompact'
     | 'Stop'
@@ -515,6 +516,7 @@ const CONTRACT_RULES: Record<ContractName, ContractRules> = {
         'PostToolBatch',
         'SessionStart',
         'SubagentStart',
+        'SubagentStop',
         'TaskCompleted',
         'PostCompact',
         'Stop',

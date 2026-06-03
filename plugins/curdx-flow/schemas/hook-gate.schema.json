@@ -27,6 +27,7 @@
         "PostToolBatch",
         "SessionStart",
         "SubagentStart",
+        "SubagentStop",
         "TaskCompleted",
         "PostCompact",
         "Stop",
