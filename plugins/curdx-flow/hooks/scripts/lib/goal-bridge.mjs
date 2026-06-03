@@ -9,7 +9,7 @@ const __dirname = __ccd(__filename);
 import { basename as basename8 } from "node:path";
 import { fileURLToPath as fileURLToPath7 } from "node:url";
 
-// src/runtime/capabilities/goal-readiness.ts
+// src/core/capabilities/goal-readiness.ts
 var GOAL_CONDITION_LIMIT = 4e3;
 var NATIVE_GOAL_REQUIRED_VERSION = "2.1.139";
 function notGeneratedLength() {

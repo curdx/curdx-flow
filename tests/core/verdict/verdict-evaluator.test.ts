@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { EvidenceBlock, StateLedger } from '../../../src/runtime/contracts/index.ts';
-import { evaluateCompletionVerdict, type EvidenceRequirement } from '../../../src/runtime/verdict/index.ts';
+import type { EvidenceBlock, StateLedger } from '../../../src/core/contracts/index.ts';
+import { evaluateCompletionVerdict, type EvidenceRequirement } from '../../../src/core/verdict/index.ts';
 
 const now = '2026-05-17T01:00:00.000Z';
 

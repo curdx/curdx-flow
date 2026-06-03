@@ -15,7 +15,7 @@ import {
   renderCapabilityMatrix,
   validateCapabilityMatrix,
   type CapabilityMatrix,
-} from '../../../src/runtime/capabilities/index.ts';
+} from '../../../src/core/capabilities/index.ts';
 import { buildGoalBridge } from '../../../src/hooks/lib/goal-bridge.ts';
 import {
   CURDX_EXTERNAL_MCPS,

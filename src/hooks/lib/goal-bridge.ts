@@ -14,7 +14,7 @@ import {
   GOAL_CONDITION_LIMIT,
   type NativeGoalConditionLength,
   type NativeGoalReadiness,
-} from "../../runtime/capabilities/goal-readiness.ts";
+} from "../../core/capabilities/goal-readiness.ts";
 import { buildWorkflowSnapshot, type WorkflowSnapshot } from "./workflow-snapshot.js";
 import { decideLastMile, type LastMileDecision } from "./last-mile-orchestrator.js";
 

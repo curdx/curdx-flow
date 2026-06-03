@@ -43,7 +43,7 @@ import {
   readNativeGoalSettingsSources,
   renderCapabilityMatrix,
   type BuildCapabilityMatrixInput,
-} from "../../runtime/capabilities/index.ts";
+} from "../../core/capabilities/index.ts";
 import {
   findSpec,
   bindSessionSpec,

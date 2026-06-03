@@ -4342,7 +4342,7 @@ function buildExecutionBrief(input) {
 import { basename as basename10 } from "node:path";
 import { fileURLToPath as fileURLToPath7 } from "node:url";
 
-// src/runtime/capabilities/goal-readiness.ts
+// src/core/capabilities/goal-readiness.ts
 import { existsSync as existsSync9, readFileSync as readFileSync9 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 import { join as join8 } from "node:path";
@@ -4740,7 +4740,7 @@ if (isDirectRun8()) {
   main8();
 }
 
-// src/runtime/capabilities/doctor.ts
+// src/core/capabilities/doctor.ts
 function tri(value) {
   if (typeof value === "boolean") return value;
   if (value === "skipped") return "skipped";
@@ -5248,7 +5248,7 @@ function buildCapabilityMatrix(input) {
   };
 }
 
-// src/runtime/capabilities/probes.ts
+// src/core/capabilities/probes.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
 function fixtureMap(env) {
   const raw = env.CURDX_FLOW_CAPABILITY_PROBES;
@@ -5302,7 +5302,7 @@ function probeCommand(input) {
   };
 }
 
-// src/runtime/capabilities/readiness.ts
+// src/core/capabilities/readiness.ts
 function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -5569,7 +5569,7 @@ function buildExternalMcpReadiness(input) {
   };
 }
 
-// src/runtime/capabilities/renderer.ts
+// src/core/capabilities/renderer.ts
 function overall(matrix) {
   if (matrix.summary.blockers > 0) return "blocked";
   if (matrix.summary.degraded > 0 || matrix.summary.unavailable > 0 || matrix.summary.skippedDeepChecks > 0) return "degraded";

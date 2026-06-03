@@ -10,8 +10,8 @@ import {
   readEvidenceLedger,
   resolveEvidencePaths,
   type ArtifactIndexInput,
-} from '../../../src/runtime/evidence/index.ts';
-import type { EvidenceBlock } from '../../../src/runtime/contracts/index.ts';
+} from '../../../src/core/evidence/index.ts';
+import type { EvidenceBlock } from '../../../src/core/contracts/index.ts';
 
 const workspaces: string[] = [];
 

@@ -8,7 +8,7 @@ import {
   parseContractJson,
   validateContract,
   type ContractName,
-} from '../../src/runtime/contracts/index.ts';
+} from '../../src/core/contracts/index.ts';
 
 const contractNames = Object.keys(CONTRACTS) as ContractName[];
 

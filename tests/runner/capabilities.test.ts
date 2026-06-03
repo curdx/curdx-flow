@@ -8,7 +8,7 @@ import {
   canonicalPkgId,
 } from '../../src/registry/capabilities.ts';
 import { PKGS } from '../../src/registry/index.ts';
-import { buildPluginDependencyReadiness } from '../../src/runtime/capabilities/index.ts';
+import { buildPluginDependencyReadiness } from '../../src/core/capabilities/index.ts';
 import { renderBlock } from '../../src/runner/claudeMd.ts';
 
 describe('curdx capability registry', () => {
