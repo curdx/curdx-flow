@@ -174,8 +174,6 @@ To clear a single phase block: `{"$unset": ["verificationBlocks.<phase>"]}`.
 
 **Skill** (canonical, expanded scope):
 - `plugins/curdx-flow/skills/verification-before-completion/SKILL.md`
-- Old name `reality-verification` resolves via alias stub at
-  `plugins/curdx-flow/skills/reality-verification/SKILL.md`.
 
 **Hook source paths**:
 - Layer-1: `src/hooks/stop-watcher.ts` → `plugins/curdx-flow/hooks/scripts/stop-watcher.mjs`
