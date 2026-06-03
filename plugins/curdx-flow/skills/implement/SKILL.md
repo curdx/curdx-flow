@@ -3,6 +3,7 @@ name: implement
 description: Use when a spec has tasks.md and should enter autonomous task execution.
 argument-hint: "[--max-task-iterations 5] [--max-global-iterations 30] [--goal-turns 30] [--manual] [--quick] [--recovery-mode]"
 allowed-tools: "Read Write Edit Agent Bash Skill"
+disallowed-tools: AskUserQuestion
 disable-model-invocation: true
 ---
 
