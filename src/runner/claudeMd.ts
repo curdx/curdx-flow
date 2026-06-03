@@ -134,7 +134,7 @@ export function removeBlock(existing: string, eol: '\n' | '\r\n'): string {
 
 // ---------- I/O: collect items ----------
 
-async function collectInstalledItems(): Promise<ManagedItem[]> {
+export async function collectInstalledItems(): Promise<ManagedItem[]> {
   const [, mcps] = await Promise.all([listPlugins(true), listMcp(true)]);
   const items: ManagedItem[] = [];
   // Installable plugins: curdx-flow + the soft-detected companions, by native scope.
