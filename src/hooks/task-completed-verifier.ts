@@ -5,7 +5,7 @@ import process from "node:process";
 import { logHookError } from "./_shared/error-logger.js";
 import { readStdinJson } from "./_shared/stdin.js";
 import { resolveCurrent } from "./_shared/path-resolver.js";
-import { getVerificationPhase, verifyPhaseBlock, type VerifyPhaseBlockResult } from "./lib/verify-blocks.js";
+import { getVerificationPhase, verifyPhaseBlockWithEvidence, type VerifyPhaseBlockResult } from "./lib/verify-blocks.js";
 import { classifySmartRoute } from "./lib/smart-route.js";
 import { decideLastMile } from "./lib/last-mile-orchestrator.js";
 import { appendBrainEvent } from "./lib/project-brain.js";
@@ -96,7 +96,7 @@ async function main(): Promise<void> {
 
       let result: VerifyPhaseBlockResult;
   try {
-    result = await verifyPhaseBlock(state, phase, specDir);
+    result = await verifyPhaseBlockWithEvidence(state, phase, specDir, cwd);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logHookError(

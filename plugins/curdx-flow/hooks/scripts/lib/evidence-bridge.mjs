@@ -5,10 +5,6 @@ const require = __ccr(import.meta.url);
 const __filename = __ccu(import.meta.url);
 const __dirname = __ccd(__filename);
 
-// src/hooks/lib/verify-blocks.ts
-import { promises as fs } from "node:fs";
-import { basename as basename2, join } from "node:path";
-
 // src/hooks/lib/evidence-bridge.ts
 import { createHash } from "node:crypto";
 import { basename } from "node:path";
@@ -1933,117 +1929,13 @@ async function crossCheckPhase(base, state, phase, block, workspaceRoot, specDir
     return base;
   }
 }
-
-// src/hooks/lib/verify-blocks.ts
-var WALK_SKIP_DIRS = /* @__PURE__ */ new Set([
-  ".git",
-  "node_modules",
-  "dist",
-  ".curdx",
-  ".claude"
-]);
-var WALK_MAX_DEPTH = 6;
-var VERIFICATION_PHASES = [
-  "research",
-  "requirements",
-  "design",
-  "tasks",
-  "execution"
-];
-function getVerificationPhase(state) {
-  const raw = typeof state.phase === "string" ? state.phase : "";
-  if (!VERIFICATION_PHASES.includes(raw)) {
-    return null;
-  }
-  return raw;
-}
-async function verifyPhaseBlock(state, phase, specDir) {
-  const block = state.verificationBlocks?.[phase];
-  if (block === void 0) {
-    return { ok: false, reason: "missing", command: "" };
-  }
-  if (block.exitCode !== 0) {
-    return {
-      ok: false,
-      reason: block.failedReason ?? "verification failed",
-      command: block.command
-    };
-  }
-  if (block.srcMtime > Date.parse(block.timestamp)) {
-    const srcIso = new Date(block.srcMtime).toISOString();
-    const specName = basename2(specDir);
-    return {
-      ok: false,
-      reason: `Stale evidence for phase '${phase}': src changed at ${srcIso}, last verified at ${block.timestamp}. Re-run: ${block.command}. Spec: ${specName}.`,
-      command: block.command
-    };
-  }
-  if (typeof state.lastSrcEditMs === "number" && state.lastSrcEditMs > Date.parse(block.timestamp)) {
-    const editIso = new Date(state.lastSrcEditMs).toISOString();
-    const specName = basename2(specDir);
-    return {
-      ok: false,
-      reason: `Stale evidence for phase '${phase}': src edited at ${editIso}, last verified at ${block.timestamp}. Re-run: ${block.command}. Spec: ${specName}.`,
-      command: block.command
-    };
-  }
-  if (phase === "execution" && typeof block.taskIndex === "number") {
-    const currentTaskIndex = typeof state.taskIndex === "number" ? state.taskIndex : 0;
-    if (block.taskIndex !== currentTaskIndex) {
-      const specName = basename2(specDir);
-      return {
-        ok: false,
-        reason: `Stale evidence for phase 'execution': block recorded against task index ${block.taskIndex}, current task index is ${currentTaskIndex}. Re-run: ${block.command}. Spec: ${specName}.`,
-        command: block.command
-      };
-    }
-  }
-  return { ok: true };
-}
-async function verifyPhaseBlockWithEvidence(state, phase, specDir, workspaceRoot) {
-  const base = await verifyPhaseBlock(state, phase, specDir);
-  if (!base.ok) return base;
-  const block = state.verificationBlocks?.[phase];
-  if (block === void 0) return base;
-  try {
-    return await crossCheckPhase(base, state, phase, block, workspaceRoot ?? specDir, specDir);
-  } catch {
-    return base;
-  }
-}
-async function walkSrcTree(dir) {
-  let maxMtime = 0;
-  async function walk(current, depth) {
-    let entries;
-    try {
-      entries = await fs.readdir(current, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const abs = join(current, entry.name);
-      if (entry.isDirectory()) {
-        if (WALK_SKIP_DIRS.has(entry.name)) continue;
-        if (depth >= WALK_MAX_DEPTH) continue;
-        await walk(abs, depth + 1);
-        continue;
-      }
-      try {
-        const st = await fs.stat(abs);
-        if (st.mtimeMs > maxMtime) maxMtime = st.mtimeMs;
-      } catch {
-        continue;
-      }
-    }
-  }
-  await walk(dir, 0);
-  return maxMtime;
-}
 export {
-  VERIFICATION_PHASES,
-  getVerificationPhase,
-  verifyPhaseBlock,
-  verifyPhaseBlockWithEvidence,
-  walkSrcTree
+  appendPhaseEvidenceBestEffort,
+  buildHookRequirement,
+  crossCheckPhase,
+  deriveIds,
+  hashCommand,
+  toEvidenceBlock,
+  toStateLedger
 };
-//# sourceMappingURL=verify-blocks.mjs.map
+//# sourceMappingURL=evidence-bridge.mjs.map

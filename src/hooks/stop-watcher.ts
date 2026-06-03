@@ -12,7 +12,7 @@ import process from "node:process";
 import { runHook } from "./_shared/run-hook.js";
 import { getSpecsDirs, resolveCurrent } from "./_shared/path-resolver.js";
 import { writeFileAtomic } from "./_shared/atomic-write.js";
-import { getVerificationPhase, verifyPhaseBlock } from "./lib/verify-blocks.js";
+import { getVerificationPhase, verifyPhaseBlockWithEvidence } from "./lib/verify-blocks.js";
 import type { BlockDecisionOutput } from "./_shared/types.js";
 import type { CurdxState } from "./_shared/types.js";
 
@@ -389,10 +389,11 @@ runHook(async (input) => {
         if (knownPhase !== null) {
           let result;
           try {
-            result = await verifyPhaseBlock(
+            result = await verifyPhaseBlockWithEvidence(
               parsedState,
               knownPhase,
               join(cwd, specPath),
+              cwd,
             );
           } catch {
             return buildMalformedVerificationBlock(specName);

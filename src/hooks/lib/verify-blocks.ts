@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import { basename, join } from "node:path";
 
 import type { CurdxState, VerificationPhase } from "../_shared/types.ts";
+import { crossCheckPhase } from "./evidence-bridge.ts";
 
 const WALK_SKIP_DIRS = new Set([
   ".git",
@@ -86,6 +87,32 @@ export async function verifyPhaseBlock(
     }
   }
   return { ok: true };
+}
+
+/**
+ * Authoritative per-phase gate (verifyPhaseBlock) plus a same-or-stricter
+ * completion cross-check: on a passing phase it appends the phase's real
+ * command-execution evidence to the core evidence ledger and runs the core
+ * completion verdict, which may only tighten an ok result to blocked, never
+ * loosen it. Every added step is best-effort and fails open to the base
+ * verifyPhaseBlock decision, so the evidence/verdict moat can never make the
+ * gate looser or throw.
+ */
+export async function verifyPhaseBlockWithEvidence(
+  state: CurdxState,
+  phase: VerificationPhase,
+  specDir: string,
+  workspaceRoot?: string,
+): Promise<VerifyPhaseBlockResult> {
+  const base = await verifyPhaseBlock(state, phase, specDir);
+  if (!base.ok) return base;
+  const block = state.verificationBlocks?.[phase];
+  if (block === undefined) return base;
+  try {
+    return await crossCheckPhase(base, state, phase, block, workspaceRoot ?? specDir, specDir);
+  } catch {
+    return base;
+  }
 }
 
 export async function walkSrcTree(dir: string): Promise<number> {
