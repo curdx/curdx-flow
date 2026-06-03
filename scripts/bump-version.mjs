@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Atomic version bumper. Writes the target version into all 5 fields that
+// Atomic version bumper. Writes the target version into every field that
 // check-versions.mjs validates, then runs that gate to confirm alignment.
 //
 // Usage:
@@ -7,15 +7,17 @@
 //   node scripts/bump-version.mjs patch|minor|major
 //   node scripts/bump-version.mjs <...> --dry-run  # plan only, no writes
 //
-// Why: CLAUDE.md's release SOP step 2 used to be "manually sync 5 version
+// Why: CLAUDE.md's release SOP step 2 used to be "manually sync version
 // fields." `npm version` covers package.json + package-lock.json (root +
 // packages[""]); this script extends the same atomic action to plugin.json
-// and marketplace.json so future releases can't regress to the v5.0.0 /
-// v6.0.0 drift incidents that motivated check-versions.mjs.
+// so future releases can't regress to the v5.0.0 / v6.0.0 drift incidents
+// that motivated check-versions.mjs. The marketplace entry no longer carries
+// a version (plugin.json is the single source; `claude plugin tag` validates
+// plugin<->marketplace agreement at tag time), so it is not patched here.
 //
-// The plugin.json / marketplace.json writes use targeted regex replacement
-// (NOT JSON.parse + JSON.stringify) so the rest of each file's formatting —
-// notably plugin.json's inline `keywords` array — stays byte-identical.
+// The plugin.json write uses targeted regex replacement (NOT JSON.parse +
+// JSON.stringify) so the rest of the file's formatting — notably the inline
+// `keywords` array — stays byte-identical.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -42,17 +44,11 @@ function readJson(rel) {
 
 // Replace exactly one `"version": "..."` field in-place, preserving every
 // other byte of the file (whitespace, key order, inline arrays, trailing
-// newline). When `afterName` is given, the version replaced is the first
-// one that appears after `"name": "<afterName>"`, so we can disambiguate
-// nested entries (e.g. marketplace.json's plugins[name=curdx-flow]).
-function patchVersionField(rel, newVersion, opts = {}) {
+// newline).
+function patchVersionField(rel, newVersion) {
   const abs = path.join(repoRoot, rel);
   const original = readFileSync(abs, 'utf8');
-  const re = opts.afterName
-    ? new RegExp(
-        `("name"\\s*:\\s*"${opts.afterName}"[\\s\\S]*?"version"\\s*:\\s*")[^"]+(")`,
-      )
-    : /("version"\s*:\s*")[^"]+(")/;
+  const re = /("version"\s*:\s*")[^"]+(")/;
   if (!re.test(original)) {
     console.error(`✗ version pattern not found in ${rel}`);
     process.exit(1);
@@ -95,7 +91,6 @@ const writes = [
   'package.json',
   'package-lock.json (root + packages[""])',
   'plugins/curdx-flow/.claude-plugin/plugin.json',
-  '.claude-plugin/marketplace.json plugins[curdx-flow]',
 ];
 
 if (dryRun) {
@@ -118,12 +113,7 @@ if (npmRes.status !== 0) {
 // 2. plugin.json — top-level version, only one in the file.
 patchVersionField('plugins/curdx-flow/.claude-plugin/plugin.json', target);
 
-// 3. marketplace.json — version sits inside plugins[name=curdx-flow].
-patchVersionField('.claude-plugin/marketplace.json', target, {
-  afterName: 'curdx-flow',
-});
-
-// 4. Confirm with the existing gate.
+// 3. Confirm with the existing gate.
 const checkRes = spawnSync('node', ['scripts/check-versions.mjs'], {
   cwd: repoRoot,
   stdio: 'inherit',
