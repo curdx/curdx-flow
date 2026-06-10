@@ -79,6 +79,7 @@ Start `tasks.md` with this audit:
 | Source | Item | Covered By | Status |
 | --- | --- | --- | --- |
 | FR-1 | Short item text | 1.1 | COVERED |
+| SC-1 | Short outcome text | 1.5 | COVERED |
 ```
 
 Then include a browser verification decision:
@@ -108,7 +109,7 @@ Every task line must be a checkbox list item:
   - _Requirements: FR-1, AC-1.1_
 ```
 
-Recognized task ids are `1.1`, `V1`, `VE1`, and `VF`. Do not use checkbox bullets for AC/FR/NFR/US references inside task bodies.
+Recognized task ids are `1.1`, `V1`, `VE1`, and `VF`. Do not use checkbox bullets for AC/FR/NFR/SC/US references inside task bodies. `_Requirements:_` footnotes may cite only stable IDs that exist in requirements.md (FR-*/NFR-*/SC-*/AC-*/US-*).
 
 ## Final Checks
 
@@ -123,6 +124,7 @@ Before finishing:
 - Browser-facing final verification uses Playwright CLI by default, or Chrome DevTools MCP for the high-fidelity cases defined in `browser-verification-policy.md`.
 - Files are real paths or clearly marked as new files to create.
 - Requirement/design traceability is present.
+- Every FR and SC id from requirements.md is cited by at least one `_Requirements:_` footnote; `curdx-flow coverage` exits 0 and reports no orphan references.
 - Parallel `[P]` appears only when adjacent tasks have zero file overlap and no dependency.
 - Final verification exists according to `autoPolicy.verificationLevel`.
 

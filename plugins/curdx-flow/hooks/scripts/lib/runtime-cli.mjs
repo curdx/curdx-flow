@@ -3227,6 +3227,146 @@ if (isDirectRun6()) {
   main6();
 }
 
+// src/hooks/lib/coverage-matrix.ts
+var ID_RE = /(?:FR|NFR|SC|AC|US)-\d+(?:\.\d+)*/g;
+var TABLE_DEF_RE = /^ {0,3}\|\s*\*{0,2}((?:FR|NFR)-\d+)\*{0,2}\s*\|/;
+var HEADING_DEF_RE = /^#{1,6}\s+\*{0,2}((?:FR|NFR|SC|AC|US)-\d+(?:\.\d+)*)\*{0,2}\s*[:.]?/;
+var BULLET_DEF_RE = /^\s*[-*]\s+\*{0,2}((?:FR|NFR|SC|AC|US)-\d+(?:\.\d+)*)\*{0,2}\s*[:.]/;
+var FOOTNOTE_RE = /_Requirements:\s*([^_]*)_/g;
+var CRITICAL_KINDS = /* @__PURE__ */ new Set(["FR", "SC"]);
+function kindOf(id) {
+  return id.slice(0, id.indexOf("-"));
+}
+function parseRequirementIds(requirementsText) {
+  if (!requirementsText) return [];
+  const lines = requirementsText.replace(/\r\n?/g, "\n").split("\n");
+  const seen = /* @__PURE__ */ new Set();
+  const defs = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const match = line.match(TABLE_DEF_RE) ?? line.match(HEADING_DEF_RE) ?? line.match(BULLET_DEF_RE);
+    const id = match?.[1];
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    defs.push({ id, kind: kindOf(id), line: i + 1 });
+  }
+  return defs;
+}
+function parseTaskRequirementRefs(tasksText) {
+  const tasks2 = parseTaskList(tasksText);
+  return tasks2.map((task, index) => {
+    const refs = /* @__PURE__ */ new Set();
+    for (const footnote of task.raw.matchAll(FOOTNOTE_RE)) {
+      for (const ref of (footnote[1] ?? "").matchAll(ID_RE)) {
+        refs.add(ref[0]);
+      }
+    }
+    return {
+      taskId: task.id ?? `#${index + 1}`,
+      taskTitle: task.title,
+      completed: task.completed,
+      refs: [...refs]
+    };
+  });
+}
+function buildCoverageReport(input) {
+  const requirements = parseRequirementIds(input.requirementsText);
+  const taskRefs = parseTaskRequirementRefs(input.tasksText);
+  const known = new Set(requirements.map((def) => def.id));
+  const tasksByRequirement = /* @__PURE__ */ new Map();
+  const orphans = [];
+  for (const task of taskRefs) {
+    for (const ref of task.refs) {
+      if (!known.has(ref)) {
+        orphans.push({ ref, taskId: task.taskId, taskTitle: task.taskTitle });
+        continue;
+      }
+      const list = tasksByRequirement.get(ref) ?? [];
+      list.push(task.taskId);
+      tasksByRequirement.set(ref, list);
+    }
+  }
+  const covered = [];
+  const uncovered = [];
+  for (const def of requirements) {
+    const tasks2 = tasksByRequirement.get(def.id) ?? [];
+    const entry = {
+      id: def.id,
+      kind: def.kind,
+      critical: CRITICAL_KINDS.has(def.kind),
+      tasks: tasks2
+    };
+    (tasks2.length > 0 ? covered : uncovered).push(entry);
+  }
+  const criticalGaps = uncovered.filter((entry) => entry.critical).map((entry) => entry.id);
+  const evaluable = requirements.length > 0;
+  return {
+    ok: evaluable && criticalGaps.length === 0,
+    evaluable,
+    requirements,
+    taskCount: taskRefs.length,
+    referencingTaskCount: taskRefs.filter((task) => task.refs.length > 0).length,
+    covered,
+    uncovered,
+    criticalGaps,
+    orphans
+  };
+}
+function renderCoverageReport(report, specName) {
+  const lines = [];
+  const byKind = /* @__PURE__ */ new Map();
+  for (const def of report.requirements) {
+    byKind.set(def.kind, (byKind.get(def.kind) ?? 0) + 1);
+  }
+  const kindSummary = [...byKind.entries()].map(([kind, count]) => `${kind} ${count}`).join(", ");
+  lines.push(`coverage: ${specName}`);
+  lines.push("");
+  lines.push(
+    `requirements: ${report.requirements.length}${kindSummary ? ` (${kindSummary})` : ""}`
+  );
+  lines.push(`tasks: ${report.taskCount} (${report.referencingTaskCount} with _Requirements:_ refs)`);
+  lines.push("");
+  lines.push(`covered (${report.covered.length}):`);
+  if (report.covered.length === 0) {
+    lines.push("  none");
+  }
+  for (const entry of report.covered) {
+    lines.push(`  ${entry.id} <- ${[...new Set(entry.tasks)].join(", ")}`);
+  }
+  lines.push("");
+  lines.push(`uncovered (${report.uncovered.length}):`);
+  if (report.uncovered.length === 0) {
+    lines.push("  none");
+  }
+  for (const entry of report.uncovered) {
+    lines.push(
+      entry.critical ? `  CRITICAL ${entry.id} \u2014 no task references this ${entry.kind}` : `  ${entry.id} (advisory)`
+    );
+  }
+  lines.push("");
+  lines.push(`orphan references (${report.orphans.length}):`);
+  if (report.orphans.length === 0) {
+    lines.push("  none");
+  }
+  for (const orphan of report.orphans) {
+    lines.push(`  ${orphan.ref} cited by task ${orphan.taskId} but not defined in requirements.md`);
+  }
+  lines.push("");
+  if (!report.evaluable) {
+    lines.push(
+      "RESULT: CANNOT EVALUATE \u2014 requirements.md defines no stable requirement IDs (FR-#/NFR-#/SC-#/AC-#.#/US-#); rewrite it using the templates/requirements.md format"
+    );
+  } else if (report.ok) {
+    lines.push("RESULT: PASS \u2014 every FR/SC id has at least one referencing task");
+  } else {
+    lines.push(
+      `RESULT: FAIL \u2014 ${report.criticalGaps.length} critical gap(s): ${report.criticalGaps.join(", ")}`
+    );
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+
 // src/hooks/lib/check-verification-blocks.ts
 import { readFileSync as readFileSync7, readdirSync as readdirSync4, statSync as statSync5, existsSync as existsSync7 } from "node:fs";
 import path2 from "node:path";
@@ -3421,6 +3561,7 @@ function resolveActiveSpecDir(specsDir) {
         latest = path2.join(specsDir, e.name);
       }
     } catch {
+      continue;
     }
   }
   return latest;
@@ -5681,6 +5822,7 @@ function usage(exitCode = 1) {
     "  dev down [--cwd <dir>]",
     "  verify run --command <cmd> [--phase execution] [--spec <name-or-path>] [--cwd <dir>] [--description <text>]",
     "  verify-blocks [--cwd <dir>] [--spec <name-or-path>]",
+    "  coverage [--spec <name-or-path>] [--cwd <dir>] [--session-id <id>] [--json]",
     "  doctor [--cwd <dir>] [--goal <text>]"
   ].join("\n");
   process.stderr.write(text + "\n");
@@ -6272,6 +6414,7 @@ function hookFreshnessDoctor() {
     ["post-tool-batch-snapshot.ts", "post-tool-batch-snapshot.mjs"],
     ["post-compact-recorder.ts", "post-compact-recorder.mjs"],
     ["task-completed-verifier.ts", "task-completed-verifier.mjs"],
+    [join9("lib", "coverage-matrix.ts"), join9("lib", "coverage-matrix.mjs")],
     [join9("lib", "smart-route.ts"), join9("lib", "smart-route.mjs")],
     [join9("lib", "tool-capabilities.ts"), join9("lib", "tool-capabilities.mjs")],
     [join9("lib", "stack-capabilities.ts"), join9("lib", "stack-capabilities.mjs")],
@@ -6522,6 +6665,45 @@ async function verifyBlocks(argv) {
   else process.stderr.write(result.message);
   process.exit(result.code);
 }
+function coverage(argv) {
+  const cwd = resolve5(readArg9("--cwd", argv) ?? process.cwd());
+  const snap = buildWorkflowSnapshot({
+    cwd,
+    spec: readArg9("--spec", argv),
+    sessionId: readArg9("--session-id", argv)
+  });
+  if (!snap.spec?.fsPath) {
+    process.stderr.write("coverage: no active spec\n");
+    process.exit(2);
+  }
+  const requirementsPath = join9(snap.spec.fsPath, "requirements.md");
+  const tasksPath = join9(snap.spec.fsPath, "tasks.md");
+  const missing = [requirementsPath, tasksPath].filter((path3) => !existsSync10(path3));
+  if (missing.length > 0) {
+    process.stderr.write(`coverage: missing artifacts: ${missing.join(", ")}
+`);
+    process.exit(2);
+  }
+  const report = buildCoverageReport({
+    requirementsText: readFileSync10(requirementsPath, "utf8"),
+    tasksText: readFileSync10(tasksPath, "utf8")
+  });
+  if (!report.evaluable) {
+    process.stderr.write(
+      "coverage: cannot evaluate \u2014 requirements.md defines no stable requirement IDs (FR-#/NFR-#/SC-#/AC-#.#/US-#); rewrite it using the templates/requirements.md format\n"
+    );
+    process.exit(2);
+  }
+  if (hasFlag2(argv, "--json")) {
+    printJson({
+      spec: { name: snap.spec.name, path: snap.spec.path, fsPath: snap.spec.fsPath },
+      ...report
+    });
+  } else {
+    process.stdout.write(renderCoverageReport(report, snap.spec.name));
+  }
+  process.exit(report.ok ? 0 : 1);
+}
 function doctor(argv) {
   const cwd = resolve5(readArg9("--cwd", argv) ?? process.cwd());
   const mode = hasFlag2(argv, "--deep") ? "deep" : "fast";
@@ -6697,6 +6879,9 @@ async function main9() {
       return;
     case "verify-blocks":
       await verifyBlocks(argv);
+      return;
+    case "coverage":
+      coverage(argv);
       return;
     case "doctor":
       doctor(argv);

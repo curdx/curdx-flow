@@ -114,6 +114,11 @@ interface {{ComponentOutput}} {
 ### E2E Tests (if UI)
 - {{User flow to test}}
 
+### Success Criteria Traceability
+
+- SC-1: {{verification approach that proves this outcome}}
+- SC-2: {{verification approach that proves this outcome}}
+
 ## Existing Patterns to Follow
 
 Based on codebase analysis:

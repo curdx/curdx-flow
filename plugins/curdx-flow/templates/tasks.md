@@ -211,6 +211,7 @@ Focus: Validate the idea works end-to-end. Skip tests, accept hardcoded values.
   - **Done when**: Feature can be demonstrated working via automated verification
   - **Verify**: Run automated end-to-end verification (e.g., `curl API`, Playwright CLI, Chrome DevTools MCP observation, or test command)
   - **Commit**: `feat(scope): complete POC`
+  - _Requirements: SC-1_
 
 ## Phase 2: Refactoring
 
@@ -282,7 +283,7 @@ After POC validated, clean up code.
   - **Done when**: User flow tested
   - **Verify**: E2E test command passes
   - **Commit**: `test(scope): add e2e tests`
-  - _Requirements: US-1_
+  - _Requirements: US-1, SC-1_
 
 ## Phase 4: Quality Gates
 
@@ -437,6 +438,7 @@ EOF
   - **Verify**: All commands pass, all criteria documented
   - **Done when**: All completion criteria ✅
   - **Commit**: None
+  - _Requirements: SC-1, SC-2_
 
 ## Notes
 
@@ -517,7 +519,7 @@ Focus: Test-driven implementation. Every change starts with a failing test.
   - **Done when**: Test exists AND fails with expected assertion error
   - **Verify**: `{{test cmd}} -- --grep "{{test name C}}" 2>&1 | grep -q "FAIL\|fail\|Error" && echo RED_PASS`
   - **Commit**: `test(scope): red - failing test for {{behavior C}}`
-  - _Requirements: FR-3, AC-3.1_
+  - _Requirements: FR-3, AC-2.2_
   - _Design: Component C_
 
 - [ ] 1.7 ...continue with [GREEN] for each, then next TDD triplet...
@@ -540,7 +542,7 @@ Focus: Integration and E2E tests beyond the unit tests written in Phase 1.
   - **Done when**: User flow tested end-to-end
   - **Verify**: {{e2e cmd}} passes
   - **Commit**: `test(scope): add e2e tests`
-  - _Requirements: US-1_
+  - _Requirements: US-1, SC-1_
 
 - [ ] 2.3 [VERIFY] Quality checkpoint: {{lint cmd}} && {{typecheck cmd}} && {{test cmd}}
   - **Do**: Run all quality commands

@@ -59,8 +59,8 @@
 
 ## Success Criteria
 
-- {{Measurable outcome that defines success}}
-- {{Another measurable outcome}}
+- SC-1: {{Measurable outcome that defines success}}
+- SC-2: {{Another measurable outcome}}
 
 ## Risks
 

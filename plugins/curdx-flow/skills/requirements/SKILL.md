@@ -84,7 +84,7 @@ Agent Teams are experimental and disabled by default in Claude Code. Use the tea
 Direct path:
 
 1. Optionally create a visible native task with `TaskCreate(subject: "Generate requirements for $spec", activeForm: "Generating requirements")`. If unavailable or failing, continue without it.
-2. Dispatch `Agent(agent_type: product-manager)` with research context, goal, and interview context. Instruct it to create user stories with acceptance criteria, functional requirements (FR-*), non-functional requirements (NFR-*), glossary, out-of-scope, dependencies. Output to `./specs/$spec/requirements.md`.
+2. Dispatch `Agent(agent_type: product-manager)` with research context, goal, and interview context. Instruct it to create user stories with acceptance criteria, functional requirements (FR-*), non-functional requirements (NFR-*), success criteria (SC-*), glossary, out-of-scope, dependencies. Stable IDs are mandatory: every user story is `US-<n>`, every acceptance criterion is `AC-<story>.<n>`, every functional/non-functional requirement is `FR-<n>`/`NFR-<n>`, and every Success Criteria bullet starts with `SC-<n>:`. The downstream `curdx-flow coverage` gate parses these IDs; unprefixed items are invisible to it. Output to `./specs/$spec/requirements.md`.
 3. Wait for the Agent result, then read `./specs/$spec/requirements.md`.
 
 Optional Agent Teams path:

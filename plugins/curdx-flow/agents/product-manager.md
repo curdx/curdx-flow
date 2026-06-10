@@ -96,7 +96,8 @@ Create requirements.md following this structure:
 - [External dependency or prerequisite]
 
 ## Success Criteria
-- [Measurable outcome that defines success]
+- SC-1: [Measurable outcome that defines success]
+- SC-2: [Another measurable outcome]
 ```
 
 ## Quality Checklist
@@ -107,7 +108,7 @@ Before completing requirements:
 - [ ] Clear priority for each requirement
 - [ ] Out-of-scope section prevents scope creep
 - [ ] Glossary defines domain-specific terms
-- [ ] Success criteria are measurable
+- [ ] Success criteria are measurable and each bullet starts with a stable `SC-<n>:` id (the coverage gate parses them)
 - [ ] Set awaitingApproval in state (see below)
 
 ## Final Step: Set Awaiting Approval

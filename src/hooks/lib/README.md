@@ -28,8 +28,9 @@ the lib risked a future caller picking up the wrong shape and writing
 state that violates the schema. Later additions such as `project-topology` and
 `dev-runtime`, `stack-capabilities`, `execution-brief`, and `project-brain`
 follow the same "non-trivial or multi-caller" bar. The inline `node -e` pattern shown in
-`references/failure-recovery.md:250-260` already mutates `fixTaskMap`
-correctly with the canonical shape — no replacement lib is needed.
+`references/failure-recovery.md` § "Update State After Fix Task Generation"
+already mutates `fixTaskMap` correctly with the canonical shape — no
+replacement lib is needed.
 
 The surviving libs are deliberately **infrastructure ahead of
 adoption**: most have zero markdown callers today because Phase 1's
@@ -46,6 +47,7 @@ to recreate later.
 | `cleanup-files` | 185 | 0 (designed for `skills/implement/SKILL.md` cleanup phase) | glob + delete with safety guards (refuses to delete outside repo, refuses dotfiles unless explicit) |
 | `count-mocks` | 107 | 0 (designed for `templates/tasks.md` verification-before-completion VE2) | walks tests/, counts `vi.mock` / `jest.mock` / `mock.fn` occurrences, prints mock-vs-real ratio JSON |
 | `count-tasks` | 54 | 0 (designed for `templates/tasks.md`, `skills/status/SKILL.md`) | parse `tasks.md` → `{total, completed, pending}` JSON via `_shared/markdown-task-parser` |
+| `coverage-matrix` | 200+ | 1 (`runtime-cli` `coverage` verb) | parses stable requirement IDs (FR/NFR/SC/AC/US) from `requirements.md` and `_Requirements:_` footnotes from `tasks.md`, then reports covered/uncovered IDs, critical FR/SC gaps, and orphan references |
 | `dev-runtime` | 500+ | 1 (`runtime-cli`) | last-mile local evidence runtime: detect project commands, start services, check health, run verification, and stop curdx-flow-started services |
 | `ensure-gitignore` | 64 | 0 (designed for `skills/implement/SKILL.md`, `templates/tasks.md`) | idempotent: append `<entry>` to `.gitignore` only if missing |
 | `execution-brief` | 200+ | 3 (`runtime-cli`, `user-prompt-expansion-guard`, `post-tool-batch-snapshot`) | compiles smart-route facts into a bounded execution contract: context budget, primary skill, agent plan, quality gates, completion evidence, and escalation rules |

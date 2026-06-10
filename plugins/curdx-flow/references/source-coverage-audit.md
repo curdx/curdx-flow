@@ -9,7 +9,7 @@ Check every available source:
 
 - Goal text from `.progress.md` or state identity.
 - `research.md`: constraints, discovered patterns, current docs, risks.
-- `requirements.md`: FR, NFR, AC, glossary, out-of-scope.
+- `requirements.md`: FR, NFR, SC, AC, US, glossary, out-of-scope.
 - `design.md`: decisions, interfaces, data flow, migration/rewrite boundaries.
 - `projectTopology` and `recommendedCapabilities` from `curdx-flow snapshot`.
 - Explicit user locked decisions in the current prompt or state.
@@ -61,3 +61,11 @@ silently produce a weaker plan.
 - A `COVERED` row points to a nonexistent task id.
 - A `DEFERRED` row has no source-backed deferral.
 - A task implements behavior contradicted by out-of-scope/deferred source text.
+
+## Deterministic Gate
+
+`curdx-flow coverage` is the machine half of this audit. It parses stable IDs
+(FR-*/NFR-*/SC-*/AC-*/US-*) from `requirements.md` and `_Requirements:_`
+footnotes from `tasks.md`, then fails (exit 1) when any FR or SC has zero
+referencing task. Run it after generating or editing `tasks.md`; prose audits
+do not replace a failing gate.

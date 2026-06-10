@@ -109,6 +109,7 @@ Direct path:
    - Cover every source item; if coverage cannot be complete, stop with `TASKS_BLOCKED`
    - Break implementation into value-slice tasks, using POC-first or TDD phases only as structure
    - Create tasks with Do/Files/Done when/Verify/Commit fields
+   - Add `_Requirements:_` footnotes citing only stable IDs that exist in requirements.md (FR-*/NFR-*/SC-*/AC-*/US-*); every FR and SC must be cited by at least one task
    - Keep top-level task count inside `autoPolicy.taskTargetRange`; if this requires more than 12 tasks, stop and recommend `/curdx-flow:triage`
    - Insert quality checkpoints according to `autoPolicy.reviewCadence` and `autoPolicy.verificationLevel`
    - Each task = one commit, tasks must be executable without human interaction
@@ -121,6 +122,13 @@ Direct path:
    - If the source requirements explicitly require Chrome DevTools MCP, do not make the final verifier a file/tooling check such as `./verify.sh --check` by itself. Generate startup/check/cleanup steps that keep the server alive for browser interaction, and require `curdx-flow verify run --description` to include the concrete MCP proof: tool used, URL, add/toggle/delete or equivalent action sequence, DOM assertion, and console-error result.
 3. Wait for the Agent result. Require `TASKS_READY` before proceeding; if `TASKS_BLOCKED`, surface the blocking source items and stop.
 4. Read `$SPEC_PATH/tasks.md`.
+5. Run the deterministic coverage gate (applies after either dispatch path):
+   ```bash
+   curdx-flow coverage --spec "$SPEC_PATH"
+   ```
+   - Exit 0: proceed.
+   - Exit 1 (CRITICAL gaps — FR/SC with zero referencing task): re-dispatch task-planner with the uncovered IDs and orphan references from the gate output. Max 2 retries; if still failing, surface the gaps to the user and stop. Never advance with uncovered FR/SC IDs unless the user explicitly waives them.
+   - Exit 2 (missing artifacts): fix the prerequisite phase first.
 
 Optional Agent Teams path:
 

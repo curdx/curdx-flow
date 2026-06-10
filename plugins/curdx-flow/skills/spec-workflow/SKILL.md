@@ -76,6 +76,7 @@ specs/
 | Slash Skill | Purpose |
 |---------|---------|
 | `/curdx-flow:status` | Show all specs and progress |
+| `/curdx-flow:coverage` | Requirement-to-task coverage gate (fails on uncovered FR/SC) |
 | `/curdx-flow:switch <name>` | Change active spec |
 | `/curdx-flow:cancel` | Cancel active execution |
 | `/curdx-flow:refactor` | Update spec files after execution |

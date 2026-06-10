@@ -14,6 +14,7 @@ import {
 } from "../../core/capabilities/catalog.ts";
 import { classifySmartRoute } from "./smart-route.js";
 import { buildWorkflowSnapshot } from "./workflow-snapshot.js";
+import { buildCoverageReport, renderCoverageReport } from "./coverage-matrix.js";
 import { runVerificationCheck } from "./check-verification-blocks.js";
 import { walkSrcTree } from "./verify-blocks.js";
 import {
@@ -95,6 +96,7 @@ function usage(exitCode = 1): never {
     "  dev down [--cwd <dir>]",
     "  verify run --command <cmd> [--phase execution] [--spec <name-or-path>] [--cwd <dir>] [--description <text>]",
     "  verify-blocks [--cwd <dir>] [--spec <name-or-path>]",
+    "  coverage [--spec <name-or-path>] [--cwd <dir>] [--session-id <id>] [--json]",
     "  doctor [--cwd <dir>] [--goal <text>]",
   ].join("\n");
   process.stderr.write(text + "\n");
@@ -855,6 +857,7 @@ function hookFreshnessDoctor(): unknown {
     ["post-tool-batch-snapshot.ts", "post-tool-batch-snapshot.mjs"],
     ["post-compact-recorder.ts", "post-compact-recorder.mjs"],
     ["task-completed-verifier.ts", "task-completed-verifier.mjs"],
+    [join("lib", "coverage-matrix.ts"), join("lib", "coverage-matrix.mjs")],
     [join("lib", "smart-route.ts"), join("lib", "smart-route.mjs")],
     [join("lib", "tool-capabilities.ts"), join("lib", "tool-capabilities.mjs")],
     [join("lib", "stack-capabilities.ts"), join("lib", "stack-capabilities.mjs")],
@@ -1127,6 +1130,45 @@ async function verifyBlocks(argv: string[]): Promise<void> {
   process.exit(result.code);
 }
 
+function coverage(argv: string[]): void {
+  const cwd = resolve(readArg("--cwd", argv) ?? process.cwd());
+  const snap = buildWorkflowSnapshot({
+    cwd,
+    spec: readArg("--spec", argv),
+    sessionId: readArg("--session-id", argv),
+  });
+  if (!snap.spec?.fsPath) {
+    process.stderr.write("coverage: no active spec\n");
+    process.exit(2);
+  }
+  const requirementsPath = join(snap.spec.fsPath, "requirements.md");
+  const tasksPath = join(snap.spec.fsPath, "tasks.md");
+  const missing = [requirementsPath, tasksPath].filter((path) => !existsSync(path));
+  if (missing.length > 0) {
+    process.stderr.write(`coverage: missing artifacts: ${missing.join(", ")}\n`);
+    process.exit(2);
+  }
+  const report = buildCoverageReport({
+    requirementsText: readFileSync(requirementsPath, "utf8"),
+    tasksText: readFileSync(tasksPath, "utf8"),
+  });
+  if (!report.evaluable) {
+    process.stderr.write(
+      "coverage: cannot evaluate — requirements.md defines no stable requirement IDs (FR-#/NFR-#/SC-#/AC-#.#/US-#); rewrite it using the templates/requirements.md format\n",
+    );
+    process.exit(2);
+  }
+  if (hasFlag(argv, "--json")) {
+    printJson({
+      spec: { name: snap.spec.name, path: snap.spec.path, fsPath: snap.spec.fsPath },
+      ...report,
+    });
+  } else {
+    process.stdout.write(renderCoverageReport(report, snap.spec.name));
+  }
+  process.exit(report.ok ? 0 : 1);
+}
+
 function doctor(argv: string[]): void {
   const cwd = resolve(readArg("--cwd", argv) ?? process.cwd());
   const mode = hasFlag(argv, "--deep") ? "deep" : "fast";
@@ -1317,6 +1359,9 @@ async function main(): Promise<void> {
       return;
     case "verify-blocks":
       await verifyBlocks(argv);
+      return;
+    case "coverage":
+      coverage(argv);
       return;
     case "doctor":
       doctor(argv);

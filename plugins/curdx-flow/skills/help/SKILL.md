@@ -44,7 +44,7 @@ If the user has not named a specific command, recommend `/curdx-flow:start`. It 
 
 All public entrypoints remain available:
 
-`/curdx-flow:cancel`, `/curdx-flow:design`, `/curdx-flow:feedback`, `/curdx-flow:help`, `/curdx-flow:implement`, `/curdx-flow:index`, `/curdx-flow:new`, `/curdx-flow:prompt-optimize`, `/curdx-flow:refactor`, `/curdx-flow:requirements`, `/curdx-flow:research`, `/curdx-flow:start`, `/curdx-flow:status`, `/curdx-flow:switch`, `/curdx-flow:tasks`, `/curdx-flow:triage`.
+`/curdx-flow:cancel`, `/curdx-flow:coverage`, `/curdx-flow:design`, `/curdx-flow:feedback`, `/curdx-flow:help`, `/curdx-flow:implement`, `/curdx-flow:index`, `/curdx-flow:new`, `/curdx-flow:prompt-optimize`, `/curdx-flow:refactor`, `/curdx-flow:requirements`, `/curdx-flow:research`, `/curdx-flow:start`, `/curdx-flow:status`, `/curdx-flow:switch`, `/curdx-flow:tasks`, `/curdx-flow:triage`.
 
 ## Implement Flags
 
