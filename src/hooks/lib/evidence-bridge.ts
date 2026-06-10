@@ -84,7 +84,6 @@ export function toStateLedger(
     evidenceIds,
     missingEvidence: [],
     artifactIndexPath: ".curdx/artifacts/index.jsonl",
-    dirtyBaseline: { capturedAt: at, files: [] },
     generatedFiles: [],
     nextAction: {
       owner: "agent",

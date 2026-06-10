@@ -2,6 +2,15 @@
 
 This reference contains branch and worktree management logic executed as the first step of the start command, before any spec files are created.
 
+## Contents
+
+- [Step 1: Check Current Branch](#step-1-check-current-branch)
+- [Step 2: Determine Default Branch](#step-2-determine-default-branch)
+- [Step 3: Branch Decision Logic](#step-3-branch-decision-logic)
+- [Branch Naming Convention](#branch-naming-convention)
+- [Quick Mode Branch Handling](#quick-mode-branch-handling)
+- [Worktree Setup](#worktree-setup)
+
 ## Step 1: Check Current Branch
 
 ```bash

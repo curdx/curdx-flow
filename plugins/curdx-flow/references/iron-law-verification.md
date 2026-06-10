@@ -3,6 +3,15 @@
 > Single source of truth for the curdx-flow Iron Law. This file is intentionally
 > compaction-resilient — every other surface (hooks, skill, CLI) points back here.
 
+## Contents
+
+- [Iron Law](#iron-law)
+- [Two-Layer Model](#two-layer-model)
+- [VerificationBlock Field Reference](#verificationblock-field-reference)
+- [Phase Boundary Checklist](#phase-boundary-checklist)
+- [Failure Recovery Cookbook](#failure-recovery-cookbook)
+- [Cross-References](#cross-references)
+
 ## Iron Law
 
 **No completion claim without fresh verification.** A phase, task, commit, tag,

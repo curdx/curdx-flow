@@ -1,20 +1,3 @@
-// src/hooks/lib/update-modification-map.ts
-//
-// CLI utility: maintain `.file-modifications.json` (taskId → list of files).
-//
-// Replacement for the v6 shell pattern that used a JSON query tool to append
-// modified files to a per-task list inside the spec dir.
-//
-// Usage:
-//   node update-modification-map.mjs <state-file-or-spec-dir> <taskId> <file1> [file2 ...]
-//
-// - If arg1 ends in `.json`, treat as the state file path.
-// - Otherwise treat as a spec dir and use `<spec-dir>/.file-modifications.json`.
-// - Loads existing JSON (defaults to `{}` when missing/empty).
-// - Sets data[taskId] = unique([...existing, ...files]).
-// - Atomically writes the result back.
-// - Prints compact JSON of the updated entry on stdout.
-
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { writeFileAtomic } from "../_shared/atomic-write.js";

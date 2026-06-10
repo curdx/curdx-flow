@@ -36,7 +36,6 @@ export type ContractValidationResult<T extends Record<string, unknown> = Record<
 
 export interface ContractDescriptor {
   schemaId: string;
-  schemaPath: string;
 }
 
 export interface EvidenceBlock extends Record<string, unknown> {
@@ -82,7 +81,6 @@ export interface StateLedger extends Record<string, unknown> {
   evidenceIds: string[];
   missingEvidence: unknown[];
   artifactIndexPath: string;
-  dirtyBaseline: Record<string, unknown>;
   generatedFiles: unknown[];
   nextAction: Record<string, unknown>;
 }
@@ -277,47 +275,36 @@ export type ContractValue =
 export const CONTRACTS = {
   evidence: {
     schemaId: 'curdx-flow/evidence',
-    schemaPath: 'plugins/curdx-flow/schemas/evidence.schema.json',
   },
   stateLedger: {
     schemaId: 'curdx-flow/state-ledger',
-    schemaPath: 'plugins/curdx-flow/schemas/state-ledger.schema.json',
   },
   session: {
     schemaId: 'curdx-flow/session',
-    schemaPath: 'plugins/curdx-flow/schemas/session.schema.json',
   },
   adapterResult: {
     schemaId: 'curdx-flow/adapter-result',
-    schemaPath: 'plugins/curdx-flow/schemas/adapter-result.schema.json',
   },
   completionVerdict: {
     schemaId: 'curdx-flow/completion-verdict',
-    schemaPath: 'plugins/curdx-flow/schemas/completion-verdict.schema.json',
   },
   releaseVerdict: {
     schemaId: 'curdx-flow/release-verdict',
-    schemaPath: 'plugins/curdx-flow/schemas/release-verdict.schema.json',
   },
   actionRiskPolicy: {
     schemaId: 'curdx-flow/action-risk-policy',
-    schemaPath: 'plugins/curdx-flow/schemas/action-risk-policy.schema.json',
   },
   hookGate: {
     schemaId: 'curdx-flow/hook-gate',
-    schemaPath: 'plugins/curdx-flow/schemas/hook-gate.schema.json',
   },
   artifactIndex: {
     schemaId: 'curdx-flow/artifact-index',
-    schemaPath: 'plugins/curdx-flow/schemas/artifact-index.schema.json',
   },
   verificationReport: {
     schemaId: 'curdx-flow/verification-report',
-    schemaPath: 'plugins/curdx-flow/schemas/verification-report.schema.json',
   },
   runtimeTopology: {
     schemaId: 'curdx-flow/runtime-topology',
-    schemaPath: 'plugins/curdx-flow/schemas/runtime-topology.schema.json',
   },
 } as const satisfies Record<ContractName, ContractDescriptor>;
 
@@ -371,7 +358,6 @@ const resultStatuses = ['passed', 'failed', 'blocked', 'degraded', 'skipped'] as
 const artifactTypes = ['screenshot', 'trace', 'log', 'request', 'response', 'report', 'state', 'other'] as const;
 const privacyClassifications = ['public', 'internal', 'confidential', 'secret', 'local-only'] as const;
 const freshnessTargetFields = ['commandHash', 'targetHash', 'fileTargets', 'environmentId', 'targetSummary'] as const;
-const dirtyFileStatuses = ['modified', 'staged', 'untracked', 'deleted', 'renamed', 'unknown'] as const;
 const generatedFileCategories = [
   'source-change',
   'generated-verification-file',
@@ -432,7 +418,6 @@ const CONTRACT_RULES: Record<ContractName, ContractRules> = {
     evidenceIds: { type: 'array', itemType: 'string' },
     missingEvidence: { type: 'array' },
     artifactIndexPath: { type: 'string', minLength: 1 },
-    dirtyBaseline: { type: 'object' },
     generatedFiles: { type: 'array', itemType: 'object' },
     nextAction: { type: 'object' },
   },
@@ -1180,29 +1165,7 @@ function validateStateLedgerDetails(
   issues: ContractIssue[],
 ): void {
   validateWorkspaceRelativeField(schemaId, '$.artifactIndexPath', payload.artifactIndexPath, issues);
-  validateDirtyBaseline(schemaId, payload.dirtyBaseline, issues);
   validateGeneratedFiles(schemaId, payload.generatedFiles, issues);
-}
-
-function validateDirtyBaseline(
-  schemaId: string,
-  value: unknown,
-  issues: ContractIssue[],
-): void {
-  if (!isRecord(value)) return;
-
-  validateDateTimeField(schemaId, '$.dirtyBaseline.capturedAt', value.capturedAt, issues);
-  if (!Array.isArray(value.files)) return;
-
-  value.files.forEach((entry, index) => {
-    const pathPrefix = `$.dirtyBaseline.files[${index}]`;
-    if (!isRecord(entry)) return;
-    validateWorkspaceRelativeField(schemaId, `${pathPrefix}.path`, entry.path, issues);
-    validateEnumField(schemaId, `${pathPrefix}.status`, entry.status, dirtyFileStatuses, issues);
-    if (entry.source !== 'user-existing') {
-      issues.push(issue(schemaId, `${pathPrefix}.source`, 'invalid-enum', "Expected dirty baseline source to equal 'user-existing'."));
-    }
-  });
 }
 
 function validateGeneratedFiles(

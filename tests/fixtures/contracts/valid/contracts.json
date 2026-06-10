@@ -54,10 +54,6 @@
     "evidenceIds": ["ev-command-1"],
     "missingEvidence": [],
     "artifactIndexPath": ".curdx/artifacts/index.json",
-    "dirtyBaseline": {
-      "capturedAt": "2026-05-16T23:20:00.000Z",
-      "files": []
-    },
     "generatedFiles": [
       {
         "path": ".curdx/evidence/run-1.jsonl",

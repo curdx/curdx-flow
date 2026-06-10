@@ -1,22 +1,3 @@
-// src/hooks/lib/count-mocks.ts
-//
-// CLI utility: count mock-framework usages across test files in a tree.
-//
-// Supports the verification-before-completion skill, which flags mock-heavy test
-// anti-patterns. Recursively walks <root>, identifies test files
-// (*.test.* / *.spec.*), and counts occurrences of:
-//   vi.mock(   jest.mock(   mock.fn(   vi.fn(   jest.fn(
-//
-// Usage:
-//   node count-mocks.mjs [<root>]
-//
-// - <root> defaults to process.cwd() when omitted.
-// - Skips: node_modules, dist, .git, coverage.
-// - Output: compact JSON `{"tests":N,"mockUsages":N,"ratio":N}` + newline.
-// - 0 test files → tests=0, mockUsages=0, ratio=0 (no divide-by-zero).
-//
-// Spec: specs/cross-platform-support/design.md → "Lib utilities → count-mocks".
-
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
@@ -25,11 +6,6 @@ const MOCK_USAGE_RE =
   /\b(?:vi|jest)\.mock\s*\(|\bmock\.fn\s*\(|\b(?:vi|jest)\.fn\s*\(/g;
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git", "coverage"]);
 
-/**
- * Recursively yield absolute paths to test files under `dir`. Skips
- * SKIP_DIRS by name. Stat / read failures on individual entries log to
- * stderr and the walk continues.
- */
 function* walkTests(dir: string): Generator<string> {
   let entries: string[];
   try {
@@ -57,7 +33,6 @@ function* walkTests(dir: string): Generator<string> {
   }
 }
 
-/** Count mock-pattern matches in the file contents. */
 function countMocksInFile(file: string): number {
   let raw: string;
   try {

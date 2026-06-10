@@ -1,25 +1,3 @@
-// src/hooks/lib/search-files.ts
-//
-// CLI utility: cross-platform grep replacement.
-//
-// Usage:
-//   node search-files.mjs <pattern> <root> [--name-only]
-//
-// - `<pattern>` is compiled with `new RegExp(pattern)` — case-sensitive,
-//   no flags. Invalid regex → stderr + exit 1.
-// - `<root>` may be a regular file (search just that file) or a directory
-//   (recursive walk). Skips directory entries named `node_modules`, `dist`,
-//   `.git` (case-sensitive). Symlinks are not followed (avoids cycles).
-// - Default output: `<path>:<lineNumber>:<lineContent>` per matching line
-//   (mirrors `grep -nH`).
-// - With `--name-only`: prints `<path>` once per file with at least one match.
-// - Files that fail to read as UTF-8 (binary, EISDIR, EACCES, …) are skipped
-//   silently.
-// - Exit 0 always when search runs cleanly (matches or no matches). Exit 1
-//   only on usage error / bad regex / unreadable root.
-//
-// Spec: specs/cross-platform-support/design.md → "Lib utilities → search-files".
-
 import {
   readdirSync,
   readFileSync,
@@ -29,13 +7,7 @@ import path from "node:path";
 
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git"]);
 
-/**
- * Recursively walk `dir`, yielding absolute paths for every regular file.
- * Skips directories named in SKIP_DIRS. Symlinks are not followed: only
- * `dirent.isDirectory()` (true symlink-following stat) descends, and
- * `dirent.isFile()` (non-symlink regular file) yields. Symlinks themselves
- * are skipped to avoid infinite loops.
- */
+// Symlinks are skipped entirely to avoid traversal cycles.
 function* walk(dir: string): Generator<string> {
   let entries;
   try {
@@ -55,11 +27,6 @@ function* walk(dir: string): Generator<string> {
   }
 }
 
-/**
- * Search a single file for `re`. Emits matches via `emit`. Returns true if
- * any line matched. Read failures (binary content, perms, etc.) → return
- * false silently.
- */
 function searchFile(
   file: string,
   re: RegExp,

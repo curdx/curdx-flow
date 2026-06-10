@@ -183,7 +183,7 @@ plugins/curdx-flow/         # Claude Code 插件主体
   skills/                   # /curdx-flow:* slash skills
   agents/                   # 执行、评审、QA、架构、PM 等代理
   hooks/                    # Claude Code hook 配置与已提交脚本 bundle
-  schemas/                  # 状态、证据、报告契约 schema
+  schemas/                  # spec 与 transcript 事件 schema
 scripts/                   # 构建、版本、校验、Claude Code smoke
 tests/                     # Vitest 测试
 ```

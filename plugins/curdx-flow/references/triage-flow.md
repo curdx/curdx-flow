@@ -1,5 +1,15 @@
 # Triage Flow: Explore-Brainstorm-Validate-Finalize
 
+## Contents
+
+- [Overview](#overview)
+- [Step 1: Exploration Research](#step-1-exploration-research)
+- [Step 2: Brainstorming & Decomposition](#step-2-brainstorming--decomposition)
+- [Step 3: Validation Research](#step-3-validation-research)
+- [Step 4: Finalize](#step-4-finalize)
+- [Output Handlers](#output-handlers)
+- [Epic Status Display](#epic-status-display)
+
 ## Overview
 
 The triage flow decomposes a large feature into multiple specs. It uses two research passes (explore + validate) sandwiching a brainstorming/decomposition phase.

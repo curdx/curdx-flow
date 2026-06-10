@@ -183,7 +183,7 @@ plugins/curdx-flow/         # The Claude Code plugin itself
   skills/                   # /curdx-flow:* slash skills
   agents/                   # executor, reviewer, QA, architect, PM, …
   hooks/                    # Claude Code hook configs + committed script bundles
-  schemas/                  # state / evidence / report contract schemas
+  schemas/                  # spec + transcript event schemas
 scripts/                    # build, version bump, validation, Claude Code smoke
 tests/                      # Vitest tests
 ```

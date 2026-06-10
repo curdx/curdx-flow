@@ -1,20 +1,3 @@
-// src/hooks/lib/count-tasks.ts
-//
-// CLI utility: count task blocks in a tasks.md and report completion stats.
-//
-// Replacement for the v6 shell pattern:
-//   total=$(grep -c '^- \[[ x]\]' tasks.md)
-//   completed=$(grep -c '^- \[x\]' tasks.md)
-//
-// Usage:
-//   node count-tasks.mjs <tasks.md>
-//
-// - Reads the tasks.md file (errors out if missing).
-// - Parses task blocks via shared markdown-task-parser (canonical source).
-// - Prints compact JSON `{"total":N,"completed":N,"pending":N}` to stdout.
-//
-// Spec: specs/cross-platform-support/design.md → "Lib utilities → count-tasks".
-
 import { readFileSync, existsSync } from "node:fs";
 import { parseTaskList } from "../_shared/markdown-task-parser.js";
 

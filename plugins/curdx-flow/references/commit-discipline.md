@@ -1,5 +1,16 @@
 # Commit Discipline
 
+## Contents
+
+- [Core Rule](#core-rule)
+- [When to Commit](#when-to-commit)
+- [Commit Message Format](#commit-message-format)
+- [What to Include in Commits](#what-to-include-in-commits)
+- [What NOT to Include](#what-not-to-include)
+- [File Locking for Parallel Commits](#file-locking-for-parallel-commits)
+- [Branch Rules](#branch-rules)
+- [State File Protection](#state-file-protection)
+
 ## Core Rule
 
 Each task = one commit. This is non-negotiable.

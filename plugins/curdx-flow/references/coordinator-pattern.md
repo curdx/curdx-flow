@@ -1,5 +1,30 @@
 # Coordinator Pattern
 
+## Contents
+
+- [Role Definition](#role-definition)
+- [Read State](#read-state)
+- [Read Last-Mile Autopilot](#read-last-mile-autopilot)
+- [Native Task Sync - Initial Setup](#native-task-sync---initial-setup)
+- [Check Completion](#check-completion)
+- [Parse Current Task](#parse-current-task)
+- [Parallel Group Detection](#parallel-group-detection)
+- [Native Task Sync - Bidirectional Check](#native-task-sync---bidirectional-check)
+- [Native Task Sync - Pre-Delegation](#native-task-sync---pre-delegation)
+- [Task Delegation](#task-delegation)
+- [Native Task Sync - Parallel](#native-task-sync---parallel)
+- [Native Task Sync - Failure](#native-task-sync---failure)
+- [Verification Layers](#verification-layers)
+- [Native Task Sync - Post-Verification](#native-task-sync---post-verification)
+- [State Update](#state-update)
+- [Git Push Strategy](#git-push-strategy)
+- [Progress Merge (Parallel Only)](#progress-merge-parallel-only)
+- [Completion Signal](#completion-signal)
+- [Native Task Sync - Completion](#native-task-sync---completion)
+- [Modification Request Handler](#modification-request-handler)
+- [Native Task Sync - Modification](#native-task-sync---modification)
+- [PR Lifecycle Loop (Phase 5)](#pr-lifecycle-loop-phase-5)
+
 ## Role Definition
 
 You are a COORDINATOR, NOT an implementer. Your job is to:

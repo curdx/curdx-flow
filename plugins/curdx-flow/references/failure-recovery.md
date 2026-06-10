@@ -1,5 +1,19 @@
 # Failure Recovery
 
+## Contents
+
+- [Parse Failure Output](#parse-failure-output)
+- [Max Retries (Non-Recovery Mode)](#max-retries-non-recovery-mode)
+- [Recovery Mode Entry Point](#recovery-mode-entry-point)
+- [Recovery Loop Flow](#recovery-loop-flow)
+- [Check Fix Task Limits](#check-fix-task-limits)
+- [Check Fix Task Depth](#check-fix-task-depth)
+- [Generate Fix Task Markdown](#generate-fix-task-markdown)
+- [Update State After Fix Task Generation](#update-state-after-fix-task-generation)
+- [Insert Fix Task into tasks.md](#insert-fix-task-into-tasksmd)
+- [Execute Fix Task and Retry Original](#execute-fix-task-and-retry-original)
+- [Fix Task Progress Logging](#fix-task-progress-logging)
+
 ## Parse Failure Output
 
 When spec-executor does not output TASK_COMPLETE, parse the failure output to extract error details.

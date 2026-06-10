@@ -1,16 +1,5 @@
-/**
- * Read JSON from stdin via async iterator.
- *
- * Contract (per design.md "Stdin/Stdout Contract"):
- *  - Empty stdin → return `{}` (graceful default).
- *  - Invalid JSON → log to stderr + throw (run-hook.ts central catch handles
- *    graceful exit per FR-8 — it calls logHookError to record the failure in
- *    ~/.claude/curdx-flow/errors.jsonl and then exits 0 so the Claude Code
- *    session is never blocked).
- *
- * Usage:
- *   const input = await readStdinJson<{ cwd?: string }>();
- */
+// Empty stdin → {}. Invalid JSON → stderr + throw; run-hook's central catch
+// exits 0 so the Claude Code session is never blocked.
 import process from 'node:process';
 
 export async function readStdinJson<T = unknown>(): Promise<T> {

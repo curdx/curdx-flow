@@ -1,24 +1,3 @@
-// src/hooks/lib/kill-port.ts
-//
-// CLI utility: kill any process listening on a given TCP port.
-//
-// Replacement for the v6 shell pattern:
-//   lsof -ti :<port> | xargs kill              (POSIX)
-//   netstat -ano | findstr :<port> + taskkill  (Windows)
-//
-// Usage:
-//   node kill-port.mjs <port>
-//
-// - Validates port is integer in 1..65535.
-// - Branches on process.platform for win32 vs POSIX.
-// - Exits 0 when no listeners are found (nothing to kill = success).
-// - Logs warnings to stderr for individual kill failures but still exits 0
-//   if at least one PID was attempted.
-//
-// Spec: specs/cross-platform-support/design.md → "Lib utilities → kill-port".
-//
-// FR-10: cross-platform port cleanup.
-
 import { execFileSync } from "node:child_process";
 
 interface ExecResult {
@@ -34,7 +13,7 @@ function tryExec(cmd: string, args: string[]): ExecResult {
     });
     return { stdout, ok: true };
   } catch {
-    // Non-zero exit (e.g. lsof returns 1 when no matches) — treat as empty.
+    // non-zero exit (e.g. lsof returns 1 when no matches) — treat as empty
     return { stdout: "", ok: false };
   }
 }

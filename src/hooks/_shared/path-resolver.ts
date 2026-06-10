@@ -9,73 +9,20 @@ import {
 import { basename, isAbsolute, join, posix } from "node:path";
 
 /**
- * Path resolution for curdx-flow hooks (ES module port of path-resolver.sh).
- *
- * Behaviour mirrors the v6 bash helper:
- *   - `getSpecsDirs()`           ← curdx_get_specs_dirs
- *   - `getDefaultDir()`          ← curdx_get_default_dir
- *   - `findSpec(name)`           ← curdx_find_spec
- *   - `listSpecs()`              ← curdx_list_specs
- *   - `resolveCurrent()`         ← curdx_resolve_current
- *
- * Plus a small helper `findRepoRoot(start)` that walks up looking for
- * either a `.git` directory or a `.claude/curdx-flow.local.md` marker —
- * v6 implicitly assumed `cwd === repo root`; the TS port makes that walk
- * explicit so hooks invoked from sub-directories still resolve.
- *
- * ──────────────────────────────────────────────────────────────────────────
- * Path-handling policy (NFR-7, design.md "Cross-Platform Path Handling")
- * ──────────────────────────────────────────────────────────────────────────
- *
- * Two `node:path` namespaces, two distinct uses:
- *
- *   1. fs IO operations (readFileSync, writeFileSync, statSync, existsSync,
- *      readdirSync, unlinkSync, mkdirSync, spawn target, etc.)
- *      → use `path.join` / `path.resolve`
- *      Reason: the OS gets its native separator (`/` on POSIX, `\\` on
- *      Windows). Node's fs APIs accept both on Windows but native sep is
- *      the canonical form and matches what `process.cwd()` returns.
- *
- *   2. Path serialization to JSON, stdout, env vars, hook continuation
- *      prompts, markdown columns, or any cross-process / on-disk channel
- *      → use `path.posix.join` (alias `posix.join` here)
- *      Reason: the output must be byte-stable across operating systems.
- *      A path written into `.curdx-state.json` on Windows must read back
- *      identically on macOS — `\\` vs `/` would break diffs, hashes, and
- *      string comparisons in downstream tooling.
- *
- * Rule of thumb:
- *   - Path goes into `node:fs`              → `path.join`
- *   - Path goes into a JSON file / stdout
- *     / env var / cross-process channel     → `path.posix.join`
- *
- * Both are equivalent on POSIX (single sep). The split only matters on
- * Windows, where `path.join` produces `\\` and `path.posix.join` produces `/`.
- *
- * ──────────────────────────────────────────────────────────────────────────
- * This module's contract
- * ──────────────────────────────────────────────────────────────────────────
- *
- * Resolvers in this file return *posix-form* paths from their public surface
- * (`findSpec`, `resolveCurrent`, `listSpecs` → `SpecEntry.path`) because
- * those values are typically embedded in `.curdx-state.json` or printed
- * to stdout. Callers that re-anchor those paths to the local filesystem
- * (e.g., `existsSync(join(cwd, specPath, ".curdx-state.json"))`) MUST use
- * `path.join` for the fs side — Node tolerates the mixed separators on
- * Windows and the fs path stays correct.
- *
- * Internal helpers in this file use `path.join` for filesystem walks
- * (`findRepoRoot`, `isDir(join(cwd, dir))`, `readdirSync(rootFs)`) and
- * `posix.join` only at the public-return boundary.
+ * Path policy: fs IO uses native `join`; values serialized to JSON, stdout,
+ * or state files use `posix.join` so output stays byte-stable across
+ * platforms. Public resolvers (`findSpec`, `resolveCurrent`, `listSpecs`)
+ * return posix-form paths; callers re-anchoring them to the filesystem must
+ * use the native `join` (Node tolerates mixed separators on Windows).
  */
 
 const DEFAULT_SPECS_DIR = "./specs";
 const SETTINGS_REL_PATH = ".claude/curdx-flow.local.md";
 
 export interface ResolverOptions {
-  /** Working directory; falls back to `CURDX_CWD` env then `process.cwd()`. */
+  /** Falls back to `CURDX_CWD` env then `process.cwd()`. */
   cwd?: string;
-  /** Claude Code session id. When present, session-scoped spec binding wins. */
+  /** When present, session-scoped spec binding wins. */
   sessionId?: string;
 }
 
@@ -175,43 +122,30 @@ export function bindSessionSpec(
   }
 }
 
-/**
- * Strip trailing slashes (preserves "/" root, collapses to "." if input was
- * only slashes — same contract as `_curdx_normalize_path` in the bash source).
- */
 function normalizePath(input: string): string {
   if (!input) return ".";
-  // Strip trailing slashes (but not a leading single "/").
   let p = input.replace(/\/+$/, "");
-  if (p === "") p = "."; // input was just "/" or empty after strip
+  if (p === "") p = ".";
   return p;
 }
 
-/**
- * Walk up from `start` until we find a `.git` dir or a curdx-flow settings
- * file. Returns the first match, or `start` itself if nothing was found
- * (matches v6 behaviour of treating cwd as the repo root by default).
- */
+// Returns `start` itself when no `.git` or settings marker is found.
 export function findRepoRoot(start?: string): string {
   const origin = start ?? process.cwd();
   let cur = origin;
-  // Hard cap in case of pathological symlinks; 64 hops > any sane tree.
+  // Hard hop cap guards against pathological symlink loops.
   for (let i = 0; i < 64; i++) {
     if (isDir(join(cur, ".git"))) return cur;
     if (existsSync(join(cur, SETTINGS_REL_PATH))) return cur;
     const parent = join(cur, "..");
-    // Resolved root → parent === cur on POSIX/Windows alike.
     if (parent === cur) break;
     cur = parent;
   }
   return origin;
 }
 
-/**
- * Parse `specs_dirs: ["./specs", "./packages/api/specs"]` from the YAML
- * frontmatter of `.claude/curdx-flow.local.md`. Returns the raw list (not
- * yet validated against the filesystem). Empty array if the key is absent.
- */
+// Parses `specs_dirs: ["./specs", ...]` from the YAML frontmatter of
+// `.claude/curdx-flow.local.md`; not yet validated against the filesystem.
 function parseSpecsDirsFromSettings(settingsPath: string): string[] {
   let raw: string;
   try {
@@ -219,14 +153,12 @@ function parseSpecsDirsFromSettings(settingsPath: string): string[] {
   } catch {
     return [];
   }
-  // Extract YAML frontmatter (between the first two `---` lines).
   const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---\s*$/m);
   const block = fmMatch?.[1] ?? raw;
   const line = block
     .split(/\r?\n/)
     .find((l) => /^\s*specs_dirs\s*:/.test(l));
   if (!line) return [];
-  // Drop key prefix → "['./specs', './x']" or "./specs, ./x"
   const value = line.replace(/^\s*specs_dirs\s*:\s*/, "");
   return value
     .replace(/[\[\]"']/g, "")
@@ -235,7 +167,6 @@ function parseSpecsDirsFromSettings(settingsPath: string): string[] {
     .filter((s) => s.length > 0);
 }
 
-/** Returns the configured specs directories, validated and normalized. */
 export function getSpecsDirs(opts?: ResolverOptions): string[] {
   const cwd = resolveCwd(opts);
   if (!isDir(cwd)) {
@@ -280,13 +211,10 @@ export function getSpecsDirs(opts?: ResolverOptions): string[] {
   return validated;
 }
 
-/** Convenience: alias for callers preferring the bash-style name. */
 export const resolveSpecsDirs = getSpecsDirs;
 
-/** First entry of `getSpecsDirs()` — used as the home for new specs. */
 export function getDefaultDir(opts?: ResolverOptions): string {
   const dirs = getSpecsDirs(opts);
-  // Non-empty by contract — `getSpecsDirs` always falls back to default.
   return normalizePath(dirs[0] ?? DEFAULT_SPECS_DIR);
 }
 
@@ -295,13 +223,7 @@ export type FindSpecResult =
   | { ok: false; reason: "not-found"; name: string }
   | { ok: false; reason: "ambiguous"; name: string; matches: string[] };
 
-/**
- * Search every configured specs directory for a child folder named `name`.
- * Returns the serialized path (`<dir>/<name>` joined with **posix** seps so
- * it can be written into state files unchanged).
- *
- * Mirrors v6 exit codes: 0 → found, 1 → not found, 2 → ambiguous (≥2 hits).
- */
+// Returns a posix-joined path so it can be written into state files unchanged.
 export function findSpec(name: string, opts?: ResolverOptions): FindSpecResult {
   if (!name) {
     return { ok: false, reason: "not-found", name: "" };
@@ -321,7 +243,6 @@ export function findSpec(name: string, opts?: ResolverOptions): FindSpecResult {
       ? join(dir, cleaned)
       : join(cwd, dir, cleaned);
     if (isDir(candidateFs)) {
-      // Serialized form uses POSIX separators for cross-platform stability.
       matches.push(posix.join(dir, cleaned));
     }
   }
@@ -335,13 +256,8 @@ export function findSpec(name: string, opts?: ResolverOptions): FindSpecResult {
   return { ok: false, reason: "ambiguous", name: cleaned, matches };
 }
 
-/**
- * Read `<defaultDir>/.current-spec` and resolve it to a full (serialized)
- * spec path. A project-root `.current-spec` is accepted as a defensive
- * fallback because older/ambiguous quick-mode instructions occasionally wrote
- * the marker there. Returns `null` when the marker file is missing or empty —
- * v6 used exit code 1 for that case; TS callers branch on `=== null`.
- */
+// A project-root `.current-spec` is accepted as a defensive fallback because
+// older quick-mode instructions occasionally wrote the marker there.
 export function resolveCurrent(opts?: ResolverOptions): string | null {
   const cwd = resolveCwd(opts);
   if (!isDir(cwd)) return null;
@@ -362,7 +278,6 @@ export function resolveCurrent(opts?: ResolverOptions): string | null {
   } catch {
     return null;
   }
-  // Strip ALL whitespace — matches `tr -d '[:space:]'` semantics.
   content = content.replace(/\s+/g, "");
   if (!content) {
     warn(".current-spec file is empty");
@@ -373,17 +288,15 @@ export function resolveCurrent(opts?: ResolverOptions): string | null {
   if (normalized.startsWith("./") || normalized.startsWith("../") || normalized.includes("/") || isAbsolute(normalized)) {
     return normalized;
   }
-  // Bare name → prepend default dir using POSIX separators (serialized form).
   return posix.join(defaultDir, normalized);
 }
 
 export interface SpecEntry {
   name: string;
-  /** Serialized path (POSIX separators) — safe to embed in state files. */
+  /** POSIX separators — safe to embed in state files. */
   path: string;
 }
 
-/** Enumerate every spec under every configured root. Hidden dirs skipped. */
 export function listSpecs(opts?: ResolverOptions): SpecEntry[] {
   const cwd = resolveCwd(opts);
   if (!isDir(cwd)) return [];

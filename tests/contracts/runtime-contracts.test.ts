@@ -1,7 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import Ajv2020 from 'ajv/dist/2020.js';
-import addFormats from 'ajv-formats';
 
 import {
   CONTRACTS,
@@ -16,39 +14,22 @@ function readJson(pathname: string): Record<string, unknown> {
   return JSON.parse(readFileSync(pathname, 'utf8')) as Record<string, unknown>;
 }
 
-function createAjv(): Ajv2020 {
-  const ajv = new Ajv2020({ allErrors: true, strict: true });
-  addFormats(ajv);
-  return ajv;
-}
-
 describe('runtime contract baseline', () => {
-  it('keeps every shipped schema aligned with the runtime guard for valid fixtures', () => {
+  it('accepts valid fixtures through the runtime guard', () => {
     const fixtures = readJson('tests/fixtures/contracts/valid/contracts.json');
-    const ajv = createAjv();
 
     for (const contractName of contractNames) {
-      const spec = CONTRACTS[contractName];
-      const schema = readJson(spec.schemaPath);
-      const validateSchema = ajv.compile(schema);
       const payload = fixtures[contractName];
-
-      expect(validateSchema(payload), `${contractName} schema`).toBe(true);
       const result = validateContract(contractName, payload);
       expect(result, `${contractName} guard`).toMatchObject({ ok: true });
     }
   });
 
-  it('rejects missing required fields through shipped schemas and runtime guards', () => {
+  it('rejects missing required fields through runtime guards', () => {
     const fixtures = readJson('tests/fixtures/contracts/invalid/missing-required.json');
-    const ajv = createAjv();
 
     for (const contractName of contractNames) {
-      const spec = CONTRACTS[contractName];
-      const validateSchema = ajv.compile(readJson(spec.schemaPath));
       const payload = fixtures[contractName];
-
-      expect(validateSchema(payload), `${contractName} schema`).toBe(false);
       const result = validateContract(contractName, payload);
       expect(result.ok, `${contractName} guard`).toBe(false);
       if (!result.ok) {
@@ -57,16 +38,11 @@ describe('runtime contract baseline', () => {
     }
   });
 
-  it('rejects invalid enum values through shipped schemas and runtime guards', () => {
+  it('rejects invalid enum values through runtime guards', () => {
     const fixtures = readJson('tests/fixtures/contracts/invalid/bad-enum.json');
-    const ajv = createAjv();
 
     for (const contractName of contractNames) {
-      const spec = CONTRACTS[contractName];
-      const validateSchema = ajv.compile(readJson(spec.schemaPath));
       const payload = fixtures[contractName];
-
-      expect(validateSchema(payload), `${contractName} schema`).toBe(false);
       const result = validateContract(contractName, payload);
       expect(result.ok, `${contractName} guard`).toBe(false);
       if (!result.ok) {
@@ -75,16 +51,11 @@ describe('runtime contract baseline', () => {
     }
   });
 
-  it('rejects unsupported schema versions through shipped schemas and runtime guards', () => {
+  it('rejects unsupported schema versions through runtime guards', () => {
     const fixtures = readJson('tests/fixtures/contracts/invalid/unsupported-version.json');
-    const ajv = createAjv();
 
     for (const contractName of contractNames) {
-      const spec = CONTRACTS[contractName];
-      const validateSchema = ajv.compile(readJson(spec.schemaPath));
       const payload = fixtures[contractName];
-
-      expect(validateSchema(payload), `${contractName} schema`).toBe(false);
       const result = validateContract(contractName, payload);
       expect(result.ok, `${contractName} guard`).toBe(false);
       if (!result.ok) {
@@ -93,17 +64,12 @@ describe('runtime contract baseline', () => {
     }
   });
 
-  it('rejects minLength, format, pattern, and array item violations through shipped schemas and runtime guards', () => {
+  it('rejects minLength, format, pattern, and array item violations through runtime guards', () => {
     const fixtures = readJson('tests/fixtures/contracts/invalid/schema-only-rules.json');
-    const ajv = createAjv();
     const contractNamesWithSchemaOnlyRules: ContractName[] = ['evidence', 'artifactIndex', 'releaseVerdict', 'verificationReport', 'actionRiskPolicy'];
 
     for (const contractName of contractNamesWithSchemaOnlyRules) {
-      const spec = CONTRACTS[contractName];
-      const validateSchema = ajv.compile(readJson(spec.schemaPath));
       const payload = fixtures[contractName];
-
-      expect(validateSchema(payload), `${contractName} schema`).toBe(false);
       const result = validateContract(contractName, payload);
       expect(result.ok, `${contractName} guard`).toBe(false);
       if (!result.ok) {
@@ -237,10 +203,7 @@ describe('runtime contract baseline', () => {
         exitCode: '0',
       },
     };
-    const ajv = createAjv();
-    const validateSchema = ajv.compile(readJson(CONTRACTS.verificationReport.schemaPath));
 
-    expect(validateSchema(payload), 'verificationReport schema').toBe(false);
     const result = validateContract('verificationReport', payload);
     expect(result.ok, 'verificationReport guard').toBe(false);
     if (!result.ok) {
@@ -263,21 +226,11 @@ describe('runtime contract baseline', () => {
     }
   });
 
-  it('rejects malformed state dirty baseline and generated file classifications', () => {
+  it('rejects malformed state artifact paths and generated file classifications', () => {
     const fixtures = readJson('tests/fixtures/contracts/valid/contracts.json');
     const payload = {
       ...(fixtures.stateLedger as Record<string, unknown>),
       artifactIndexPath: '../artifacts/index.jsonl',
-      dirtyBaseline: {
-        capturedAt: 'not-a-date',
-        files: [
-          {
-            path: '/tmp/app.ts',
-            status: 'changed',
-            source: 'tool-generated',
-          },
-        ],
-      },
       generatedFiles: [
         {
           path: '.curdx/reports/run-1.report.md',
@@ -289,20 +242,13 @@ describe('runtime contract baseline', () => {
         },
       ],
     };
-    const ajv = createAjv();
-    const validateSchema = ajv.compile(readJson(CONTRACTS.stateLedger.schemaPath));
 
-    expect(validateSchema(payload), 'stateLedger schema').toBe(false);
     const result = validateContract('stateLedger', payload);
     expect(result.ok, 'stateLedger guard').toBe(false);
     if (!result.ok) {
       expect(result.issues).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ path: '$.artifactIndexPath', code: 'invalid-pattern' }),
-          expect.objectContaining({ path: '$.dirtyBaseline.capturedAt', code: 'invalid-format' }),
-          expect.objectContaining({ path: '$.dirtyBaseline.files[0].path', code: 'invalid-pattern' }),
-          expect.objectContaining({ path: '$.dirtyBaseline.files[0].status', code: 'invalid-enum' }),
-          expect.objectContaining({ path: '$.dirtyBaseline.files[0].source', code: 'invalid-enum' }),
           expect.objectContaining({ path: '$.generatedFiles[0].category', code: 'invalid-enum' }),
           expect.objectContaining({ path: '$.generatedFiles[0].owner', code: 'invalid-range' }),
           expect.objectContaining({ path: '$.generatedFiles[0].createdAt', code: 'invalid-format' }),
@@ -322,10 +268,7 @@ describe('runtime contract baseline', () => {
       confidence: 1.2,
       unverifiedScope: ['not-an-object'],
     };
-    const ajv = createAjv();
-    const validateSchema = ajv.compile(readJson(CONTRACTS.completionVerdict.schemaPath));
 
-    expect(validateSchema(payload), 'completionVerdict schema').toBe(false);
     const result = validateContract('completionVerdict', payload);
     expect(result.ok, 'completionVerdict guard').toBe(false);
     if (!result.ok) {
@@ -360,10 +303,7 @@ describe('runtime contract baseline', () => {
         },
       ],
     };
-    const ajv = createAjv();
-    const validateSchema = ajv.compile(readJson(CONTRACTS.actionRiskPolicy.schemaPath));
 
-    expect(validateSchema(payload), 'actionRiskPolicy schema').toBe(false);
     const result = validateContract('actionRiskPolicy', payload);
     expect(result.ok, 'actionRiskPolicy guard').toBe(false);
     if (!result.ok) {
@@ -385,13 +325,9 @@ describe('runtime contract baseline', () => {
     }
   });
 
-  it('rejects evidence without verdict-usable freshness through shipped schemas and runtime guards', () => {
+  it('rejects evidence without verdict-usable freshness through runtime guards', () => {
     const fixture = readJson('tests/fixtures/contracts/invalid/empty-freshness.json');
-    const ajv = createAjv();
-    const spec = CONTRACTS.evidence;
-    const validateSchema = ajv.compile(readJson(spec.schemaPath));
 
-    expect(validateSchema(fixture.evidence), 'evidence schema').toBe(false);
     const result = validateContract('evidence', fixture.evidence);
     expect(result.ok, 'evidence guard').toBe(false);
     if (!result.ok) {

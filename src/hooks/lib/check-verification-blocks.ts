@@ -1,35 +1,3 @@
-// src/hooks/lib/check-verification-blocks.ts
-//
-// Shared library for the verificationBlocks gate (release-time + CLI).
-// Single source of truth for the verificationBlocks evaluation called from:
-//   1. `scripts/check-verification-blocks.mjs` — npm verify chain (D3 hybrid).
-//   2. `src/flows/check.ts` — `npx @curdx/flow check` CLI subcommand
-//      (Task 2.23/2.24).
-//
-// The `verifyPhaseBlock` lib in `src/hooks/lib/verify-blocks.ts` powers the
-// per-phase evaluator used by the in-process Stop / TaskCompleted hooks.
-// This file is a thin wrapper that adds:
-//   - active-spec resolution (specs/.current-spec → latest-mtime fallback),
-//   - state-file load + parse,
-//   - permissive "no verificationBlocks field at all" branch (initial state),
-//   - per-phase walk + multi-failure aggregation, and
-//   - human-readable error message production for stderr.
-//
-// Why a separate lib instead of importing verify-blocks.ts directly?
-// The release-time gate must work even when verifyPhaseBlock's mandated
-// FS-scan side-effect (walkSrcTree) is unwanted (no spec dir on disk for
-// non-spec repos / CI). It also aggregates failures across phases rather
-// than short-circuiting on the first one — useful for users who want to
-// see every stale/failed block in a single run.
-//
-// Behavior mirrors `scripts/check-verification-blocks.mjs` (Task 2.20)
-// verbatim, with one functional addition: the script's `process.env`
-// opt-out (`CURDX_VERIFY_SKIP_BLOCKS=1`) is honored here too so callers
-// have a single escape hatch.
-//
-// Spec: specs/spec-verification-iron-law/tasks.md Task 2.23
-//        specs/spec-verification-iron-law/design.md §Component 7 (D3)
-
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import path from "node:path";
 
@@ -43,16 +11,6 @@ const VERIFICATION_PHASES: ReadonlyArray<VerificationPhase> = [
   "execution",
 ];
 
-/**
- * Outcome of `runVerificationCheck`. The `code` field is the exit code the
- * CLI / script should produce (0 pass, 2 fail). `message` is the rendered
- * stdout (on pass) or stderr (on fail) blob the caller should write.
- *
- * `skipped` is true when the gate took a graceful no-op branch (no spec dir
- * found, env opt-out, or initial-state with absent `verificationBlocks`
- * field). Callers may distinguish `ok && skipped` from `ok && !skipped`
- * for telemetry, but both should still exit 0.
- */
 export interface VerificationCheckResult {
   ok: boolean;
   code: 0 | 2;
@@ -61,47 +19,11 @@ export interface VerificationCheckResult {
   specDir?: string;
 }
 
-/**
- * Options for `runVerificationCheck`. `repoRoot` is the directory under which
- * to look for `specs/` (defaults to `process.cwd()`). `env` is the env-var
- * map (defaults to `process.env`).
- */
 export interface RunVerificationCheckOptions {
   repoRoot?: string;
   env?: NodeJS.ProcessEnv;
 }
 
-/**
- * Run the verificationBlocks gate.
- *
- * Resolution order for the active spec (mirrors `check-verification-blocks.mjs`):
- *   (a) `specs/.current-spec` pointer file — read trimmed, must reference a
- *       sub-dir that contains `.curdx-state.json`.
- *   (b) Else: latest-mtime sub-dir under `specs/` whose `.curdx-state.json`
- *       file exists. Skips dot-prefixed and underscore-prefixed dirs.
- *   (c) Else: graceful no-op `{ok: true, code: 0, skipped: true}`.
- *
- * After a spec is resolved, the env-var opt-out
- * (`CURDX_VERIFY_SKIP_BLOCKS=1`) is honored — also a graceful no-op.
- *
- * If `state.verificationBlocks === undefined` (the field is wholly absent),
- * the gate treats it as "initial state, predates iron-law" and exits 0.
- * If the field is present but empty `{}`, the gate fails (exitCode 2):
- * someone wiped the blocks but kept the field — that is a regression.
- *
- * For each present phase block, the gate enforces:
- *   - phase key must be one of `VERIFICATION_PHASES`,
- *   - `block` must be an object,
- *   - `block.exitCode === 0`,
- *   - `Date.parse(block.timestamp)` is finite,
- *   - `block.srcMtime` is a non-negative finite number,
- *   - `Date.parse(block.timestamp) >= block.srcMtime` (verification ran
- *     after the last src edit). Equivalent to verify-blocks.ts's canonical
- *     `block.srcMtime > Date.parse(block.timestamp)` negated.
- *
- * Aggregates all failures into a single stderr blob so users see every
- * problem in one run, not one-at-a-time.
- */
 export async function runVerificationCheck(
   opts: RunVerificationCheckOptions = {},
 ): Promise<VerificationCheckResult> {
@@ -290,16 +212,6 @@ export async function runVerificationCheck(
   };
 }
 
-/**
- * Resolve the active spec directory.
- *
- *  (a) `<specsDir>/.current-spec` pointer.
- *  (b) Latest-mtime sub-dir under `specsDir` containing `.curdx-state.json`.
- *  (c) `null` if neither — caller treats as graceful no-op.
- *
- * Skips dot-prefixed and underscore-prefixed dirs (`.index`, `_epics`, etc).
- * Per-entry `stat` failures are swallowed; the candidate is just skipped.
- */
 function resolveActiveSpecDir(specsDir: string): string | null {
   const pointer = path.join(specsDir, ".current-spec");
   if (existsSync(pointer)) {
@@ -310,7 +222,7 @@ function resolveActiveSpecDir(specsDir: string): string | null {
         if (existsSync(path.join(dir, ".curdx-state.json"))) return dir;
       }
     } catch {
-      // fall through to (b)
+      // fall through to the latest-mtime scan
     }
   }
   if (!existsSync(specsDir)) return null;
@@ -334,7 +246,7 @@ function resolveActiveSpecDir(specsDir: string): string | null {
         latest = path.join(specsDir, e.name);
       }
     } catch {
-      // ignore unreadable
+      continue;
     }
   }
   return latest;

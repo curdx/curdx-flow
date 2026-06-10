@@ -29,10 +29,6 @@ function state(overrides: Partial<StateLedger> = {}): StateLedger {
     evidenceIds: [],
     missingEvidence: [],
     artifactIndexPath: '.curdx/artifacts/index.jsonl',
-    dirtyBaseline: {
-      capturedAt: '2026-05-17T00:50:00.000Z',
-      files: [],
-    },
     generatedFiles: [],
     nextAction: {
       owner: 'agent',

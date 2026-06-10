@@ -1,5 +1,17 @@
 # Bounded Parallel Dispatch
 
+## Contents
+
+- [Coordinator Role](#coordinator-role)
+- [Domain Coverage](#domain-coverage)
+- [Independence Criteria](#independence-criteria)
+- [Per-Domain Anti-patterns](#per-domain-anti-patterns)
+- [Subagent-vs-Grep Guidance](#subagent-vs-grep-guidance)
+- [Topic Identification](#topic-identification)
+- [Dispatch Pattern (Direct Agent Default, Teams Optional)](#dispatch-pattern-direct-agent-default-teams-optional)
+- [Merging Results](#merging-results)
+- [Scaling by Complexity](#scaling-by-complexity)
+
 ## Coordinator Role
 
 The research command is a **coordinator, not a researcher**. It MUST delegate ALL research work to subagents:

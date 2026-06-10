@@ -3,6 +3,16 @@
 Use this reference when route output includes `stackProfile`, `qualityGates`,
 `suggestedVerifier`, `contextBudget`, `recommendedCapabilities`, or `lastMile`.
 
+## Contents
+
+- [Route Facts](#route-facts)
+- [Stack Profile](#stack-profile)
+- [Quality Gates](#quality-gates)
+- [Capability Availability](#capability-availability)
+- [Last-Mile Autopilot](#last-mile-autopilot)
+- [Context Budget](#context-budget)
+- [Claude Code Plugin Work](#claude-code-plugin-work)
+
 ## Route Facts
 
 - Treat `route` as the workflow decision.

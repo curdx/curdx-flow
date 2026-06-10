@@ -4,6 +4,14 @@ Completion verification runs BEFORE advancing taskIndex after a task reports
 TASK_COMPLETE. Layers 1-2 always run. Layer 3 runs only when AutoPolicy says it
 should.
 
+## Contents
+
+- [Layer 1: Contradiction Detection](#layer-1-contradiction-detection)
+- [Layer 2: TASK_COMPLETE Signal Verification](#layer-2-task_complete-signal-verification)
+- [Layer 3: Artifact Review](#layer-3-artifact-review)
+- [Verification Summary](#verification-summary)
+- [Spec-Executor Self-Verification (Pre-Signal)](#spec-executor-self-verification-pre-signal)
+
 ## Layer 1: Contradiction Detection
 
 Check spec-executor output for contradiction patterns alongside TASK_COMPLETE:

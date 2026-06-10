@@ -12,48 +12,37 @@ import { basename } from "node:path";
 // src/core/contracts/index.ts
 var CONTRACTS = {
   evidence: {
-    schemaId: "curdx-flow/evidence",
-    schemaPath: "plugins/curdx-flow/schemas/evidence.schema.json"
+    schemaId: "curdx-flow/evidence"
   },
   stateLedger: {
-    schemaId: "curdx-flow/state-ledger",
-    schemaPath: "plugins/curdx-flow/schemas/state-ledger.schema.json"
+    schemaId: "curdx-flow/state-ledger"
   },
   session: {
-    schemaId: "curdx-flow/session",
-    schemaPath: "plugins/curdx-flow/schemas/session.schema.json"
+    schemaId: "curdx-flow/session"
   },
   adapterResult: {
-    schemaId: "curdx-flow/adapter-result",
-    schemaPath: "plugins/curdx-flow/schemas/adapter-result.schema.json"
+    schemaId: "curdx-flow/adapter-result"
   },
   completionVerdict: {
-    schemaId: "curdx-flow/completion-verdict",
-    schemaPath: "plugins/curdx-flow/schemas/completion-verdict.schema.json"
+    schemaId: "curdx-flow/completion-verdict"
   },
   releaseVerdict: {
-    schemaId: "curdx-flow/release-verdict",
-    schemaPath: "plugins/curdx-flow/schemas/release-verdict.schema.json"
+    schemaId: "curdx-flow/release-verdict"
   },
   actionRiskPolicy: {
-    schemaId: "curdx-flow/action-risk-policy",
-    schemaPath: "plugins/curdx-flow/schemas/action-risk-policy.schema.json"
+    schemaId: "curdx-flow/action-risk-policy"
   },
   hookGate: {
-    schemaId: "curdx-flow/hook-gate",
-    schemaPath: "plugins/curdx-flow/schemas/hook-gate.schema.json"
+    schemaId: "curdx-flow/hook-gate"
   },
   artifactIndex: {
-    schemaId: "curdx-flow/artifact-index",
-    schemaPath: "plugins/curdx-flow/schemas/artifact-index.schema.json"
+    schemaId: "curdx-flow/artifact-index"
   },
   verificationReport: {
-    schemaId: "curdx-flow/verification-report",
-    schemaPath: "plugins/curdx-flow/schemas/verification-report.schema.json"
+    schemaId: "curdx-flow/verification-report"
   },
   runtimeTopology: {
-    schemaId: "curdx-flow/runtime-topology",
-    schemaPath: "plugins/curdx-flow/schemas/runtime-topology.schema.json"
+    schemaId: "curdx-flow/runtime-topology"
   }
 };
 var riskLevels = ["low", "medium", "high", "critical"];
@@ -89,7 +78,6 @@ var resultStatuses = ["passed", "failed", "blocked", "degraded", "skipped"];
 var artifactTypes = ["screenshot", "trace", "log", "request", "response", "report", "state", "other"];
 var privacyClassifications = ["public", "internal", "confidential", "secret", "local-only"];
 var freshnessTargetFields = ["commandHash", "targetHash", "fileTargets", "environmentId", "targetSummary"];
-var dirtyFileStatuses = ["modified", "staged", "untracked", "deleted", "renamed", "unknown"];
 var generatedFileCategories = [
   "source-change",
   "generated-verification-file",
@@ -149,7 +137,6 @@ var CONTRACT_RULES = {
     evidenceIds: { type: "array", itemType: "string" },
     missingEvidence: { type: "array" },
     artifactIndexPath: { type: "string", minLength: 1 },
-    dirtyBaseline: { type: "object" },
     generatedFiles: { type: "array", itemType: "object" },
     nextAction: { type: "object" }
   },
@@ -716,22 +703,7 @@ function validateReportVerifier(schemaId, value, issues) {
 }
 function validateStateLedgerDetails(schemaId, payload, issues) {
   validateWorkspaceRelativeField(schemaId, "$.artifactIndexPath", payload.artifactIndexPath, issues);
-  validateDirtyBaseline(schemaId, payload.dirtyBaseline, issues);
   validateGeneratedFiles(schemaId, payload.generatedFiles, issues);
-}
-function validateDirtyBaseline(schemaId, value, issues) {
-  if (!isRecord(value)) return;
-  validateDateTimeField(schemaId, "$.dirtyBaseline.capturedAt", value.capturedAt, issues);
-  if (!Array.isArray(value.files)) return;
-  value.files.forEach((entry, index) => {
-    const pathPrefix = `$.dirtyBaseline.files[${index}]`;
-    if (!isRecord(entry)) return;
-    validateWorkspaceRelativeField(schemaId, `${pathPrefix}.path`, entry.path, issues);
-    validateEnumField(schemaId, `${pathPrefix}.status`, entry.status, dirtyFileStatuses, issues);
-    if (entry.source !== "user-existing") {
-      issues.push(issue(schemaId, `${pathPrefix}.source`, "invalid-enum", "Expected dirty baseline source to equal 'user-existing'."));
-    }
-  });
 }
 function validateGeneratedFiles(schemaId, value, issues) {
   if (!Array.isArray(value)) return;
@@ -1875,7 +1847,6 @@ function toStateLedger(phase, ids, workspaceRoot, evidenceIds, at) {
     evidenceIds,
     missingEvidence: [],
     artifactIndexPath: ".curdx/artifacts/index.jsonl",
-    dirtyBaseline: { capturedAt: at, files: [] },
     generatedFiles: [],
     nextAction: {
       owner: "agent",

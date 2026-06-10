@@ -3,6 +3,16 @@
 > Single source of truth for the curdx-flow two-stage review protocol. This file is intentionally
 > compaction-resilient — every other surface (agent prompts, entrypoint skills, drift test) points back here.
 
+## Contents
+
+- [Why two reviewers](#why-two-reviewers)
+- [Section 1: Domain Boundary Table](#section-1-domain-boundary-table)
+- [Section 2: Anti-Rationalization Rule](#section-2-anti-rationalization-rule)
+- [Section 3: SLSA-Shape Verdict Field Glossary](#section-3-slsa-shape-verdict-field-glossary)
+- [Section 4: 3-Layer Drift Defense Implementation Details](#section-4-3-layer-drift-defense-implementation-details)
+- [Section 5: Exclusion List Minimum Keyword Set](#section-5-exclusion-list-minimum-keyword-set)
+- [Cross-References](#cross-references)
+
 ## Why two reviewers
 
 A single reviewer agent that owns both **spec-compliance** (does this artifact match its requirements / phase contract?)

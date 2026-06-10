@@ -1,28 +1,7 @@
 /**
- * Error logger for the 4 curdx-flow hooks.
- *
- * Writes one JSON line per error to `~/.claude/curdx-flow/errors.jsonl` so
- * `analyze` can roll them up alongside jsonl `hook_success.exitCode!==0`
- * entries (R-9 fuzzy join). Reads `errorLogEnabled` from
- * `~/.claude/settings.json` once per process and caches the result — hooks
- * are one-shot Node processes, so we never need to invalidate.
- *
- * Hard contract (NFR-9):
- *   • THIS FUNCTION NEVER THROWS. Every external call is wrapped in
- *     try/catch and any failure is silently swallowed. The whole point of
- *     the logger is to capture errors in the hook — letting it crash would
- *     turn a recoverable hook fault into a session blocker.
- *   • Single line MUST stay below 4 KB on disk so jsonl readers (analyze)
- *     don't choke. We aggressively truncate `msg`, `stack`, and stringy
- *     payloads, then re-truncate stack to 0 if the assembled line still
- *     exceeds the budget.
- *
- * Schema (line):
- *   { ts, level, hook, event, msg?, cwd?, transcript_path?, spec?, path?, stack? }
- *
- * `__resetCacheForTest()` is exported solely for fake-fs unit tests
- * (Phase 3 tests inject a temp settings.json and need to clear the cache
- * between cases).
+ * Hard contract: the logging entry points NEVER throw — a logging fault must
+ * not turn into a session blocker. Each written line must stay below 4 KB on
+ * disk so jsonl readers don't choke; msg/stack/payload are truncated to fit.
  */
 import {
   appendFileSync,
@@ -47,11 +26,10 @@ const MSG_MAX = 500;
 const STACK_MAX = 2000;
 const STR_MAX = 500;
 
-// Rotation thresholds (D2/D3 design decisions).
-const ROTATE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
-const ROTATE_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const ROTATE_THROTTLE_N = 10; // only stat every 10th call (p99 budget)
-const ROTATE_KEEP = 5; // retention count (D2 hardcoded)
+const ROTATE_SIZE_BYTES = 10 * 1024 * 1024;
+const ROTATE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const ROTATE_THROTTLE_N = 10;
+const ROTATE_KEEP = 5;
 const RENAME_RETRY_DELAYS_MS = [50, 200, 500] as const;
 
 let cachedEnabled: boolean | null = null;
@@ -65,11 +43,9 @@ function readEnabled(): boolean {
       cachedEnabled = parsed.errorLogEnabled;
       return cachedEnabled;
     }
-    // Field missing — default to true (FR-8: errors should surface).
     cachedEnabled = true;
     return cachedEnabled;
   } catch {
-    // Missing or corrupt settings.json — default to enabled, breadcrumb to stderr.
     process.stderr.write('[error-logger] settings.json missing/corrupt, defaulting errorLogEnabled=true\n');
     cachedEnabled = true;
     return cachedEnabled;
@@ -81,24 +57,10 @@ function trunc(s: unknown, max: number): string | undefined {
   return s.length <= max ? s : s.slice(0, max);
 }
 
-/**
- * Severity / category of an event line.
- *
- * - `'error'` is reserved for `logHookError` (back-compat).
- * - `'info'` is the default for `logHookEvent` (general structured events).
- * - `'metric'` is for measurement-only lines (counts, durations).
- * - `'decision'` flags lines that record a hook policy decision (allow / block / side-effect).
- */
 export type EventLevel = 'error' | 'info' | 'metric' | 'decision';
 
-/**
- * Closed enumeration of event kinds emitted by the 4 curdx-flow hooks.
- *
- * Adding a new kind here is the only safe way to introduce a new event
- * category — `coerceKind` falls back to `'unknown'` for any string outside
- * this set, so old jsonl rows produced before a kind was introduced still
- * round-trip cleanly through the parser.
- */
+// Closed set: `coerceKind` collapses anything outside it to 'unknown' so old
+// jsonl rows survive schema upgrades.
 export type EventKind =
   | 'stop_block_continuation'
   | 'stop_block_cost_runaway'
@@ -126,25 +88,12 @@ const KNOWN_KINDS: ReadonlySet<EventKind> = new Set<EventKind>([
   'unknown',
 ]);
 
-/**
- * Coerce an unknown value into the closed `EventKind` set.
- *
- * Anything not in `KNOWN_KINDS` (including `undefined`, non-strings, or
- * future-version kinds an older parser doesn't understand) becomes
- * `'unknown'`. This is what lets old log rows survive a schema upgrade.
- */
 export function coerceKind(raw: unknown): EventKind {
   return typeof raw === 'string' && KNOWN_KINDS.has(raw as EventKind)
     ? (raw as EventKind)
     : 'unknown';
 }
 
-/**
- * Returns true when `filePath` exists and either exceeds 10 MB OR is older
- * than 30 days. Missing file → false (nothing to rotate). NEVER-throw —
- * any `statSync` failure (ENOENT, EPERM, mocked-fs) is caught and treated
- * as "do not rotate".
- */
 export function shouldRotate(filePath: string): boolean {
   try {
     const st = statSync(filePath);
@@ -156,13 +105,8 @@ export function shouldRotate(filePath: string): boolean {
   }
 }
 
-/**
- * Renames `from` → `to` durably across platforms.
- * - POSIX same-FS: `renameSync` is atomic.
- * - Windows: file-locking (EBUSY/EPERM) gets a 50/200/500ms retry chain.
- * - Cross-device (EXDEV) or final retry failure: copy + unlink fallback.
- * NEVER throws — outer wrapper swallows everything (NFR-9).
- */
+// POSIX same-FS rename is atomic; Windows file-locking (EBUSY/EPERM) gets a
+// retry chain; EXDEV or exhausted retries fall back to copy + unlink.
 export function safeRename(from: string, to: string): void {
   try {
     try { renameSync(from, to); return; } catch (e) {
@@ -174,23 +118,16 @@ export function safeRename(from: string, to: string): void {
           try { renameSync(from, to); return; } catch { /* keep retrying */ }
         }
       }
-      // EXDEV or exhausted retries → copy + unlink fallback.
       try { copyFileSync(from, to); unlinkSync(from); } catch { /* give up silently */ }
     }
-  } catch { /* NEVER-throw outer */ }
+  } catch { /* never throw */ }
 }
 
-/**
- * Keeps the newest 5 rotated files in `dir` (matching `errors.<*>.jsonl`,
- * NOT the live `errors.jsonl`). Sorts by mtime desc, unlinks the rest.
- * NEVER throws.
- */
 export function pruneRotatedFiles(dir: string): void {
   try {
     const entries = readdirSync(dir);
     const rotated: Array<{ p: string; m: number }> = [];
     for (const name of entries) {
-      // Match `errors.<something>.jsonl` but NOT the live `errors.jsonl`.
       if (!name.startsWith('errors.') || !name.endsWith('.jsonl')) continue;
       if (name === 'errors.jsonl') continue;
       const full = path.join(dir, name);
@@ -198,27 +135,21 @@ export function pruneRotatedFiles(dir: string): void {
         rotated.push({ p: full, m: statSync(full).mtimeMs });
       } catch { /* skip unreadable entry */ }
     }
-    rotated.sort((a, b) => b.m - a.m); // newest first
+    rotated.sort((a, b) => b.m - a.m);
     for (const { p } of rotated.slice(ROTATE_KEEP)) {
       try { unlinkSync(p); } catch { /* skip */ }
     }
-  } catch { /* NEVER-throw */ }
+  } catch { /* never throw */ }
 }
 
 let rotateCounter = 0;
 
-/**
- * Throttled rotation check. Only every Nth call (N=10) actually invokes
- * `shouldRotate` to keep the p99 hot-path budget (~50ms/spec) intact.
- * On hit: rename live log to `errors.<ISO-ts>-<pid>.jsonl`, then prune.
- * NEVER throws.
- */
+// Only every Nth call stats the file, to protect the hot-path latency budget.
 export function rotateIfNeeded(filePath: string): void {
   try {
     rotateCounter = (rotateCounter + 1) % ROTATE_THROTTLE_N;
     if (rotateCounter !== 0) return;
     if (!shouldRotate(filePath)) return;
-    // ISO-ts compact form `20260507T143205Z` is dictionary-ordered = sort order.
     const iso = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
     const dir = path.dirname(filePath);
     const target = path.join(dir, `errors.${iso}-${process.pid}.jsonl`);
@@ -227,7 +158,6 @@ export function rotateIfNeeded(filePath: string): void {
   } catch { /* NEVER-throw */ }
 }
 
-/** Test-only: reset throttle counter so unit tests get deterministic behavior. */
 export function __resetRotateCounterForTest(): void {
   rotateCounter = 0;
 }
@@ -241,26 +171,11 @@ export interface LogHookErrorContext {
   spec?: string;
   path?: string;
   stack?: string;
-  /**
-   * Optional event kind. Older callers may still omit this; `logHookError`
-   * will default it to `'unknown'` via `coerceKind` when redirecting to
-   * `logHookEvent`.
-   */
   kind?: EventKind;
 }
 
-/**
- * Input shape for {@link logHookEvent}.
- *
- * Extends `LogHookErrorContext` with the 4 schema fields added in OB-2:
- *   - `level` — severity tag (defaults to `'info'` for `logHookEvent`)
- *   - `kind`  — closed-enum category (defaults to `'unknown'`)
- *   - `payload` — opaque structured side-data (consumers should redact
- *      before calling; this layer trusts what it gets and only enforces
- *      the 4 KB line cap)
- *   - `correlationId` — 3-segment id `<session>.<spec>.<phase>` produced by
- *      `_shared/correlation.ts#buildCorrelationId` (added in Task 1.3)
- */
+// `payload` is trusted as-is — consumers must redact before calling; this
+// layer only enforces the 4 KB line cap.
 export interface LogHookEventInput extends LogHookErrorContext {
   level?: EventLevel;
   kind?: EventKind;
@@ -268,14 +183,7 @@ export interface LogHookEventInput extends LogHookErrorContext {
   correlationId?: string;
 }
 
-/**
- * Append one structured event line. Never throws — see file header.
- *
- * `level` defaults to `'info'` and `kind` defaults to `'unknown'`. The
- * 4 KB line-cap cascade (drop `stack`, then `msg`, then `payload`) is the
- * same as the legacy `logHookError` path, plus an extra payload-drop step
- * because payloads can be arbitrarily large.
- */
+// Never throws. Over-budget lines drop stack, then msg, then payload.
 export function logHookEvent(input: LogHookEventInput, err?: Error): void {
   try {
     if (!readEnabled()) return;
@@ -309,10 +217,6 @@ export function logHookEvent(input: LogHookEventInput, err?: Error): void {
     }
 
     let line = JSON.stringify(record);
-    // Defensive: if assembled line still exceeds 4 KB (e.g. weird unicode
-    // expansion), drop stack first, then msg, then payload (largest last
-    // because payload is the most likely overflow culprit but also the most
-    // valuable signal — drop the cheap stuff first).
     if (Buffer.byteLength(line + '\n', 'utf8') > MAX_LINE_BYTES) {
       delete record.stack;
       line = JSON.stringify(record);
@@ -329,29 +233,19 @@ export function logHookEvent(input: LogHookEventInput, err?: Error): void {
     try {
       mkdirSync(ERRORS_DIR, { recursive: true });
     } catch {
-      // ignore — appendFileSync failure below will swallow.
+      // appendFileSync failure below will swallow
     }
     rotateIfNeeded(ERRORS_LOG);
     appendFileSync(ERRORS_LOG, line + '\n');
   } catch {
-    // NFR-9: hook events logging MUST NOT cascade. Swallow everything.
+    // never throw — logging must not cascade into a session blocker
   }
 }
 
-/**
- * Append one error line. Never throws — see file header.
- *
- * Implementation note (OB-2): this is now a thin redirect to
- * `logHookEvent` with `level='error'` so all writers share the same
- * 4 KB cap, mkdir, and NEVER-throw guarantees. The signature is frozen —
- * existing 4 unit tests in `tests/hooks/error-logger.test.ts` MUST continue
- * to pass without modification (AC9).
- */
 export function logHookError(ctx: LogHookErrorContext, err?: Error): void {
   logHookEvent({ ...ctx, level: 'error', kind: ctx.kind ?? 'unknown' }, err);
 }
 
-/** Test-only: clear the module-level enabled cache (Phase 3 fake-fs). */
 export function __resetCacheForTest(): void {
   cachedEnabled = null;
 }

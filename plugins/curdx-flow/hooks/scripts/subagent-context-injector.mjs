@@ -436,9 +436,7 @@ import { basename as basename2 } from "node:path";
 var IRON_LAW_SUMMARY = "No completion claim without fresh verification.";
 var DEFAULT_MAX_BYTES = 2048;
 var PayloadOverBudgetError = class extends Error {
-  /** Actual byte length of the over-budget payload. */
   byteLength;
-  /** Configured byte ceiling at the time of build. */
   maxBytes;
   constructor(byteLength, maxBytes) {
     super(

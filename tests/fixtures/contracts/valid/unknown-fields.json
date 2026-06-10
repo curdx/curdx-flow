@@ -68,10 +68,6 @@
     "evidenceIds": [],
     "missingEvidence": [],
     "artifactIndexPath": ".curdx/artifacts/index.jsonl",
-    "dirtyBaseline": {
-      "capturedAt": "2026-05-16T23:20:00.000Z",
-      "files": []
-    },
     "generatedFiles": [],
     "nextAction": {
       "owner": "dev",

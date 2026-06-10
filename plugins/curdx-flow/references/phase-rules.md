@@ -5,6 +5,27 @@ All specs follow one of three workflows based on intent classification:
 - **Non-greenfield** intent (TRIVIAL, REFACTOR, MID_SIZED) → TDD Red-Green-Yellow workflow (4 phases)
 - **BUG_FIX** intent → Bug TDD workflow (Phase 0 + 4 phases)
 
+## Contents
+
+- [Workflow Selection](#workflow-selection)
+- [Phase 1: Make It Work (POC)](#phase-1-make-it-work-poc)
+- [Phase 2: Refactoring](#phase-2-refactoring)
+- [Phase 3: Testing](#phase-3-testing)
+- [Phase 4: Quality Gates](#phase-4-quality-gates)
+- [Phase 5: PR Lifecycle](#phase-5-pr-lifecycle)
+- [TDD Phase 1: Red-Green-Yellow Cycles](#tdd-phase-1-red-green-yellow-cycles)
+- [TDD Phase 2: Additional Testing](#tdd-phase-2-additional-testing)
+- [TDD Phase 3: Quality Gates](#tdd-phase-3-quality-gates)
+- [TDD Phase 4: PR Lifecycle](#tdd-phase-4-pr-lifecycle)
+- [TDD Target Task Count](#tdd-target-task-count)
+- [TDD Behaviors Per Phase](#tdd-behaviors-per-phase)
+- [Phase 0: Reproduce](#phase-0-reproduce)
+- [VF Task for Fix Goals](#vf-task-for-fix-goals)
+- [VE Tasks (E2E Verification)](#ve-tasks-e2e-verification)
+- [Quality Checkpoint Rules](#quality-checkpoint-rules)
+- [POC Target Task Count](#poc-target-task-count)
+- [POC Behaviors Per Phase](#poc-behaviors-per-phase)
+
 ## Workflow Selection
 
 Read Intent Classification from `.progress.md`:

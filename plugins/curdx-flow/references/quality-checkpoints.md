@@ -1,5 +1,16 @@
 # Quality Checkpoints
 
+## Contents
+
+- [Purpose](#purpose)
+- [Frequency Rules](#frequency-rules)
+- [What Checkpoints Verify](#what-checkpoints-verify)
+- [[VERIFY] Task Format](#verify-task-format)
+- [Final Verification Sequence (Last 3 Tasks)](#final-verification-sequence-last-3-tasks)
+- [VF Task for Fix Goals](#vf-task-for-fix-goals)
+- [VE Tasks (E2E Verification)](#ve-tasks-e2e-verification)
+- [Execution: How [VERIFY] Tasks Are Handled](#execution-how-verify-tasks-are-handled)
+
 ## Purpose
 
 Quality gate checkpoints are inserted throughout the task list to catch type errors, lint issues, and regressions early. They prevent accumulation of technical debt and make debugging easier by limiting the scope of potential issues.

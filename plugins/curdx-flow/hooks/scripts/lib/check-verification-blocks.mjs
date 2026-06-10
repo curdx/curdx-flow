@@ -199,6 +199,7 @@ function resolveActiveSpecDir(specsDir) {
         latest = path.join(specsDir, e.name);
       }
     } catch {
+      continue;
     }
   }
   return latest;
