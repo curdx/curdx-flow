@@ -6,8 +6,8 @@
   "author": {
     "name": "curdx"
   },
-  "homepage": "https://github.com/curdx/curdx-flow#readme",
-  "repository": "https://github.com/curdx/curdx-flow",
+  "homepage": "https://github.com/mugsun/curdx-flow#readme",
+  "repository": "https://github.com/mugsun/curdx-flow",
   "license": "MIT",
   "keywords": ["spec-driven", "skills-first", "research", "requirements", "design", "tasks", "autonomous", "goal-driven", "epic", "triage"],
   "skills": "./skills/"

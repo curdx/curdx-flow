@@ -44,12 +44,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/curdx/curdx-flow.git"
+    "url": "git+https://github.com/mugsun/curdx-flow.git"
   },
   "bugs": {
-    "url": "https://github.com/curdx/curdx-flow/issues"
+    "url": "https://github.com/mugsun/curdx-flow/issues"
   },
-  "homepage": "https://github.com/curdx/curdx-flow#readme",
+  "homepage": "https://github.com/mugsun/curdx-flow#readme",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
