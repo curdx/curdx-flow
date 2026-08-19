@@ -5,7 +5,7 @@
 **Claude Code 的规格驱动交付层 —— 把一句需求变成可审查、可恢复、可验证的交付记录。**
 
 [![npm version](https://img.shields.io/npm/v/@curdx/flow?style=for-the-badge&logo=npm&logoColor=white&color=3B82F6&labelColor=0B1020)](https://www.npmjs.com/package/@curdx/flow)
-[![GitHub release](https://img.shields.io/github/v/release/curdx/curdx-flow?style=for-the-badge&logo=github&color=60A5FA&labelColor=0B1020)](https://github.com/curdx/curdx-flow/releases)
+[![GitHub release](https://img.shields.io/github/v/release/curdx/curdx-flow?style=for-the-badge&logo=github&color=60A5FA&labelColor=0B1020)](https://github.com/mugsun/curdx-flow/releases)
 [![License](https://img.shields.io/badge/license-MIT-A78BFA?style=for-the-badge&labelColor=0B1020)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Plugin-FBBF24?style=for-the-badge&labelColor=0B1020)](https://docs.claude.com/en/docs/claude-code/plugins)
 
@@ -249,7 +249,7 @@ git push origin main vX.Y.Z curdx-flow--vX.Y.Z
 - Claude Code Plugins: <https://docs.claude.com/en/docs/claude-code/plugins>
 - Claude Code Hooks: <https://docs.claude.com/en/docs/claude-code/hooks>
 - npm package: <https://www.npmjs.com/package/@curdx/flow>
-- Releases: <https://github.com/curdx/curdx-flow/releases>
+- Releases: <https://github.com/mugsun/curdx-flow/releases>
 
 ## License
 

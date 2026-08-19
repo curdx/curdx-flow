@@ -37,9 +37,9 @@ Help improve curdx-flow by submitting feedback or reporting issues.
 3. **If `gh` is NOT available**, inform the user:
    > The `gh` CLI is not installed or not authenticated. Please submit your feedback manually at:
    >
-   > **https://github.com/curdx/curdx-flow/issues/new**
+   > **https://github.com/mugsun/curdx-flow/issues/new**
    >
-   > Or browse existing issues: https://github.com/curdx/curdx-flow/issues?q=sort%3Aupdated-desc+is%3Aissue+is%3Aopen
+   > Or browse existing issues: https://github.com/mugsun/curdx-flow/issues?q=sort%3Aupdated-desc+is%3Aissue+is%3Aopen
 
 4. **If no message was provided**, ask the user what feedback they'd like to submit.
 
